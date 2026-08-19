@@ -1,0 +1,7 @@
+{
+  "filename": "caliper_294_00",
+  "expectedReading": 294,
+  "description": "CASNUB 22 NLB Snubber Used Band I/II boundary (294.00mm)",
+  "unit": "mm",
+  "tolerance": 0.05
+}

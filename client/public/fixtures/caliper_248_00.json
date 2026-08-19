@@ -1,0 +1,7 @@
+{
+  "filename": "caliper_248_00",
+  "expectedReading": 248,
+  "description": "CASNUB 22 NLB Outer Used Band V/VI boundary (248.00mm)",
+  "unit": "mm",
+  "tolerance": 0.05
+}

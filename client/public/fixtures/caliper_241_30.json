@@ -1,0 +1,7 @@
+{
+  "filename": "caliper_241_30",
+  "expectedReading": 241.3,
+  "description": "CASNUB 22 HS Inner Used Band II (241.30mm)",
+  "unit": "mm",
+  "tolerance": 0.05
+}

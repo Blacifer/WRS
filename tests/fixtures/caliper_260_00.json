@@ -1,0 +1,7 @@
+{
+  "filename": "caliper_260_00",
+  "expectedReading": 260,
+  "description": "CASNUB 22 NLB Outer Used Band I (exact 260.00mm boundary)",
+  "unit": "mm",
+  "tolerance": 0.05
+}

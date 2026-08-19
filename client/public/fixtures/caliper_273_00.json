@@ -1,0 +1,7 @@
+{
+  "filename": "caliper_273_00",
+  "expectedReading": 273,
+  "description": "CASNUB 22 RFT New Outer Band I/II boundary (273.00mm)",
+  "unit": "mm",
+  "tolerance": 0.05
+}

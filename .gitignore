@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Production build outputs
+dist/
+client/dist/
+server/dist/
+
+# SQLite databases, journals & caches
+*.db
+*.db-shm
+*.db-wal
+data/*.db
+data/*.db-shm
+data/*.db-wal
+server/data/*.db
+server/data/*.db-shm
+server/data/*.db-wal
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs and agent artifacts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.agents/
+.DS_Store
+*.log
+
+# Editor directories
+.vscode/
+.idea/

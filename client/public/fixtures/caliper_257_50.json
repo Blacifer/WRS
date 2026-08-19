@@ -1,0 +1,7 @@
+{
+  "filename": "caliper_257_50",
+  "expectedReading": 257.5,
+  "description": "CASNUB 22 NLB Outer Used Band II (midpoint 257.50mm)",
+  "unit": "mm",
+  "tolerance": 0.05
+}

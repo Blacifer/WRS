@@ -1,0 +1,40 @@
+{
+  "name": "wrs-raipur-spring-system",
+  "version": "1.0.0",
+  "description": "Indian Railways WRS Raipur Spring Classification & Wagon QC System (Phase 1 & Phase 2)",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n \"SERVER,CLIENT\" -c \"blue,cyan\" \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "seed": "npm run seed --prefix server",
+    "start:live": "npm run seed && concurrently -n \"SERVER,CLIENT\" -c \"blue,cyan\" \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "build": "npm run build --prefix server && npm run build --prefix client",
+    "build:server": "npm run build --prefix server",
+    "build:client": "npm run build --prefix client",
+    "start": "npm run start --prefix server",
+    "test": "bash tests/run_e2e.sh --all",
+    "test:e2e": "bash tests/run_e2e.sh --all",
+    "test:phase1": "bash tests/run_e2e.sh --all",
+    "test:phase2": "bash tests/run_e2e.sh --phase2",
+    "test:tier1": "bash tests/run_e2e.sh --tier1",
+    "test:tier2": "bash tests/run_e2e.sh --tier2",
+    "test:tier3": "bash tests/run_e2e.sh --tier3",
+    "test:tier4": "bash tests/run_e2e.sh --tier4",
+    "test:tier5": "bash tests/run_e2e.sh --tier5",
+    "test:all": "bash tests/run_e2e.sh --all",
+    "generate-fixtures": "node tests/fixtures/generate_fixtures.js"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "keywords": [
+    "indian-railways",
+    "wrs-raipur",
+    "spring-classification",
+    "rdso-g95",
+    "casnub",
+    "wagon-qc",
+    "exit-gate"
+  ],
+  "author": "Indian Railways WRS Raipur",
+  "license": "UNLICENSED"
+}

@@ -1,0 +1,35 @@
+{
+  "name": "wrs-raipur-server",
+  "version": "1.0.0",
+  "description": "Indian Railways WRS Raipur Spring Classification & Inspection System Backend",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "node --experimental-strip-types src/index.ts",
+    "build": "node build.js",
+    "start": "node --experimental-strip-types src/index.ts",
+    "seed": "node --experimental-strip-types src/db/seed.ts",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "test:unit": "node --experimental-strip-types --test tests/classification.test.ts tests/db-triggers.test.ts",
+    "test:integration": "node --experimental-strip-types --test tests/inspections-api.test.ts tests/auth-rbac.test.ts",
+    "test:all": "node --experimental-strip-types --test tests/*.test.ts"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.7",
+    "@types/node": "^22.10.1",
+    "supertest": "^7.0.0",
+    "@types/supertest": "^6.0.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "filename": "caliper_305_20",
+  "expectedReading": 305.2,
+  "description": "CASNUB 22 RFT Snubber Used Band I (305.20mm)",
+  "unit": "mm",
+  "tolerance": 0.05
+}

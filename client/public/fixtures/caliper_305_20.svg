@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 260" width="480" height="260">
+  <defs>
+    <linearGradient id="caliperMetal" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#475569" />
+      <stop offset="40%" stop-color="#334155" />
+      <stop offset="70%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="lcdBezel" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="lcdGlass" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#b4c6a6" />
+      <stop offset="10%" stop-color="#c8d6bc" />
+      <stop offset="90%" stop-color="#b0c2a2" />
+      <stop offset="100%" stop-color="#9eb090" />
+    </linearGradient>
+    <filter id="lcdInnerShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="1" dy="2" stdDeviation="2" flood-color="#000000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Caliper Metallic Housing -->
+  <rect x="20" y="20" width="440" height="220" rx="16" fill="url(#caliperMetal)" stroke="#64748b" stroke-width="3" />
+  
+  <!-- Caliper Scale Beam (Stainless Steel) -->
+  <rect x="0" y="70" width="35" height="120" fill="#94a3b8" stroke="#475569" stroke-width="1.5" />
+  <line x1="10" y1="80" x2="30" y2="80" stroke="#334155" stroke-width="1.5" />
+  <line x1="15" y1="95" x2="30" y2="95" stroke="#334155" stroke-width="1" />
+  <line x1="10" y1="110" x2="30" y2="110" stroke="#334155" stroke-width="1.5" />
+  <line x1="15" y1="125" x2="30" y2="125" stroke="#334155" stroke-width="1" />
+  <line x1="10" y1="140" x2="30" y2="140" stroke="#334155" stroke-width="1.5" />
+  <line x1="15" y1="155" x2="30" y2="155" stroke="#334155" stroke-width="1" />
+  <line x1="10" y1="170" x2="30" y2="170" stroke="#334155" stroke-width="1.5" />
+
+  <!-- Caliper Branding / Details -->
+  <text x="50" y="52" fill="#e2e8f0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="700" letter-spacing="1">MITUTOYO / DIGIMATIC CALIPER</text>
+  <text x="320" y="52" fill="#94a3b8" font-family="monospace" font-size="11">WRS RAIPUR CAL-04</text>
+
+  <!-- LCD Screen Housing & Bezel -->
+  <rect x="70" y="68" width="340" height="124" rx="8" fill="url(#lcdBezel)" stroke="#020617" stroke-width="2" />
+  <rect x="80" y="76" width="320" height="108" rx="4" fill="url(#lcdGlass)" filter="url(#lcdInnerShadow)" />
+
+  <!-- Caliper Status Indicators on LCD -->
+  <text x="96" y="98" fill="#1e293b" font-family="Arial, sans-serif" font-size="11" font-weight="bold">INC</text>
+  <text x="365" y="152" fill="#0f172a" font-family="Arial, sans-serif" font-size="18" font-weight="bold">mm</text>
+
+  <!-- Rendered Digits -->
+  <g class="digit-3">
+  <path d="M 116 95 L 142 95 L 136 101 L 122 101 Z" fill="#0f172a" />
+  <path d="M 148 101 L 148 126 L 142 123 L 142 107 Z" fill="#0f172a" />
+  <path d="M 148 132 L 148 157 L 142 151 L 142 135 Z" fill="#0f172a" />
+  <path d="M 116 163 L 142 163 L 136 157 L 122 157 Z" fill="#0f172a" />
+  <path d="M 110 132 L 110 157 L 116 151 L 116 135 Z" fill="#94a3b830" />
+  <path d="M 110 101 L 110 126 L 116 123 L 116 107 Z" fill="#94a3b830" />
+  <path d="M 116 129 L 122 126 L 136 126 L 142 129 L 136 132 L 122 132 Z" fill="#0f172a" />
+</g><g class="digit-0">
+  <path d="M 164 95 L 190 95 L 184 101 L 170 101 Z" fill="#0f172a" />
+  <path d="M 196 101 L 196 126 L 190 123 L 190 107 Z" fill="#0f172a" />
+  <path d="M 196 132 L 196 157 L 190 151 L 190 135 Z" fill="#0f172a" />
+  <path d="M 164 163 L 190 163 L 184 157 L 170 157 Z" fill="#0f172a" />
+  <path d="M 158 132 L 158 157 L 164 151 L 164 135 Z" fill="#0f172a" />
+  <path d="M 158 101 L 158 126 L 164 123 L 164 107 Z" fill="#0f172a" />
+  <path d="M 164 129 L 170 126 L 184 126 L 190 129 L 184 132 L 170 132 Z" fill="#94a3b830" />
+</g><g class="digit-5">
+  <path d="M 212 95 L 238 95 L 232 101 L 218 101 Z" fill="#0f172a" />
+  <path d="M 244 101 L 244 126 L 238 123 L 238 107 Z" fill="#94a3b830" />
+  <path d="M 244 132 L 244 157 L 238 151 L 238 135 Z" fill="#0f172a" />
+  <path d="M 212 163 L 238 163 L 232 157 L 218 157 Z" fill="#0f172a" />
+  <path d="M 206 132 L 206 157 L 212 151 L 212 135 Z" fill="#94a3b830" />
+  <path d="M 206 101 L 206 126 L 212 123 L 212 107 Z" fill="#0f172a" />
+  <path d="M 212 129 L 218 126 L 232 126 L 238 129 L 232 132 L 218 132 Z" fill="#0f172a" />
+</g>
+<circle cx="256" cy="153" r="4.5" fill="#0f172a" /><g class="digit-2">
+  <path d="M 276 95 L 302 95 L 296 101 L 282 101 Z" fill="#0f172a" />
+  <path d="M 308 101 L 308 126 L 302 123 L 302 107 Z" fill="#0f172a" />
+  <path d="M 308 132 L 308 157 L 302 151 L 302 135 Z" fill="#94a3b830" />
+  <path d="M 276 163 L 302 163 L 296 157 L 282 157 Z" fill="#0f172a" />
+  <path d="M 270 132 L 270 157 L 276 151 L 276 135 Z" fill="#0f172a" />
+  <path d="M 270 101 L 270 126 L 276 123 L 276 107 Z" fill="#94a3b830" />
+  <path d="M 276 129 L 282 126 L 296 126 L 302 129 L 296 132 L 282 132 Z" fill="#0f172a" />
+</g><g class="digit-0">
+  <path d="M 324 95 L 350 95 L 344 101 L 330 101 Z" fill="#0f172a" />
+  <path d="M 356 101 L 356 126 L 350 123 L 350 107 Z" fill="#0f172a" />
+  <path d="M 356 132 L 356 157 L 350 151 L 350 135 Z" fill="#0f172a" />
+  <path d="M 324 163 L 350 163 L 344 157 L 330 157 Z" fill="#0f172a" />
+  <path d="M 318 132 L 318 157 L 324 151 L 324 135 Z" fill="#0f172a" />
+  <path d="M 318 101 L 318 126 L 324 123 L 324 107 Z" fill="#0f172a" />
+  <path d="M 324 129 L 330 126 L 344 126 L 350 129 L 344 132 L 330 132 Z" fill="#94a3b830" />
+</g>
+
+  <!-- Physical Buttons on Caliper Body -->
+  <g transform="translate(100, 204)">
+    <!-- ZERO/ABS Button -->
+    <rect x="0" y="0" width="70" height="22" rx="4" fill="#eab308" stroke="#ca8a04" stroke-width="1" />
+    <text x="14" y="15" fill="#000000" font-family="sans-serif" font-size="10" font-weight="bold">ORIGIN</text>
+    
+    <!-- mm/inch Button -->
+    <rect x="90" y="0" width="60" height="22" rx="4" fill="#3b82f6" stroke="#2563eb" stroke-width="1" />
+    <text x="100" y="15" fill="#ffffff" font-family="sans-serif" font-size="10" font-weight="bold">in/mm</text>
+
+    <!-- ON/OFF Button -->
+    <rect x="170" y="0" width="60" height="22" rx="4" fill="#ef4444" stroke="#dc2626" stroke-width="1" />
+    <text x="180" y="15" fill="#ffffff" font-family="sans-serif" font-size="10" font-weight="bold">ON/OFF</text>
+    
+    <!-- Thumb Roller -->
+    <rect x="250" y="-4" width="40" height="28" rx="2" fill="#64748b" stroke="#334155" />
+    <line x1="256" y1="-2" x2="256" y2="22" stroke="#1e293b" stroke-width="1" />
+    <line x1="262" y1="-2" x2="262" y2="22" stroke="#1e293b" stroke-width="1" />
+    <line x1="268" y1="-2" x2="268" y2="22" stroke="#1e293b" stroke-width="1" />
+    <line x1="274" y1="-2" x2="274" y2="22" stroke="#1e293b" stroke-width="1" />
+    <line x1="280" y1="-2" x2="280" y2="22" stroke="#1e293b" stroke-width="1" />
+  </g>
+</svg>
