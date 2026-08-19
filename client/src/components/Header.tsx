@@ -154,38 +154,44 @@ export const Header: React.FC<HeaderProps> = ({
             🚂 {dict.nav.wagons || 'Wagons Pipeline'}
           </button>
 
-          <button
-            onClick={() => onSelectTab('dashboard')}
-            className={`min-h-[48px] px-4 py-2 text-sm font-bold rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-              activeTab === 'dashboard'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-            }`}
-          >
-            📊 {dict.nav.dashboard || 'DRM Dashboard'}
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => onSelectTab('dashboard')}
+              className={`min-h-[48px] px-4 py-2 text-sm font-bold rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
+                activeTab === 'dashboard'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              }`}
+            >
+              📊 {dict.nav.dashboard || 'DRM Dashboard'}
+            </button>
+          )}
 
-          <button
-            onClick={() => onSelectTab('inventory')}
-            className={`min-h-[48px] px-4 py-2 text-sm font-bold rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-              activeTab === 'inventory'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-            }`}
-          >
-            📦 {dict.nav.inventory || 'Stores & Inventory'}
-          </button>
+          {isSupervisorOrAdmin && (
+            <>
+              <button
+                onClick={() => onSelectTab('inventory')}
+                className={`min-h-[48px] px-4 py-2 text-sm font-bold rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
+                  activeTab === 'inventory'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+              >
+                📦 {dict.nav.inventory || 'Stores & Inventory'}
+              </button>
 
-          <button
-            onClick={() => onSelectTab('passports')}
-            className={`min-h-[48px] px-4 py-2 text-sm font-bold rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-              activeTab === 'passports'
-                ? 'bg-cyan-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-            }`}
-          >
-            🪪 {dict.nav.passports || 'Component Passports'}
-          </button>
+              <button
+                onClick={() => onSelectTab('passports')}
+                className={`min-h-[48px] px-4 py-2 text-sm font-bold rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
+                  activeTab === 'passports'
+                    ? 'bg-cyan-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+              >
+                🪪 {dict.nav.passports || 'Component Passports'}
+              </button>
+            </>
+          )}
 
           <button
             onClick={() => onSelectTab('inspection')}
@@ -198,27 +204,31 @@ export const Header: React.FC<HeaderProps> = ({
             🌀 {dict.nav.inspection}
           </button>
 
-          <button
-            onClick={() => onSelectTab('history')}
-            className={`min-h-[48px] px-4 py-2 text-sm font-bold rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-              activeTab === 'history'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-            }`}
-          >
-            {dict.nav.history}
-          </button>
+          {isSupervisorOrAdmin && (
+            <button
+              onClick={() => onSelectTab('history')}
+              className={`min-h-[48px] px-4 py-2 text-sm font-bold rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
+                activeTab === 'history'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              }`}
+            >
+              {dict.nav.history}
+            </button>
+          )}
 
-          <button
-            onClick={() => onSelectTab('analytics')}
-            className={`min-h-[48px] px-4 py-2 text-sm font-bold rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-              activeTab === 'analytics'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-            }`}
-          >
-            {dict.nav.analytics}
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => onSelectTab('analytics')}
+              className={`min-h-[48px] px-4 py-2 text-sm font-bold rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
+                activeTab === 'analytics'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              }`}
+            >
+              {dict.nav.analytics}
+            </button>
+          )}
 
           {isSupervisorOrAdmin && (
             <button

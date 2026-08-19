@@ -129,40 +129,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           </button>
         </form>
 
-        {/* Demo Fast Login Chips for Workshop Operators */}
-        <div className="pt-2 border-t border-slate-800 space-y-2">
-          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block text-center">
-            {lang === 'hi' ? 'त्वरित डेमो लॉगिन (Quick Role Select)' : 'Quick Demo Role Selection'}
-          </span>
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              onClick={() => handleQuickFill('inspector1', 'password123')}
-              className="min-h-[44px] p-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-lg text-center"
-            >
-              <div className="text-xs font-extrabold text-blue-400">Inspector</div>
-              <div className="text-[10px] text-slate-500">inspector1</div>
-            </button>
 
-            <button
-              type="button"
-              onClick={() => handleQuickFill('supervisor1', 'password123')}
-              className="min-h-[44px] p-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-lg text-center"
-            >
-              <div className="text-xs font-extrabold text-purple-400">Supervisor</div>
-              <div className="text-[10px] text-slate-500">supervisor1</div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleQuickFill('admin1', 'password123')}
-              className="min-h-[44px] p-2 bg-slate-950 hover:bg-slate-800 border border-slate-800 rounded-lg text-center"
-            >
-              <div className="text-xs font-extrabold text-amber-400">Admin</div>
-              <div className="text-[10px] text-slate-500">admin1</div>
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* Footer */}

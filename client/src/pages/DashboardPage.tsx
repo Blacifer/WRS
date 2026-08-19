@@ -252,6 +252,30 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Predictive AI Agent Insight Panel */}
+      <div className="bg-gradient-to-r from-emerald-900/40 via-slate-900 to-emerald-950/20 border border-emerald-800/50 rounded-2xl p-5 shadow-2xl relative overflow-hidden flex items-start gap-4">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="shrink-0 p-3 bg-emerald-900/50 border border-emerald-500/30 rounded-2xl shadow-inner text-emerald-400 text-2xl">
+          🤖
+        </div>
+        <div className="relative z-10 flex-1 space-y-2">
+          <h3 className="text-sm font-black text-emerald-400 uppercase tracking-widest flex items-center gap-2">
+            Predictive AI Insight <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          </h3>
+          <p className="text-sm text-slate-300 font-medium leading-relaxed">
+            <strong className="text-white">Trend Alert:</strong> CASNUB 22 HS outer springs from the SECR zone are showing a <span className="text-rose-400 font-bold bg-rose-950/50 px-1 rounded">22% higher condemnation rate</span> due to physical damage this month compared to the historical average. 
+          </p>
+          <div className="pt-3 mt-1 border-t border-emerald-800/50 flex flex-wrap gap-3">
+             <button className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 shadow-lg text-white text-xs font-bold rounded-xl transition-all active:scale-95 flex items-center gap-2">
+               📝 Auto-Draft Restock Request (400 Units)
+             </button>
+             <button className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold rounded-xl transition-all active:scale-95 flex items-center gap-2">
+               📈 View Failure Analysis
+             </button>
+          </div>
+        </div>
+      </div>
+
       {/* KPI Overview Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-1">
@@ -519,8 +543,8 @@ export const DashboardPage: React.FC = () => {
           </h3>
 
           <div className="divide-y divide-slate-800/80 max-h-80 overflow-y-auto pr-1">
-            {inspectors.map((insp) => (
-              <div key={insp.inspectorId} className="py-3 flex justify-between items-center">
+            {inspectors.map((insp, idx) => (
+              <div key={`${insp.inspectorId}-${idx}`} className="py-3 flex justify-between items-center">
                 <div>
                   <h5 className="text-xs font-bold text-white">{insp.inspectorName}</h5>
                   <p className="text-[11px] text-slate-400">ID: {insp.inspectorId}</p>

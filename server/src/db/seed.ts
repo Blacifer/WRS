@@ -1631,7 +1631,7 @@ export function seedDemoData(db?: DatabaseSync): void {
         classification.tableReference,
         classification.validRange.min,
         classification.validRange.max,
-        classification.condemnationReason,
+        classification.condemnationReason || null,
         sp.inspectorId,
         sp.inspectorName,
         0,
@@ -2393,8 +2393,8 @@ export function seedDemoData(db?: DatabaseSync): void {
   // -------------------------------------------------------------------------
   // 6. Seed Serialized Components & Passport Ledgers (Phase 3 - R4)
   // -------------------------------------------------------------------------
-  const checkCompStmt = db.prepare('SELECT id FROM components WHERE serial_number = ?');
-  const insertCompStmt = db.prepare(`
+  const checkCompStmt = database.prepare('SELECT id FROM components WHERE serial_number = ?');
+  const insertCompStmt = database.prepare(`
     INSERT INTO components (
       id, serial_number, component_type, category, part_name, qr_code, rfid_tag,
       status, current_wagon_number, current_bogie_position, manufacturing_date,
@@ -2403,7 +2403,7 @@ export function seedDemoData(db?: DatabaseSync): void {
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  const insertHistoryStmt = db.prepare(`
+  const insertHistoryStmt = database.prepare(`
     INSERT INTO component_history (
       id, component_id, serial_number, event_type, wagon_number, stage,
       action_details, performed_by, performer_name, notes, created_at

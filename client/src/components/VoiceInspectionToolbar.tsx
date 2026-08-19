@@ -352,20 +352,20 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-2xl space-y-4">
+    <div className="bg-white/5 border border-white/10 backdrop-blur-md rounded-xl p-5 shadow-2xl space-y-4">
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-slate-800">
         <div className="flex items-center gap-3">
           <div
             className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black transition-all duration-300 ${
               micStatus === 'LISTENING'
-                ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/50 animate-pulse ring-4 ring-rose-500/30'
+                ? 'bg-rose-500/20 text-rose-400 ring-2 ring-rose-500/50 animate-pulse'
                 : micStatus === 'PROCESSING'
-                ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/50 animate-bounce'
-                : 'bg-slate-800 text-slate-300'
+                ? 'bg-amber-500/20 text-amber-400 ring-2 ring-amber-500/50'
+                : 'bg-white/10 text-white'
             }`}
           >
-            {micStatus === 'LISTENING' ? '🎙️' : micStatus === 'PROCESSING' ? '⚙️' : '🎤'}
+            {micStatus === 'LISTENING' ? '️' : micStatus === 'PROCESSING' ? '️' : ''}
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -422,7 +422,7 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
                 : 'bg-slate-800 border-slate-700 text-slate-500'
             }`}
           >
-            <span>{ttsEnabled ? '🔊' : '🔇'}</span>
+            <span>{ttsEnabled ? '' : ''}</span>
             <span className="hidden md:inline">{ttsEnabled ? 'TTS ON' : 'TTS OFF'}</span>
           </button>
 
@@ -431,7 +431,7 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
             onClick={() => setShowHelp(!showHelp)}
             className="p-2.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 rounded-xl text-xs font-bold transition flex items-center gap-1 min-h-[38px]"
           >
-            <span>📖</span>
+            <span></span>
             <span className="hidden md:inline">{t('voice.helpBtn') || 'Guide'}</span>
           </button>
         </div>
@@ -444,11 +444,11 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
           onClick={handleToggleListening}
           className={`px-6 py-3.5 rounded-xl font-bold text-sm transition flex items-center justify-center gap-3 shadow-xl min-h-[52px] ${
             isListening
-              ? 'bg-rose-600 hover:bg-rose-500 text-white ring-4 ring-rose-600/30 animate-pulse'
-              : 'bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white shadow-orange-600/30'
+              ? 'bg-rose-500 hover:bg-rose-600 text-white shadow-sm animate-pulse'
+              : 'bg-white text-slate-900 hover:bg-slate-100 shadow-sm'
           }`}
         >
-          <span className="text-xl">{isListening ? '🛑' : '🎙️'}</span>
+          <span className="text-xl">{isListening ? '' : '️'}</span>
           <span>{isListening ? (t('voice.stop') || 'Stop Voice Inspection') : (t('voice.start') || 'Start Voice Inspection')}</span>
           {isListening && (
             <span className="flex h-3 w-3 relative">
@@ -462,7 +462,7 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
         <div className="flex-1 bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 flex items-center justify-between min-h-[52px]">
           <div className="flex items-center gap-3 overflow-hidden">
             <span className={`text-base ${isListening ? 'text-rose-500 animate-bounce' : 'text-slate-500'}`}>
-              💬
+              
             </span>
             <div className="truncate">
               {liveTranscript ? (
@@ -488,12 +488,12 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
                       : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
                   }`}
                 >
-                  ✓ {lastParsedResult.status}
+                   {lastParsedResult.status}
                 </span>
               )}
               {lastParsedResult.actionType === 'SWITCH_CATEGORY' && (
                 <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/40">
-                  📂 {lastParsedResult.categoryToSwitch}
+                   {lastParsedResult.categoryToSwitch}
                 </span>
               )}
               {lastParsedResult.actionType === 'UNDO' && (
@@ -512,13 +512,13 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
           className={`p-3.5 rounded-xl border text-xs flex items-center justify-between transition-all duration-300 ${
             lastParsedResult.matched
               ? lastParsedResult.status === 'CONDEMNED' || lastParsedResult.status === 'FAIL'
-                ? 'bg-rose-950/60 border-rose-500/40 text-rose-200'
-                : 'bg-emerald-950/60 border-emerald-500/40 text-emerald-200'
-              : 'bg-slate-800/80 border-slate-700 text-amber-300'
+                ? 'bg-rose-500/10 border-rose-500/20 text-rose-300'
+                : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
+              : 'bg-slate-800/40 border-slate-700 text-amber-400'
           }`}
         >
           <div className="flex items-center gap-2">
-            <span className="text-base">{lastParsedResult.matched ? '✅' : '⚠️'}</span>
+            <span className="text-base">{lastParsedResult.matched ? '' : '️'}</span>
             <span className="font-semibold">
               {voiceLang.startsWith('hi') && lastParsedResult.feedbackMessageHi
                 ? lastParsedResult.feedbackMessageHi
@@ -536,89 +536,24 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
       {/* Error / Fallback Notice */}
       {errorMessage && (
         <div className="bg-amber-950/40 border border-amber-800/60 p-3 rounded-xl text-xs text-amber-300 flex items-center gap-2">
-          <span>⚠️</span>
+          <span>️</span>
           <span>{errorMessage}</span>
         </div>
       )}
-
-      {/* Interactive Simulation Chips (For Hands-Free E2E Testing & Demo fallback) */}
-      <div className="space-y-2 pt-2">
-        <div className="flex items-center justify-between text-xs text-slate-400">
-          <span className="font-bold flex items-center gap-1.5">
-            <span>⚡</span>
-            {t('voice.simulation.title') || 'Quick Voice Simulation Chips:'}
-          </span>
-          <span className="text-[10px] text-slate-500">1-click touch/E2E test simulation</span>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          {simulationChips.map((chip) => {
-            const isPass = chip.expectedStatus === 'PASS';
-            const isCondemn = chip.expectedStatus === 'CONDEMNED';
-            const isNav = chip.intent === 'SWITCH_CATEGORY';
-            const isUndo = chip.intent === 'UNDO';
-
-            return (
-              <button
-                key={chip.id}
-                onClick={() => handleRunSimulationChip(chip)}
-                className={`px-3 py-2 rounded-xl text-xs font-bold border transition duration-150 flex items-center gap-1.5 min-h-[44px] ${
-                  isCondemn
-                    ? 'bg-rose-950/50 hover:bg-rose-900/70 border-rose-800/60 text-rose-300'
-                    : isPass
-                    ? 'bg-emerald-950/50 hover:bg-emerald-900/70 border-emerald-800/60 text-emerald-300'
-                    : isNav
-                    ? 'bg-blue-950/50 hover:bg-blue-900/70 border-blue-800/60 text-blue-300'
-                    : isUndo
-                    ? 'bg-purple-950/50 hover:bg-purple-900/70 border-purple-800/60 text-purple-300'
-                    : 'bg-slate-800 hover:bg-slate-750 border-slate-700 text-slate-200'
-                }`}
-              >
-                <span>
-                  {isCondemn ? '❌' : isPass ? '✓' : isNav ? '📂' : isUndo ? '↩' : '🔧'}
-                </span>
-                <span>{voiceLang.startsWith('hi') ? chip.labelHi : chip.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Manual Text Simulation Input Bar */}
-      <form onSubmit={handleManualSubmit} className="flex gap-2 pt-1">
-        <input
-          type="text"
-          value={manualInput}
-          onChange={(e) => setManualInput(e.target.value)}
-          placeholder={
-            voiceLang.startsWith('hi')
-              ? 'सिम्युलेटेड वॉयस कमांड टाइप करें (जैसे: "आउटर स्प्रिंग पास", "घर्षण वेज कंडम")...'
-              : 'Type spoken command simulation (e.g. "Outer spring passes", "Condemn friction wedge", "Undo")...'
-          }
-          className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-orange-500"
-        />
-        <button
-          type="submit"
-          disabled={!manualInput.trim()}
-          className="px-4 py-2 bg-slate-800 hover:bg-slate-750 disabled:opacity-50 text-orange-400 border border-slate-700 rounded-xl text-xs font-bold transition min-h-[40px]"
-        >
-          Execute
-        </button>
-      </form>
 
       {/* Help Modal Reference */}
       {showHelp && (
         <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 text-xs text-slate-300">
           <div className="flex justify-between items-center pb-2 border-b border-slate-800">
             <h4 className="font-bold text-white flex items-center gap-2">
-              <span>📖</span>
+              <span></span>
               {t('voice.help.title') || 'Hands-Free Voice Command Reference'}
             </h4>
             <button
               onClick={() => setShowHelp(false)}
               className="text-slate-400 hover:text-white font-bold"
             >
-              ✕
+              
             </button>
           </div>
 

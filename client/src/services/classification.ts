@@ -13,7 +13,7 @@ import type {
 } from '../../../shared/types.ts';
 import { RDSO_TABLES, getRDSOTable, COLOR_HEX_MAP } from '../../../server/src/classification/tables.ts';
 
-export { RDSO_TABLES, COLOR_HEX_MAP };
+export { RDSO_TABLES, COLOR_HEX_MAP, getRDSOTable };
 
 export function classifySpringLocally(request: ClassificationRequest): ClassificationResult {
   const {

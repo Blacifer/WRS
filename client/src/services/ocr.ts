@@ -123,19 +123,21 @@ export async function processCaliperImage(input: string): Promise<CaliperOCRResu
     console.warn('[ClientOCR] Server OCR call failed, falling back to pattern matching:', err);
   }
 
-  // 3. Fallback pattern matching
-  const regex = /(?:(\d{3})\.?(\d{1,2}))|(?:(\d{2,3}\.\d{1,2}))/;
-  const match = input.match(regex);
-  if (match) {
-    const val = parseFloat(match[0]);
-    if (!isNaN(val) && val >= 100 && val <= 500) {
-      return {
-        measuredHeight: val,
-        confidence: 0.92,
-        processingTimeMs: Math.round(performance.now() - startTime),
-        rawText: `${val.toFixed(2)} mm`,
-        digits: val.toFixed(2).replace('.', '')
-      };
+  // 3. Fallback pattern matching (only for text input, not base64 image data)
+  if (!input.startsWith('data:image')) {
+    const regex = /(?:(\d{3})\.?(\d{1,2}))|(?:(\d{2,3}\.\d{1,2}))/;
+    const match = input.match(regex);
+    if (match) {
+      const val = parseFloat(match[0]);
+      if (!isNaN(val) && val >= 100 && val <= 500) {
+        return {
+          measuredHeight: val,
+          confidence: 0.92,
+          processingTimeMs: Math.round(performance.now() - startTime),
+          rawText: `${val.toFixed(2)} mm`,
+          digits: val.toFixed(2).replace('.', '')
+        };
+      }
     }
   }
 

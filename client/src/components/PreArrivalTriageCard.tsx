@@ -78,16 +78,10 @@ export const PreArrivalTriageCard: React.FC<PreArrivalTriageCardProps> = ({
   const isAdvisory = scan?.triageSeverity === 'ADVISORY';
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl relative overflow-hidden">
+    <div className="bg-white/5 border border-white/10 backdrop-blur-md rounded-xl p-5 sm:p-6 shadow-2xl relative overflow-hidden">
       {/* Decorative gradient glow */}
       <div
-        className={`absolute -top-12 -right-12 w-48 h-48 rounded-full blur-3xl pointer-events-none ${
-          isCritical
-            ? 'bg-rose-500/10'
-            : isAdvisory
-            ? 'bg-amber-500/10'
-            : 'bg-blue-500/10'
-        }`}
+        className={`absolute -top-12 -right-12 w-48 h-48 rounded-full blur-3xl pointer-events-none opacity-20 ${isCritical ? "bg-rose-500" : isAdvisory ? "bg-amber-500" : "bg-slate-500"}`}
       />
 
       {/* Header */}
@@ -96,10 +90,10 @@ export const PreArrivalTriageCard: React.FC<PreArrivalTriageCardProps> = ({
           <div
             className={`w-10 h-10 rounded-xl flex items-center justify-center border shadow-inner ${
               isCritical
-                ? 'bg-rose-950/80 border-rose-700 text-rose-400'
+                ? 'bg-rose-500/10 border-rose-500/20 text-rose-400'
                 : isAdvisory
-                ? 'bg-amber-950/80 border-amber-700 text-amber-400'
-                : 'bg-blue-950/80 border-blue-700 text-blue-400'
+                ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                : 'bg-slate-500/10 border-slate-500/20 text-slate-300'
             }`}
           >
             <CpuIcon size={22} />
@@ -134,18 +128,18 @@ export const PreArrivalTriageCard: React.FC<PreArrivalTriageCardProps> = ({
             disabled={triaging}
             className={`min-h-[42px] px-4 py-2 text-xs font-bold rounded-xl shadow flex items-center gap-2 transition-all active:scale-95 ${
               !scan || !scan.isTriaged
-                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-blue-500/20'
+                ? 'bg-white text-slate-900 hover:bg-slate-100 shadow-sm border border-transparent'
                 : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
             }`}
           >
             {triaging ? (
               <>
-                <RefreshCwIcon size={14} className="animate-spin text-blue-300" />
+                <RefreshCwIcon size={14} className="animate-spin text-slate-500" />
                 <span>Running AI Triage & Allocating...</span>
               </>
             ) : (
               <>
-                <CpuIcon size={14} className="text-blue-300" />
+                <CpuIcon size={14} className="text-slate-500" />
                 <span>{scan?.isTriaged ? 'Re-run AI Triage' : t('omrs.runTriageBtn', 'Run AI Triage & Auto-Reserve')}</span>
               </>
             )}
@@ -155,7 +149,7 @@ export const PreArrivalTriageCard: React.FC<PreArrivalTriageCardProps> = ({
 
       {/* Success Notification Banner */}
       {successBanner && (
-        <div className="mt-4 p-3.5 bg-emerald-950/60 border border-emerald-800/80 rounded-xl flex items-center gap-3 text-xs text-emerald-200 animate-fadeIn">
+        <div className="mt-4 p-3.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl flex items-center gap-3 text-xs text-emerald-200 animate-fadeIn">
           <CheckCircleIcon size={18} className="text-emerald-400 shrink-0" />
           <span className="font-semibold">{successBanner}</span>
         </div>
@@ -163,7 +157,7 @@ export const PreArrivalTriageCard: React.FC<PreArrivalTriageCardProps> = ({
 
       {/* Error Banner */}
       {error && (
-        <div className="mt-4 p-3.5 bg-rose-950/60 border border-rose-800/80 rounded-xl flex items-center gap-3 text-xs text-rose-200">
+        <div className="mt-4 p-3.5 bg-rose-500/10 border border-rose-500/20 rounded-xl flex items-center gap-3 text-xs text-rose-200">
           <AlertTriangleIcon size={18} className="text-rose-400 shrink-0" />
           <span className="font-semibold">{error}</span>
         </div>
@@ -192,7 +186,7 @@ export const PreArrivalTriageCard: React.FC<PreArrivalTriageCardProps> = ({
           {/* Sensor Gauges Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {/* WILD Impact */}
-            <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl">
+            <div className="p-3 bg-black/20 border border-white/5 rounded-xl">
               <div className="text-[10px] uppercase font-bold text-slate-400 flex items-center justify-between">
                 <span>{t('omrs.wildImpact', 'WILD Wheel Impact')}</span>
                 <span className="text-[9px] font-mono text-slate-500">Max: 130 kN</span>
@@ -214,7 +208,7 @@ export const PreArrivalTriageCard: React.FC<PreArrivalTriageCardProps> = ({
             </div>
 
             {/* ABD Acoustic Peak */}
-            <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl">
+            <div className="p-3 bg-black/20 border border-white/5 rounded-xl">
               <div className="text-[10px] uppercase font-bold text-slate-400 flex items-center justify-between">
                 <span>{t('omrs.abdAcoustic', 'ABD Acoustic Peak')}</span>
                 <span className="text-[9px] font-mono text-slate-500">Max: 80 dB</span>
@@ -236,7 +230,7 @@ export const PreArrivalTriageCard: React.FC<PreArrivalTriageCardProps> = ({
             </div>
 
             {/* HABD Axle Temp */}
-            <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl">
+            <div className="p-3 bg-black/20 border border-white/5 rounded-xl">
               <div className="text-[10px] uppercase font-bold text-slate-400 flex items-center justify-between">
                 <span>{t('omrs.habdTemp', 'HABD Axle Temp')}</span>
                 <span className="text-[9px] font-mono text-slate-500">Max: 75 °C</span>
@@ -258,7 +252,7 @@ export const PreArrivalTriageCard: React.FC<PreArrivalTriageCardProps> = ({
             </div>
 
             {/* Wheel Profile Deviation */}
-            <div className="p-3 bg-slate-950/80 border border-slate-800 rounded-xl">
+            <div className="p-3 bg-black/20 border border-white/5 rounded-xl">
               <div className="text-[10px] uppercase font-bold text-slate-400 flex items-center justify-between">
                 <span>{t('omrs.profileDeviation', 'Profile Deviation')}</span>
                 <span className="text-[9px] font-mono text-slate-500">Max: 5.0 mm</span>

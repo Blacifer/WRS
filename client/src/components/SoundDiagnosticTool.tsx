@@ -298,12 +298,12 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
   };
 
   return (
-    <div className={`bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-6 ${className}`}>
+    <div className={`bg-white/5 border border-white/10 rounded-xl p-6 shadow-2xl backdrop-blur-md space-y-6 ${className}`}>
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-slate-800">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-2xl">🎧</span>
+            <span className="text-2xl"></span>
             <h3 className="text-lg font-black text-white tracking-wide">
               {t('acoustic.title')}
             </h3>
@@ -317,29 +317,7 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
         </div>
 
         {/* Audio Output Mute / Audible Toggle */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsAudible(!isAudible)}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
-              isAudible
-                ? 'bg-slate-800 border-cyan-500/50 text-cyan-300'
-                : 'bg-slate-850 border-slate-700 text-slate-400'
-            }`}
-            title="Toggle synthetic audio playback speaker output"
-          >
-            <span>{isAudible ? '🔊' : '🔇'}</span>
-            <span>{isAudible ? 'Audible On' : 'Muted'}</span>
-          </button>
-
-          {isActive && (
-            <button
-              onClick={handleStop}
-              className="px-4 py-1.5 bg-rose-900/60 hover:bg-rose-800 border border-rose-700 rounded-xl text-xs font-bold text-rose-200 transition flex items-center gap-1.5"
-            >
-              <span>⏹</span> {t('acoustic.stopAnalysis')}
-            </button>
-          )}
-        </div>
+        
       </div>
 
       {/* Control Buttons / Presets */}
@@ -352,7 +330,7 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
               : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750 hover:text-white'
           }`}
         >
-          <span className="text-base">🎙️</span>
+          <span className="text-base">️</span>
           <span>{t('acoustic.simMic')}</span>
         </button>
 
@@ -364,7 +342,7 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
               : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750 hover:text-white'
           }`}
         >
-          <span className="text-base">💨</span>
+          <span className="text-base"></span>
           <span>{t('acoustic.simAirLeak')}</span>
         </button>
 
@@ -376,7 +354,7 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
               : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750 hover:text-white'
           }`}
         >
-          <span className="text-base">⚙️</span>
+          <span className="text-base">️</span>
           <span>{t('acoustic.simBearingKnock')}</span>
         </button>
 
@@ -388,7 +366,7 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
               : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750 hover:text-white'
           }`}
         >
-          <span className="text-base">🏭</span>
+          <span className="text-base"></span>
           <span>{t('acoustic.simNormalSound')}</span>
         </button>
       </div>
@@ -426,7 +404,7 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
           <p className={`text-xl font-black font-mono mt-0.5 ${
             crestFactor >= 3.8 ? 'text-rose-400 font-bold' : 'text-slate-200'
           }`}>
-            {crestFactor.toFixed(1)} {crestFactor >= 3.8 && '⚠️'}
+            {crestFactor.toFixed(1)} {crestFactor >= 3.8 && '️'}
           </p>
         </div>
 
@@ -435,7 +413,7 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
           <p className={`text-xl font-black font-mono mt-0.5 ${
             highFreqRatio >= 0.35 ? 'text-amber-400 font-bold' : 'text-slate-200'
           }`}>
-            {(highFreqRatio * 100).toFixed(0)}% {highFreqRatio >= 0.35 && '⚠️'}
+            {(highFreqRatio * 100).toFixed(0)}% {highFreqRatio >= 0.35 && '️'}
           </p>
         </div>
       </div>
@@ -446,7 +424,7 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
         <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4 space-y-2">
           <div className="flex justify-between items-center text-xs text-slate-400 font-bold">
             <span className="flex items-center gap-1.5 text-slate-300">
-              <span>📊</span> {t('acoustic.equalizerTitle')}
+              <span></span> {t('acoustic.equalizerTitle')}
             </span>
             <span className="font-mono text-[10px] text-slate-500">20 Hz - 20 kHz (32 Bands)</span>
           </div>
@@ -479,16 +457,16 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
       <div
         className={`p-4 rounded-xl border transition-all duration-200 space-y-2 ${
           anomalyType === 'AIR_LEAK'
-            ? 'bg-amber-950/40 border-amber-500/80 shadow-lg shadow-amber-950/30'
+            ? 'bg-amber-500/10 border-amber-500/20'
             : anomalyType === 'BEARING_DEFECT'
-            ? 'bg-rose-950/40 border-rose-500/80 shadow-lg shadow-rose-950/30'
-            : 'bg-emerald-950/20 border-emerald-500/40'
+            ? 'bg-rose-500/10 border-rose-500/20'
+            : 'bg-slate-800/40 border-slate-700/50'
         }`}
       >
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <div className="flex items-center gap-2.5">
             <span className="text-xl">
-              {anomalyType === 'AIR_LEAK' ? '💨' : anomalyType === 'BEARING_DEFECT' ? '🚨' : '✅'}
+              {anomalyType === 'AIR_LEAK' ? '' : anomalyType === 'BEARING_DEFECT' ? '' : ''}
             </span>
             <div>
               <h4
@@ -532,7 +510,7 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
                   : 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/30'
               }`}
             >
-              <span>🚫</span>
+              <span></span>
               <span>{isLogging ? t('acoustic.loggingDefect') : t('acoustic.logDefectBtn')}</span>
             </button>
           </div>
@@ -542,14 +520,14 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
       {/* Success / Error Messages */}
       {logSuccessMessage && (
         <div className="p-4 bg-emerald-950/50 border border-emerald-500/70 rounded-xl text-xs text-emerald-200 flex items-center gap-2">
-          <span>✓</span>
+          <span></span>
           <span>{logSuccessMessage}</span>
         </div>
       )}
 
       {logErrorMessage && (
         <div className="p-4 bg-rose-950/50 border border-rose-500/70 rounded-xl text-xs text-rose-200 flex items-center gap-2">
-          <span>⚠️</span>
+          <span>️</span>
           <span>{logErrorMessage}</span>
         </div>
       )}
@@ -559,7 +537,7 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
         <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800/80 space-y-3">
           <div className="flex justify-between items-center">
             <h5 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-              <span>🎯</span> {t('acoustic.targetComponent')}
+              <span></span> {t('acoustic.targetComponent')}
             </h5>
             <span className="text-[10px] text-slate-500">{t('acoustic.defectLoggedNotice')}</span>
           </div>

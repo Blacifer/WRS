@@ -15,7 +15,7 @@ import type { SmartVisionMeasurement } from '../../../shared/types.ts';
 interface CaliperCameraProps {
   lang: LanguageCode;
   measuredHeight: number | null;
-  onMeasurementChange: (height: number, source: 'OCR' | 'MANUAL', confidence?: number) => void;
+  onMeasurementChange: (height: number, source: 'OCR' | 'MANUAL' | 'SMART_VISION', confidence?: number, autoDetect?: any) => void;
 }
 
 export const CaliperCamera: React.FC<CaliperCameraProps> = ({
@@ -71,11 +71,19 @@ export const CaliperCamera: React.FC<CaliperCameraProps> = ({
         const content = event.target?.result as string;
         setCapturedPreviewUrl(content.startsWith('data:') ? content : `data:image/svg+xml;utf8,${encodeURIComponent(content)}`);
         const result = await processCaliperImage(content);
-        setOcrConfidence(result.confidence);
-        setOcrLatencyMs(result.processingTimeMs);
-        setManualInputStr(String(result.measuredHeight));
-        setManualError(null);
-        onMeasurementChange(result.measuredHeight, 'OCR', result.confidence);
+        
+        if (result.measuredHeight > 0) {
+          setOcrConfidence(result.confidence);
+          setOcrLatencyMs(result.processingTimeMs);
+          setManualInputStr(String(result.measuredHeight));
+          setManualError(null);
+          onMeasurementChange(result.measuredHeight, 'OCR', result.confidence);
+        } else {
+          setOcrConfidence(0);
+          setOcrLatencyMs(result.processingTimeMs);
+          setManualInputStr('');
+          setManualError(dict.messages.invalidMeasurement || 'Could not read measurement. Please enter manually.');
+        }
         setIsProcessing(false);
       };
       reader.readAsText(file);
@@ -84,11 +92,20 @@ export const CaliperCamera: React.FC<CaliperCameraProps> = ({
         const base64 = event.target?.result as string;
         setCapturedPreviewUrl(base64);
         const result = await processCaliperImage(base64);
-        setOcrConfidence(result.confidence);
-        setOcrLatencyMs(result.processingTimeMs);
-        setManualInputStr(String(result.measuredHeight));
-        setManualError(null);
-        onMeasurementChange(result.measuredHeight, 'OCR', result.confidence);
+        
+        if (result.measuredHeight > 0) {
+          setOcrConfidence(result.confidence);
+          setOcrLatencyMs(result.processingTimeMs);
+          setManualInputStr(String(result.measuredHeight));
+          setManualError(null);
+          onMeasurementChange(result.measuredHeight, 'OCR', result.confidence);
+        } else {
+          setOcrConfidence(0);
+          setOcrLatencyMs(result.processingTimeMs);
+          setManualInputStr('');
+          setManualError(dict.messages.invalidMeasurement || 'Could not read measurement. Please enter manually.');
+          // Do not call onMeasurementChange so we don't trigger a Condemned classification
+        }
         setIsProcessing(false);
       };
       reader.readAsDataURL(file);
@@ -177,10 +194,10 @@ export const CaliperCamera: React.FC<CaliperCameraProps> = ({
           lang={lang}
           initialTarget="OUTER_SPRING"
           inline={true}
-          onMeasurementCaptured={(res: SmartVisionMeasurement) => {
+          onMeasurementCaptured={(res: any) => {
             setManualInputStr(String(res.measuredValue));
             setOcrConfidence(res.confidence);
-            onMeasurementChange(res.measuredValue, 'OCR', res.confidence);
+            onMeasurementChange(res.measuredValue, 'SMART_VISION', res.confidence, res);
           }}
         />
       )}
