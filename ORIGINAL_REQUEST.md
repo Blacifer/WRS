@@ -44,3 +44,39 @@ Due to the hardware-simulation nature of this update, verification will rely on 
 - [ ] **Component Passports**: A distinct inventory/passport view exists. Scanning/entering a serial number reveals a component's history, and components can be uniquely assigned to wagons.
 - [ ] **Pre-Arrival Triage**: New wagons automatically pull a "Predicted Defects" list upon registration, and those items are decremented from a simulated Stores Inventory.
 - [ ] **Non-Regression**: The core 7-stage lifecycle, PDF certificate generation, and DRM dashboards from Phase 2 continue to function flawlessly.
+
+## Follow-up — 2026-08-20T03:44:49Z
+
+# Teamwork Project Prompt — Draft
+
+> Status: Step 9 — Ready for launch — awaiting user approval
+> Goal: Craft prompt → get user approval → delegate to teamwork_preview
+> Requested team: Use a small focused team.
+
+Complete UX/UI Simplification and Smart Vision enhancement for the WRS Raipur Wagon Quality Control application. The backend and AI features are complete, but the frontend needs to be stripped down for real-world shop floor usability.
+
+Working directory: /Users/patty/Desktop/WRS_Raipur
+Integrity mode: development
+
+## Requirements
+
+### R1. Role-Based UX Simplification (Inspector View)
+Redesign the primary view for the `INSPECTOR` role to be incredibly simple and touch-friendly for shop floor workers. 
+- They should not see complex data tables. 
+- Upon logging in, they should see large, highly visible calls-to-action (e.g., "Scan New Wagon QR", "Start Voice Inspection").
+- Ensure all complex routing (Dashboards, Analytics, Inventory) remains hidden from them and strictly reserved for Admins/Supervisors.
+
+### R2. Smart Vision Context Filtering (Computer Vision)
+Enhance the existing "Smart Vision Mode" (the AR camera feature) to include intelligent noise filtering. 
+- The UI overlay should visually indicate that it is detecting and ignoring background noise (like humans, tools, or scaffolding).
+- The system must ensure that only the targeted railway component (e.g., a spring or caliper) is highlighted and recorded in the audit trail, explicitly discarding the human/background data.
+
+## Acceptance Criteria
+
+### UI Simplification Verification
+- [ ] Logging in as an `INSPECTOR` presents a drastically simplified, touch-friendly landing page with zero analytics charts or administrative clutter.
+- [ ] Large "Scan Wagon" or "Start Inspection" buttons are the primary focus of the Inspector UI.
+
+### Smart Vision Verification
+- [ ] The AR Camera modal visually demonstrates (via UI feedback/console) that it recognizes "Human" or "Background Noise" and actively filters it out.
+- [ ] Captured images/measurements strictly record the target component.

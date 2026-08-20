@@ -91,6 +91,8 @@ export function runMigrations(db: DatabaseSync): void {
         user_role TEXT NOT NULL,
         ip_address TEXT DEFAULT NULL,
         payload_json TEXT NOT NULL,
+        previous_hash TEXT DEFAULT NULL,
+        hash TEXT DEFAULT NULL,
         created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
       );

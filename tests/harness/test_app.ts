@@ -1312,28 +1312,42 @@ export class TestApp {
     if (pathname === '/api/cv/measure' && req.method === 'POST') {
       const body = req.body as {
         wagonNumber: string;
-        componentType: string;
+        componentType?: string;
         position?: SpringPosition;
-        measuredHeight: number;
+        measuredHeight?: number;
+        measuredValue?: number;
         bogieType?: BogieType;
+        metadata?: any;
       };
 
-      if (!body || !body.wagonNumber || body.measuredHeight === undefined) {
-        return json(400, { success: false, error: 'Missing required CV measurement fields (wagonNumber, measuredHeight)' });
+      const rawHeight = body?.measuredValue !== undefined ? body.measuredValue : body?.measuredHeight;
+
+      if (!body || !body.wagonNumber || rawHeight === undefined) {
+        return json(400, { success: false, error: 'Missing required CV measurement fields (wagonNumber, measuredHeight / measuredValue)' });
       }
 
+      const componentType = body.componentType || 'Outer Spring';
+      const posUpper = componentType.toUpperCase();
+      const position: SpringPosition = body.position || (posUpper.includes('INNER') ? 'INNER' : posUpper.includes('SNUBBER') ? 'SNUBBER' : 'OUTER');
+      const metadata = body.metadata || {};
+
+      const noiseCandidates = metadata.noiseCategoriesFiltered
+        ? metadata.noiseCategoriesFiltered.map((cls: string) => ({ class: cls, score: 0.95 }))
+        : undefined;
+
       const cvResult = simulateCVDetection(
-        body.componentType || 'Outer Spring',
-        body.position || 'OUTER',
-        body.measuredHeight,
-        body.bogieType || 'CASNUB_22_NLB'
+        componentType,
+        position,
+        rawHeight,
+        body.bogieType || 'CASNUB_22_NLB',
+        noiseCandidates
       );
 
       this.auditDb.saveCVMeasurement({
         wagonNumber: body.wagonNumber,
-        componentType: body.componentType || 'Outer Spring',
-        position: body.position || 'OUTER',
-        measuredHeight: body.measuredHeight,
+        componentType,
+        position,
+        measuredHeight: rawHeight,
         status: cvResult.arCaliper.status,
         bandColor: cvResult.arCaliper.bandColor || undefined,
         photoId: 'cv_snap_' + crypto.randomUUID().substring(0, 8),
@@ -1342,15 +1356,29 @@ export class TestApp {
 
       // Also update matching checklist item if found
       const items = this.auditDb.getChecklistItems(body.wagonNumber);
-      const springItem = items.find(i => i.category === 'SPRINGS' && i.partName.toLowerCase().includes((body.position || 'outer').toLowerCase()));
+      const springItem = items.find(i => i.category === 'SPRINGS' && i.partName.toLowerCase().includes((position || 'outer').toLowerCase()));
       if (springItem) {
         this.auditDb.updateChecklistItem(springItem.id, {
           status: cvResult.arCaliper.status === 'PASS' ? 'PASS' : 'CONDEMNED',
-          repairNotes: `CV AR Measurement: ${body.measuredHeight}mm (${cvResult.arCaliper.status})`
+          repairNotes: `CV AR Measurement: ${rawHeight}mm (${cvResult.arCaliper.status})`
         });
       }
 
-      return json(200, { success: true, measurement: cvResult, data: cvResult });
+      return json(200, {
+        success: true,
+        verdict: cvResult.arCaliper.status,
+        componentType,
+        measuredValue: rawHeight,
+        measurement: cvResult,
+        data: cvResult,
+        metadata: {
+          contextFilterActive: metadata.contextFilterActive ?? true,
+          noiseObjectsFilteredCount: metadata.noiseObjectsFilteredCount ?? (noiseCandidates ? noiseCandidates.length : 0),
+          noiseCategoriesFiltered: metadata.noiseCategoriesFiltered ?? (noiseCandidates ? noiseCandidates.map((n: any) => n.class) : []),
+          targetComponentIsolated: metadata.targetComponentIsolated ?? componentType,
+          ...metadata
+        }
+      });
     }
 
     // -----------------------------------------------------------------------

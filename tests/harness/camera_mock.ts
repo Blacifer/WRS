@@ -30,12 +30,28 @@ export interface ARCaliperOverlay {
   hudBadgeColor: string;
 }
 
+export interface NoiseFilterIndicator {
+  bbox: [number, number, number, number];
+  badgeText: string;
+  lineDash: number[];
+  borderColor: string;
+}
+
+export interface ContextFilterState {
+  active: boolean;
+  noiseObjectsSuppressed: Array<{ class: string; score: number; bbox: [number, number, number, number] }>;
+  targetComponentIsolated: string;
+  hudNoiseIndicators: NoiseFilterIndicator[];
+  topHudBanner: string;
+}
+
 export interface CVDetectionResult {
   boundingBox: BoundingBox;
   arCaliper: ARCaliperOverlay;
   snapshotBase64: string;
   confidence: number;
   timestamp: string;
+  contextFilter?: ContextFilterState;
 }
 
 export class MockMediaStreamTrack {
@@ -99,13 +115,15 @@ export class MockMediaDevices {
 }
 
 /**
- * Simulates Computer Vision detection of CASNUB springs with dynamic AR calipers and RDSO tolerance evaluation
+ * Simulates Computer Vision detection of CASNUB springs with dynamic AR calipers,
+ * dual-channel context filtering (noise vs target isolation), and RDSO tolerance evaluation.
  */
 export function simulateCVDetection(
   componentType: string,
   position: SpringPosition,
   measuredHeight: number,
-  bogieType: BogieType = 'CASNUB_22_NLB'
+  bogieType: BogieType = 'CASNUB_22_NLB',
+  noiseObjects?: Array<{ class: string; score?: number; bbox?: [number, number, number, number] }>
 ): CVDetectionResult {
   const isOuter = position === 'OUTER';
   const isSnubber = position === 'SNUBBER' || position === 'SNUBBER_OUTER' || position === 'SNUBBER_INNER';
@@ -133,7 +151,6 @@ export function simulateCVDetection(
     confidence: 0.94
   };
 
-
   const toleranceMin = classification.validRange?.min ?? (isOuter ? 245 : 244);
   const toleranceMax = classification.validRange?.max ?? (isOuter ? 260 : 262);
 
@@ -151,6 +168,30 @@ export function simulateCVDetection(
     hudBadgeColor: isPass ? '#10B981' : '#EF4444'
   };
 
+  // Build Context Filter State
+  const suppressedList = (noiseObjects || []).map(n => ({
+    class: n.class,
+    score: n.score ?? 0.92,
+    bbox: n.bbox ?? [100, 100, 200, 300] as [number, number, number, number]
+  }));
+
+  const hudNoiseIndicators: NoiseFilterIndicator[] = suppressedList.map(n => ({
+    bbox: n.bbox,
+    badgeText: `🚫 FILTERED: ${n.class.toUpperCase()} (IGNORED)`,
+    lineDash: [8, 6],
+    borderColor: 'rgba(245, 158, 11, 0.85)'
+  }));
+
+  const contextFilter: ContextFilterState = {
+    active: true,
+    noiseObjectsSuppressed: suppressedList,
+    targetComponentIsolated: `${bogieType} ${posLabel} Spring`,
+    hudNoiseIndicators,
+    topHudBanner: suppressedList.length > 0
+      ? `🛡️ Context Filter: Active | ${suppressedList.length} Noise Object(s) Suppressed`
+      : `🛡️ Context Filter: Active | 0 Noise Objects`
+  };
+
   // Generate synthetic base64 image data URI with embedded JSON watermark
   const watermarkPayload = {
     app: 'WRS_RAIPUR_CV_AR',
@@ -159,6 +200,9 @@ export function simulateCVDetection(
     measuredHeight,
     status: classification.status,
     bandColor,
+    contextFilterActive: true,
+    noiseSuppressedCount: suppressedList.length,
+    isolatedTarget: `${bogieType} ${posLabel} Spring`,
     timestamp: new Date().toISOString()
   };
   const watermarkBase64 = Buffer.from(JSON.stringify(watermarkPayload)).toString('base64');
@@ -169,6 +213,7 @@ export function simulateCVDetection(
     arCaliper,
     snapshotBase64,
     confidence: 0.94,
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    contextFilter
   };
 }

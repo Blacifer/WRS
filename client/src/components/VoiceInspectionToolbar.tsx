@@ -16,7 +16,7 @@ import type {
   VoiceSimulationChip
 } from '../../../shared/types.ts';
 import { parseVoiceCommand, getCategoryLabelEn, getCategoryLabelHi } from '../utils/voiceCommandParser.ts';
-import { playPassChime, playCondemnedBuzz } from '../utils/audioFeedback.ts';
+import { playPassChime, playCondemnedBuzz, playActionTap } from '../utils/audioFeedback.ts';
 import { useI18n } from '../i18n/index.ts';
 
 export interface VoiceInspectionToolbarProps {
@@ -308,6 +308,7 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
   };
 
   const handleToggleListening = () => {
+    playActionTap();
     if (isListening) {
       shouldKeepListeningRef.current = false;
       if (recognitionRef.current) {
@@ -338,6 +339,7 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
   };
 
   const handleRunSimulationChip = (chip: VoiceSimulationChip) => {
+    playActionTap();
     const text = voiceLang.startsWith('hi') ? chip.phrase : chip.phrase;
     setLiveTranscript(text);
     handleProcessTranscript(text);
@@ -346,6 +348,7 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualInput.trim()) return;
+    playActionTap();
     setLiveTranscript(manualInput);
     handleProcessTranscript(manualInput);
     setManualInput('');
@@ -391,7 +394,7 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
           {/* Language Selector */}
           <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
             <button
-              onClick={() => setVoiceLang('en-IN')}
+              onClick={() => { playActionTap(); setVoiceLang('en-IN'); }}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
                 voiceLang === 'en-IN'
                   ? 'bg-orange-600 text-white shadow'
@@ -401,7 +404,7 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
               EN (India)
             </button>
             <button
-              onClick={() => setVoiceLang('hi-IN')}
+              onClick={() => { playActionTap(); setVoiceLang('hi-IN'); }}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
                 voiceLang === 'hi-IN'
                   ? 'bg-orange-600 text-white shadow'
@@ -414,7 +417,7 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
 
           {/* TTS Audio Readback Toggle */}
           <button
-            onClick={() => setTtsEnabled(!ttsEnabled)}
+            onClick={() => { playActionTap(); setTtsEnabled(!ttsEnabled); }}
             title={ttsEnabled ? 'Mute Voice Readback' : 'Enable Voice Readback'}
             className={`p-2.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 min-h-[38px] ${
               ttsEnabled
@@ -428,7 +431,7 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
 
           {/* Quick Guide Button */}
           <button
-            onClick={() => setShowHelp(!showHelp)}
+            onClick={() => { playActionTap(); setShowHelp(!showHelp); }}
             className="p-2.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 rounded-xl text-xs font-bold transition flex items-center gap-1 min-h-[38px]"
           >
             <span></span>

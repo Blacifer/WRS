@@ -13,7 +13,8 @@ import { ReleaseCertificateModal } from '../components/ReleaseCertificateModal.t
 import { PreArrivalTriageCard } from '../components/PreArrivalTriageCard.tsx';
 import { SoundDiagnosticTool } from '../components/SoundDiagnosticTool.tsx';
 import { VoiceInspectionToolbar } from '../components/VoiceInspectionToolbar.tsx';
-import { SmartVisionCamera, playPassChime, playCondemnedBuzz } from '../components/SmartVisionCamera.tsx';
+import { SmartVisionCamera } from '../components/SmartVisionCamera.tsx';
+import { playPassChime, playCondemnedBuzz } from '../utils/audioFeedback.ts';
 import { PassportQRScannerModal } from '../components/PassportQRScannerModal.tsx';
 import type {
   WagonRecord,
@@ -69,7 +70,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
   const [photos, setPhotos] = useState<WagonPhotoRecord[]>([]);
   const [gateStatus, setGateStatus] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<'CHECKLIST' | 'GATE' | 'PHOTOS' | 'TIMELINE' | 'OMRS' | 'ACOUSTIC' | 'COMPONENTS'>('CHECKLIST');
+  const [activeTab, setActiveTab] = useState<'CHECKLIST' | 'GATE' | 'PHOTOS' | 'TIMELINE' | 'ACOUSTIC' | 'COMPONENTS'>('CHECKLIST');
 
   // Selected Checklist Category
   const [selectedCategory, setSelectedCategory] = useState<string>('SPRINGS');
@@ -790,16 +791,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
           <span>⏱️</span> Timeline & Dwell Times
         </button>
 
-        <button
-          onClick={() => setActiveTab('OMRS')}
-          className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
-            activeTab === 'OMRS'
-              ? 'border-blue-500 text-blue-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <span>📡</span> {t('omrs.title', 'Pre-Arrival OMRS')}
-        </button>
+
 
         <button
           onClick={() => setActiveTab('ACOUSTIC')}
@@ -837,15 +829,10 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
             onUndo={handleVoiceUndo}
           />
 
-          {wagon?.currentStage === 'ENTRY_REGISTRATION' && (
-            <PreArrivalTriageCard
-              wagonNumber={wagonNumber}
-              onTriageComplete={() => loadWagonData()}
-            />
-          )}
+
 
           {/* Category Navigation Pills */}
-          <div className="flex flex-wrap gap-2 bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+          <div className="flex flex-wrap gap-2 border-b border-white/10 pb-4">
             {categoryKeys.map((catKey) => {
               const catItems = categories[catKey] || [];
               const hasCondemned = catItems.some((i) => i.status === 'CONDEMNED');
@@ -855,10 +842,10 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                 <button
                   key={catKey}
                   onClick={() => setSelectedCategory(catKey)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition min-h-[44px] flex items-center gap-2 ${
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
                     isSelected
-                      ? 'bg-orange-600 text-white shadow-md'
-                      : 'bg-slate-800 text-slate-300 hover:bg-slate-750'
+                      ? 'bg-white text-black'
+                      : 'bg-transparent text-neutral-400 hover:text-white'
                   }`}
                 >
                   <span>{t(`checklist.categories.${catKey}` as any) || catKey}</span>
@@ -897,35 +884,32 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
           )}
 
           {/* Checklist Items Table */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-            <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-slate-850">
-              <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                <span>🔍</span>
+          <div className="bg-transparent border-t border-white/10 mt-8 pt-4">
+            <div className="flex justify-between items-center mb-6">
+              <h4 className="text-sm font-semibold text-white">
                 {t(`checklist.categories.${selectedCategory}` as any) || selectedCategory}
               </h4>
-              <span className="text-xs text-slate-400">
-                {(categories[selectedCategory] || []).length} Components
+              <span className="text-xs text-neutral-500">
+                {(categories[selectedCategory] || []).length} items
               </span>
             </div>
 
-            <div className="divide-y divide-slate-800/60">
+            <div className="divide-y divide-white/5 border-y border-white/5">
               {(categories[selectedCategory] || []).map((item) => {
                 return (
                   <div
                     id={`chk-row-${item.id}`}
                     key={item.id}
-                    className={`p-5 flex flex-col lg:flex-row justify-between lg:items-center gap-4 transition-all duration-500 rounded-xl ${
+                    className={`py-4 flex flex-col lg:flex-row justify-between lg:items-center gap-4 transition-colors ${
                       highlightedItemId === item.id
-                        ? item.status === 'PASS' || item.status === 'REPAIRED' || item.status === 'REPLACED'
-                          ? 'ring-4 ring-emerald-500 bg-emerald-950/70 border border-emerald-400 shadow-xl shadow-emerald-500/30'
-                          : 'ring-4 ring-rose-500 bg-rose-950/70 border border-rose-400 shadow-xl shadow-rose-500/30 animate-pulse'
-                        : 'hover:bg-slate-850/50'
+                        ? 'bg-white/5'
+                        : 'hover:bg-white/[0.02]'
                     }`}
                   >
                     {/* Item Details */}
-                    <div className="space-y-1 max-w-md">
-                      <div className="flex items-center gap-2">
-                        <h5 className="text-sm font-bold text-white">{item.partName}</h5>
+                    <div className="space-y-1.5 max-w-md">
+                      <div className="flex items-center gap-3">
+                        <h5 className="text-sm font-medium text-white">{item.partName}</h5>
                         {item.isMandatory && (
                           <span className="px-2 py-0.5 bg-rose-500/20 text-rose-400 border border-rose-500/40 rounded text-[9px] font-black tracking-wider">
                             MANDATORY
@@ -947,7 +931,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                       )}
                     </div>
 
-                    {/* 5-State Status Touch Buttons (>=48x48px) */}
+                    {/* 5-State Status Minimal Selectors */}
                     <div className="flex flex-wrap items-center gap-2">
                       {(['PASS', 'FAIL', 'CONDEMNED', 'REPAIRED', 'REPLACED'] as const).map((st) => {
                         const isCurrent = item.status === st;
@@ -955,16 +939,14 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                           <button
                             key={st}
                             onClick={() => handleStatusChange(item, st)}
-                            className={`min-h-[48px] px-3.5 py-2 rounded-xl text-xs font-bold border transition duration-150 flex items-center justify-center ${
+                            className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                               isCurrent
                                 ? st === 'PASS'
-                                  ? 'bg-emerald-600 border-emerald-500 text-white shadow-md'
-                                  : st === 'FAIL'
-                                  ? 'bg-amber-600 border-amber-500 text-white shadow-md'
-                                  : st === 'CONDEMNED'
-                                  ? 'bg-rose-600 border-rose-500 text-white shadow-md animate-pulse'
-                                  : 'bg-blue-600 border-blue-500 text-white shadow-md'
-                                : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-200 hover:bg-slate-750'
+                                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                  : st === 'FAIL' || st === 'CONDEMNED'
+                                  ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                                  : 'bg-white/10 border-white/20 text-white'
+                                : 'bg-transparent border-transparent text-neutral-500 hover:text-neutral-300 hover:border-white/10'
                             }`}
                           >
                             {st}
@@ -1198,15 +1180,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
         </div>
       )}
 
-      {/* Tab 5: Pre-Arrival OMRS Telemetry & AI Triage */}
-      {activeTab === 'OMRS' && (
-        <div className="space-y-6">
-          <PreArrivalTriageCard
-            wagonNumber={wagonNumber}
-            onTriageComplete={() => loadWagonData()}
-          />
-        </div>
-      )}
+
 
       {/* Tab 6: Smart Acoustic Bearing & Pneumatic Leak Detection */}
       {activeTab === 'ACOUSTIC' && (

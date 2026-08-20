@@ -10,8 +10,14 @@ export default {
       colors: {
         railway: {
           blue: '#1e3a8a',
-          dark: '#0f172a'
-        }
+          dark: '#000000'
+        },
+        background: '#0a0a0a',
+        surface: '#121212',
+        subtle: '#27272a'
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
       }
     }
   },

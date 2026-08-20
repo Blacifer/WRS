@@ -56,6 +56,7 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
   // Canvas refs
   const eqCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const oscCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const specCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Current frame data cache for rendering
   const currentBandsRef = useRef<EqualizerBand[]>([]);
@@ -205,6 +206,54 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
         }
         ctx.stroke();
         ctx.shadowBlur = 0; // reset
+      }
+    }
+
+    // 3. Render Scrolling Waterfall Spectrogram
+    const specCanvas = specCanvasRef.current;
+    if (specCanvas && frame.frequencySpectrum) {
+      const ctx = specCanvas.getContext('2d');
+      if (ctx) {
+        const width = specCanvas.width;
+        const height = specCanvas.height;
+        
+        // Shift existing image left by 2 pixels to create scrolling effect
+        const imageData = ctx.getImageData(2, 0, width - 2, height);
+        ctx.putImageData(imageData, 0, 0);
+
+        // Draw new column of frequency data on the right edge
+        const spectrum = frame.frequencySpectrum;
+        const binCount = spectrum.length / 2; // only draw bottom half (up to 11kHz) to save space
+        const sliceHeight = height / binCount;
+
+        for (let i = 0; i < binCount; i++) {
+          const db = spectrum[i];
+          // Map -90dB to -10dB into 0..1
+          const intensity = Math.max(0, Math.min(1, (db + 90) / 80));
+          
+          let r = 0, g = 0, b = 0;
+          if (frame.anomalyType === 'AIR_LEAK') {
+            // Amber heatmap
+            r = Math.floor(intensity * 255);
+            g = Math.floor(intensity * 160);
+            b = Math.floor(intensity * 20);
+          } else if (frame.anomalyType === 'BEARING_DEFECT') {
+            // Rose heatmap
+            r = Math.floor(intensity * 255);
+            g = Math.floor(intensity * 40);
+            b = Math.floor(intensity * 100);
+          } else {
+            // Cyan/Blue heatmap
+            r = Math.floor(intensity * 10);
+            g = Math.floor(intensity * 180);
+            b = Math.floor(intensity * 255);
+          }
+          
+          ctx.fillStyle = `rgb(${r},${g},${b})`;
+          // Draw bottom to top (low freq at bottom)
+          const y = height - ((i + 1) * sliceHeight);
+          ctx.fillRect(width - 2, y, 2, sliceHeight + 1);
+        }
       }
     }
   };
@@ -451,6 +500,22 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
             className="w-full h-40 rounded-lg bg-[#090d16] border border-slate-850"
           />
         </div>
+      </div>
+
+      {/* Visualizer 3: Scrolling Waterfall Spectrogram (Heatmap) */}
+      <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4 space-y-2">
+        <div className="flex justify-between items-center text-xs text-slate-400 font-bold">
+          <span className="flex items-center gap-1.5 text-slate-300">
+            <span>🔥</span> Waterfall Spectrogram (Live Heatmap)
+          </span>
+          <span className="font-mono text-[10px] text-slate-500">Frequency vs Time</span>
+        </div>
+        <canvas
+          ref={specCanvasRef}
+          width={960}
+          height={160}
+          className="w-full h-40 rounded-lg bg-[#090d16] border border-slate-850"
+        />
       </div>
 
       {/* Anomaly Status Banner */}

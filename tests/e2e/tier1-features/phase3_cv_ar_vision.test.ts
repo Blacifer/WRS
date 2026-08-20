@@ -127,4 +127,100 @@ describe('Tier 1 — Phase 3 Feature R2: Direct Computer Vision & AR Vision', ()
     assert.strictEqual(measurements[0].measuredHeight, 258.0);
     assert.strictEqual(measurements[0].status, 'PASS');
   });
+
+  // TC-P3-CV-06: Dual-Channel Context Filter suppresses background human/tool noise and renders dashed amber HUD badges
+  it('TC-P3-CV-06: Dual-Channel Context Filter suppresses background human/tool noise and renders dashed amber HUD badges', async () => {
+    const noiseCandidates = [
+      { class: 'person', score: 0.95, bbox: [50, 60, 180, 420] as [number, number, number, number] },
+      { class: 'tool', score: 0.89, bbox: [240, 300, 80, 60] as [number, number, number, number] }
+    ];
+
+    const cvResult = simulateCVDetection('Outer Spring', 'OUTER', 260.0, 'CASNUB_22_NLB', noiseCandidates);
+
+    assert.ok(cvResult.contextFilter);
+    assert.strictEqual(cvResult.contextFilter.active, true);
+    assert.strictEqual(cvResult.contextFilter.noiseObjectsSuppressed.length, 2);
+    assert.strictEqual(cvResult.contextFilter.noiseObjectsSuppressed[0].class, 'person');
+    assert.strictEqual(cvResult.contextFilter.noiseObjectsSuppressed[1].class, 'tool');
+
+    // Verify HUD noise indicators have dashed amber line and filter badge
+    assert.strictEqual(cvResult.contextFilter.hudNoiseIndicators.length, 2);
+    const personIndicator = cvResult.contextFilter.hudNoiseIndicators[0];
+    assert.ok(personIndicator.badgeText.includes('FILTERED: PERSON (IGNORED)'));
+    assert.deepStrictEqual(personIndicator.lineDash, [8, 6]);
+    assert.ok(personIndicator.borderColor.includes('245, 158, 11'));
+
+    // Verify HUD top banner
+    assert.ok(cvResult.contextFilter.topHudBanner.includes('Context Filter: Active'));
+    assert.ok(cvResult.contextFilter.topHudBanner.includes('2 Noise Object(s) Suppressed'));
+  });
+
+  // TC-P3-CV-07: Context Filter strictly isolates target component and discards human/tool noise from audit telemetry
+  it('TC-P3-CV-07: Context Filter strictly isolates target component and discards human/tool noise from audit telemetry', async () => {
+    const noiseCandidates = [
+      { class: 'person', score: 0.97, bbox: [40, 50, 200, 480] as [number, number, number, number] },
+      { class: 'cell phone', score: 0.92, bbox: [120, 200, 40, 80] as [number, number, number, number] }
+    ];
+
+    const cvResult = simulateCVDetection('Outer Spring', 'OUTER', 259.0, 'CASNUB_22_NLB', noiseCandidates);
+
+    // Bounding box must lock onto the railway component, NOT the human or phone
+    assert.ok(cvResult.boundingBox.label.includes('CASNUB_22_NLB Outer Spring'));
+    assert.strictEqual(cvResult.arCaliper.dimensionMm, 259.0);
+    assert.strictEqual(cvResult.arCaliper.status, 'PASS');
+
+    // Watermark metadata in the composite snapshot must certify target isolation
+    const metaMatch = cvResult.snapshotBase64.match(/#meta=(.+)$/);
+    assert.ok(metaMatch);
+    const decodedMeta = JSON.parse(Buffer.from(metaMatch[1], 'base64').toString('utf8'));
+    assert.strictEqual(decodedMeta.contextFilterActive, true);
+    assert.strictEqual(decodedMeta.noiseSuppressedCount, 2);
+    assert.ok(decodedMeta.isolatedTarget.includes('Outer Spring'));
+  });
+
+  // TC-P3-CV-08: POST /api/cv/measure records context filter metadata with suppressed noise count
+  it('TC-P3-CV-08: POST /api/cv/measure records context filter metadata with suppressed noise count', async () => {
+    const res = await app.post(
+      '/api/cv/measure',
+      {
+        wagonNumber: testWagonNumber,
+        componentType: 'OUTER_SPRING',
+        measuredValue: 260.0,
+        bogieType: 'CASNUB_22_NLB',
+        condition: 'USED',
+        metadata: {
+          contextFilterActive: true,
+          noiseObjectsFilteredCount: 3,
+          noiseCategoriesFiltered: ['person', 'chair', 'backpack'],
+          targetComponentIsolated: 'OUTER_SPRING',
+          inspectorName: 'QC Inspector 1'
+        }
+      },
+      { Authorization: `Bearer ${inspectorToken}` }
+    );
+
+    assert.strictEqual(res.status, 200);
+    const body = res.body as {
+      success: boolean;
+      verdict: string;
+      componentType: string;
+      measuredValue: number;
+      metadata?: {
+        contextFilterActive?: boolean;
+        noiseObjectsFilteredCount?: number;
+        noiseCategoriesFiltered?: string[];
+        targetComponentIsolated?: string;
+      };
+    };
+
+    assert.strictEqual(body.success, true);
+    assert.strictEqual(body.verdict, 'PASS');
+    assert.strictEqual(body.componentType, 'OUTER_SPRING');
+    assert.strictEqual(body.measuredValue, 260.0);
+    assert.ok(body.metadata);
+    assert.strictEqual(body.metadata.contextFilterActive, true);
+    assert.strictEqual(body.metadata.noiseObjectsFilteredCount, 3);
+    assert.deepStrictEqual(body.metadata.noiseCategoriesFiltered, ['person', 'chair', 'backpack']);
+    assert.strictEqual(body.metadata.targetComponentIsolated, 'OUTER_SPRING');
+  });
 });

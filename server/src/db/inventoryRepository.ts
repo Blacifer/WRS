@@ -112,7 +112,7 @@ export class InventoryRepository {
   }
 
   /**
-   * Reserve part for a wagon (e.g. via OMRS AI Triage or Manual Allocation)
+   * Reserve part for a wagon
    */
   public reservePart(data: {
     wagonNumber: string;
@@ -125,7 +125,7 @@ export class InventoryRepository {
     const partCode = data.partCode.trim().toUpperCase();
     const wagonNumber = data.wagonNumber.trim().toUpperCase();
     const quantity = Math.max(1, Math.floor(Number(data.quantity) || 1));
-    const source = (data.source || 'OMRS_AI_TRIAGE') as ReservationSource;
+    const source = (data.source || 'MANUAL_INSPECTION') as ReservationSource;
     const confidenceScore = data.confidenceScore !== undefined ? Number(data.confidenceScore) : null;
     const predictedDefect = data.predictedDefect || null;
 

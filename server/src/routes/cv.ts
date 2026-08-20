@@ -517,6 +517,13 @@ cvRouter.post('/measure', optionalAuthMiddleware, async (req: AuthenticatedReque
       checklistUpdated,
       photoRecorded,
       timestamp: now,
+      metadata: {
+        contextFilterActive: metadata.contextFilterActive ?? true,
+        noiseObjectsFilteredCount: metadata.noiseObjectsFilteredCount ?? 0,
+        noiseCategoriesFiltered: metadata.noiseCategoriesFiltered ?? [],
+        targetComponentIsolated: metadata.targetComponentIsolated ?? normalizedTarget,
+        ...metadata
+      },
       message: verdict === 'PASS'
         ? `Component ${normalizedTarget} meets RDSO tolerance (${rdsoTable}).`
         : `Component ${normalizedTarget} CONDEMNED: ${condemnationReason || 'Out of RDSO tolerance'}.`

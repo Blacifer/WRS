@@ -306,9 +306,9 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
       )}
 
       {/* Section 1: Wagon Identification & Nest Details */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 shadow-lg space-y-4">
-        <h2 className="text-sm font-extrabold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-          <span className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs">1</span>
+      <div className="glass-panel rounded-2xl p-6 space-y-8">
+        <h2 className="text-sm font-medium text-neutral-400 tracking-wide flex items-center gap-3">
+          <span className="w-5 h-5 rounded-full border border-white/20 flex items-center justify-center text-[10px]">1</span>
           <span>{lang === 'hi' ? 'वैगन व बोगी विवरण' : 'Wagon & Bogie Assembly Details'}</span>
         </h2>
 
@@ -322,7 +322,7 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
             value={wagonNumber}
             onChange={(e) => setWagonNumber(e.target.value.toUpperCase())}
             placeholder={dict.form.wagonPlaceholder}
-            className="w-full min-h-[48px] px-4 py-2.5 bg-slate-950 border border-slate-700 focus:border-blue-500 rounded-xl text-white font-mono font-bold text-base outline-none uppercase"
+            className="w-full bg-transparent border-b border-white/20 focus:border-white py-3 text-white font-mono text-xl outline-none transition-colors uppercase placeholder:text-neutral-600"
           />
         </div>
 
@@ -337,10 +337,10 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
                 key={type}
                 type="button"
                 onClick={() => setBogieType(type)}
-                className={`min-h-[48px] px-3 py-2.5 rounded-lg border text-xs sm:text-sm font-bold transition-all ${
+                className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
                   bogieType === type
-                    ? 'bg-blue-600 border-blue-400 text-white shadow'
-                    : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                    ? 'bg-white text-black border-white'
+                    : 'bg-transparent border-white/10 text-neutral-400 hover:text-white hover:border-white/30'
                 }`}
               >
                 {getBogieTypeText(type, lang)}
@@ -362,10 +362,10 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
                   key={c}
                   type="button"
                   onClick={() => setCondition(c)}
-                  className={`min-h-[48px] px-3 py-2 rounded-lg border text-xs font-bold transition-all ${
+                  className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
                     condition === c
-                      ? 'bg-blue-600 border-blue-400 text-white shadow'
-                      : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                      ? 'bg-white text-black border-white'
+                      : 'bg-transparent border-white/10 text-neutral-400 hover:text-white hover:border-white/30'
                   }`}
                 >
                   {getConditionText(c, lang)}
@@ -385,10 +385,10 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
                   key={p}
                   type="button"
                   onClick={() => setPosition(p)}
-                  className={`min-h-[48px] px-2 py-2 rounded-lg border text-xs font-bold transition-all ${
+                  className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
                     position === p
-                      ? 'bg-blue-600 border-blue-400 text-white shadow'
-                      : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                      ? 'bg-white text-black border-white'
+                      : 'bg-transparent border-white/10 text-neutral-400 hover:text-white hover:border-white/30'
                   }`}
                 >
                   {getPositionText(p, lang)}
@@ -591,28 +591,27 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
         />
       </div>
 
-      {/* Section 5: Primary Action Buttons (Touch Target >= 52px) */}
-      <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-        <button
-          type="button"
-          onClick={handleSaveInspection}
-          disabled={isSaving}
-          className="flex-1 min-h-[52px] px-6 py-3.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-black text-base rounded-xl shadow-lg flex items-center justify-center gap-2.5 transition-all active:scale-[0.98]"
-        >
-          {isSaving ? <RefreshCwIcon size={20} className="animate-spin" /> : <CheckCircleIcon size={20} />}
-          <span>{isSaving ? dict.app.syncing : dict.actions.saveInspection}</span>
-        </button>
-
+      <div className="pt-6 flex flex-col sm:flex-row items-center gap-4 justify-end border-t border-white/10 mt-8">
         {isSupervisorOrAdmin && (
           <button
             type="button"
             onClick={() => setIsOverrideModalOpen(true)}
-            className="min-h-[52px] px-5 py-3.5 bg-purple-700 hover:bg-purple-600 text-white font-extrabold text-sm rounded-xl border border-purple-500 shadow flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+            className="px-6 py-3 bg-transparent text-neutral-400 font-medium text-sm rounded-full border border-white/10 hover:text-white transition-colors flex items-center gap-2"
           >
-            <ShieldIcon size={18} />
+            <ShieldIcon size={16} />
             <span>{dict.actions.override}</span>
           </button>
         )}
+
+        <button
+          type="button"
+          onClick={handleSaveInspection}
+          disabled={isSaving}
+          className="px-8 py-3 bg-white hover:bg-neutral-200 text-black font-semibold text-sm rounded-full flex items-center justify-center gap-2 transition-transform active:scale-95"
+        >
+          {isSaving ? <RefreshCwIcon size={16} className="animate-spin" /> : <CheckCircleIcon size={16} />}
+          <span>{isSaving ? dict.app.syncing : dict.actions.saveInspection}</span>
+        </button>
       </div>
 
       {/* Supervisor Override Modal */}

@@ -553,10 +553,21 @@ export class InspectionRepository {
     const payloadJson = JSON.stringify(event.payload || {});
     const createdAt = event.createdAt || new Date().toISOString();
 
+    // 1. Fetch the previous hash
+    const prevRow = this.db.prepare(`
+      SELECT hash FROM inspection_audit_log ORDER BY rowid DESC LIMIT 1
+    `).get() as { hash: string } | undefined;
+    const previousHash = prevRow?.hash || 'GENESIS_BLOCK';
+
+    // 2. Compute the new cryptographic hash (SHA-256)
+    // Hash includes the previous hash to create an unbreakable blockchain
+    const dataToHash = `${previousHash}|${id}|${inspectionId}|${eventType}|${userId}|${payloadJson}|${createdAt}`;
+    const hash = crypto.createHash('sha256').update(dataToHash).digest('hex');
+
     this.db.prepare(`
-      INSERT INTO inspection_audit_log (id, inspection_id, event_type, user_id, user_role, ip_address, payload_json, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, inspectionId, eventType, userId, userRole, ipAddress, payloadJson, createdAt);
+      INSERT INTO inspection_audit_log (id, inspection_id, event_type, user_id, user_role, ip_address, payload_json, previous_hash, hash, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, inspectionId, eventType, userId, userRole, ipAddress, payloadJson, previousHash, hash, createdAt);
   }
 
   /**

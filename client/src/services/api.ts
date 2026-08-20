@@ -39,7 +39,9 @@ import type {
   AssignComponentRequest,
   UnassignComponentRequest,
   ComponentFilter,
-  ComponentStats
+  ComponentStats,
+  CVMeasureRequest,
+  CVMeasureResponse
 } from '../../../shared/types.ts';
 
 const BASE_URL = '/api';

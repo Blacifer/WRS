@@ -68,6 +68,11 @@ export function playPassChime(): void {
 
     osc2.start(now + 0.06);
     osc2.stop(now + 0.20);
+
+    // Haptic Feedback for "Greasy Gloves" UX
+    if (navigator.vibrate) {
+      navigator.vibrate([40, 40, 60]);
+    }
   } catch (err) {
     // Gracefully ignore audio restrictions (e.g. autoplay policies)
     console.debug('[Audio] Pass chime skipped:', err);
@@ -115,8 +120,47 @@ export function playCondemnedBuzz(): void {
 
     osc2.start(now + 0.10);
     osc2.stop(now + 0.18);
+
+    // Heavy error vibration
+    if (navigator.vibrate) {
+      navigator.vibrate([250]);
+    }
   } catch (err) {
     // Gracefully ignore audio restrictions
     console.debug('[Audio] Condemned buzz skipped:', err);
+  }
+  }
+}
+
+/**
+ * TAP: Subtle pop for UI interaction
+ */
+export function playActionTap(): void {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(400, now);
+
+    gain.gain.setValueAtTime(0.05, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.05);
+
+    // Light tick vibration
+    if (navigator.vibrate) {
+      navigator.vibrate(20);
+    }
+  } catch (err) {
+    console.debug('[Audio] Tap skipped:', err);
   }
 }

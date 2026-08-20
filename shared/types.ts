@@ -1133,6 +1133,13 @@ export interface SmartVisionMeasurement {
   tableReference: string;     // e.g. 'Table 28'
   snapshotBase64?: string;    // Composite AR + video image
   timestamp: string;
+  metadata?: {
+    contextFilterActive?: boolean;
+    noiseObjectsFilteredCount?: number;
+    noiseCategoriesFiltered?: string[];
+    targetComponentIsolated?: string;
+    [key: string]: any;
+  };
 }
 
 export interface CVMeasureRequest {
@@ -1157,6 +1164,11 @@ export interface CVMeasureRequest {
     inspectorName?: string;
     notes?: string;
     timestamp?: string;
+    contextFilterActive?: boolean;
+    noiseObjectsFilteredCount?: number;
+    noiseCategoriesFiltered?: string[];
+    targetComponentIsolated?: string;
+    [key: string]: any;
   };
 }
 
@@ -1185,6 +1197,13 @@ export interface CVMeasureResponse {
   photoRecorded?: boolean;
   timestamp: string;
   message?: string;
+  metadata?: {
+    contextFilterActive?: boolean;
+    noiseObjectsFilteredCount?: number;
+    noiseCategoriesFiltered?: string[];
+    targetComponentIsolated?: string;
+    [key: string]: any;
+  };
 }
 
 // -------------------------------------------------------------------------
@@ -1282,4 +1301,47 @@ export interface VoiceSimulationChip {
   intent: VoiceCommandIntent;
   category?: CASNUBCategory;
   expectedStatus?: PartInspectionStatus;
+}
+
+// -------------------------------------------------------------------------
+// Navigation Tabs & Role Route Guards (Phase 3 UX Simplification)
+// -------------------------------------------------------------------------
+
+export type NavigationTab =
+  | 'inspector_home'
+  | 'inspection'
+  | 'wagons'
+  | 'dashboard'
+  | 'inventory'
+  | 'passports'
+  | 'history'
+  | 'analytics'
+  | 'admin'
+  | 'smart_vision';
+
+export function isUserInspector(role?: string | null): boolean {
+  return role?.toUpperCase() === 'INSPECTOR';
+}
+
+export function isUserSupervisorOrAdmin(role?: string | null): boolean {
+  const r = role?.toUpperCase();
+  return r === 'SUPERVISOR' || r === 'ADMIN';
+}
+
+export function canAccessTab(role: string | undefined, tab: NavigationTab, hasSelectedWagon: boolean = false): boolean {
+  const roleUpper = role?.toUpperCase();
+  if (roleUpper === 'INSPECTOR') {
+    if (tab === 'inspector_home' || tab === 'inspection' || tab === 'smart_vision') return true;
+    // An inspector can access 'wagons' ONLY when a specific wagon is active/selected (WagonDetailPage)
+    if (tab === 'wagons' && hasSelectedWagon) return true;
+    return false;
+  }
+  if (roleUpper === 'SUPERVISOR') {
+    if (tab === 'dashboard' || tab === 'analytics') return false;
+    return true;
+  }
+  if (roleUpper === 'ADMIN') {
+    return true;
+  }
+  return false;
 }

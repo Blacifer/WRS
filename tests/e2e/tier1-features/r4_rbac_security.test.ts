@@ -9,6 +9,7 @@
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import { TestApp } from '../../harness/test_app.ts';
+import { canAccessTab, isUserInspector, isUserSupervisorOrAdmin } from '../../../shared/types.ts';
 
 describe('Tier 1 — R4: Role-Based Access Control & Security', () => {
   let app: TestApp;
@@ -208,4 +209,64 @@ describe('Tier 1 — R4: Role-Based Access Control & Security', () => {
     assert.strictEqual(secondUse.status, 403);
   });
 
+  // Test Case 8: Inspector role UX isolation & route guard access checks
+  it('TC-R4-08: canAccessTab route security strictly confines Inspector to inspector_home, inspection, smart_vision, and active checklist', () => {
+    // Inspector allowed tabs
+    assert.strictEqual(canAccessTab('INSPECTOR', 'inspector_home'), true);
+    assert.strictEqual(canAccessTab('INSPECTOR', 'inspection'), true);
+    assert.strictEqual(canAccessTab('INSPECTOR', 'smart_vision'), true);
+
+    // Inspector accessing wagons pipeline with active selected wagon (WagonDetailPage checklist) -> allowed
+    assert.strictEqual(canAccessTab('INSPECTOR', 'wagons', true), true);
+
+    // Inspector accessing wagons table without selected wagon -> blocked (redirects to inspector_home)
+    assert.strictEqual(canAccessTab('INSPECTOR', 'wagons', false), false);
+
+    // Inspector prohibited from administrative & supervisory tabs
+    assert.strictEqual(canAccessTab('INSPECTOR', 'dashboard'), false);
+    assert.strictEqual(canAccessTab('INSPECTOR', 'inventory'), false);
+    assert.strictEqual(canAccessTab('INSPECTOR', 'passports'), false);
+    assert.strictEqual(canAccessTab('INSPECTOR', 'history'), false);
+    assert.strictEqual(canAccessTab('INSPECTOR', 'analytics'), false);
+    assert.strictEqual(canAccessTab('INSPECTOR', 'admin'), false);
+  });
+
+  // Test Case 9: Supervisor and Admin tab access permissions
+  it('TC-R4-09: canAccessTab grants Supervisor pipeline & inventory access while restricting DRM analytics; Admin has full access', () => {
+    // Supervisor permissions
+    assert.strictEqual(canAccessTab('SUPERVISOR', 'wagons'), true);
+    assert.strictEqual(canAccessTab('SUPERVISOR', 'inventory'), true);
+    assert.strictEqual(canAccessTab('SUPERVISOR', 'passports'), true);
+    assert.strictEqual(canAccessTab('SUPERVISOR', 'history'), true);
+    assert.strictEqual(canAccessTab('SUPERVISOR', 'admin'), true);
+    // Supervisor restricted from high-level DRM analytics/dashboards
+    assert.strictEqual(canAccessTab('SUPERVISOR', 'dashboard'), false);
+    assert.strictEqual(canAccessTab('SUPERVISOR', 'analytics'), false);
+
+    // Admin has full access to all tabs
+    assert.strictEqual(canAccessTab('ADMIN', 'wagons'), true);
+    assert.strictEqual(canAccessTab('ADMIN', 'dashboard'), true);
+    assert.strictEqual(canAccessTab('ADMIN', 'inventory'), true);
+    assert.strictEqual(canAccessTab('ADMIN', 'passports'), true);
+    assert.strictEqual(canAccessTab('ADMIN', 'history'), true);
+    assert.strictEqual(canAccessTab('ADMIN', 'analytics'), true);
+    assert.strictEqual(canAccessTab('ADMIN', 'admin'), true);
+  });
+
+  // Test Case 10: Role case-insensitivity and helper utilities
+  it('TC-R4-10: isUserInspector and isUserSupervisorOrAdmin handle case variations gracefully', () => {
+    assert.strictEqual(isUserInspector('Inspector'), true);
+    assert.strictEqual(isUserInspector('INSPECTOR'), true);
+    assert.strictEqual(isUserInspector('inspector'), true);
+    assert.strictEqual(isUserInspector('Supervisor'), false);
+    assert.strictEqual(isUserInspector(null), false);
+    assert.strictEqual(isUserInspector(undefined), false);
+
+    assert.strictEqual(isUserSupervisorOrAdmin('Supervisor'), true);
+    assert.strictEqual(isUserSupervisorOrAdmin('SUPERVISOR'), true);
+    assert.strictEqual(isUserSupervisorOrAdmin('Admin'), true);
+    assert.strictEqual(isUserSupervisorOrAdmin('ADMIN'), true);
+    assert.strictEqual(isUserSupervisorOrAdmin('Inspector'), false);
+    assert.strictEqual(isUserSupervisorOrAdmin(null), false);
+  });
 });

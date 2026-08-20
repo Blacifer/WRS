@@ -4,19 +4,21 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import type { User } from '../../../shared/types.ts';
+import type { User, NavigationTab } from '../../../shared/types.ts';
 import { getDictionary } from '../i18n/index.ts';
 import type { LanguageCode } from '../i18n/index.ts';
 import { offlineDb } from '../services/offlineDb.ts';
 import { GlobeIcon, RefreshCwIcon, LogOutIcon, ShieldIcon } from './Icons.tsx';
+
+export type { NavigationTab };
 
 interface HeaderProps {
   user: User | null;
   currentLang: LanguageCode;
   onToggleLang: () => void;
   onLogout: () => void;
-  activeTab: 'inspection' | 'wagons' | 'dashboard' | 'inventory' | 'passports' | 'history' | 'analytics' | 'admin';
-  onSelectTab: (tab: 'inspection' | 'wagons' | 'dashboard' | 'inventory' | 'passports' | 'history' | 'analytics' | 'admin') => void;
+  activeTab: NavigationTab;
+  onSelectTab: (tab: NavigationTab) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -59,21 +61,26 @@ export const Header: React.FC<HeaderProps> = ({
     }
   };
 
-  const isSupervisorOrAdmin = user?.role === 'SUPERVISOR' || user?.role === 'ADMIN' || user?.role === 'Supervisor' || user?.role === 'Admin';
-  const isAdmin = user?.role === 'ADMIN' || user?.role === 'Admin';
+  const roleUpper = user?.role?.toUpperCase();
+  const isInspector = roleUpper === 'INSPECTOR';
+  const isSupervisorOrAdmin = roleUpper === 'SUPERVISOR' || roleUpper === 'ADMIN';
+  const isAdmin = roleUpper === 'ADMIN';
 
   return (
-    <header className="sticky top-0 z-40 bg-slate-900 border-b border-slate-800 text-white shadow-lg select-none">
+    <header className="sticky top-0 z-40 bg-[#0a0a0a]/80 backdrop-blur-md border-b border-white/10 text-white select-none">
       {/* Top Branding Bar */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-2">
         {/* Left: Indian Railways Branding */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-blue-700 border border-blue-500 flex items-center justify-center font-black text-white text-lg shadow-inner">
+        <div 
+          onClick={() => onSelectTab(isInspector ? 'inspector_home' : 'wagons')}
+          className="flex items-center gap-3 cursor-pointer group"
+        >
+          <div className="w-10 h-10 rounded-lg bg-blue-700 border border-blue-500 flex items-center justify-center font-black text-white text-lg shadow-inner group-hover:scale-105 transition-transform">
             IR
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-extrabold text-sm sm:text-base tracking-tight text-white">
+              <span className="font-extrabold text-sm sm:text-base tracking-tight text-white group-hover:text-blue-300 transition-colors">
                 WRS Raipur
               </span>
               <span className="hidden sm:inline-block px-2 py-0.5 text-[11px] font-bold uppercase bg-blue-950 text-blue-300 border border-blue-800 rounded">
@@ -112,7 +119,7 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Language Toggle Button (Touch Target >= 48px) */}
           <button
             onClick={onToggleLang}
-            className="min-w-[48px] min-h-[48px] px-3 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-200 hover:text-white border border-slate-700 rounded-lg flex items-center justify-center gap-1.5 font-bold text-sm transition-all"
+            className="min-w-[48px] min-h-[48px] px-3 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-200 hover:text-white border border-slate-700 rounded-lg flex items-center justify-center gap-1.5 font-bold text-sm transition-all shadow-sm"
             aria-label="Toggle language between English and Hindi"
           >
             <GlobeIcon size={18} className="text-blue-400" />
@@ -141,107 +148,174 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Navigation Tabs Bar (Touch Targets >= 48px) */}
-      <nav className="bg-slate-950 px-2 border-t border-slate-800/80">
-        <div className="max-w-7xl mx-auto flex items-center justify-start sm:justify-center overflow-x-auto no-scrollbar gap-1 sm:gap-2 py-1">
-          <button
-            onClick={() => onSelectTab('wagons')}
-            className={`min-h-[48px] px-4 py-2 text-sm font-bold rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-              activeTab === 'wagons'
-                ? 'bg-orange-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-            }`}
-          >
-            🚂 {dict.nav.wagons || 'Wagons Pipeline'}
-          </button>
-
-          {isAdmin && (
-            <button
-              onClick={() => onSelectTab('dashboard')}
-              className={`min-h-[48px] px-4 py-2 text-sm font-bold rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                activeTab === 'dashboard'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
-            >
-              📊 {dict.nav.dashboard || 'DRM Dashboard'}
-            </button>
-          )}
-
-          {isSupervisorOrAdmin && (
+      <nav className="bg-transparent px-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-start sm:justify-center overflow-x-auto no-scrollbar gap-3 sm:gap-6 py-2">
+          {/* 1. INSPECTOR ROLE: Ultra-Simple Shop-Floor Essentials ONLY */}
+          {isInspector ? (
             <>
               <button
-                onClick={() => onSelectTab('inventory')}
-                className={`min-h-[48px] px-4 py-2 text-sm font-bold rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                  activeTab === 'inventory'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                data-testid="nav-inspector-home"
+                onClick={() => onSelectTab('inspector_home')}
+                className={`min-h-[44px] px-4 py-2 text-sm font-extrabold rounded-xl flex items-center gap-2 whitespace-nowrap transition-all ${
+                  activeTab === 'inspector_home'
+                    ? 'bg-blue-600/40 text-blue-300 border border-blue-500/60 shadow-md'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                 }`}
               >
-                📦 {dict.nav.inventory || 'Stores & Inventory'}
+                <span>🏠</span>
+                <span>{currentLang === 'hi' ? 'होम / कार्य' : 'Tasks / Home'}</span>
               </button>
 
               <button
-                onClick={() => onSelectTab('passports')}
-                className={`min-h-[48px] px-4 py-2 text-sm font-bold rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                  activeTab === 'passports'
-                    ? 'bg-cyan-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                data-testid="nav-inspection"
+                onClick={() => onSelectTab('inspection')}
+                className={`min-h-[44px] px-4 py-2 text-sm font-extrabold rounded-xl flex items-center gap-2 whitespace-nowrap transition-all ${
+                  activeTab === 'inspection'
+                    ? 'bg-purple-600/40 text-purple-300 border border-purple-500/60 shadow-md'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                 }`}
               >
-                🪪 {dict.nav.passports || 'Component Passports'}
+                <span>🌀</span>
+                <span>{dict.nav.inspection}</span>
+              </button>
+
+              <button
+                data-testid="nav-smart-vision"
+                onClick={() => onSelectTab('smart_vision')}
+                className={`min-h-[44px] px-4 py-2 text-sm font-extrabold rounded-xl flex items-center gap-2 whitespace-nowrap transition-all ${
+                  activeTab === 'smart_vision'
+                    ? 'bg-emerald-600/40 text-emerald-300 border border-emerald-500/60 shadow-md'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <span>🔬</span>
+                <span>{currentLang === 'hi' ? 'स्मार्ट विज़न' : 'Smart Vision'}</span>
               </button>
             </>
-          )}
+          ) : (
+            /* 2. SUPERVISOR / ADMIN ROLES: Full Pipeline, Inventory, Analytics & Admin */
+            <>
+              <button
+                data-testid="nav-wagons"
+                onClick={() => onSelectTab('wagons')}
+                className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
+                  activeTab === 'wagons'
+                    ? 'text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                🚂 {dict.nav.wagons || 'Wagons Pipeline'}
+              </button>
 
-          <button
-            onClick={() => onSelectTab('inspection')}
-            className={`min-h-[48px] px-4 py-2 text-sm font-bold rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-              activeTab === 'inspection'
-                ? 'bg-blue-600 text-white shadow-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-            }`}
-          >
-            🌀 {dict.nav.inspection}
-          </button>
+              {isAdmin && (
+                <button
+                  data-testid="nav-dashboard"
+                  onClick={() => onSelectTab('dashboard')}
+                  className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
+                    activeTab === 'dashboard'
+                      ? 'text-white'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  📊 {dict.nav.dashboard || 'DRM Dashboard'}
+                </button>
+              )}
 
-          {isSupervisorOrAdmin && (
-            <button
-              onClick={() => onSelectTab('history')}
-              className={`min-h-[48px] px-4 py-2 text-sm font-bold rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                activeTab === 'history'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
-            >
-              {dict.nav.history}
-            </button>
-          )}
+              {isSupervisorOrAdmin && (
+                <>
+                  <button
+                    data-testid="nav-inventory"
+                    onClick={() => onSelectTab('inventory')}
+                    className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
+                      activeTab === 'inventory'
+                        ? 'text-white'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    📦 {dict.nav.inventory || 'Stores & Inventory'}
+                  </button>
 
-          {isAdmin && (
-            <button
-              onClick={() => onSelectTab('analytics')}
-              className={`min-h-[48px] px-4 py-2 text-sm font-bold rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                activeTab === 'analytics'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
-            >
-              {dict.nav.analytics}
-            </button>
-          )}
+                  <button
+                    data-testid="nav-passports"
+                    onClick={() => onSelectTab('passports')}
+                    className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
+                      activeTab === 'passports'
+                        ? 'text-white'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    🪪 {dict.nav.passports || 'Component Passports'}
+                  </button>
+                </>
+              )}
 
-          {isSupervisorOrAdmin && (
-            <button
-              onClick={() => onSelectTab('admin')}
-              className={`min-h-[48px] px-4 py-2 text-sm font-bold rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                activeTab === 'admin'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
-              }`}
-            >
-              <ShieldIcon size={16} className="text-amber-400" />
-              {dict.nav.admin}
-            </button>
+              <button
+                data-testid="nav-inspection"
+                onClick={() => onSelectTab('inspection')}
+                className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
+                  activeTab === 'inspection'
+                    ? 'text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                🌀 {dict.nav.inspection}
+              </button>
+
+              <button
+                data-testid="nav-smart-vision"
+                onClick={() => onSelectTab('smart_vision')}
+                className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
+                  activeTab === 'smart_vision'
+                    ? 'text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                🔬 Smart Vision
+              </button>
+
+              {isSupervisorOrAdmin && (
+                <button
+                  data-testid="nav-history"
+                  onClick={() => onSelectTab('history')}
+                  className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
+                    activeTab === 'history'
+                      ? 'text-white'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {dict.nav.history}
+                </button>
+              )}
+
+              {isAdmin && (
+                <button
+                  data-testid="nav-analytics"
+                  onClick={() => onSelectTab('analytics')}
+                  className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
+                    activeTab === 'analytics'
+                      ? 'text-white'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {dict.nav.analytics}
+                </button>
+              )}
+
+              {isSupervisorOrAdmin && (
+                <button
+                  data-testid="nav-admin"
+                  onClick={() => onSelectTab('admin')}
+                  className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
+                    activeTab === 'admin'
+                      ? 'text-white'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <ShieldIcon size={16} className="text-amber-400" />
+                  {dict.nav.admin}
+                </button>
+              )}
+            </>
           )}
 
           {user && (

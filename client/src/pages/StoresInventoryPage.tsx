@@ -253,7 +253,7 @@ export const StoresInventoryPage: React.FC = () => {
             <span className="text-2xl sm:text-3xl font-black text-purple-400 font-mono">
               {stats?.totalReservedCount ?? reservations.filter(r => r.status === 'RESERVED').length}
             </span>
-            <span className="text-xs text-purple-300/80 font-medium">Auto-Reserved / OMRS</span>
+            <span className="text-xs text-purple-300/80 font-medium">Auto-Reserved</span>
           </div>
           <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-full blur-xl pointer-events-none"></div>
         </div>
@@ -532,16 +532,9 @@ export const StoresInventoryPage: React.FC = () => {
                         {/* Source / Defect */}
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-2">
-                            {isOMRS ? (
-                              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-purple-950 text-purple-300 border border-purple-800 flex items-center gap-1">
-                                <CpuIcon size={12} />
-                                {t('inventory.omrsTriageBadge', 'OMRS AI Triage')}
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-800 text-slate-300">
-                                {res.source}
-                              </span>
-                            )}
+                            <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-slate-800 text-slate-300">
+                              {res.source}
+                            </span>
                           </div>
                           {res.predictedDefect && (
                             <div className="text-xs font-medium text-slate-300 mt-1">
