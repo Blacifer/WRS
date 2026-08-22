@@ -22,6 +22,7 @@ import { StoresInventoryPage } from './pages/StoresInventoryPage.tsx';
 import { ComponentPassportsPage } from './pages/ComponentPassportsPage.tsx';
 import { InspectorLandingView } from './components/InspectorLandingView.tsx';
 import { PassportQRScannerModal } from './components/PassportQRScannerModal.tsx';
+import { UserManagementPage } from './pages/UserManagementPage.tsx';
 
 export { isUserInspector, isUserSupervisorOrAdmin, canAccessTab };
 
@@ -227,6 +228,7 @@ export const App: React.FC = () => {
         {activeTab === 'inspection' && <InspectionPage lang={currentLang} user={user} />}
         {activeTab === 'history' && !isInspector && <HistoryPage lang={currentLang} />}
         {activeTab === 'analytics' && !isInspector && <AnalyticsPage lang={currentLang} user={user} />}
+        {activeTab === 'users' && user.role?.toUpperCase() === 'ADMIN' && <UserManagementPage />}
       </main>
 
       {/* Admin Export Dialog (Guarded from Inspector) */}

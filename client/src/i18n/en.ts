@@ -25,6 +25,7 @@ export const en = {
     history: 'History & Logs',
     analytics: 'Spring Analytics',
     admin: 'Admin Console',
+    users: 'User Accounts',
     logout: 'Logout',
     sync: 'Sync Data',
     shiftTarget: 'Shift Target: 1,800 - 2,000'

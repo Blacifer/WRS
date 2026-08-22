@@ -315,6 +315,20 @@ export const Header: React.FC<HeaderProps> = ({
                   {dict.nav.admin}
                 </button>
               )}
+
+              {isAdmin && (
+                <button
+                  data-testid="nav-users"
+                  onClick={() => onSelectTab('users')}
+                  className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
+                    activeTab === 'users'
+                      ? 'text-white'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  👤 {dict.nav.users || 'User Accounts'}
+                </button>
+              )}
             </>
           )}
 

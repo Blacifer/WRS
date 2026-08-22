@@ -39,7 +39,8 @@ import type {
   ComponentFilter,
   ComponentStats,
   CVMeasureRequest,
-  CVMeasureResponse
+  CVMeasureResponse,
+  AdminUserRecord
 } from '../../../shared/types.ts';
 
 const BASE_URL = '/api';
@@ -150,6 +151,35 @@ export class ApiClient {
 
   public async getMe(): Promise<{ user: User }> {
     return this.request<{ user: User }>('/auth/me');
+  }
+
+  // =========================================================================
+  // Admin: Real Account Management (create/list/deactivate/reactivate)
+  // =========================================================================
+
+  public async listUsers(): Promise<{ success: boolean; data: AdminUserRecord[] }> {
+    return this.request('/auth/users');
+  }
+
+  public async createUser(payload: {
+    username: string;
+    password: string;
+    role: 'INSPECTOR' | 'SUPERVISOR' | 'ADMIN';
+    fullName: string;
+    employeeId: string;
+  }): Promise<{ success: boolean; data: AdminUserRecord }> {
+    return this.request('/auth/users', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  public async deactivateUser(id: string): Promise<{ success: boolean; data: AdminUserRecord }> {
+    return this.request(`/auth/users/${id}/deactivate`, { method: 'PATCH' });
+  }
+
+  public async reactivateUser(id: string): Promise<{ success: boolean; data: AdminUserRecord }> {
+    return this.request(`/auth/users/${id}/reactivate`, { method: 'PATCH' });
   }
 
   // =========================================================================

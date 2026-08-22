@@ -1375,7 +1375,19 @@ export type NavigationTab =
   | 'history'
   | 'analytics'
   | 'admin'
-  | 'smart_vision';
+  | 'smart_vision'
+  | 'users';
+
+export interface AdminUserRecord {
+  id: string;
+  username: string;
+  role: 'INSPECTOR' | 'SUPERVISOR' | 'ADMIN';
+  full_name: string;
+  employee_id: string;
+  is_active: 0 | 1;
+  created_at: string;
+  updated_at: string;
+}
 
 export function isUserInspector(role?: string | null): boolean {
   return role?.toUpperCase() === 'INSPECTOR';
@@ -1395,7 +1407,7 @@ export function canAccessTab(role: string | undefined, tab: NavigationTab, hasSe
     return false;
   }
   if (roleUpper === 'SUPERVISOR') {
-    if (tab === 'dashboard' || tab === 'analytics') return false;
+    if (tab === 'dashboard' || tab === 'analytics' || tab === 'users') return false;
     return true;
   }
   if (roleUpper === 'ADMIN') {
