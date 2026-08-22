@@ -1,0 +1,40 @@
+# WRS Raipur QC Platform — nginx reverse proxy with TLS.
+#
+# Camera access (spring OCR, QR scanning) only works in browsers over HTTPS
+# or on localhost — this is a browser security requirement, not something
+# the app can work around. This config terminates TLS and proxies to the
+# app container/process running on 127.0.0.1:3000.
+#
+# Setup (Ubuntu/Debian):
+#   sudo apt install nginx certbot python3-certbot-nginx
+#   sudo cp nginx.conf.example /etc/nginx/sites-available/wrs-raipur
+#   sudo ln -s /etc/nginx/sites-available/wrs-raipur /etc/nginx/sites-enabled/
+#   # edit server_name below to your real domain first
+#   sudo certbot --nginx -d wrs-raipur.example.in
+#   # certbot rewrites this file in place to add the TLS cert paths and
+#   # auto-configures renewal (systemd timer / cron) — you don't need to
+#   # do that part by hand.
+#   sudo nginx -t && sudo systemctl reload nginx
+
+server {
+    listen 80;
+    server_name wrs-raipur.example.in;   # <-- replace with your real domain
+
+    # certbot will add the HTTPS server block and redirect here automatically.
+    # Until you have a domain + TLS cert, do NOT expose this on the public
+    # internet over plain HTTP — camera features won't work anyway, and API
+    # traffic (including login credentials) would be unencrypted.
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Large photo/OCR uploads (matches the 10mb body limit set in
+        # server/src/app.ts's express.json/urlencoded config).
+        client_max_body_size 12m;
+    }
+}

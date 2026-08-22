@@ -526,7 +526,16 @@ export interface LifecycleTransition {
   isOverride: boolean;
   overrideJustification?: string | null;
   otpToken?: string | null;
+  // Additional fields as actually returned by WagonRepository's transition mapping
+  performedBy?: string;
+  performerName?: string;
+  performerRole?: string;
+  overrideReason?: string | null;
+  durationInStageHours?: number;
 }
+
+/** Alias — the wagon timeline API returns LifecycleTransition rows under this name */
+export type WagonTransition = LifecycleTransition;
 
 // -------------------------------------------------------------------------
 // Phase 2: CASNUB Bogie Parts Checklist
@@ -576,9 +585,12 @@ export interface ChecklistItem {
   partName: string;
   status: PartInspectionStatus;
   criticality: PartCriticality;
+  isMandatory?: boolean;
+  bogiePosition?: 'BOGIE_1' | 'BOGIE_2' | 'UNDERFRAME' | 'BODY' | 'NONE';
   conditionNotes?: string | null;
   repairAction?: RepairActionType | null;
   repairNotes?: string | null;
+  reinspectedStatus?: PartInspectionStatus | null;
   photoId?: string | null;
   inspectedBy?: string;
   inspectedByName?: string;
@@ -680,6 +692,21 @@ export interface ReleaseCertificate {
   html?: string;
 }
 
+export interface GateSignoffRecord {
+  id: string;
+  wagonNumber: string;
+  supervisorId: string;
+  supervisorName: string;
+  supervisorEmployeeId?: string;
+  digitalSignature: string;
+  otpTokenRef?: string | null;
+  signoffNotes?: string | null;
+  checksSummaryJson?: string;
+  certificateNumber: string;
+  certificateHash: string;
+  signedAt: string;
+}
+
 // -------------------------------------------------------------------------
 // Phase 2: DRM Officer Analytics & Reports
 // -------------------------------------------------------------------------
@@ -762,6 +789,28 @@ export interface PhotoRecord {
   timestamp: string;
   imageBase64: string;
   tags: string[];
+}
+
+/** Shape actually returned by the wagon photo endpoints (WagonRepository.mapPhotoRow) */
+export interface WagonPhotoRecord {
+  id: string;
+  wagonNumber: string;
+  checklistItemId?: string | null;
+  category?: CASNUBCategory | string | null;
+  partCategory?: CASNUBCategory | string | null;
+  partName: string;
+  stage?: string | null;
+  fileName?: string;
+  mimeType?: string;
+  fileSize?: number;
+  imageData?: string;
+  imageBase64?: string;
+  inspectorId: string;
+  inspectorName?: string;
+  tags: string[];
+  timestamp: string;
+  capturedAt?: string;
+  createdAt?: string;
 }
 
 export interface PhotoUploadRequest {
@@ -1117,7 +1166,16 @@ export type CVComponentTarget =
   | 'CTRB_END_CAP'
   | 'CTRB_BEARING_END_CAP'
   | 'WHEEL_FLANGE'
-  | 'BRAKE_BLOCK';
+  | 'BRAKE_BLOCK'
+  // Mark-50 Draft Gear recondition gauges (WRS Raipur shop-floor gauge boards,
+  // Gauge Nos. BE/91-6x — see comments in server/src/routes/cv.ts).
+  | 'DG_HOUSING_WALL_THICKNESS'
+  | 'DG_CENTRE_WEDGE_LOCATION'
+  | 'DG_MOVABLE_PLATE_LOCATION'
+  | 'DG_OUTER_COIL_SPRING'
+  | 'DG_INNER_COIL_SPRING'
+  | 'DG_CORNER_COIL_SPRING'
+  | 'DG_RELEASE_SPRING';
 
 export interface SmartVisionMeasurement {
   componentType: CVComponentTarget;

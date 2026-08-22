@@ -3,6 +3,7 @@
  * Indian Railways WRS Raipur
  */
 
+import Tesseract from 'tesseract.js';
 import type { CaliperOCRResult } from '../../../shared/types.ts';
 
 export interface SampleFixture {
@@ -73,86 +74,126 @@ export const SAMPLE_CALIPER_FIXTURES: SampleFixture[] = [
   }
 ];
 
-export async function processCaliperImage(input: string): Promise<CaliperOCRResult> {
-  const startTime = performance.now();
-
-  // 1. Try local fast extraction if input contains SVG or known digit classes
-  if (input.includes('digit-') || input.includes('<svg')) {
-    const svgMatch = input.match(/digit-([0-9])/g);
-    if (svgMatch && svgMatch.length >= 3) {
-      const digits = svgMatch.map(m => m.replace('digit-', ''));
-      let reading: number;
-      if (input.includes('<circle') && digits.length >= 5) {
-        const intPart = digits.slice(0, digits.length - 2).join('');
-        const decPart = digits.slice(digits.length - 2).join('');
-        reading = parseFloat(`${intPart}.${decPart}`);
-      } else if (digits.length === 5) {
-        reading = parseFloat(`${digits.slice(0, 3).join('')}.${digits.slice(3).join('')}`);
-      } else {
-        reading = parseFloat(digits.join(''));
+export async function preprocessImageForOCR(imageDataUrl: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        return resolve(imageDataUrl);
       }
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+        
+        const threshold = 128;
+        const color = gray > threshold ? 255 : 0;
+        
+        data[i] = color;
+        data[i + 1] = color;
+        data[i + 2] = color;
+      }
+      
+      ctx.putImageData(imageData, 0, 0);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.onerror = (err) => reject(err);
+    img.src = imageDataUrl;
+  });
+}
 
-      return {
-        measuredHeight: reading,
-        confidence: 0.99,
-        processingTimeMs: Math.round(performance.now() - startTime),
-        rawText: `${reading.toFixed(2)} mm`,
-        digits: digits.join('')
-      };
-    }
-  }
+export interface MeasurementRange {
+  min: number;
+  max: number;
+}
 
-  // 2. Try server OCR endpoint
+export const DEFAULT_CALIPER_RANGE: MeasurementRange = { min: 100.0, max: 500.0 };
+
+/**
+ * Valid physical measurement ranges per CV component target, mirroring
+ * RDSO_TOLERANCE_SPECS in server/src/routes/cv.ts (widened slightly to cover
+ * both branch interpretations that endpoint uses for dual-purpose readings,
+ * e.g. friction wedge wear-step vs. slope height).
+ */
+export const CV_COMPONENT_RANGES: Record<string, MeasurementRange> = {
+  OUTER_SPRING: DEFAULT_CALIPER_RANGE,
+  INNER_SPRING: DEFAULT_CALIPER_RANGE,
+  SNUBBER_SPRING: DEFAULT_CALIPER_RANGE,
+  FRICTION_WEDGE: { min: 0.0, max: 150.0 },
+  CTRB_END_CAP: { min: 0.0, max: 200.0 },
+  CTRB_BEARING_END_CAP: { min: 0.0, max: 200.0 },
+  WHEEL_FLANGE: { min: 10.0, max: 40.0 },
+  BRAKE_BLOCK: { min: 5.0, max: 60.0 },
+  DG_HOUSING_WALL_THICKNESS: { min: 5.0, max: 70.0 },
+  DG_CENTRE_WEDGE_LOCATION: { min: 40.0, max: 80.0 },
+  DG_MOVABLE_PLATE_LOCATION: { min: 100.0, max: 180.0 },
+  DG_OUTER_COIL_SPRING: { min: 300.0, max: 420.0 },
+  DG_INNER_COIL_SPRING: { min: 300.0, max: 420.0 },
+  DG_CORNER_COIL_SPRING: { min: 240.0, max: 360.0 },
+  DG_RELEASE_SPRING: { min: 80.0, max: 180.0 }
+};
+
+export async function processCaliperImage(input: string, range: MeasurementRange = DEFAULT_CALIPER_RANGE): Promise<CaliperOCRResult> {
+  const startTime = performance.now();
   try {
-    const res = await fetch('/api/ocr/read-caliper', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ imageBase64: input })
-    });
-    if (res.ok) {
-      const data = await res.json();
-      return {
-        measuredHeight: data.measuredHeight || data.data?.measuredHeight || 0,
-        confidence: data.confidence || data.data?.confidence || 0.95,
-        processingTimeMs: Math.round(performance.now() - startTime),
-        rawText: data.rawText || `${data.measuredHeight} mm`,
-        digits: data.digits || ''
-      };
-    }
-  } catch (err) {
-    console.warn('[ClientOCR] Server OCR call failed, falling back to pattern matching:', err);
-  }
+    const processedUrl = await preprocessImageForOCR(input);
 
-  // 3. Fallback pattern matching (only for text input, not base64 image data)
-  if (!input.startsWith('data:image')) {
-    const regex = /(?:(\d{3})\.?(\d{1,2}))|(?:(\d{2,3}\.\d{1,2}))/;
-    const match = input.match(regex);
-    if (match) {
-      const val = parseFloat(match[0]);
-      if (!isNaN(val) && val >= 100 && val <= 500) {
+    const worker = await Tesseract.createWorker('eng');
+    await worker.setParameters({
+      tessedit_char_whitelist: '0123456789.',
+    });
+    const result = await worker.recognize(processedUrl);
+    await worker.terminate();
+
+    const { data: { text, confidence: tesseractConfidence } } = result;
+    const confidence = tesseractConfidence / 100;
+
+    const match = text.match(/\d{1,3}\.?\d{0,2}/);
+
+    if (match && confidence >= 0.5) {
+      const parsedValue = parseFloat(match[0]);
+      if (parsedValue >= range.min && parsedValue <= range.max) {
         return {
-          measuredHeight: val,
-          confidence: 0.92,
+          measuredHeight: parsedValue,
+          confidence,
           processingTimeMs: Math.round(performance.now() - startTime),
-          rawText: `${val.toFixed(2)} mm`,
-          digits: val.toFixed(2).replace('.', '')
+          rawText: text.trim(),
+          digits: match[0].replace('.', '')
         };
       }
     }
+    
+    return {
+      measuredHeight: 0,
+      confidence,
+      processingTimeMs: Math.round(performance.now() - startTime),
+      rawText: text.trim(),
+      digits: ''
+    };
+  } catch (err) {
+    console.error('OCR processing error:', err);
+    return {
+      measuredHeight: 0,
+      confidence: 0,
+      processingTimeMs: Math.round(performance.now() - startTime),
+      rawText: '',
+      digits: ''
+    };
   }
-
-  return {
-    measuredHeight: 0,
-    confidence: 0,
-    processingTimeMs: Math.round(performance.now() - startTime),
-    rawText: '',
-    digits: ''
-  };
 }
 
-export function validateManualMeasurement(val: unknown): { valid: boolean; value?: number; error?: string } {
+export function validateManualMeasurement(val: unknown, range: MeasurementRange = DEFAULT_CALIPER_RANGE): { valid: boolean; value?: number; error?: string } {
   if (val === null || val === undefined || val === '') {
-    return { valid: false, error: 'Free height measurement is required' };
+    return { valid: false, error: 'Measurement is required' };
   }
 
   let num: number;
@@ -176,12 +217,12 @@ export function validateManualMeasurement(val: unknown): { valid: boolean; value
     return { valid: false, error: 'Measurement must be strictly positive (> 0 mm)' };
   }
 
-  if (num < 100.0) {
-    return { valid: false, error: `Height (${num} mm) is below minimum possible limit (100.00 mm)` };
+  if (num < range.min) {
+    return { valid: false, error: `Measurement (${num} mm) is below minimum possible limit (${range.min.toFixed(2)} mm)` };
   }
 
-  if (num > 500.0) {
-    return { valid: false, error: `Height (${num} mm) exceeds maximum caliper limit (500.00 mm)` };
+  if (num > range.max) {
+    return { valid: false, error: `Measurement (${num} mm) exceeds maximum possible limit (${range.max.toFixed(2)} mm)` };
   }
 
   const rounded = Math.round(num * 100) / 100;

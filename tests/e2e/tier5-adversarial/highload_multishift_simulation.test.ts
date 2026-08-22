@@ -18,7 +18,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { runMigrations } from '../../../server/src/db/migrations.ts';
 import { seedUsers } from '../../../server/src/db/seed.ts';
 import { InspectionRepository } from '../../../server/src/db/repository.ts';
-import { classifySpring } from '../../../server/src/classification/engine.ts';
+import { classifySpring } from '../../../shared/classification/engine.ts';
 import type { BogieType, SpringCondition, SpringPosition, DamageType, BandColor } from '../../../shared/types.ts';
 
 describe('Tier 5 — High-Load Multi-Shift Simulation Suite (>2000 Springs/Day)', () => {

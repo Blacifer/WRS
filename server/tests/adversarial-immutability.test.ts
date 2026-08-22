@@ -168,7 +168,7 @@ describe('Adversarial Verification: Database Immutability & API Integrity', () =
             condition: conditions[i % conditions.length],
             position: positions[i % positions.length],
             measuredHeight: 245.0 + (i % 20) * 1.0,
-            inspectorId: `usr_insp_${(i % 5) + 1}`
+            inspectorId: `usr_insp_${String((i % 4) + 1).padStart(3, '0')}`
           })
         );
       }

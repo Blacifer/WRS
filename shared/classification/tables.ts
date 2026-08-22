@@ -9,7 +9,7 @@ import type {
   SpringPosition,
   RDSOTableDefinition,
   BandColor
-} from '../../../shared/types.ts';
+} from '../types.ts';
 
 export const COLOR_HEX_MAP: Record<BandColor, string> = {
   BLUE: '#2563eb',

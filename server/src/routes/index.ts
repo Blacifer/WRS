@@ -8,7 +8,6 @@ import { classifyRouter } from './classify.ts';
 import { inspectionsRouter } from './inspections.ts';
 import { authRouter } from './auth.ts';
 import { healthRouter } from './health.ts';
-import { ocrRouter } from './ocr.ts';
 import { i18nRouter } from './i18n.ts';
 import { syncRouter } from './sync.ts';
 import { wagonsRouter } from './wagons.ts';
@@ -24,7 +23,6 @@ export const apiRouter = Router();
 
 apiRouter.use('/auth', authRouter);
 apiRouter.use('/inspections', inspectionsRouter);
-apiRouter.use('/ocr', ocrRouter);
 apiRouter.use('/i18n', i18nRouter);
 apiRouter.use('/sync', syncRouter);
 apiRouter.use('/wagons', wagonsRouter);

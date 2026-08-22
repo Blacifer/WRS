@@ -213,10 +213,22 @@ export const COMPONENT_ALIASES: ComponentAliasMapping[] = [
     regex: /(?:^|\s)(adapter\s+crown(\s+wear)?|axle\s+box\s+adapter|adapter\s+wear|crown\s+wear|एडाप्टर(\s+क्राउन)?|एक्सल\s+बॉक्स\s+एडाप्टर)(?:$|\s)/i
   },
   {
-    canonicalPartName: 'Grease Seals & End Cap Bolts',
+    canonicalPartName: 'CTRB Grease Seal (100% Replace — POH)',
     category: 'BEARINGS',
-    aliases: ['grease seal', 'grease seals', 'end cap bolts', 'end cap', 'cap bolts', 'ग्रीस सील', 'एंड कैप'],
-    regex: /(?:^|\s)(grease\s+seal(s)?|end\s+cap(\s+bolts)?|cap\s+bolts|ग्रीस\s+सील|एंड\s+कैप(\s+बोल्ट)?)(?:$|\s)/i
+    aliases: ['grease seal', 'grease seals', 'ग्रीस सील'],
+    regex: /(?:^|\s)(grease\s+seal(s)?|ग्रीस\s+सील)(?:$|\s)/i
+  },
+  {
+    canonicalPartName: 'CTRB End Cap Screws (100% Replace — POH)',
+    category: 'BEARINGS',
+    aliases: ['end cap bolts', 'end cap', 'end cap screws', 'cap bolts', 'एंड कैप'],
+    regex: /(?:^|\s)(end\s+cap(\s+bolts|\s+screws)?|cap\s+bolts|एंड\s+कैप(\s+बोल्ट)?)(?:$|\s)/i
+  },
+  {
+    canonicalPartName: 'CTRB Locking Plate (100% Replace — POH)',
+    category: 'BEARINGS',
+    aliases: ['locking plate', 'ctrb locking plate', 'लॉकिंग प्लेट'],
+    regex: /(?:^|\s)((ctrb\s+)?locking\s+plate|लॉकिंग\s+प्लेट)(?:$|\s)/i
   },
   {
     canonicalPartName: 'CTRB Cartridge Bearing Rotation',

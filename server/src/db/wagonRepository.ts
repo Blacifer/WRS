@@ -5,6 +5,8 @@
 
 import { DatabaseSync } from 'node:sqlite';
 import crypto from 'node:crypto';
+import { logAuditEvent } from './auditLog.ts';
+import { CASNUB_CHECKLIST_TEMPLATE } from './seed.ts';
 import type {
   LifecycleStage,
   CASNUBCategory,
@@ -146,14 +148,13 @@ export class WagonRepository {
     this.initializeDefaultChecklist(id, wagonNumber, wagonType, createdBy, 'Intake Inspector');
 
     // Audit log
-    this.db.prepare(`
-      INSERT INTO inspection_audit_log (id, inspection_id, event_type, user_id, user_role, payload_json, created_at)
-      VALUES (?, NULL, 'WAGON_REGISTERED', ?, 'INSPECTOR', ?, ?)
-    `).run(
-      lowerHexRandom(16), createdBy,
-      JSON.stringify({ wagonId: id, wagonNumber, wagonType, owningRailway, entryDate }),
-      now
-    );
+    logAuditEvent(this.db, {
+      eventType: 'WAGON_REGISTERED' as any,
+      userId: createdBy,
+      userRole: 'INSPECTOR',
+      payload: { wagonId: id, wagonNumber, wagonType, owningRailway, entryDate },
+      createdAt: now
+    });
 
     return this.getWagonByNumber(wagonNumber);
   }
@@ -296,12 +297,11 @@ export class WagonRepository {
     `).run(data.toStage, wagonStatus, actualReleaseDate, now, wagon.id);
 
     // Log to audit trail
-    this.db.prepare(`
-      INSERT INTO inspection_audit_log (id, inspection_id, event_type, user_id, user_role, payload_json, created_at)
-      VALUES (?, NULL, 'WAGON_STAGE_TRANSITION', ?, ?, ?, ?)
-    `).run(
-      lowerHexRandom(16), data.performedBy, data.performerRole,
-      JSON.stringify({
+    logAuditEvent(this.db, {
+      eventType: 'WAGON_STAGE_TRANSITION' as any,
+      userId: data.performedBy,
+      userRole: data.performerRole,
+      payload: {
         transitionId: id,
         wagonNumber: wagon.wagonNumber,
         fromStage: data.fromStage,
@@ -309,9 +309,9 @@ export class WagonRepository {
         transitionType: data.transitionType,
         isOverride: Boolean(isOverride),
         overrideReason: data.overrideReason
-      }),
-      now
-    );
+      },
+      createdAt: now
+    });
 
     return {
       id,
@@ -1447,6 +1447,7 @@ export class WagonRepository {
       inspector_name: row.inspector_name,
       tags,
       timestamp: row.created_at,
+      capturedAt: row.created_at,
       createdAt: row.created_at,
       created_at: row.created_at
     };
@@ -1557,13 +1558,11 @@ export class WagonRepository {
     );
 
     // Audit log
-    this.db.prepare(`
-      INSERT INTO inspection_audit_log (id, inspection_id, event_type, user_id, user_role, payload_json, created_at)
-      VALUES (?, NULL, 'ACOUSTIC_DEFECT_LOGGED', ?, 'INSPECTOR', ?, ?)
-    `).run(
-      lowerHexRandom(16),
-      inspectorId,
-      JSON.stringify({
+    logAuditEvent(this.db, {
+      eventType: 'ACOUSTIC_DEFECT_LOGGED' as any,
+      userId: inspectorId,
+      userRole: 'INSPECTOR',
+      payload: {
         diagnosticId: diagId,
         wagonNumber: normalizedWagonNumber,
         anomalyType,
@@ -1573,9 +1572,9 @@ export class WagonRepository {
         targetCategory,
         targetPartName,
         checklistItemId: updatedChecklistItem?.id || null
-      }),
-      now
-    );
+      },
+      createdAt: now
+    });
 
     const diagnosticResult: AcousticDiagnosticResult = {
       timestamp: now,
@@ -1651,56 +1650,9 @@ export class WagonRepository {
   }
 
   private getDefaultRDSOItems(): Array<{ category: CASNUBCategory; partName: string; bogiePosition: string; isMandatory: number }> {
-    return [
-      // 1. Springs
-      { category: 'SPRINGS', partName: 'Outer Spring (Bogie 1)', bogiePosition: 'BOGIE_1', isMandatory: 1 },
-      { category: 'SPRINGS', partName: 'Inner Spring (Bogie 1)', bogiePosition: 'BOGIE_1', isMandatory: 1 },
-      { category: 'SPRINGS', partName: 'Snubber Spring (Bogie 1)', bogiePosition: 'BOGIE_1', isMandatory: 1 },
-      { category: 'SPRINGS', partName: 'Outer Spring (Bogie 2)', bogiePosition: 'BOGIE_2', isMandatory: 1 },
-      { category: 'SPRINGS', partName: 'Inner Spring (Bogie 2)', bogiePosition: 'BOGIE_2', isMandatory: 1 },
-      { category: 'SPRINGS', partName: 'Snubber Spring (Bogie 2)', bogiePosition: 'BOGIE_2', isMandatory: 1 },
-
-      // 2. Wheels & Axles
-      { category: 'WHEELS_AXLES', partName: 'Wheel Tread Diameter (Axle 1-4)', bogiePosition: 'BOGIE_1', isMandatory: 1 },
-      { category: 'WHEELS_AXLES', partName: 'Flange Thickness (Min 16.0mm)', bogiePosition: 'BOGIE_1', isMandatory: 1 },
-      { category: 'WHEELS_AXLES', partName: 'Wheel Gauge (1600 +2/-1 mm)', bogiePosition: 'BOGIE_2', isMandatory: 1 },
-      { category: 'WHEELS_AXLES', partName: 'Axle Journal UST Flaw Detection', bogiePosition: 'BOGIE_2', isMandatory: 1 },
-
-      // 3. Bearings
-      { category: 'BEARINGS', partName: 'CTRB Cartridge Bearing Rotation', bogiePosition: 'BOGIE_1', isMandatory: 1 },
-      { category: 'BEARINGS', partName: 'Axle Box Adapter Crown Wear', bogiePosition: 'BOGIE_1', isMandatory: 1 },
-      { category: 'BEARINGS', partName: 'Grease Seals & End Cap Bolts', bogiePosition: 'BOGIE_2', isMandatory: 1 },
-
-      // 4. Brake System
-      { category: 'BRAKE_SYSTEM', partName: 'Composite Brake Blocks (Min 10mm)', bogiePosition: 'BOGIE_1', isMandatory: 1 },
-      { category: 'BRAKE_SYSTEM', partName: 'Brake Beams & Truss Assembly', bogiePosition: 'BOGIE_2', isMandatory: 1 },
-      { category: 'BRAKE_SYSTEM', partName: 'SAB Slack Adjuster DA-2(T)', bogiePosition: 'UNDERFRAME', isMandatory: 1 },
-      { category: 'BRAKE_SYSTEM', partName: 'Brake Cylinder Piston Stroke', bogiePosition: 'UNDERFRAME', isMandatory: 1 },
-      { category: 'BRAKE_SYSTEM', partName: 'Distributor Valve KE/C3W', bogiePosition: 'UNDERFRAME', isMandatory: 1 },
-      { category: 'BRAKE_SYSTEM', partName: 'Air Hose & Angle Cocks', bogiePosition: 'BODY', isMandatory: 1 },
-
-      // 5. Couplers & Draft Gear
-      { category: 'COUPLERS_DRAFT_GEAR', partName: 'CBC Coupler Body Contour', bogiePosition: 'BODY', isMandatory: 1 },
-      { category: 'COUPLERS_DRAFT_GEAR', partName: 'CBC Knuckle Nose Wear', bogiePosition: 'BODY', isMandatory: 1 },
-      { category: 'COUPLERS_DRAFT_GEAR', partName: 'Mark-50 Draft Gear Housing', bogiePosition: 'BODY', isMandatory: 1 },
-      { category: 'COUPLERS_DRAFT_GEAR', partName: 'Striker Casting Wear Plate', bogiePosition: 'BODY', isMandatory: 1 },
-
-      // 6. Bogie Frame & Bolster
-      { category: 'BOGIE_FRAME_BOLSTER', partName: 'Side Frame Column Liners', bogiePosition: 'BOGIE_1', isMandatory: 1 },
-      { category: 'BOGIE_FRAME_BOLSTER', partName: 'Bolster Pocket Slope Liners', bogiePosition: 'BOGIE_1', isMandatory: 1 },
-      { category: 'BOGIE_FRAME_BOLSTER', partName: 'Center Plate & Pivot Pin', bogiePosition: 'BOGIE_2', isMandatory: 1 },
-      { category: 'BOGIE_FRAME_BOLSTER', partName: 'Constant Contact Side Bearers', bogiePosition: 'BOGIE_2', isMandatory: 1 },
-
-      // 7. Friction Wedges
-      { category: 'FRICTION_WEDGES', partName: 'Wedge Main Slope Surface', bogiePosition: 'BOGIE_1', isMandatory: 1 },
-      { category: 'FRICTION_WEDGES', partName: 'Wedge Vertical Face & Spigot Fit', bogiePosition: 'BOGIE_2', isMandatory: 1 },
-
-      // 8. Body & Underframe
-      { category: 'BODY_UNDERFRAME', partName: 'Center Sill & Sole Bar Camber', bogiePosition: 'UNDERFRAME', isMandatory: 1 },
-      { category: 'BODY_UNDERFRAME', partName: 'Steel Flooring & Perforations', bogiePosition: 'BODY', isMandatory: 1 },
-      { category: 'BODY_UNDERFRAME', partName: 'Side Doors & Locking Gear', bogiePosition: 'BODY', isMandatory: 1 },
-      { category: 'BODY_UNDERFRAME', partName: 'Paint & Stenciling Legibility', bogiePosition: 'BODY', isMandatory: 0 } // Advisory
-    ];
+    return CASNUB_CHECKLIST_TEMPLATE.map(({ category, partName, bogiePosition, isMandatory }) => ({
+      category, partName, bogiePosition, isMandatory
+    }));
   }
 }
 

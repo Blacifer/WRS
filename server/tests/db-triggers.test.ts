@@ -181,8 +181,8 @@ describe('SQLite Immutability Triggers & Append-Only Storage', () => {
     assert.strictEqual(auditLogs[0].user_id, 'usr_insp_001');
 
     const payload = JSON.parse(auditLogs[0].payload_json);
-    assert.strictEqual(payload.wagon_number, 'W-TRIGGER-CHECK');
-    assert.strictEqual(payload.classified_band, 'BLUE');
+    assert.strictEqual(payload.wagonNumber, 'W-TRIGGER-CHECK');
+    assert.strictEqual(payload.classifiedBand, 'BLUE');
   });
 
   // Test Case 7: Monotonically increasing sequence numbering

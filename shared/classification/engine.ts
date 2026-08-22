@@ -12,7 +12,7 @@ import type {
   BandColor,
   BandRoman,
   InspectionStatus
-} from '../../../shared/types.ts';
+} from '../types.ts';
 import { getRDSOTable, COLOR_HEX_MAP } from './tables.ts';
 import { validateClassificationRequest } from './validator.ts';
 

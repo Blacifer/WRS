@@ -15,6 +15,7 @@ import type {
   DamageType,
   AuditLogEntry
 } from '../../../shared/types.ts';
+import { logAuditEvent as sharedLogAuditEvent } from './auditLog.ts';
 
 export class InspectionRepository {
   private db: DatabaseSync;
@@ -94,20 +95,19 @@ export class InspectionRepository {
     const overrideSupervisorName = data.supervisorName ?? data.override_supervisor_name ?? null;
     const otpTokenRef = data.otpTokenRef ?? data.otp_token_ref ?? null;
 
-    // Ensure inspector user exists to satisfy foreign key constraint
+    // Verify inspector user exists — do NOT silently create ghost users, and do
+    // NOT let a missing FK surface as a raw, unhandled SQLite constraint error.
     const userCheck = this.db.prepare('SELECT id FROM users WHERE id = ?');
     if (!userCheck.get(inspectorId)) {
-      this.db.prepare(`
-        INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, employee_id, is_active)
-        VALUES (?, ?, 'none', 'INSPECTOR', ?, ?, 1)
-      `).run(inspectorId, `user_${inspectorId}`, inspectorName, `EMP-${inspectorId}`);
+      const err: any = new Error(`Inspector ID "${inspectorId}" does not correspond to a known, active user. Please re-authenticate and try again.`);
+      err.name = 'ValidationError';
+      throw err;
     }
 
     if (overrideSupervisorId && !userCheck.get(overrideSupervisorId)) {
-      this.db.prepare(`
-        INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, employee_id, is_active)
-        VALUES (?, ?, 'none', 'SUPERVISOR', ?, ?, 1)
-      `).run(overrideSupervisorId, `sup_${overrideSupervisorId}`, overrideSupervisorName || 'Supervisor', `SUP-${overrideSupervisorId}`);
+      const err: any = new Error(`Supervisor ID "${overrideSupervisorId}" does not correspond to a known, active user.`);
+      err.name = 'ValidationError';
+      throw err;
     }
 
     const measurementSource = data.measurementSource ?? data.measurement_source ?? 'MANUAL';
@@ -156,6 +156,35 @@ export class InspectionRepository {
       overrideReason, overrideSupervisorId, overrideSupervisorName, otpTokenRef,
       measurementSource, ocrConfidence, ocrImageRef, offlineCreatedAt, timestamp, syncedAt, auditHash
     );
+
+    // Chained audit trail entry — this is the highest-volume event type in
+    // the system (every spring inspection), so it must go through the same
+    // hash chain as everything else rather than the old DB trigger, which
+    // could not compute a chained hash.
+    sharedLogAuditEvent(this.db, {
+      inspectionId: id,
+      eventType: supervisorOverride ? 'SUPERVISOR_OVERRIDE_RECORDED' : 'INSPECTION_CREATED',
+      userId: inspectorId,
+      userRole: 'INSPECTOR',
+      payload: {
+        sequenceNumber,
+        wagonNumber,
+        bogieType,
+        springCondition,
+        springPosition,
+        measuredHeight,
+        classifiedBand,
+        status,
+        damageType,
+        damageNotes,
+        supervisorOverride: Boolean(supervisorOverride),
+        overrideReason,
+        otpTokenRef,
+        measurementSource,
+        auditHash
+      },
+      createdAt: timestamp
+    });
 
     return {
       id,
@@ -541,33 +570,73 @@ export class InspectionRepository {
   }
 
   /**
-   * Log an audit event
+   * List all users (active and inactive), excluding password hashes.
+   */
+  public listUsers(): any[] {
+    return this.db.prepare(`
+      SELECT id, username, role, full_name, employee_id, is_active, created_at, updated_at
+      FROM users ORDER BY created_at ASC
+    `).all();
+  }
+
+  /**
+   * Create a real user account. Throws a ValidationError (caught by the
+   * centralized error handler -> 400) on a duplicate username/employee_id
+   * rather than letting a raw UNIQUE constraint violation surface.
+   */
+  public createUser(data: {
+    username: string;
+    passwordHash: string;
+    role: string;
+    fullName: string;
+    employeeId: string;
+  }): any {
+    const existing = this.db.prepare('SELECT id FROM users WHERE username = ? OR employee_id = ?')
+      .get(data.username, data.employeeId);
+    if (existing) {
+      const err: any = new Error(`A user with username "${data.username}" or employee ID "${data.employeeId}" already exists.`);
+      err.name = 'ValidationError';
+      throw err;
+    }
+
+    const id = `usr_${crypto.randomUUID()}`;
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      INSERT INTO users (id, username, password_hash, role, full_name, employee_id, is_active, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)
+    `).run(id, data.username, data.passwordHash, data.role, data.fullName, data.employeeId, now, now);
+
+    return this.db.prepare(`
+      SELECT id, username, role, full_name, employee_id, is_active, created_at, updated_at FROM users WHERE id = ?
+    `).get(id);
+  }
+
+  /**
+   * Deactivate (soft-disable) a user account — never hard-deletes, since
+   * users are referenced by FK from inspections/audit rows and those must
+   * remain attributable.
+   */
+  public setUserActive(id: string, isActive: boolean): any {
+    const now = new Date().toISOString();
+    const result = this.db.prepare('UPDATE users SET is_active = ?, updated_at = ? WHERE id = ?')
+      .run(isActive ? 1 : 0, now, id);
+    if (result.changes === 0) {
+      const err: any = new Error(`User "${id}" not found.`);
+      err.name = 'ValidationError';
+      throw err;
+    }
+    return this.db.prepare(`
+      SELECT id, username, role, full_name, employee_id, is_active, created_at, updated_at FROM users WHERE id = ?
+    `).get(id);
+  }
+
+  /**
+   * Log an audit event — delegates to the shared chained writer so this
+   * repository's events participate in the same hash chain as every other
+   * subsystem (see server/src/db/auditLog.ts).
    */
   public logAuditEvent(event: Partial<AuditLogEntry>): void {
-    const id = event.id || `audit_${crypto.randomUUID()}`;
-    const inspectionId = event.inspectionId || null;
-    const eventType = event.eventType || 'INSPECTION_CREATED';
-    const userId = event.userId || 'system';
-    const userRole = event.userRole || 'SYSTEM';
-    const ipAddress = event.ipAddress || null;
-    const payloadJson = JSON.stringify(event.payload || {});
-    const createdAt = event.createdAt || new Date().toISOString();
-
-    // 1. Fetch the previous hash
-    const prevRow = this.db.prepare(`
-      SELECT hash FROM inspection_audit_log ORDER BY rowid DESC LIMIT 1
-    `).get() as { hash: string } | undefined;
-    const previousHash = prevRow?.hash || 'GENESIS_BLOCK';
-
-    // 2. Compute the new cryptographic hash (SHA-256)
-    // Hash includes the previous hash to create an unbreakable blockchain
-    const dataToHash = `${previousHash}|${id}|${inspectionId}|${eventType}|${userId}|${payloadJson}|${createdAt}`;
-    const hash = crypto.createHash('sha256').update(dataToHash).digest('hex');
-
-    this.db.prepare(`
-      INSERT INTO inspection_audit_log (id, inspection_id, event_type, user_id, user_role, ip_address, payload_json, previous_hash, hash, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, inspectionId, eventType, userId, userRole, ipAddress, payloadJson, previousHash, hash, createdAt);
+    sharedLogAuditEvent(this.db, event);
   }
 
   /**

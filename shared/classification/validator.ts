@@ -9,7 +9,7 @@ import type {
   SpringPosition,
   DamageType,
   ClassificationRequest
-} from '../../../shared/types.ts';
+} from '../types.ts';
 
 export const VALID_BOGIE_TYPES: readonly BogieType[] = [
   'CASNUB_22_NLB',

@@ -7,7 +7,7 @@ import { Router } from '../framework/index.ts';
 import type { Request, Response, NextFunction } from '../framework/index.ts';
 import { getDatabase } from '../db/connection.ts';
 import { InspectionRepository } from '../db/repository.ts';
-import { classifySpring } from '../classification/engine.ts';
+import { classifySpring } from '../../../shared/classification/engine.ts';
 import { optionalAuthMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { otpService } from '../auth/otpService.ts';

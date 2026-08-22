@@ -24,8 +24,6 @@ import type {
   StoresPart,
   InventoryReservation,
   InventoryStats,
-  OMRSScanRecord,
-  AITriageResult,
   AcousticAnomalyType,
   AcousticDiagnosticResult,
   AcousticDiagnosticRecord,
@@ -448,27 +446,6 @@ export class ApiClient {
     return this.request<{ success: boolean; data: StoresPart; message?: string }>('/inventory/restock', {
       method: 'POST',
       body: JSON.stringify(payload)
-    });
-  }
-
-  public async getOMRSScans(limit: number = 50): Promise<{ success: boolean; data: OMRSScanRecord[]; meta?: any }> {
-    return this.request<{ success: boolean; data: OMRSScanRecord[]; meta?: any }>(`/omrs/scans?limit=${limit}`);
-  }
-
-  public async getOMRSScanByWagon(wagonNumber: string): Promise<{ success: boolean; data: OMRSScanRecord }> {
-    return this.request<{ success: boolean; data: OMRSScanRecord }>(`/omrs/scans/${encodeURIComponent(wagonNumber)}`);
-  }
-
-  public async simulateOMRSScan(payload: any): Promise<{ success: boolean; data: OMRSScanRecord; message?: string }> {
-    return this.request<{ success: boolean; data: OMRSScanRecord; message?: string }>('/omrs/simulate-scan', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-  }
-
-  public async runAITriage(wagonNumber: string): Promise<{ success: boolean; data: AITriageResult; message?: string }> {
-    return this.request<{ success: boolean; data: AITriageResult; message?: string }>(`/omrs/triage/${encodeURIComponent(wagonNumber)}`, {
-      method: 'POST'
     });
   }
 

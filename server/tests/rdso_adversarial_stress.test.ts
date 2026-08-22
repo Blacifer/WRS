@@ -12,7 +12,7 @@ import {
   getRDSOTable,
   validateClassificationRequest,
   RDSO_TABLES
-} from '../src/classification/index.ts';
+} from '../../shared/classification/index.ts';
 import type {
   BogieType,
   SpringCondition,

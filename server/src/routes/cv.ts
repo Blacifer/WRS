@@ -9,7 +9,7 @@ import type { Request, Response } from '../framework/index.ts';
 import { getDatabase } from '../db/connection.ts';
 import { InspectionRepository } from '../db/repository.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
-import { classifySpring } from '../classification/engine.ts';
+import { classifySpring } from '../../../shared/classification/engine.ts';
 import { optionalAuthMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import type {
@@ -82,49 +82,161 @@ export const RDSO_TOLERANCE_SPECS = {
     bandsCount: 6,
     bandStepMm: 3.0
   },
+  // PARTIALLY VERIFIED against WMM 2.0 §309D "Wear Limit for Friction Wedge
+  // Block": the source gives TWO DIFFERENT wear limits by surface —
+  // Vertical Surface: 7mm, Slope Surface: 3mm — which this single wear-step
+  // threshold does not distinguish (maxPermissibleWear below matches the
+  // 7mm vertical-surface figure, not the stricter 3mm slope-surface one).
+  // The 129-138mm "height" branch below is a separate interpretation not
+  // confirmed against this source. Needs DRM technical sign-off on which
+  // surface WRS's caliper measures before this threshold is fully trusted.
   FRICTION_WEDGE: {
     componentType: 'FRICTION_WEDGE',
     nameEn: 'Friction Wedge (Wear Profile)',
     nameHi: 'घर्षण वेज (घिसाव माप)',
-    rdsoStandard: 'RDSO G-95 Para 4.4 / G-97',
+    rdsoStandard: 'RDSO G-95 Para 4.4 / G-97 / WMM 2.0 §309D (partially verified — see comment above)',
     nominalValue: 136.0,
     minPermissible: 129.0,
     maxPermissible: 138.0,
     maxPermissibleWear: 7.0,
     unit: 'mm'
   },
+  // UNVERIFIED: no numeric gap/clearance figure for this found in WMM 2.0 —
+  // only torque/must-change-screw procedure, not a measurable mm limit.
+  // Needs DRM technical sign-off before live use.
   CTRB_END_CAP: {
     componentType: 'CTRB_END_CAP',
     nameEn: 'CTRB End Cap (Gap & Bolt Deflection)',
     nameHi: 'सीटीआरबी एंड कैप (गैप व बोल्ट)',
-    rdsoStandard: 'RDSO G-81 Wheelset & Bearing Maintenance',
+    rdsoStandard: 'RDSO G-81 Wheelset & Bearing Maintenance (UNVERIFIED — needs sign-off)',
     nominalValue: 1.5,
     minPermissible: 0.5,
     maxPermissible: 3.0,
     diameterNominal: 178.0,
     unit: 'mm'
   },
+  // VERIFIED against WMM 2.0 §607(a) "Thin and Sharp Flange": minimum
+  // thickness 16mm matches exactly. Max 31mm verified against §7 Wheel
+  // table: "Height of flange — if height more than 31mm do not use under
+  // ROH" (was previously an unverified 32mm).
   WHEEL_FLANGE: {
     componentType: 'WHEEL_FLANGE',
     nameEn: 'Wheel Flange Thickness',
     nameHi: 'पहिया फ्लैंज मोटाई',
-    rdsoStandard: 'RDSO G-95 Para 5.2 / Wheelset Manual',
+    rdsoStandard: 'RDSO G-95 Para 5.2 / WMM 2.0 §607(a), §7',
     nominalValue: 28.5,
     minPermissible: 16.0,
-    maxPermissible: 32.0,
+    maxPermissible: 31.0,
     unit: 'mm'
   },
+  // VERIFIED against WMM 2.0 §308A "Brake Gear Limit and Clearances":
+  // "Brake block condemning limits — 10mm" matches exactly.
   BRAKE_BLOCK: {
     componentType: 'BRAKE_BLOCK',
     nameEn: 'Composite Brake Block Thickness',
     nameHi: 'कम्पोजिट ब्रेक ब्लॉक मोटाई',
-    rdsoStandard: 'RDSO G-97 Para 6.1',
+    rdsoStandard: 'RDSO G-97 Para 6.1 / WMM 2.0 §308A',
     nominalValue: 45.0,
     minPermissible: 10.0,
     maxPermissible: 55.0,
     unit: 'mm'
+  },
+  // ---------------------------------------------------------------------
+  // Mark-50 Draft Gear recondition gauges — sourced directly from the WRS
+  // Raipur shop-floor gauge reference boards (photographed on site,
+  // 2026-08-22), NOT from a numbered RDSO/WMM 2.0 clause like the specs
+  // above. Cited by Gauge No. as printed on each board. The 4 spring items
+  // and the wall-thickness item are min-only checks (board states only a
+  // condemning floor via "gauge should not contact surface, if contact —
+  // scrap"); maxPermissible on those is an unsourced generous input-range
+  // cap for the caliper UI, not a real condemning ceiling — see the
+  // min-only branch below that ignores it for the verdict.
+  // The two "location" gauges are genuine two-sided GO/NO-GO gauges, but
+  // which reading is the reject side is NOT confirmed — the board shows
+  // GO > NO-GO for Centre Wedge Location (61.11 > 59.54) and the reverse
+  // for Movable Plate Location (144.48 > 141.27). Treated here as an
+  // inclusive band [min(GO,NoGo), max(GO,NoGo)] pending DRM sign-off,
+  // same as the pre-existing friction-wedge caveat above.
+  DG_HOUSING_WALL_THICKNESS: {
+    componentType: 'DG_HOUSING_WALL_THICKNESS',
+    nameEn: 'Draft Gear Housing Wall Thickness',
+    nameHi: 'ड्राफ्ट गियर हाउसिंग दीवार मोटाई',
+    rdsoStandard: 'WRS Raipur Gauge BE/91-62-6 (Housing Wall Thickness Gauge) — needs RDSO doc citation confirmation',
+    nominalValue: 15.88,
+    minPermissible: 15.88,
+    maxPermissible: 60.0,
+    unit: 'mm'
+  },
+  DG_CENTRE_WEDGE_LOCATION: {
+    componentType: 'DG_CENTRE_WEDGE_LOCATION',
+    nameEn: 'Draft Gear Housing Centre Wedge Location',
+    nameHi: 'ड्राफ्ट गियर हाउसिंग सेंटर वेज लोकेशन',
+    rdsoStandard: 'WRS Raipur Gauge BE/91-72-1 (Housing Centre Wedge Location Gauge) — GO/NO-GO direction unconfirmed, needs DRM sign-off',
+    nominalValue: 60.325,
+    minPermissible: 59.54,
+    maxPermissible: 61.11,
+    unit: 'mm'
+  },
+  DG_MOVABLE_PLATE_LOCATION: {
+    componentType: 'DG_MOVABLE_PLATE_LOCATION',
+    nameEn: 'Draft Gear Housing Movable Plate Location',
+    nameHi: 'ड्राफ्ट गियर हाउसिंग मूवेबल प्लेट लोकेशन',
+    rdsoStandard: 'WRS Raipur Gauge BE/91-61-10 (Housing Movable Plate Location Gauge) — GO/NO-GO direction unconfirmed, needs DRM sign-off',
+    nominalValue: 142.875,
+    minPermissible: 141.27,
+    maxPermissible: 144.48,
+    unit: 'mm'
+  },
+  DG_OUTER_COIL_SPRING: {
+    componentType: 'DG_OUTER_COIL_SPRING',
+    nameEn: 'Draft Gear Outer Coil Spring (Free Height)',
+    nameHi: 'ड्राफ्ट गियर बाहरी कॉइल स्प्रिंग (मुक्त ऊंचाई)',
+    rdsoStandard: 'WRS Raipur Gauge BE/91-61-6 (Outer Coil Spring Gauge)',
+    nominalValue: 342.0,
+    minPermissible: 342.0,
+    maxPermissible: 400.0,
+    unit: 'mm'
+  },
+  DG_INNER_COIL_SPRING: {
+    componentType: 'DG_INNER_COIL_SPRING',
+    nameEn: 'Draft Gear Inner Coil Spring (Free Height)',
+    nameHi: 'ड्राफ्ट गियर भीतरी कॉइल स्प्रिंग (मुक्त ऊंचाई)',
+    rdsoStandard: 'WRS Raipur Gauge BE/91-61-7A (Inner Coil Spring Gauge)',
+    nominalValue: 342.0,
+    minPermissible: 342.0,
+    maxPermissible: 400.0,
+    unit: 'mm'
+  },
+  DG_CORNER_COIL_SPRING: {
+    componentType: 'DG_CORNER_COIL_SPRING',
+    nameEn: 'Draft Gear Corner Coil Spring (Free Height)',
+    nameHi: 'ड्राफ्ट गियर कॉर्नर कॉइल स्प्रिंग (मुक्त ऊंचाई)',
+    rdsoStandard: 'WRS Raipur Gauge BE/91-61-7a (Corner Coil Spring Gauge)',
+    nominalValue: 286.0,
+    minPermissible: 286.0,
+    maxPermissible: 340.0,
+    unit: 'mm'
+  },
+  DG_RELEASE_SPRING: {
+    componentType: 'DG_RELEASE_SPRING',
+    nameEn: 'Draft Gear Release Spring (Free Height)',
+    nameHi: 'ड्राफ्ट गियर रिलीज़ स्प्रिंग (मुक्त ऊंचाई)',
+    rdsoStandard: 'WRS Raipur Gauge BE/91-61-8 (Release Spring Gauge)',
+    nominalValue: 123.0,
+    minPermissible: 123.0,
+    maxPermissible: 160.0,
+    unit: 'mm'
   }
 };
+
+const DG_MIN_ONLY_TARGETS = [
+  'DG_HOUSING_WALL_THICKNESS',
+  'DG_OUTER_COIL_SPRING',
+  'DG_INNER_COIL_SPRING',
+  'DG_CORNER_COIL_SPRING',
+  'DG_RELEASE_SPRING'
+] as const;
+const DG_RANGE_TARGETS = ['DG_CENTRE_WEDGE_LOCATION', 'DG_MOVABLE_PLATE_LOCATION'] as const;
 
 // -------------------------------------------------------------------------
 // POST /api/cv/measure — Direct CV Measurement Telemetry & Verification
@@ -378,6 +490,34 @@ cvRouter.post('/measure', optionalAuthMiddleware, async (req: AuthenticatedReque
         condemnationReason = `Composite brake block thickness ${measuredValue.toFixed(1)} mm is below 10.0mm condemning limit`;
         colorHex = '#ef4444';
       }
+    } else if ((DG_MIN_ONLY_TARGETS as readonly string[]).includes(normalizedTarget)) {
+      const spec = RDSO_TOLERANCE_SPECS[normalizedTarget as keyof typeof RDSO_TOLERANCE_SPECS] as typeof RDSO_TOLERANCE_SPECS['DG_HOUSING_WALL_THICKNESS'];
+      rdsoTable = spec.rdsoStandard;
+      nominalValue = spec.nominalValue;
+      delta = Number((measuredValue - nominalValue).toFixed(2));
+      toleranceRange = { min: spec.minPermissible, max: spec.maxPermissible };
+      if (measuredValue >= spec.minPermissible) {
+        verdict = 'PASS';
+        colorHex = '#10b981';
+      } else {
+        verdict = 'CONDEMNED';
+        condemnationReason = `${spec.nameEn} ${measuredValue.toFixed(2)} mm is below the ${spec.minPermissible}mm condemning limit (${spec.rdsoStandard})`;
+        colorHex = '#ef4444';
+      }
+    } else if ((DG_RANGE_TARGETS as readonly string[]).includes(normalizedTarget)) {
+      const spec = RDSO_TOLERANCE_SPECS[normalizedTarget as keyof typeof RDSO_TOLERANCE_SPECS] as typeof RDSO_TOLERANCE_SPECS['DG_CENTRE_WEDGE_LOCATION'];
+      rdsoTable = spec.rdsoStandard;
+      nominalValue = spec.nominalValue;
+      delta = Number((measuredValue - nominalValue).toFixed(2));
+      toleranceRange = { min: spec.minPermissible, max: spec.maxPermissible };
+      if (measuredValue >= spec.minPermissible && measuredValue <= spec.maxPermissible) {
+        verdict = 'PASS';
+        colorHex = '#10b981';
+      } else {
+        verdict = 'CONDEMNED';
+        condemnationReason = `${spec.nameEn} ${measuredValue.toFixed(2)} mm is outside gauge range [${spec.minPermissible}, ${spec.maxPermissible}] mm (${spec.rdsoStandard})`;
+        colorHex = '#ef4444';
+      }
     } else {
       // Generic component fallback
       nominalValue = customNominal || measuredValue;
@@ -477,18 +617,15 @@ cvRouter.post('/measure', optionalAuthMiddleware, async (req: AuthenticatedReque
 
           // If snapshot provided, save photo
           if (imageSnapshot) {
-            wagonRepo.addPhoto({
+            wagonRepo.insertPhoto({
               wagonNumber,
               category,
-              partCategory: category,
               partName: `${normalizedTarget} (AR CV Inspection)`,
               stage: wagon.currentStage,
               imageData: imageSnapshot,
-              imageBase64: imageSnapshot,
-              tagsJson: JSON.stringify(['CV_AR', normalizedTarget, verdict]),
+              tags: ['CV_AR', normalizedTarget, verdict],
               inspectorId,
-              inspectorName,
-              capturedAt: now
+              inspectorName
             });
             photoRecorded = true;
           }

@@ -10,10 +10,10 @@ import { useI18n } from '../i18n/index.ts';
 import { PhotoCaptureModal } from '../components/PhotoCaptureModal.tsx';
 import { PhotoGallery } from '../components/PhotoGallery.tsx';
 import { ReleaseCertificateModal } from '../components/ReleaseCertificateModal.tsx';
-import { PreArrivalTriageCard } from '../components/PreArrivalTriageCard.tsx';
 import { SoundDiagnosticTool } from '../components/SoundDiagnosticTool.tsx';
 import { VoiceInspectionToolbar } from '../components/VoiceInspectionToolbar.tsx';
-import { SmartVisionCamera } from '../components/SmartVisionCamera.tsx';
+import { CaliperCamera } from '../components/CaliperCamera.tsx';
+import { computeComponentVerdict } from '../services/classification.ts';
 import { playPassChime, playCondemnedBuzz } from '../utils/audioFeedback.ts';
 import { PassportQRScannerModal } from '../components/PassportQRScannerModal.tsx';
 import type {
@@ -34,8 +34,29 @@ import type {
   ComponentHealthStatus
 } from '../../../shared/types.ts';
 
-export function resolveComponentTarget(partName: string, category: string): CVComponentTarget {
+export function resolveComponentTarget(partName: string, category: string): CVComponentTarget | null {
   const name = partName.toLowerCase();
+
+  // Draft Gear items are handled as a dedicated block, checked first and
+  // always returning (a DG_* target or null), so a name like "Spring Seat
+  // Gap Gauge" can't fall through into the generic spring-branch default
+  // below just because it contains the word "spring".
+  if (category === 'COUPLERS_DRAFT_GEAR' || name.includes('draft gear')) {
+    if (name.includes('wall thickness')) return 'DG_HOUSING_WALL_THICKNESS';
+    if (name.includes('centre wedge location')) return 'DG_CENTRE_WEDGE_LOCATION';
+    if (name.includes('movable plate location')) return 'DG_MOVABLE_PLATE_LOCATION';
+    if (name.includes('outer coil spring')) return 'DG_OUTER_COIL_SPRING';
+    if (name.includes('inner coil spring')) return 'DG_INNER_COIL_SPRING';
+    if (name.includes('corner coil spring')) return 'DG_CORNER_COIL_SPRING';
+    if (name.includes('release spring')) return 'DG_RELEASE_SPRING';
+    // Housing box profile gauge, the gap/contact gauges (wedge shoe, centre
+    // wedge, outer stationary plate, taper stationary plate, spring seat),
+    // the movable-plate 180° rotation check, and the pre-existing
+    // coupler/knuckle/lock/housing items are physical GO/NO-GO or visual
+    // checks with no digital caliper reading defined — no AR Caliper button.
+    return null;
+  }
+
   if (category === 'SPRINGS' || name.includes('spring') || name.includes('स्प्रिंग')) {
     if (name.includes('snubber') || name.includes('स्नबर')) return 'SNUBBER_SPRING';
     if (name.includes('inner') || name.includes('भीतरी') || name.includes('इनर')) return 'INNER_SPRING';
@@ -165,7 +186,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
         const data = detailRes.data;
         setWagon(data);
         setTimeline(data.timeline || []);
-        setChecklist(data.checklistSummary?.categories ? Object.values(data.checklistSummary.categories).flat() : []);
+        setChecklist(data.checklistSummary?.categories ? (Object.values(data.checklistSummary.categories).flat() as ChecklistItem[]) : []);
         setCategories(data.checklistSummary?.categories || {});
         setGateStatus(data.gateStatus);
         setPhotos(data.photos || []);
@@ -954,25 +975,28 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                         );
                       })}
 
-                      {/* Smart Vision AR Caliper Button */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const target = resolveComponentTarget(item.partName, item.category);
-                          setSmartVisionModalTarget({
-                            category: item.category,
-                            partName: item.partName,
-                            itemId: item.id,
-                            bogiePosition: item.bogiePosition,
-                            initialTarget: target
-                          });
-                        }}
-                        className="min-h-[48px] px-3 py-2 bg-blue-950/60 hover:bg-blue-900 border border-blue-700/60 rounded-xl text-xs text-blue-300 font-bold transition flex items-center gap-1.5 shadow-sm"
-                        title="Measure with Smart Vision AR Caliper"
-                      >
-                        <span>🤖</span>
-                        <span className="hidden sm:inline">{t('actions.smartVision') || 'AR Caliper'}</span>
-                      </button>
+                      {/* Smart Vision AR Caliper Button — only for items with a real digital tolerance spec */}
+                      {resolveComponentTarget(item.partName, item.category) && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const target = resolveComponentTarget(item.partName, item.category);
+                            if (!target) return;
+                            setSmartVisionModalTarget({
+                              category: item.category,
+                              partName: item.partName,
+                              itemId: item.id,
+                              bogiePosition: item.bogiePosition,
+                              initialTarget: target
+                            });
+                          }}
+                          className="min-h-[48px] px-3 py-2 bg-blue-950/60 hover:bg-blue-900 border border-blue-700/60 rounded-xl text-xs text-blue-300 font-bold transition flex items-center gap-1.5 shadow-sm"
+                          title="Measure with Smart Vision AR Caliper"
+                        >
+                          <span>🤖</span>
+                          <span className="hidden sm:inline">{t('actions.smartVision') || 'AR Caliper'}</span>
+                        </button>
+                      )}
 
                       {/* Photo Attach Button */}
                       <button
@@ -1156,7 +1180,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                     )}
                   </div>
                   <span className="text-[11px] text-slate-400">
-                    {new Date(tr.transitionTimestamp).toLocaleString()}
+                    {new Date(tr.timestamp).toLocaleString()}
                   </span>
                 </div>
 
@@ -1164,8 +1188,8 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                   <span>
                     By: {tr.performerName} ({tr.performerRole})
                   </span>
-                  {tr.dwellHours !== undefined && (
-                    <span className="font-mono text-orange-400">Dwell: {tr.dwellHours}h</span>
+                  {tr.durationInStageHours !== undefined && (
+                    <span className="font-mono text-orange-400">Dwell: {tr.durationInStageHours}h</span>
                   )}
                 </div>
 
@@ -1714,17 +1738,43 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
         />
       )}
 
-      {/* Smart Vision AR Viewfinder Modal */}
+      {/* Smart Vision AR & Caliper OCR Viewfinder Modal */}
       {smartVisionModalTarget && (
-        <SmartVisionCamera
-          lang={lang || 'en'}
-          wagonNumber={wagonNumber}
-          bogieType={(wagon?.wagonType?.includes('HS') ? 'CASNUB_22_HS' : 'CASNUB_22_NLB') as BogieType}
-          condition="USED"
-          initialTarget={smartVisionModalTarget.initialTarget || 'OUTER_SPRING'}
-          onMeasurementCaptured={handleSmartVisionMeasurementCaptured}
-          onClose={() => setSmartVisionModalTarget(null)}
-        />
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setSmartVisionModalTarget(null)} />
+          
+          {/* Modal Container */}
+          <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-700 shadow-2xl rounded-2xl overflow-hidden flex flex-col max-h-[95vh]">
+            <CaliperCamera
+              lang={lang || 'en'}
+              wagonNumber={wagonNumber}
+              bogieType={(wagon?.wagonType?.includes('HS') ? 'CASNUB_22_HS' : 'CASNUB_22_NLB') as BogieType}
+              condition="USED"
+              initialTarget={smartVisionModalTarget.initialTarget || 'OUTER_SPRING'}
+              measuredHeight={null}
+              onClose={() => setSmartVisionModalTarget(null)}
+              onMeasurementChange={(height, _source, confidence) => {
+                const componentType = smartVisionModalTarget.initialTarget || 'OUTER_SPRING';
+                const bogieType = (wagon?.wagonType?.includes('HS') ? 'CASNUB_22_HS' : 'CASNUB_22_NLB') as BogieType;
+                const verdict = computeComponentVerdict(componentType, height, bogieType, 'USED');
+                handleSmartVisionMeasurementCaptured({
+                  componentType,
+                  measuredValue: height,
+                  nominalValue: verdict.nominalValue,
+                  delta: verdict.delta,
+                  status: verdict.status,
+                  band: verdict.band,
+                  bandRoman: verdict.bandRoman,
+                  toleranceRange: verdict.validRange,
+                  confidence: confidence ?? 1.0,
+                  tableReference: verdict.tableReference,
+                  timestamp: new Date().toISOString()
+                });
+              }}
+            />
+          </div>
+        </div>
       )}
 
       {/* Release Certificate Modal */}

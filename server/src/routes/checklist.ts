@@ -10,6 +10,7 @@ import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.ts';
 import { requireRole } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
+import { logAuditEvent } from '../db/auditLog.ts';
 import type {
   VoiceActionRequest,
   VoiceActionResponse,
@@ -244,18 +245,15 @@ checklistRouter.post('/voice-action', optionalAuthMiddleware, async (req: Reques
       recordedAt: timestamp
     };
 
-    db.prepare(`
-      INSERT INTO inspection_audit_log (
-        id, inspection_id, event_type, user_id, user_role, payload_json, created_at
-      ) VALUES (?, ?, 'CHECKLIST_ITEM_INSPECTED', ?, ?, ?, ?)
-    `).run(
-      auditId,
-      inspectionId || null,
-      inspectorId,
+    logAuditEvent(db, {
+      id: auditId,
+      inspectionId: inspectionId || null,
+      eventType: 'CHECKLIST_ITEM_INSPECTED' as any,
+      userId: inspectorId,
       userRole,
-      JSON.stringify(auditPayload),
-      timestamp
-    );
+      payload: auditPayload,
+      createdAt: timestamp
+    });
 
     const statusMapEn: Record<PartInspectionStatus, string> = {
       PASS: 'PASS',

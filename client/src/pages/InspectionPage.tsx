@@ -399,38 +399,6 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
         </div>
       </div>
 
-      {/* AI Acoustic Diagnostic Agent Panel */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 shadow-lg space-y-4">
-        <h2 className="text-sm font-extrabold text-blue-400 uppercase tracking-wider flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-blue-900/50 border border-blue-500/30 text-blue-400 flex items-center justify-center text-xs">
-              <Volume2Icon size={12} />
-            </span>
-            <span>{lang === 'hi' ? 'एआई ध्वनिक निदान (AI Acoustic Triage)' : 'AI Acoustic Bearing Diagnostics'}</span>
-          </div>
-          <span className="text-[10px] font-mono bg-blue-900/30 text-blue-400 px-2 py-0.5 rounded border border-blue-800/50">M5 AGENT</span>
-        </h2>
-        <div className="flex items-center gap-4 bg-slate-950 p-3 rounded-xl border border-slate-800 relative overflow-hidden">
-           <div className="w-12 h-12 rounded-full bg-slate-900 flex items-center justify-center border border-slate-700 relative overflow-hidden shrink-0">
-             <div className="absolute inset-0 bg-blue-500/10 animate-pulse" />
-             <div className="flex gap-[2px] items-end h-5">
-               {[1,2,3,4,5,6].map(i => (
-                 <div key={i} className="w-1 bg-blue-400 rounded-t-sm" style={{ animation: `bounce ${0.5 + (i * 0.1)}s infinite alternate`, height: `${30 + Math.random() * 70}%` }} />
-               ))}
-             </div>
-           </div>
-           <div className="flex-1 relative z-10">
-              <p className="text-xs font-bold text-slate-300">Status: <span className="text-emerald-400 ml-1">Listening to ambient frequency...</span></p>
-              <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">Edge AI Agent scanning for micro-fracture acoustic anomalies</p>
-           </div>
-           <button 
-             type="button"
-             className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-95 text-white text-xs font-bold rounded-lg shadow-lg transition-all"
-           >
-             Run AI Triage
-           </button>
-        </div>
-      </div>
 
       {/* Section 2: Caliper Camera & OCR Pipeline */}
       <div className="space-y-2">

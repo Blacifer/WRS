@@ -11,9 +11,10 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import type { User, LanguageCode } from '../../../shared/types.ts';
+import type { User, LanguageCode, WagonRecord } from '../../../shared/types.ts';
 import { getDictionary } from '../i18n/index.ts';
 import { offlineDb } from '../services/offlineDb.ts';
+import { api } from '../services/api.ts';
 import { CameraIcon, RefreshCwIcon, GlobeIcon, CheckCircleIcon, ShieldIcon } from './Icons.tsx';
 
 export interface InspectorLandingViewProps {
@@ -29,14 +30,6 @@ export interface InspectorLandingViewProps {
   onContinueChecklist: (wagonNumber: string) => void;
   onLogout?: () => void;
 }
-
-// Preset workshop wagons for quick 1-tap testing & shop floor selection
-const WORKSHOP_WAGONS = [
-  { wagonNumber: 'SECR-BOXN-101', type: 'BOXN', railway: 'SECR', stage: 'COMPONENT_INSPECTION', bay: 'Bay 3' },
-  { wagonNumber: 'SECR/BOXNHL/2024/9910', type: 'BOXNHL', railway: 'SECR', stage: 'COMPONENT_INSPECTION', bay: 'Bay 2' },
-  { wagonNumber: 'SECR/BCN/2023/5041', type: 'BCN', railway: 'SECR', stage: 'DISMANTLING', bay: 'Bay 1' },
-  { wagonNumber: 'SECR/BOXNHL/44202', type: 'BOXNHL', railway: 'SECR', stage: 'REASSEMBLY', bay: 'Bay 4' }
-];
 
 export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
   user,
@@ -58,6 +51,9 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [isWagonSelectorOpen, setIsWagonSelectorOpen] = useState<boolean>(false);
   const [manualInput, setManualInput] = useState<string>('');
+  const [activeWagonInfo, setActiveWagonInfo] = useState<WagonRecord | null>(null);
+  const [activeWagonLoadFailed, setActiveWagonLoadFailed] = useState<boolean>(false);
+  const [recentWagons, setRecentWagons] = useState<WagonRecord[]>([]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -74,13 +70,36 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
     };
   }, []);
 
-  const currentWagonInfo = WORKSHOP_WAGONS.find(w => w.wagonNumber === activeWagonNumber) || {
-    wagonNumber: activeWagonNumber || 'SECR-BOXN-101',
-    type: 'BOXN',
-    railway: 'SECR',
-    stage: 'COMPONENT_INSPECTION',
-    bay: 'Bay 3'
-  };
+  // Look up the real record for the currently active wagon (if any) — never
+  // fabricate placeholder data for a wagon that isn't actually in the system.
+  useEffect(() => {
+    let cancelled = false;
+    if (!activeWagonNumber) {
+      setActiveWagonInfo(null);
+      setActiveWagonLoadFailed(false);
+      return;
+    }
+    setActiveWagonLoadFailed(false);
+    api.getWagonDetail(activeWagonNumber)
+      .then((res) => {
+        if (cancelled) return;
+        setActiveWagonInfo(res?.data || null);
+        if (!res?.data) setActiveWagonLoadFailed(true);
+      })
+      .catch(() => {
+        if (!cancelled) setActiveWagonLoadFailed(true);
+      });
+    return () => { cancelled = true; };
+  }, [activeWagonNumber]);
+
+  // Real, currently in-progress wagons for the quick-pick switcher — not a
+  // hardcoded demo list that would 404 the moment someone selects it.
+  useEffect(() => {
+    if (!isWagonSelectorOpen) return;
+    api.queryWagons({ limit: 8 })
+      .then((res) => setRecentWagons((res?.data || []).filter(w => w.currentStage !== 'RELEASE')))
+      .catch(() => setRecentWagons([]));
+  }, [isWagonSelectorOpen]);
 
   const handleManualWagonSelect = (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,61 +182,108 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
       <div data-testid="active-wagon-card" className="bg-gradient-to-r from-blue-950/40 via-slate-900 to-indigo-950/30 border-2 border-blue-500/40 rounded-3xl p-5 sm:p-7 shadow-2xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none"></div>
 
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 relative z-10">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-blue-900/80 text-blue-200 border border-blue-600 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-blue-400 animate-ping"></span>
-                {isHi ? 'सक्रिय निरीक्षण सत्र' : 'Active Inspection Session'}
-              </span>
-              <span className="text-xs text-slate-400 font-medium">
-                {currentWagonInfo.bay}
-              </span>
-            </div>
-
+        {!activeWagonNumber ? (
+          /* No wagon selected yet — don't fabricate one */
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative z-10">
             <div>
               <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
-                {isHi ? 'वर्तमान चयनित वैगन' : 'Current Active Wagon'}
+                {isHi ? 'कोई सक्रिय वैगन नहीं' : 'No Active Wagon'}
               </div>
-              <div data-testid="active-wagon-number" className="text-2xl sm:text-4xl font-black text-white font-mono tracking-wider text-glow-blue mt-0.5">
-                {currentWagonInfo.wagonNumber}
-              </div>
+              <p className="text-sm text-slate-300 mt-1">
+                {isHi ? 'शुरू करने के लिए QR स्कैन करें या वैगन चुनें' : 'Scan a QR code or select a wagon to get started'}
+              </p>
             </div>
-
-            <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-300">
-              <span className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700">
-                {isHi ? 'प्रकार:' : 'Type:'} <strong className="text-white">{currentWagonInfo.type}</strong>
-              </span>
-              <span className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700">
-                {isHi ? 'रेलवे:' : 'Zone:'} <strong className="text-white">{currentWagonInfo.railway}</strong>
-              </span>
-              <span className="px-2.5 py-1 rounded-lg bg-blue-950 text-blue-300 border border-blue-800">
-                {isHi ? 'चरण: घटक निरीक्षण' : 'Stage: Component Inspection'}
-              </span>
+            <div className="flex items-stretch sm:items-center gap-3">
+              <button
+                onClick={onOpenQRScanner}
+                className="min-h-[52px] px-5 py-3 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-extrabold text-sm rounded-2xl shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95 border border-blue-400"
+              >
+                <span>📷</span>
+                <span>{isHi ? 'QR स्कैन करें' : 'Scan QR'}</span>
+              </button>
+              <button
+                data-testid="btn-switch-wagon"
+                onClick={() => setIsWagonSelectorOpen(true)}
+                className="min-h-[52px] px-4 py-3 bg-slate-800/90 hover:bg-slate-700 active:bg-slate-900 text-slate-200 hover:text-white font-bold text-sm rounded-2xl border border-slate-700 flex items-center justify-center gap-2 transition-all active:scale-95"
+              >
+                <span>🔍</span>
+                <span>{isHi ? 'वैगन चुनें' : 'Select Wagon'}</span>
+              </button>
             </div>
           </div>
-
-          {/* Large Action Buttons on Active Wagon (>= 56px height, spacious touch target) */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <button
-              data-testid="btn-continue-checklist"
-              onClick={() => onContinueChecklist(currentWagonInfo.wagonNumber)}
-              className="min-h-[56px] px-6 py-3 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-extrabold text-base rounded-2xl shadow-xl shadow-blue-900/30 flex items-center justify-center gap-2 transition-all active:scale-95 border border-blue-400"
-            >
-              <span>{isHi ? 'चेकलिस्ट जारी रखें' : 'Continue Checklist'}</span>
-              <span className="text-xl">→</span>
-            </button>
-
+        ) : activeWagonLoadFailed ? (
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative z-10">
+            <div>
+              <div className="text-xs text-rose-400 font-semibold uppercase tracking-wider">
+                {isHi ? 'वैगन नहीं मिला' : 'Wagon Not Found'}
+              </div>
+              <p className="text-sm text-slate-300 mt-1 font-mono">{activeWagonNumber}</p>
+            </div>
             <button
               data-testid="btn-switch-wagon"
               onClick={() => setIsWagonSelectorOpen(true)}
-              className="min-h-[56px] px-4 py-3 bg-slate-800/90 hover:bg-slate-700 active:bg-slate-900 text-slate-200 hover:text-white font-bold text-sm rounded-2xl border border-slate-700 flex items-center justify-center gap-2 transition-all active:scale-95"
+              className="min-h-[52px] px-4 py-3 bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-sm rounded-2xl border border-slate-700 flex items-center justify-center gap-2 transition-all active:scale-95"
             >
               <span>🔄</span>
               <span>{isHi ? 'वैगन बदलें' : 'Switch Wagon'}</span>
             </button>
           </div>
-        </div>
+        ) : (
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 relative z-10">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-blue-900/80 text-blue-200 border border-blue-600 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-blue-400 animate-ping"></span>
+                  {isHi ? 'सक्रिय निरीक्षण सत्र' : 'Active Inspection Session'}
+                </span>
+              </div>
+
+              <div>
+                <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
+                  {isHi ? 'वर्तमान चयनित वैगन' : 'Current Active Wagon'}
+                </div>
+                <div data-testid="active-wagon-number" className="text-2xl sm:text-4xl font-black text-white font-mono tracking-wider text-glow-blue mt-0.5">
+                  {activeWagonNumber}
+                </div>
+              </div>
+
+              {activeWagonInfo && (
+                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-300">
+                  <span className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700">
+                    {isHi ? 'प्रकार:' : 'Type:'} <strong className="text-white">{activeWagonInfo.wagonType}</strong>
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700">
+                    {isHi ? 'रेलवे:' : 'Zone:'} <strong className="text-white">{activeWagonInfo.owningRailway}</strong>
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg bg-blue-950 text-blue-300 border border-blue-800">
+                    {isHi ? 'चरण:' : 'Stage:'} {activeWagonInfo.currentStage}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Large Action Buttons on Active Wagon (>= 56px height, spacious touch target) */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <button
+                data-testid="btn-continue-checklist"
+                onClick={() => onContinueChecklist(activeWagonNumber)}
+                className="min-h-[56px] px-6 py-3 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-extrabold text-base rounded-2xl shadow-xl shadow-blue-900/30 flex items-center justify-center gap-2 transition-all active:scale-95 border border-blue-400"
+              >
+                <span>{isHi ? 'चेकलिस्ट जारी रखें' : 'Continue Checklist'}</span>
+                <span className="text-xl">→</span>
+              </button>
+
+              <button
+                data-testid="btn-switch-wagon"
+                onClick={() => setIsWagonSelectorOpen(true)}
+                className="min-h-[56px] px-4 py-3 bg-slate-800/90 hover:bg-slate-700 active:bg-slate-900 text-slate-200 hover:text-white font-bold text-sm rounded-2xl border border-slate-700 flex items-center justify-center gap-2 transition-all active:scale-95"
+              >
+                <span>🔄</span>
+                <span>{isHi ? 'वैगन बदलें' : 'Switch Wagon'}</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 3. 4 Primary Large Action Cards (Touch Target >= 96px, High Contrast) */}
@@ -294,7 +360,7 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
             </div>
           </button>
 
-          {/* Card 3: Smart Vision AR Inspection (Emerald Green) */}
+          {/* Card 3: Spring Batch Inspection (Emerald Green) */}
           <button
             data-testid="cta-smart-vision"
             onClick={onOpenSmartVision}
@@ -307,16 +373,16 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-extrabold uppercase px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
-                    {isHi ? 'एआई संदर्भ फ़िल्टर' : 'Context Filter AR'}
+                    {isHi ? 'तेज़ बैच प्रोसेसिंग' : 'Fast Batch Processing'}
                   </span>
                 </div>
                 <h3 className="text-xl font-extrabold text-white group-hover:text-emerald-300 transition-colors">
-                  {isHi ? 'स्मार्ट विज़न एआर निरीक्षण' : 'Smart Vision AR Inspection'}
+                  {isHi ? 'स्प्रिंग बैच निरीक्षण' : 'Spring Batch Inspection'}
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-300 font-medium line-clamp-2">
-                  {isHi 
-                    ? 'वास्तविक समय एआर कैलिपर्स — मानव एवं बैकग्राउंड शोर का स्वतः दमन' 
-                    : 'Real-time AR calipers with AI noise & human background suppression'}
+                  {isHi
+                    ? 'एक बोगी के सभी 6 स्प्रिंग एक के बाद एक — कैमरा OCR या मैनुअल एंट्री'
+                    : 'All 6 springs in a bogie, one after another — camera OCR or manual entry'}
                 </p>
               </div>
             </div>
@@ -386,7 +452,12 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
                 {isHi ? 'कार्यशाला में सक्रिय वैगन' : 'Active Workshop Wagons'}
               </span>
               <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto no-scrollbar">
-                {WORKSHOP_WAGONS.map(w => (
+                {recentWagons.length === 0 && (
+                  <p className="text-xs text-slate-500 italic px-1 py-2">
+                    {isHi ? 'कोई वैगन नहीं मिला — नीचे नंबर दर्ज करें' : 'No wagons found — enter a number below'}
+                  </p>
+                )}
+                {recentWagons.map(w => (
                   <button
                     key={w.wagonNumber}
                     onClick={() => {
@@ -401,7 +472,7 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
                   >
                     <div>
                       <div className="font-mono font-bold text-sm">{w.wagonNumber}</div>
-                      <div className="text-[11px] text-slate-400">{w.type} • {w.railway} • {w.bay}</div>
+                      <div className="text-[11px] text-slate-400">{w.wagonType} • {w.owningRailway} • {w.currentStage}</div>
                     </div>
                     {w.wagonNumber === activeWagonNumber && (
                       <span className="text-xs font-bold text-blue-400 bg-blue-950 px-2 py-1 rounded border border-blue-700">

@@ -562,4 +562,10 @@ export function runMigrations(db: DatabaseSync): void {
   }
 
   db.exec(schemaSql);
+
+  // Migration cleanup: older databases may still have this trigger from
+  // before inspection-insert audit logging moved to application code
+  // (it wrote unchained audit rows — no previous_hash/hash — which would
+  // now duplicate the chained entry written by InspectionRepository).
+  db.exec('DROP TRIGGER IF EXISTS trg_auto_log_inspection_insert;');
 }

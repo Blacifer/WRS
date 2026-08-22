@@ -293,44 +293,10 @@ BEGIN
   SELECT RAISE(ABORT, 'Audit log is strictly append-only. Audit log entries are immutable and cannot be deleted.');
 END;
 
--- Automatic audit log entry creation upon inspection insertion
-CREATE TRIGGER IF NOT EXISTS trg_auto_log_inspection_insert
-AFTER INSERT ON inspections
-BEGIN
-  INSERT INTO inspection_audit_log (
-    id,
-    inspection_id,
-    event_type,
-    user_id,
-    user_role,
-    payload_json,
-    created_at
-  ) VALUES (
-    lower(hex(randomblob(16))),
-    NEW.id,
-    CASE WHEN NEW.supervisor_override = 1 THEN 'SUPERVISOR_OVERRIDE_RECORDED' ELSE 'INSPECTION_CREATED' END,
-    NEW.inspector_id,
-    'INSPECTOR',
-    json_object(
-      'sequence_number', NEW.sequence_number,
-      'wagon_number', NEW.wagon_number,
-      'bogie_type', NEW.bogie_type,
-      'spring_condition', NEW.spring_condition,
-      'spring_position', NEW.spring_position,
-      'measured_height', NEW.measured_height,
-      'classified_band', NEW.classified_band,
-      'status', NEW.status,
-      'damage_type', NEW.damage_type,
-      'damage_notes', NEW.damage_notes,
-      'supervisor_override', NEW.supervisor_override,
-      'override_reason', NEW.override_reason,
-      'otp_token_ref', NEW.otp_token_ref,
-      'measurement_source', NEW.measurement_source,
-      'audit_hash', NEW.audit_hash
-    ),
-    NEW.created_at
-  );
-END;
+-- NOTE: Inspection-insert audit logging is done in application code
+-- (InspectionRepository.insertInspection -> auditLog.ts's logAuditEvent),
+-- not via a DB trigger here, because it needs to compute a SHA-256 hash
+-- chain (previous_hash/hash) that plain SQLite triggers cannot produce.
 
 -- Block UPDATE on wagon_transitions
 CREATE TRIGGER IF NOT EXISTS trg_prevent_wagon_transitions_update

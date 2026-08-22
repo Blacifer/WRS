@@ -10,6 +10,7 @@ import type { LanguageCode } from './i18n/index.ts';
 import { api } from './services/api.ts';
 import { Header } from './components/Header.tsx';
 import { InspectionPage } from './pages/InspectionPage.tsx';
+import { SpringBatchPage } from './pages/SpringBatchPage.tsx';
 import { HistoryPage } from './pages/HistoryPage.tsx';
 import { AnalyticsPage } from './pages/AnalyticsPage.tsx';
 import { LoginPage } from './pages/LoginPage.tsx';
@@ -20,7 +21,6 @@ import { DashboardPage } from './pages/DashboardPage.tsx';
 import { StoresInventoryPage } from './pages/StoresInventoryPage.tsx';
 import { ComponentPassportsPage } from './pages/ComponentPassportsPage.tsx';
 import { InspectorLandingView } from './components/InspectorLandingView.tsx';
-import { SmartVisionCamera } from './components/SmartVisionCamera.tsx';
 import { PassportQRScannerModal } from './components/PassportQRScannerModal.tsx';
 
 export { isUserInspector, isUserSupervisorOrAdmin, canAccessTab };
@@ -42,7 +42,7 @@ export const App: React.FC = () => {
     return 'wagons';
   });
 
-  const [selectedWagonNumber, setSelectedWagonNumber] = useState<string | null>('SECR-BOXN-101');
+  const [selectedWagonNumber, setSelectedWagonNumber] = useState<string | null>(null);
   const [isAdminExportOpen, setIsAdminExportOpen] = useState<boolean>(false);
   const [isQRScannerModalOpen, setIsQRScannerModalOpen] = useState<boolean>(false);
 
@@ -131,8 +131,13 @@ export const App: React.FC = () => {
               setSelectedWagonNumber(wNum);
             }}
             onOpenVoiceInspection={() => {
-              setSelectedWagonNumber(selectedWagonNumber || 'SECR-BOXN-101');
-              setActiveTab('wagons');
+              // Voice inspection happens on a wagon's checklist — if none is
+              // active yet, prompt a scan instead of fabricating a wagon number.
+              if (selectedWagonNumber) {
+                setActiveTab('wagons');
+              } else {
+                setIsQRScannerModalOpen(true);
+              }
             }}
             onOpenSmartVision={() => {
               setActiveTab('smart_vision');
@@ -199,14 +204,10 @@ export const App: React.FC = () => {
                 <span>←</span>
                 <span>{currentLang === 'hi' ? 'मुख्य पृष्ठ पर लौटें' : 'Back to Home'}</span>
               </button>
-              <div className="text-xs font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-800 px-3 py-1.5 rounded-full">
-                {currentLang === 'hi' ? 'एआई संदर्भ फ़िल्टर सक्रिय' : 'AI Context Filter: Active'}
-              </div>
             </div>
-            <SmartVisionCamera
+            <SpringBatchPage
               lang={currentLang}
-              wagonNumber={selectedWagonNumber || 'SECR-BOXN-101'}
-              inline={true}
+              user={user}
               onClose={() => setActiveTab(isInspector ? 'inspector_home' : 'wagons')}
             />
           </div>

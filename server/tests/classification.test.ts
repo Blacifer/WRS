@@ -5,7 +5,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { classifySpring, getRDSOTable } from '../src/classification/index.ts';
+import { classifySpring, getRDSOTable } from '../../shared/classification/index.ts';
 
 describe('RDSO G-95 Revision-II Spring Classification Engine Tests', () => {
 

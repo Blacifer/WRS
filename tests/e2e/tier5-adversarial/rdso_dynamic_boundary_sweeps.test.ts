@@ -12,8 +12,8 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { classifySpring as serverClassify } from '../../../server/src/classification/engine.ts';
-import { getRDSOTable as serverGetTable, RDSO_TABLES as SERVER_TABLES } from '../../../server/src/classification/tables.ts';
+import { classifySpring as serverClassify } from '../../../shared/classification/engine.ts';
+import { getRDSOTable as serverGetTable, RDSO_TABLES as SERVER_TABLES } from '../../../shared/classification/tables.ts';
 import { classifySpring as harnessClassify, getRDSOTable as harnessGetTable, RDSO_TABLES as HARNESS_TABLES } from '../../harness/classification_engine.ts';
 import type { BogieType, SpringCondition, SpringPosition, DamageType, ClassificationRequest } from '../../../shared/types.ts';
 

@@ -129,7 +129,6 @@ export function playCondemnedBuzz(): void {
     // Gracefully ignore audio restrictions
     console.debug('[Audio] Condemned buzz skipped:', err);
   }
-  }
 }
 
 /**

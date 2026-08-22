@@ -5,6 +5,7 @@
 
 import { DatabaseSync } from 'node:sqlite';
 import crypto from 'node:crypto';
+import { logAuditEvent } from './auditLog.ts';
 import type {
   StoresPart,
   InventoryReservation,
@@ -164,28 +165,25 @@ export class InventoryRepository {
       now
     );
 
-    // Log audit event
-    try {
-      this.db.prepare(`
-        INSERT INTO inspection_audit_log (
-          id, inspection_id, event_type, user_id, user_role, ip_address, payload_json, created_at
-        ) VALUES (?, NULL, 'INVENTORY_RESERVED', 'system_omrs', 'SYSTEM', '127.0.0.1', ?, ?)
-      `).run(
-        `audit_${crypto.randomUUID()}`,
-        JSON.stringify({
-          reservationId,
-          wagonNumber,
-          partCode,
-          quantity,
-          source,
-          predictedDefect,
-          confidenceScore
-        }),
-        now
-      );
-    } catch {
-      // Ignore if system user foreign key or schema variant
-    }
+    // Log audit event — 'usr_adm_001' is the always-seeded system/admin actor
+    // for automated events; a fake unseeded id here would silently violate
+    // the users FK and drop the audit entry.
+    logAuditEvent(this.db, {
+      eventType: 'INVENTORY_RESERVED' as any,
+      userId: 'usr_adm_001',
+      userRole: 'SYSTEM',
+      ipAddress: '127.0.0.1',
+      payload: {
+        reservationId,
+        wagonNumber,
+        partCode,
+        quantity,
+        source,
+        predictedDefect,
+        confidenceScore
+      },
+      createdAt: now
+    });
 
     const createdRow = this.db.prepare(`
       SELECT r.*, i.part_name, i.bin_location, i.category
@@ -243,24 +241,19 @@ export class InventoryRepository {
     `).run(qty, qty, now, reservation.partCode);
 
     // Log audit event
-    try {
-      this.db.prepare(`
-        INSERT INTO inspection_audit_log (
-          id, inspection_id, event_type, user_id, user_role, ip_address, payload_json, created_at
-        ) VALUES (?, NULL, 'INVENTORY_ISSUED', 'stores_depot', 'SUPERVISOR', '127.0.0.1', ?, ?)
-      `).run(
-        `audit_${crypto.randomUUID()}`,
-        JSON.stringify({
-          reservationId: reservation.id,
-          wagonNumber: reservation.wagonNumber,
-          partCode: reservation.partCode,
-          quantity: qty
-        }),
-        now
-      );
-    } catch {
-      // ignore
-    }
+    logAuditEvent(this.db, {
+      eventType: 'INVENTORY_ISSUED' as any,
+      userId: 'usr_adm_001',
+      userRole: 'SUPERVISOR',
+      ipAddress: '127.0.0.1',
+      payload: {
+        reservationId: reservation.id,
+        wagonNumber: reservation.wagonNumber,
+        partCode: reservation.partCode,
+        quantity: qty
+      },
+      createdAt: now
+    });
 
     const updatedPart = this.getPartByCode(reservation.partCode)!;
     const updatedResRow = this.db.prepare(`
@@ -304,23 +297,18 @@ export class InventoryRepository {
     `).run(qty, now, cleanCode);
 
     // Log audit event
-    try {
-      this.db.prepare(`
-        INSERT INTO inspection_audit_log (
-          id, inspection_id, event_type, user_id, user_role, ip_address, payload_json, created_at
-        ) VALUES (?, NULL, 'INVENTORY_RESTOCKED', 'stores_depot', 'SUPERVISOR', '127.0.0.1', ?, ?)
-      `).run(
-        `audit_${crypto.randomUUID()}`,
-        JSON.stringify({
-          partCode: cleanCode,
-          restockedQuantity: qty,
-          newStockQuantity: part.stockQuantity + qty
-        }),
-        now
-      );
-    } catch {
-      // ignore
-    }
+    logAuditEvent(this.db, {
+      eventType: 'INVENTORY_RESTOCKED' as any,
+      userId: 'usr_adm_001',
+      userRole: 'SUPERVISOR',
+      ipAddress: '127.0.0.1',
+      payload: {
+        partCode: cleanCode,
+        restockedQuantity: qty,
+        newStockQuantity: part.stockQuantity + qty
+      },
+      createdAt: now
+    });
 
     return this.getPartByCode(cleanCode)!;
   }

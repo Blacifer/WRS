@@ -5,7 +5,7 @@
 
 import { Router } from '../framework/index.ts';
 import type { Request, Response, NextFunction } from '../framework/index.ts';
-import { classifySpring } from '../classification/engine.ts';
+import { classifySpring } from '../../../shared/classification/engine.ts';
 import type { ClassificationRequest } from '../../../shared/types.ts';
 
 export const classifyRouter = Router();

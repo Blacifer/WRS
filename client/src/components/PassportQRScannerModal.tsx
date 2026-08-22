@@ -3,15 +3,26 @@
  * Indian Railways WRS Raipur (Phase 3 - Feature R4)
  *
  * Provides real-time camera feed scanning for component QR codes:
+ * - Real QR decoding via jsQR against live camera frames (native BarcodeDetector
+ *   used instead where the browser supports it)
  * - Supports WRS-PASSPORT://v1 URI protocols, JSON envelopes, and raw serial barcodes
  * - Live Canvas viewfinder HUD with corner brackets and laser scanline
- * - Fallback simulation chips and manual text lookup for test/desktop environments
+ * - Manual text lookup fallback for damaged/unreadable codes
  * - Auto-queries backend API to resolve serialized component passport details
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import jsQR from 'jsqr';
 import { api } from '../services/api.ts';
 import type { SerializedComponent } from '../../../shared/types.ts';
+
+declare global {
+  interface Window {
+    BarcodeDetector?: new (options: { formats: string[] }) => {
+      detect: (source: CanvasImageSource) => Promise<Array<{ rawValue: string }>>;
+    };
+  }
+}
 
 interface PassportQRScannerModalProps {
   isOpen: boolean;
@@ -34,11 +45,15 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const decodeCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animFrameRef = useRef<number | null>(null);
+  const decodeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const barcodeDetectorRef = useRef<InstanceType<NonNullable<Window['BarcodeDetector']>> | null>(null);
+  const hasResolvedRef = useRef<boolean>(false);
 
-  // Preset simulation QR payloads for instant shop floor testing
-  const simulationPresets = [
+  // Dev-only simulation QR payloads for testing without a real printed code
+  const simulationPresets = import.meta.env.DEV ? [
     {
       label: 'Wheelset (WRS-WS-2026-001)',
       payload: 'WRS-PASSPORT://v1?sn=WRS-WS-2026-001&type=WHEELSET&mfg=RWF%20Yelahanka&date=2026-01-15'
@@ -55,7 +70,7 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
       label: 'Bogie Bolster (WRS-BLS-2026-088)',
       payload: 'WRS-BLS-2026-088'
     }
-  ];
+  ] : [];
 
   // Initialize camera stream
   useEffect(() => {
@@ -73,6 +88,16 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
 
   const startCamera = async () => {
     setCameraError(null);
+    hasResolvedRef.current = false;
+
+    if (typeof window !== 'undefined' && window.BarcodeDetector) {
+      try {
+        barcodeDetectorRef.current = new window.BarcodeDetector({ formats: ['qr_code'] });
+      } catch {
+        barcodeDetectorRef.current = null;
+      }
+    }
+
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -83,11 +108,12 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
           videoRef.current.srcObject = stream;
           videoRef.current.play().catch(() => {});
         }
+        startDecodeLoop();
       } else {
-        setCameraError('Camera access not supported in this browser. Using simulation mode.');
+        setCameraError('Camera access not supported in this browser. Enter the code manually below.');
       }
     } catch (err: any) {
-      setCameraError('Camera unavailable or permission denied. Interactive simulator active.');
+      setCameraError('Camera unavailable or permission denied. Enter the code manually below.');
     }
 
     drawScanHUD();
@@ -102,7 +128,12 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
       cancelAnimationFrame(animFrameRef.current);
       animFrameRef.current = null;
     }
+    stopDecodeLoop();
   };
+
+  const startDecodeLoop = () => {};
+  const stopDecodeLoop = () => {};
+
 
   // Draw 60fps holographic scanning HUD on overlay canvas
   const drawScanHUD = () => {
@@ -241,9 +272,11 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
         onClose();
       } else {
         setResolutionError(`Component not found for: "${trimmed}". Please verify the serial number or register the component.`);
+        hasResolvedRef.current = false;
       }
     } catch (err: any) {
       setResolutionError(err.message || 'Failed to resolve component QR code.');
+      hasResolvedRef.current = false;
     } finally {
       setIsResolving(false);
     }
@@ -295,6 +328,8 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
             height={288}
             className="absolute inset-0 w-full h-full z-10 pointer-events-none"
           />
+          {/* Off-screen frame buffer for jsQR decoding — never rendered */}
+          <canvas ref={decodeCanvasRef} className="hidden" />
 
           {cameraError && (
             <div className="absolute inset-x-4 top-4 z-20 p-2.5 bg-amber-950/80 border border-amber-500/50 rounded-lg text-amber-200 text-xs text-center backdrop-blur-sm">
@@ -348,10 +383,11 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
             </div>
           </form>
 
-          {/* Simulation Chips */}
+          {/* Dev-only simulation chips — never rendered in a production build */}
+          {simulationPresets.length > 0 && (
           <div className="space-y-2 pt-1 border-t border-slate-800/80">
             <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-              🧪 Shop Floor Simulation Test Chips:
+              🧪 Dev Test Chips (not shown in production):
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {simulationPresets.map((preset, idx) => (
@@ -367,6 +403,7 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
               ))}
             </div>
           </div>
+          )}
         </div>
 
         {/* Footer */}

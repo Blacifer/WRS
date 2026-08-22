@@ -19,7 +19,7 @@ import { InspectionRepository } from '../server/src/db/repository.ts';
 import { LifecycleEngine } from '../server/src/lifecycle/engine.ts';
 import { ExitGateValidator } from '../server/src/gate/validator.ts';
 import { CertificateGenerator } from '../server/src/reports/certificate.ts';
-import { classifySpring } from '../server/src/classification/engine.ts';
+import { classifySpring } from '../shared/classification/engine.ts';
 import type { LifecycleStage } from '../shared/types.ts';
 
 describe('=== INDEPENDENT VICTORY AUDITOR VERIFICATION SUITE ===', () => {
