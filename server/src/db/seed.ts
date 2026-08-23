@@ -2503,8 +2503,14 @@ export function seedDemoData(db?: DatabaseSync): void {
     }
   }
 
+  const wagonCount = (database.prepare('SELECT COUNT(*) as c FROM wagons').get() as any).c;
+  const springCount = (database.prepare('SELECT COUNT(*) as c FROM inspections').get() as any).c;
+  const checklistCount = (database.prepare('SELECT COUNT(*) as c FROM checklist_items').get() as any).c;
+  const inventoryCount = (database.prepare('SELECT COUNT(*) as c FROM stores_inventory').get() as any).c;
+  const componentCount = (database.prepare('SELECT COUNT(*) as c FROM components').get() as any).c;
+
   console.log('✅ [Demo Seed] Rich Demo Seeding successfully finished!');
-  console.log(`📊 Summary: 13 Wagons across all 7 stages, 40 Springs across all 6 RDSO bands, 416 Checklist Items, 12 Stores Inventory Parts, 5 Trackside OMRS Scans, 22 Serialized Components.`);
+  console.log(`📊 Summary: ${wagonCount} Wagons across all 7 stages, ${springCount} Springs, ${checklistCount} Checklist Items, ${inventoryCount} Stores Inventory Parts, ${componentCount} Serialized Components.`);
 }
 
 // ---------------------------------------------------------------------------
