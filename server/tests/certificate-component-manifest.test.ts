@@ -11,6 +11,7 @@ import { WagonRepository } from '../src/db/wagonRepository.ts';
 import { InspectionRepository } from '../src/db/repository.ts';
 import { ComponentRepository } from '../src/db/componentRepository.ts';
 import { CertificateGenerator } from '../src/reports/certificate.ts';
+import { generateToken } from '../src/auth/jwt.ts';
 import type { ExpressApp } from '../src/framework/index.ts';
 
 describe('Phase 3 M1: Release Certificate Serialized Component Manifest (R4)', () => {
@@ -18,10 +19,22 @@ describe('Phase 3 M1: Release Certificate Serialized Component Manifest (R4)', (
   let wagonRepo: WagonRepository;
   let inspectionRepo: InspectionRepository;
   let componentRepo: ComponentRepository;
+  let supervisorToken: string;
   const testWagon = 'SECR/BOXNHL/10492';
+  const unsignedWagon = 'SECR/BOXNHL/99777';
 
   before(() => {
     app = createApp(':memory:');
+
+    // The certificate endpoint requires an authenticated user — a release
+    // certificate is a formal safety attestation, not public data.
+    supervisorToken = generateToken({
+      id: 'usr_sup_001',
+      username: 'supervisor1',
+      role: 'SUPERVISOR',
+      name: 'S. K. Verma',
+      employeeId: 'WRS-SUP-2019'
+    });
     const db = getDatabase();
     wagonRepo = new WagonRepository(db);
     inspectionRepo = new InspectionRepository(db);
@@ -163,7 +176,8 @@ describe('Phase 3 M1: Release Certificate Serialized Component Manifest (R4)', (
   it('TC-CERT-MANIFEST-04: GET /api/wagons/:wagonNumber/certificate?format=json returns component manifest', async () => {
     const res = await app.dispatch({
       method: 'GET',
-      url: `/api/wagons/${encodeURIComponent(testWagon)}/certificate?format=json`
+      url: `/api/wagons/${encodeURIComponent(testWagon)}/certificate?format=json`,
+      headers: { authorization: `Bearer ${supervisorToken}` }
     });
 
     assert.strictEqual(res.status, 200);
@@ -175,12 +189,76 @@ describe('Phase 3 M1: Release Certificate Serialized Component Manifest (R4)', (
   it('TC-CERT-MANIFEST-05: GET /api/wagons/:wagonNumber/certificate returns HTML with Section 3 manifest', async () => {
     const res = await app.dispatch({
       method: 'GET',
-      url: `/api/wagons/${encodeURIComponent(testWagon)}/certificate?format=html`
+      url: `/api/wagons/${encodeURIComponent(testWagon)}/certificate?format=html`,
+      headers: { authorization: `Bearer ${supervisorToken}` }
     });
 
     assert.strictEqual(res.status, 200);
     assert.ok(typeof res.body === 'string');
     assert.ok(res.body.includes('3. Serialized Component Health Passport Manifest (RDSO R4 Serialization)'));
     assert.ok(res.body.includes('WHL-RWF-2023-8841'));
+  });
+
+  // -------------------------------------------------------------------------
+  // 5. Release-authorisation guards
+  //
+  // Regression cover for a defect where this endpoint issued a full
+  // "100% PASSED" release certificate for ANY wagon, at any lifecycle stage,
+  // to any unauthenticated caller — including wagons the exit gate was
+  // actively blocking.
+  // -------------------------------------------------------------------------
+  it('TC-CERT-GUARD-01: certificate endpoint rejects unauthenticated callers', async () => {
+    const res = await app.dispatch({
+      method: 'GET',
+      url: `/api/wagons/${encodeURIComponent(testWagon)}/certificate`
+    });
+
+    assert.strictEqual(res.status, 401);
+  });
+
+  it('TC-CERT-GUARD-02: refuses to issue a release certificate for a wagon with no gate sign-off', async () => {
+    wagonRepo.registerWagon({
+      wagonNumber: unsignedWagon,
+      wagonType: 'BOXNHL',
+      owningRailway: 'SECR'
+    });
+
+    const res = await app.dispatch({
+      method: 'GET',
+      url: `/api/wagons/${encodeURIComponent(unsignedWagon)}/certificate`,
+      headers: { authorization: `Bearer ${supervisorToken}` }
+    });
+
+    assert.strictEqual(res.status, 409);
+    assert.strictEqual(res.body.error, 'CERTIFICATE_NOT_AUTHORIZED');
+  });
+
+  it('TC-CERT-GUARD-03: provisional preview is watermarked and never claims release', async () => {
+    const res = await app.dispatch({
+      method: 'GET',
+      url: `/api/wagons/${encodeURIComponent(unsignedWagon)}/certificate?provisional=true`,
+      headers: { authorization: `Bearer ${supervisorToken}` }
+    });
+
+    assert.strictEqual(res.status, 200);
+    const html = res.body as string;
+    assert.ok(html.includes('NOT A RELEASE CERTIFICATE'), 'must be marked as not a release certificate');
+    assert.ok(html.includes('provisional-watermark'), 'must carry the provisional watermark');
+    assert.ok(!html.includes('100% PASSED'), 'must not contain hardcoded pass claims');
+    assert.ok(!html.includes('S. K. Verma'), 'must not attribute an unsigned document to a real supervisor');
+  });
+
+  it('TC-CERT-GUARD-04: category matrix reflects real checklist state, not hardcoded passes', async () => {
+    const res = await app.dispatch({
+      method: 'GET',
+      url: `/api/wagons/${encodeURIComponent(unsignedWagon)}/certificate?provisional=true`,
+      headers: { authorization: `Bearer ${supervisorToken}` }
+    });
+
+    const html = res.body as string;
+    // A freshly registered wagon has an untouched checklist, so every category
+    // must report NOT CLEARED rather than a clean bill of health.
+    assert.ok(html.includes('not inspected'), 'uninspected items must be reported as such');
+    assert.ok(html.includes('status-fail'), 'uncleared categories must render as failures');
   });
 });

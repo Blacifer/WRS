@@ -481,12 +481,15 @@ describe('CHALLENGER 2: Milestone 1 Concurrency, Integrity & API Stress Harness'
         owningRailway: 'SECR'
       });
 
-      const result = CertificateGenerator.generate(emptyWagon, wagonRepo, inspectionRepo, componentRepo, 'json');
+      // This wagon is deliberately unreleased — the case under test is the
+      // empty-manifest fallback, not release authorisation, so it takes the
+      // provisional (clearly watermarked, non-release) document.
+      const result = CertificateGenerator.generate(emptyWagon, wagonRepo, inspectionRepo, componentRepo, 'json', { provisional: true });
       assert.ok(result.json);
       assert.strictEqual(result.json.componentManifest.totalSerializedComponents, 0);
       assert.strictEqual(result.json.componentManifest.components.length, 0);
 
-      const htmlResult = CertificateGenerator.generate(emptyWagon, wagonRepo, inspectionRepo, componentRepo, 'html');
+      const htmlResult = CertificateGenerator.generate(emptyWagon, wagonRepo, inspectionRepo, componentRepo, 'html', { provisional: true });
       assert.ok(htmlResult.html);
       assert.ok(htmlResult.html.includes('All high-value serialized components'));
     });

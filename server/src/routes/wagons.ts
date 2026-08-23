@@ -3,11 +3,14 @@
  * Indian Railways WRS Raipur (Phase 2)
  */
 
+import crypto from 'node:crypto';
 import { Router } from '../framework/index.ts';
 import type { Request, Response } from '../framework/index.ts';
 import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.ts';
+import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { requireRole } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
+import { logAuditEvent } from '../db/auditLog.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
 import { InspectionRepository } from '../db/repository.ts';
 import { LifecycleEngine } from '../lifecycle/engine.ts';
@@ -223,10 +226,15 @@ wagonsRouter.get('/:wagonNumber/gate/status', optionalAuthMiddleware, async (req
 // 6. Printable / Exportable Official RDSO Release Certificate
 // -------------------------------------------------------------------------
 
-wagonsRouter.get('/:wagonNumber/certificate', optionalAuthMiddleware, async (req: Request, res: Response) => {
+// A release certificate is a formal safety attestation, so this route requires
+// a real authenticated user (was optionalAuthMiddleware — i.e. world-readable),
+// refuses to issue for un-signed-off wagons unless a provisional preview is
+// explicitly requested, and records every issuance in the audit chain.
+wagonsRouter.get('/:wagonNumber/certificate', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   const { wagonRepo, inspectionRepo } = getRepos();
   const wagonNumber = req.params?.wagonNumber;
   const format = (req.query?.format || 'html').toLowerCase() === 'json' ? 'json' : 'html';
+  const provisional = String(req.query?.provisional || '').toLowerCase() === 'true';
 
   if (!wagonNumber) {
     res.status(400).json({
@@ -240,7 +248,28 @@ wagonsRouter.get('/:wagonNumber/certificate', optionalAuthMiddleware, async (req
   }
 
   try {
-    const cert = CertificateGenerator.generate(wagonNumber, wagonRepo, inspectionRepo, format);
+    const cert = CertificateGenerator.generate(
+      wagonNumber, wagonRepo, inspectionRepo, undefined, format, { provisional }
+    );
+
+    // Uses the existing CERTIFICATE_GENERATED event type rather than adding new
+    // ones: altering the audit table's CHECK constraint would mean rebuilding a
+    // table that is append-only by trigger and carries the hash chain — not a
+    // migration worth running on a live pilot database for a labelling nicety.
+    // The issued/preview distinction is carried in the payload instead.
+    logAuditEvent(getDatabase(), {
+      id: `audit_cert_${crypto.randomUUID()}`,
+      inspectionId: null,
+      eventType: 'CERTIFICATE_GENERATED' as any,
+      userId: req.user?.id,
+      userRole: req.user?.role,
+      payload: {
+        wagonNumber: wagonNumber.trim().toUpperCase(),
+        format,
+        provisional,
+        documentType: provisional ? 'PROVISIONAL_PREVIEW' : 'RELEASE_CERTIFICATE'
+      }
+    });
 
     if (format === 'json') {
       res.status(200).json({
@@ -253,6 +282,20 @@ wagonsRouter.get('/:wagonNumber/certificate', optionalAuthMiddleware, async (req
       res.status(200).send(cert.html);
     }
   } catch (err: any) {
+    // A wagon that exists but has not been signed off is a 409, not a 404 —
+    // the distinction matters because the client should offer a provisional
+    // preview rather than reporting the wagon as missing.
+    if (err?.name === 'CertificateNotAuthorized') {
+      res.status(409).json({
+        success: false,
+        error: 'CERTIFICATE_NOT_AUTHORIZED',
+        message: err.message,
+        hint: 'Append ?provisional=true to view the current inspection state as a clearly-marked non-release document.',
+        statusCode: 409,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
     res.status(404).json({
       success: false,
       error: 'CERTIFICATE_NOT_FOUND',

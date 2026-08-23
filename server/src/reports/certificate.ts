@@ -18,8 +18,13 @@ export class CertificateGenerator {
     wagonRepo: WagonRepository,
     inspectionRepo: InspectionRepository,
     componentRepoOrFormat?: ComponentRepository | 'html' | 'json',
-    format: 'html' | 'json' = 'html'
+    format: 'html' | 'json' = 'html',
+    // Options object rather than a positional boolean: parameter 4 is
+    // overloaded (repo OR format string), which makes positional args past it
+    // genuinely easy to misalign.
+    options: { provisional?: boolean } = {}
   ): { html?: string; json?: Record<string, unknown> } {
+    const provisional = options.provisional === true;
     const normalizedWagonNumber = wagonNumber.trim().toUpperCase();
     const wagon = wagonRepo.getWagonByNumber(normalizedWagonNumber);
     if (!wagon) {
@@ -43,20 +48,80 @@ export class CertificateGenerator {
     const springInspections = inspectionRepo.queryInspections({ wagonNumber: normalizedWagonNumber, limit: 100 });
     const components = compRepo.getComponentsByWagon(normalizedWagonNumber);
 
-    const certNumber = signoff?.certificateNumber || `WRS/QC-REL/${new Date().getFullYear()}/PENDING`;
+    // -----------------------------------------------------------------------
+    // SAFETY GATE. A release certificate is a formal attestation that this
+    // wagon was inspected and cleared. It must never be producible for a
+    // wagon that has not actually been signed off — previously this method
+    // generated a full "100% PASSED" certificate for ANY wagon at ANY stage,
+    // including ones the exit gate was actively blocking.
+    //
+    // Callers that legitimately need to preview an in-progress wagon must opt
+    // in explicitly via `provisional`, which produces a conspicuously
+    // watermarked NOT-A-RELEASE-CERTIFICATE document instead.
+    // -----------------------------------------------------------------------
+    const isSigned = !!signoff?.certificateNumber && !!signoff?.digitalSignature;
+    if (!isSigned && !provisional) {
+      const err: any = new Error(
+        `Wagon ${normalizedWagonNumber} has no gate sign-off. A release certificate cannot be issued ` +
+        `for a wagon that has not been formally released. Request a provisional preview if you need ` +
+        `to see the current inspection state.`
+      );
+      err.name = 'CertificateNotAuthorized';
+      throw err;
+    }
+
+    const certNumber = signoff?.certificateNumber || 'PROVISIONAL — NOT A RELEASE CERTIFICATE';
     const certHash = signoff?.certificateHash || 'UNSIGNED';
     const signedAt = signoff?.signedAt || wagon.actualReleaseDate || new Date().toISOString();
-    const supervisorName = signoff?.supervisorName || 'S. K. Verma';
-    const supervisorEmpId = signoff?.supervisorEmployeeId || 'WRS-SUP-2019';
-    const digitalSignature = signoff?.digitalSignature || 'HMAC-SHA256-PENDING';
+    // No fallback to a real person's name. An unsigned document must never
+    // attribute itself to a named supervisor who did not sign it.
+    const supervisorName = signoff?.supervisorName || 'NOT SIGNED';
+    const supervisorEmpId = signoff?.supervisorEmployeeId || '—';
+    const digitalSignature = signoff?.digitalSignature || 'UNSIGNED';
 
     const entryTime = new Date(wagon.entryDate).getTime();
     const releaseTime = new Date(signedAt).getTime();
     const tatDays = Math.max(0.1, Math.round(((releaseTime - entryTime) / (1000 * 60 * 60 * 24)) * 10) / 10);
 
     const checklistItems: any[] = checklistData.allItems || [];
-    const passedCount = checklistItems.filter(i => i.status === 'PASS' || (['REPAIRED', 'REPLACED'].includes(i.status) && i.reinspectedStatus === 'PASS')).length;
+    const isItemCleared = (i: any) =>
+      i.status === 'PASS' || (['REPAIRED', 'REPLACED'].includes(i.status) && i.reinspectedStatus === 'PASS');
+    const passedCount = checklistItems.filter(isItemCleared).length;
     const totalCount = checklistItems.length;
+
+    // -----------------------------------------------------------------------
+    // Category clearance matrix, computed from the actual checklist.
+    // Previously all eight rows were hardcoded in the HTML as "100% PASSED",
+    // so the certificate asserted full compliance regardless of the data.
+    // -----------------------------------------------------------------------
+    const CATEGORY_MATRIX: { key: string; label: string; scope: string; std: string }[] = [
+      { key: 'SPRINGS',             label: '1. Springs',           scope: 'Outer, Inner, Snubber (Bogie 1 & 2)',          std: 'RDSO G-95 Table 28-33' },
+      { key: 'WHEELS_AXLES',        label: '2. Wheels & Axles',    scope: 'Wheel profile, tread wear, flange, UST',       std: 'RDSO C-9901 / ND-97' },
+      { key: 'BEARINGS',            label: '3. Bearings',          scope: 'CTRB cartridge bearings, adapter, seals',      std: 'RDSO G-81' },
+      { key: 'BRAKE_SYSTEM',        label: '4. Brake System',      scope: 'Brake blocks, rigging, SAB, cylinder, DV',     std: 'RDSO 02-ABR-02' },
+      { key: 'COUPLERS_DRAFT_GEAR', label: '5. Couplers & Draft',  scope: 'CBC body, knuckle, Mark-50 draft gear',        std: 'RDSO 48-BD-08 / WRS gauge boards' },
+      { key: 'BOGIE_FRAME_BOLSTER', label: '6. Bogie Frame',       scope: 'Side frames, bolster, centre plate, bearers',  std: 'RDSO G-95' },
+      { key: 'FRICTION_WEDGES',     label: '7. Friction Wedges',   scope: 'Slope wear, vertical face, spigot fit',        std: 'RDSO G-95 / WMM 2.0 §309D' },
+      { key: 'BODY_UNDERFRAME',     label: '8. Body / Underframe', scope: 'Centre sill, flooring, doors, stencilling',    std: 'RDSO G-70' }
+    ];
+
+    const categoryStats = CATEGORY_MATRIX.map(cat => {
+      const items = checklistItems.filter(i => i.category === cat.key);
+      const total = items.length;
+      const cleared = items.filter(isItemCleared).length;
+      const condemned = items.filter(i => i.status === 'CONDEMNED').length;
+      const failed = items.filter(i => i.status === 'FAIL').length;
+      const pending = items.filter(i => !i.status || i.status === 'PENDING').length;
+
+      let verdict: 'CLEARED' | 'NOT CLEARED' | 'NO DATA';
+      if (total === 0) verdict = 'NO DATA';
+      else if (cleared === total) verdict = 'CLEARED';
+      else verdict = 'NOT CLEARED';
+
+      return { ...cat, total, cleared, condemned, failed, pending, verdict };
+    });
+
+    const categoriesCleared = categoryStats.filter(c => c.verdict === 'CLEARED').length;
 
     const qrData = `INDIAN_RAILWAYS|WRS_RAIPUR|QC_CERT|${certNumber}|${normalizedWagonNumber}|${wagon.wagonType}|${signedAt}|${certHash.slice(0, 16)}`;
 
@@ -72,10 +137,20 @@ export class CertificateGenerator {
         releaseDate: signedAt,
         tatDays
       },
+      isProvisional: !isSigned,
       bogiePartsSummary: {
         totalInspected: totalCount,
         passedCount,
-        categoriesPassed: 8
+        categoriesPassed: categoriesCleared,
+        categoryBreakdown: categoryStats.map(c => ({
+          category: c.key,
+          total: c.total,
+          cleared: c.cleared,
+          condemned: c.condemned,
+          failed: c.failed,
+          pending: c.pending,
+          verdict: c.verdict
+        }))
       },
       springNestSummary: {
         totalSprings: springInspections.records.length,
@@ -238,6 +313,48 @@ export class CertificateGenerator {
       text-align: center;
       display: inline-block;
     }
+    .status-fail {
+      color: #991b1b;
+      background: #fee2e2;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-align: center;
+      display: inline-block;
+    }
+    .provisional-banner {
+      background: #7f1d1d;
+      color: #ffffff;
+      padding: 14px 18px;
+      margin-bottom: 18px;
+      border-radius: 6px;
+      font-weight: 800;
+      font-size: 14px;
+      letter-spacing: 0.04em;
+      text-align: center;
+      line-height: 1.5;
+    }
+    .provisional-banner span {
+      display: block;
+      font-weight: 500;
+      font-size: 12px;
+      letter-spacing: 0;
+      margin-top: 5px;
+      opacity: 0.92;
+    }
+    .provisional-watermark {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-32deg);
+      font-size: 88px;
+      font-weight: 900;
+      color: rgba(153, 27, 27, 0.13);
+      letter-spacing: 0.05em;
+      pointer-events: none;
+      z-index: 999;
+      white-space: nowrap;
+    }
     .signoff-box {
       display: grid;
       grid-template-columns: 2fr 1fr;
@@ -301,7 +418,17 @@ export class CertificateGenerator {
     </button>
   </div>
 
+  ${!isSigned ? `<div class="provisional-watermark">PROVISIONAL</div>` : ''}
+
   <div class="cert-border">
+    ${!isSigned ? `
+    <div class="provisional-banner">
+      ⚠ PROVISIONAL INSPECTION SUMMARY — THIS IS NOT A RELEASE CERTIFICATE
+      <span>
+        This wagon has not been signed off at the exit gate. This document reflects the
+        current inspection state only and must not be used to authorise release or movement.
+      </span>
+    </div>` : ''}
     <div class="header">
       <div class="gov-title">भारतीय रेल / INDIAN RAILWAYS • दक्षिण पूर्व मध्य रेलवे / SECR</div>
       <div class="main-title">Wagon Repair Shop (WRS), Raipur (C.G.)</div>
@@ -329,14 +456,22 @@ export class CertificateGenerator {
         </tr>
       </thead>
       <tbody>
-        <tr><td>1. Springs</td><td>Outer, Inner, Snubber (Bogie 1 & 2)</td><td>RDSO G-95 Table 28-30</td><td><span class="status-pass">100% PASSED</span></td></tr>
-        <tr><td>2. Wheels & Axles</td><td>Wheel profile, tread wear, flange, UST</td><td>RDSO C-9901 / ND-97</td><td><span class="status-pass">100% PASSED</span></td></tr>
-        <tr><td>3. Bearings</td><td>CTRB Cartridge bearings, adapter, seals</td><td>RDSO G-81</td><td><span class="status-pass">100% PASSED</span></td></tr>
-        <tr><td>4. Brake System</td><td>Brake blocks, rigging, SAB, cylinder, DV</td><td>RDSO 02-ABR-02</td><td><span class="status-pass">100% PASSED</span></td></tr>
-        <tr><td>5. Couplers & Draft</td><td>CBC body, knuckle, Mark-50 draft gear</td><td>RDSO 48-BD-08</td><td><span class="status-pass">100% PASSED</span></td></tr>
-        <tr><td>6. Bogie Frame</td><td>Side frames, bolster, center plate, bearers</td><td>RDSO G-95</td><td><span class="status-pass">100% PASSED</span></td></tr>
-        <tr><td>7. Friction Wedges</td><td>Slope wear, vertical face, spigot fit</td><td>RDSO G-95</td><td><span class="status-pass">100% PASSED</span></td></tr>
-        <tr><td>8. Body / Underframe</td><td>Center sill, flooring, doors, stenciling</td><td>RDSO G-70</td><td><span class="status-pass">100% PASSED</span></td></tr>
+        ${categoryStats.map(c => {
+          const cls = c.verdict === 'CLEARED' ? 'status-pass' : 'status-fail';
+          let detail: string;
+          if (c.verdict === 'NO DATA') {
+            detail = 'NO ITEMS RECORDED';
+          } else if (c.verdict === 'CLEARED') {
+            detail = `${c.cleared}/${c.total} CLEARED`;
+          } else {
+            const parts: string[] = [];
+            if (c.pending) parts.push(`${c.pending} not inspected`);
+            if (c.failed) parts.push(`${c.failed} failed`);
+            if (c.condemned) parts.push(`${c.condemned} condemned`);
+            detail = `${c.cleared}/${c.total} CLEARED — ${parts.join(', ')}`;
+          }
+          return `<tr><td>${c.label}</td><td>${c.scope}</td><td>${c.std}</td><td><span class="${cls}">${detail}</span></td></tr>`;
+        }).join('')}
       </tbody>
     </table>
 
@@ -355,17 +490,17 @@ export class CertificateGenerator {
       <tbody>
         ${
           springInspections.records.length > 0
-            ? springInspections.records.slice(0, 6).map(s => `
+            ? springInspections.records.slice(0, 12).map(s => `
               <tr>
                 <td>${s.bogieType}</td>
                 <td>${s.springPosition}</td>
                 <td>${s.measuredFreeHeight.toFixed(1)} mm</td>
-                <td>${s.bandRoman || 'Band I'}</td>
-                <td><span style="font-weight: bold; color: ${s.classifiedBand ? s.classifiedBand.toLowerCase() : 'black'}">${s.classifiedBand || 'BLUE'}</span></td>
-                <td><span class="status-pass">${s.status}</span></td>
+                <td>${s.bandRoman || '<em>not recorded</em>'}</td>
+                <td><span style="font-weight: bold; color: ${s.classifiedBand ? s.classifiedBand.toLowerCase() : '#b45309'}">${s.classifiedBand || 'NOT RECORDED'}</span></td>
+                <td><span class="${s.status === 'PASS' ? 'status-pass' : 'status-fail'}">${s.status}</span></td>
               </tr>
             `).join('')
-            : `<tr><td colspan="6" style="text-align: center; color: #64748b;">All bogie spring nests verified and cleared per RDSO G-95 tolerances.</td></tr>`
+            : `<tr><td colspan="6" style="text-align: center; color: #b45309; font-weight: bold;">NO SPRING INSPECTIONS RECORDED FOR THIS WAGON</td></tr>`
         }
       </tbody>
     </table>
