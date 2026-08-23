@@ -7,6 +7,7 @@ import { DatabaseSync } from 'node:sqlite';
 import crypto from 'node:crypto';
 import { logAuditEvent } from './auditLog.ts';
 import { CASNUB_CHECKLIST_TEMPLATE } from './seed.ts';
+import { validateSpringNests } from '../../../shared/classification/nestGrouping.ts';
 import type {
   LifecycleStage,
   CASNUBCategory,
@@ -80,7 +81,7 @@ export interface ExitGateBlockerDetail {
   partName: string;
   issueType: 'MISSING_INSPECTION' | 'INSPECTION_FAILED' | 'CONDEMNED_UNRESOLVED' | 'REINSPECTION_REQUIRED' | 'SPRING_CONDEMNED' | 'MISSING_SPRINGS' | 'STAGE_INVALID';
   description: string;
-  severity: 'CRITICAL_BLOCKER' | 'WARNING';
+  severity: 'CRITICAL_BLOCKER' | 'WARNING' | 'ADVISORY';
   remediationAction: string;
 }
 
@@ -658,6 +659,8 @@ export class WagonRepository {
     currentStage: LifecycleStage;
     blockers: string[];
     blockerDetails: ExitGateBlockerDetail[];
+    advisories: string[];
+    advisoryDetails: ExitGateBlockerDetail[];
     summary: {
       totalItems: number;
       totalMandatory: number;
@@ -671,6 +674,13 @@ export class WagonRepository {
         condemnedSprings: number;
         hasCondemnedSprings: boolean;
       };
+      springNestCheck: {
+        isMatched: boolean;
+        violationCount: number;
+        groups: unknown[];
+        ruleReference: string;
+        maxVariationMm: number;
+      };
       hasSupervisorSignoff: boolean;
     };
   } {
@@ -678,6 +688,10 @@ export class WagonRepository {
     const wagon = this.getWagonByNumber(normalizedWagonNumber);
     const blockers: string[] = [];
     const blockerDetails: ExitGateBlockerDetail[] = [];
+    // Advisories do not block release — they surface recommended-practice
+    // issues (currently spring nest grouping) for supervisor judgement.
+    const advisories: string[] = [];
+    const advisoryDetails: ExitGateBlockerDetail[] = [];
 
     const currentStage: LifecycleStage = wagon ? wagon.currentStage : 'ENTRY_REGISTRATION';
 
@@ -785,6 +799,55 @@ export class WagonRepository {
               AND i.sequence_number = latest.max_seq
     `).all(normalizedWagonNumber) as any[];
 
+    // -----------------------------------------------------------------------
+    // Spring nest grouping / segregation check (RDSO WMM 2.0).
+    //
+    // The per-spring loop below catches individually condemned springs. This
+    // check catches the set-level failure it cannot see: a nest whose springs
+    // each PASS individually but whose free heights are spread across more
+    // than 3 mm, which will not share load evenly once assembled.
+    //
+    // Raised as an ADVISORY rather than a hard blocker, for two reasons:
+    //   1. The manual's own wording is "it is recommended that springs having
+    //      not more than 3 mm free height variation should be assembled in the
+    //      same group" — advisory language, not a condemning limit.
+    //   2. Inspection records carry no per-spring identity, so two rows at the
+    //      same position may be two springs OR one spring measured twice.
+    //      Hard-blocking on an ambiguous signal would wrongly detain wagons.
+    // Adding a per-spring nest index would let this become a hard blocker.
+    // -----------------------------------------------------------------------
+    const allWagonSprings = this.db.prepare(`
+      SELECT id, spring_position, spring_condition, measured_height, classified_band, status
+      FROM inspections WHERE wagon_number = ?
+    `).all(normalizedWagonNumber) as any[];
+
+    const nestResult = validateSpringNests(
+      allWagonSprings.map((s) => ({
+        id: s.id,
+        springPosition: s.spring_position,
+        condition: s.spring_condition,
+        measuredFreeHeight: s.measured_height,
+        classifiedBand: s.classified_band,
+        status: s.status
+      }))
+    );
+
+    for (const v of nestResult.violations) {
+      advisories.push(v.message);
+      advisoryDetails.push({
+        id: `nest_${v.type}_${v.groupKey}`,
+        category: 'SPRINGS',
+        partName: `${v.groupKey} spring nest`,
+        issueType: v.type,
+        description: v.message,
+        severity: 'ADVISORY',
+        remediationAction:
+          v.type === 'NEW_OLD_MIXED'
+            ? 'Re-group so each nest contains either all-new or all-used springs.'
+            : `Re-group so every spring in this nest falls within one 3 mm band. ${nestResult.ruleReference}.`
+      });
+    }
+
     const springCount = latestSprings.length;
     let springsPassed = 0;
     let springsCondemned = 0;
@@ -835,6 +898,8 @@ export class WagonRepository {
       currentStage,
       blockers,
       blockerDetails,
+      advisories,
+      advisoryDetails,
       summary: {
         totalItems: items.length,
         totalMandatory,
@@ -847,6 +912,13 @@ export class WagonRepository {
           passedSprings: springsPassed,
           condemnedSprings: springsCondemned,
           hasCondemnedSprings: springsCondemned > 0
+        },
+        springNestCheck: {
+          isMatched: nestResult.isValid,
+          violationCount: nestResult.violations.length,
+          groups: nestResult.groups,
+          ruleReference: nestResult.ruleReference,
+          maxVariationMm: nestResult.maxVariationMm
         },
         hasSupervisorSignoff
       }

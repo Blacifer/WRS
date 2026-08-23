@@ -16,6 +16,15 @@ export interface ExitGateEvaluationResult {
   currentStage: LifecycleStage;
   blockers: string[];
   blockerDetails: ExitGateBlockerDetail[];
+  /**
+   * Recommended-practice issues that do NOT block release — currently spring
+   * nest grouping (RDSO WMM 2.0's 3 mm same-group variation recommendation).
+   * Surfaced for supervisor judgement rather than enforced, because the
+   * manual's wording is advisory and inspection records carry no per-spring
+   * identity. See validateSpringNests() for the full reasoning.
+   */
+  advisories: string[];
+  advisoryDetails: ExitGateBlockerDetail[];
   summary: {
     totalItems: number;
     totalMandatory: number;
@@ -28,6 +37,13 @@ export interface ExitGateEvaluationResult {
       passedSprings: number;
       condemnedSprings: number;
       hasCondemnedSprings: boolean;
+    };
+    springNestCheck: {
+      isMatched: boolean;
+      violationCount: number;
+      groups: unknown[];
+      ruleReference: string;
+      maxVariationMm: number;
     };
     hasSupervisorSignoff: boolean;
   };
