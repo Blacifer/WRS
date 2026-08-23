@@ -71,7 +71,17 @@ export function resolveComponentTarget(partName: string, category: string): CVCo
     return 'FRICTION_WEDGE';
   }
   if (category === 'BEARINGS' || name.includes('end cap') || name.includes('ctrb') || name.includes('bearing') || name.includes('कैप')) {
-    return 'CTRB_END_CAP';
+    // None of the current BEARINGS checklist items are actually a caliper-
+    // measurable CTRB end-cap gap: "CTRB Cartridge Bearing Rotation" is a
+    // spin/rotation test, "Axle Box Adapter Crown Wear" has no verified
+    // numeric limit sourced anywhere, and Locking Plate/Grease Seal/End Cap
+    // Screws are 100%-replace items, not measurements. CTRB_END_CAP's own
+    // tolerance spec (server/src/routes/cv.ts) is itself flagged UNVERIFIED
+    // — no gap/clearance figure exists in WMM 2.0, only a must-change-screw
+    // procedure — so routing any of these to it would show a confidently
+    // precise but fabricated verdict. No AR Caliper button until a real
+    // number exists; these stay manual PASS/FAIL/REPLACED like the rest.
+    return null;
   }
   if (category === 'WHEELS_AXLES' || name.includes('flange') || name.includes('wheel') || name.includes('पहिया')) {
     return 'WHEEL_FLANGE';
