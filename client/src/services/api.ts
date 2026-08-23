@@ -174,6 +174,50 @@ export class ApiClient {
     });
   }
 
+  // =========================================================================
+  // Machine Learning Feedback Loop
+  // =========================================================================
+
+  /**
+   * Records what the machine proposed against what the human committed.
+   * This is the signal the system learns from — see
+   * server/src/learning/learningService.ts.
+   */
+  public async recordLearningOutcome(payload: {
+    subsystem: 'OCR_CALIPER' | 'SPRING_CLASSIFICATION' | 'VOICE_COMMAND' | 'ACOUSTIC_DIAGNOSTIC' | 'DEFECT_SUGGESTION';
+    wagonNumber?: string;
+    inspectionId?: string;
+    machineOutput: unknown;
+    machineConfidence?: number;
+    humanOutput?: unknown;
+    wasCorrected: boolean;
+    correctionMagnitude?: number;
+    context?: Record<string, unknown>;
+  }): Promise<{ success: boolean; data: { id: string } }> {
+    return this.request('/learning/outcome', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  public async getLearningDashboard(): Promise<{ success: boolean; data: any }> {
+    return this.request('/learning/dashboard');
+  }
+
+  public async runLearningAnalysis(): Promise<{ success: boolean; data: any }> {
+    return this.request('/learning/analyze', { method: 'POST' });
+  }
+
+  public async decideLearningProposal(
+    paramKey: string,
+    decision: 'APPROVE' | 'REJECT'
+  ): Promise<{ success: boolean; data: any }> {
+    return this.request(`/learning/parameters/${encodeURIComponent(paramKey)}/decide`, {
+      method: 'POST',
+      body: JSON.stringify({ decision })
+    });
+  }
+
   public async deactivateUser(id: string): Promise<{ success: boolean; data: AdminUserRecord }> {
     return this.request(`/auth/users/${id}/deactivate`, { method: 'PATCH' });
   }

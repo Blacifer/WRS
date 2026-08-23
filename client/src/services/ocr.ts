@@ -144,6 +144,28 @@ export const CV_COMPONENT_RANGES: Record<string, MeasurementRange> = {
   DG_RELEASE_SPRING: { min: 80.0, max: 180.0 }
 };
 
+/**
+ * OCR confidence below which a reading should not be auto-accepted.
+ *
+ * This is the one value the machine-learning feedback loop is allowed to
+ * tune (server/src/learning/learningService.ts). It starts at the safe
+ * default and is replaced at runtime only after an admin approves a
+ * proposal derived from real correction data — the system never silently
+ * retunes itself. RDSO band limits are regulation and are NOT tunable.
+ */
+let ocrConfirmThreshold = 0.5;
+
+export function getOcrConfirmThreshold(): number {
+  return ocrConfirmThreshold;
+}
+
+/** Applies an admin-approved threshold learned from inspector corrections. */
+export function setOcrConfirmThreshold(value: number): void {
+  if (typeof value === 'number' && value >= 0.3 && value <= 0.95) {
+    ocrConfirmThreshold = value;
+  }
+}
+
 export async function processCaliperImage(input: string, range: MeasurementRange = DEFAULT_CALIPER_RANGE): Promise<CaliperOCRResult> {
   const startTime = performance.now();
   try {
@@ -161,7 +183,7 @@ export async function processCaliperImage(input: string, range: MeasurementRange
 
     const match = text.match(/\d{1,3}\.?\d{0,2}/);
 
-    if (match && confidence >= 0.5) {
+    if (match && confidence >= ocrConfirmThreshold) {
       const parsedValue = parseFloat(match[0]);
       if (parsedValue >= range.min && parsedValue <= range.max) {
         return {

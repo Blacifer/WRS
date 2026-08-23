@@ -18,6 +18,7 @@ import { inventoryRouter } from './inventory.ts';
 import { cvRouter } from './cv.ts';
 import { acousticRouter } from './acoustic.ts';
 import { componentsRouter } from './components.ts';
+import { learningRouter } from './learning.ts';
 
 export const apiRouter = Router();
 
@@ -33,6 +34,7 @@ apiRouter.use('/inventory', inventoryRouter);
 apiRouter.use('/cv', cvRouter);
 apiRouter.use('/acoustic', acousticRouter);
 apiRouter.use('/components', componentsRouter);
+apiRouter.use('/learning', learningRouter);
 apiRouter.use('/classification', classifyRouter);
 apiRouter.use('/', classifyRouter);
 apiRouter.use('/', healthRouter);

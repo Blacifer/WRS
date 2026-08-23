@@ -73,6 +73,9 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
   const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
   const [measurementSource, setMeasurementSource] = useState<'OCR' | 'MANUAL'>('OCR');
   const [ocrConfidence, setOcrConfidence] = useState<number | undefined>(undefined);
+  // What OCR proposed before any human edit — used to feed the learning loop.
+  const [ocrProposedHeight, setOcrProposedHeight] = useState<number | null>(null);
+  const [ocrProposedConfidence, setOcrProposedConfidence] = useState<number | undefined>(undefined);
   const [damageType, setDamageType] = useState<DamageType>('NONE');
   const [damageNotes, setDamageNotes] = useState<string>('');
   const [showDefectPanel, setShowDefectPanel] = useState<boolean>(false);
@@ -98,11 +101,21 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
     setMeasuredHeight(height);
     setMeasurementSource(source);
     setOcrConfidence(confidence);
+    // Remember what OCR first proposed, so that if the inspector overrides it
+    // we can tell the difference between "machine was right" and "machine was
+    // corrected". That comparison is the training signal the learning loop
+    // runs on — without capturing it here, OCR can never improve.
+    if (source === 'OCR') {
+      setOcrProposedHeight(height);
+      setOcrProposedConfidence(confidence);
+    }
   };
 
   const resetStepInputs = () => {
     setMeasuredHeight(null);
     setOcrConfidence(undefined);
+    setOcrProposedHeight(null);
+    setOcrProposedConfidence(undefined);
     setDamageType('NONE');
     setDamageNotes('');
     setShowDefectPanel(false);
@@ -188,6 +201,32 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
         setIsSaving(false);
         return;
       }
+    }
+
+    // Feed the learning loop: did the inspector keep what OCR read, or fix it?
+    // Best-effort and non-blocking — a failure here must never cost the
+    // inspector their reading, which is already safely saved above.
+    if (ocrProposedHeight !== null) {
+      const delta = Math.abs(measuredHeight - ocrProposedHeight);
+      // Sub-0.01mm differences are float noise, not a human correction.
+      const wasCorrected = delta >= 0.01;
+      api
+        .recordLearningOutcome({
+          subsystem: 'OCR_CALIPER',
+          wagonNumber: inspectionPayload.wagonNumber,
+          machineOutput: { measuredFreeHeight: ocrProposedHeight },
+          machineConfidence: ocrProposedConfidence,
+          humanOutput: { measuredFreeHeight: measuredHeight },
+          wasCorrected,
+          correctionMagnitude: delta,
+          context: {
+            componentTarget: `${currentStep.position}_SPRING`,
+            bogieType,
+            springCondition: condition,
+            finalSource: measurementSource
+          }
+        })
+        .catch((e) => console.warn('[SpringBatch] learning outcome not recorded:', e));
     }
 
     if (classification.status === 'CONDEMNED') {

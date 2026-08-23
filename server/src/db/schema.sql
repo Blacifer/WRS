@@ -672,3 +672,100 @@ BEGIN
 END;
 
 
+
+-- ===========================================================================
+-- MACHINE LEARNING FEEDBACK LOOP
+--
+-- The system makes machine judgements in several places (OCR caliper reads,
+-- RDSO band classification, voice command parsing, acoustic diagnostics).
+-- Whenever a human accepts or corrects one of those judgements, that is a
+-- labelled training signal. Previously those signals were discarded, so the
+-- system could never get better at anything.
+--
+-- These two tables close the loop:
+--   machine_learning_events  — the correction ledger (append-only evidence)
+--   learned_parameters       — tuned values, each requiring human approval
+--
+-- DELIBERATE CONSTRAINT: nothing here may silently alter a safety limit. The
+-- RDSO band tables and condemning limits are regulation, not parameters. What
+-- adapts is operational behaviour — when to ask an inspector to double-check
+-- a reading, which defect types to surface first, and so on.
+-- ===========================================================================
+
+CREATE TABLE IF NOT EXISTS machine_learning_events (
+  id TEXT PRIMARY KEY,
+  subsystem TEXT NOT NULL CHECK(subsystem IN (
+    'OCR_CALIPER',
+    'SPRING_CLASSIFICATION',
+    'VOICE_COMMAND',
+    'ACOUSTIC_DIAGNOSTIC',
+    'DEFECT_SUGGESTION'
+  )),
+  wagon_number TEXT DEFAULT NULL,
+  inspection_id TEXT DEFAULT NULL,
+
+  -- What the machine proposed, and how sure it was (0.0 - 1.0).
+  machine_output_json TEXT NOT NULL,
+  machine_confidence REAL DEFAULT NULL
+    CHECK(machine_confidence IS NULL OR (machine_confidence >= 0.0 AND machine_confidence <= 1.0)),
+
+  -- What the human committed. NULL means the machine output was accepted as-is.
+  human_output_json TEXT DEFAULT NULL,
+  was_corrected INTEGER NOT NULL DEFAULT 0 CHECK(was_corrected IN (0, 1)),
+  -- Absolute numeric delta where the judgement is numeric (mm for OCR).
+  correction_magnitude REAL DEFAULT NULL,
+
+  -- Free-form conditions that may explain the outcome (device, lighting,
+  -- component target). Used to find systematic weaknesses.
+  context_json TEXT DEFAULT NULL,
+
+  user_id TEXT DEFAULT NULL,
+  user_role TEXT DEFAULT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_mle_subsystem   ON machine_learning_events(subsystem, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_mle_corrected   ON machine_learning_events(subsystem, was_corrected);
+CREATE INDEX IF NOT EXISTS idx_mle_created     ON machine_learning_events(created_at DESC);
+
+-- Evidence must not be rewritten after the fact, same principle as the audit log.
+CREATE TRIGGER IF NOT EXISTS trg_mle_no_update
+BEFORE UPDATE ON machine_learning_events
+BEGIN
+  SELECT RAISE(ABORT, 'Machine learning event ledger is strictly append-only.');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_mle_no_delete
+BEFORE DELETE ON machine_learning_events
+BEGIN
+  SELECT RAISE(ABORT, 'Machine learning event ledger is strictly append-only.');
+END;
+
+CREATE TABLE IF NOT EXISTS learned_parameters (
+  id TEXT PRIMARY KEY,
+  param_key TEXT NOT NULL UNIQUE,
+  subsystem TEXT NOT NULL,
+
+  current_value REAL NOT NULL,
+  default_value REAL NOT NULL,
+  -- A proposal derived from the ledger, awaiting a human decision.
+  proposed_value REAL DEFAULT NULL,
+  proposal_rationale TEXT DEFAULT NULL,
+  proposal_sample_size INTEGER DEFAULT NULL,
+  proposed_at TEXT DEFAULT NULL,
+
+  -- Proposals never self-apply. A named human accepts or rejects.
+  approval_status TEXT NOT NULL DEFAULT 'NONE'
+    CHECK(approval_status IN ('NONE', 'PENDING', 'APPROVED', 'REJECTED')),
+  approved_by TEXT DEFAULT NULL,
+  approved_at TEXT DEFAULT NULL,
+
+  min_allowed REAL NOT NULL,
+  max_allowed REAL NOT NULL,
+  description TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+
+  FOREIGN KEY (approved_by) REFERENCES users(id)
+);
