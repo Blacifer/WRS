@@ -7,7 +7,7 @@ import { describe, it, before, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { runMigrations } from '../src/db/migrations.ts';
-import { seedDemoData } from '../src/db/seedDemo.ts';
+import { seedDemoData } from '../src/db/seed.ts';
 import { WagonRepository } from '../src/db/wagonRepository.ts';
 import { InspectionRepository } from '../src/db/repository.ts';
 

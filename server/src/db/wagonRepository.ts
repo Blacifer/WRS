@@ -618,9 +618,28 @@ export class WagonRepository {
 
   public getChecklistConfig(wagonType?: string): any[] {
     if (wagonType) {
-      return this.db.prepare(`
+      const rows = this.db.prepare(`
         SELECT * FROM checklist_config WHERE wagon_type = ? ORDER BY category, part_name
       `).all(wagonType) as any[];
+
+      // No saved overrides for this wagon type yet — return the standard
+      // CASNUB template rather than an empty list. Asking "what is the
+      // checklist for a BOXNHL?" should answer with the default checklist,
+      // which is what actually gets applied at registration; an empty array
+      // wrongly implies no checks are configured.
+      if (rows.length === 0) {
+        return CASNUB_CHECKLIST_TEMPLATE.map((it) => ({
+          id: `cfg_default_${wagonType}_${it.category}_${it.partName}`.replace(/[^a-zA-Z0-9_]/g, '_'),
+          wagon_type: wagonType,
+          category: it.category,
+          part_name: it.partName,
+          bogie_position: it.bogiePosition,
+          is_mandatory: it.isMandatory,
+          standard_reference: it.std,
+          is_default: 1
+        }));
+      }
+      return rows;
     }
     return this.db.prepare(`
       SELECT * FROM checklist_config ORDER BY wagon_type, category, part_name
