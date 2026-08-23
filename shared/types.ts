@@ -1163,6 +1163,13 @@ export type CVComponentTarget =
   | 'INNER_SPRING'
   | 'SNUBBER_SPRING'
   | 'FRICTION_WEDGE'
+  // Split from FRICTION_WEDGE: WMM 2.0 §309D gives distinct wear limits per
+  // surface (vertical 7mm / slope 3mm), and the checklist already has two
+  // separate line items for them ("Wedge Vertical Face & Spigot Fit" /
+  // "Wedge Main Slope Surface") — this wires the digital measurement to
+  // match instead of sharing one ambiguous target between both.
+  | 'FRICTION_WEDGE_VERTICAL'
+  | 'FRICTION_WEDGE_SLOPE'
   | 'CTRB_END_CAP'
   | 'CTRB_BEARING_END_CAP'
   | 'WHEEL_FLANGE'

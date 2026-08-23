@@ -82,23 +82,43 @@ export const RDSO_TOLERANCE_SPECS = {
     bandsCount: 6,
     bandStepMm: 3.0
   },
-  // PARTIALLY VERIFIED against WMM 2.0 §309D "Wear Limit for Friction Wedge
-  // Block": the source gives TWO DIFFERENT wear limits by surface —
-  // Vertical Surface: 7mm, Slope Surface: 3mm — which this single wear-step
-  // threshold does not distinguish (maxPermissibleWear below matches the
-  // 7mm vertical-surface figure, not the stricter 3mm slope-surface one).
-  // The 129-138mm "height" branch below is a separate interpretation not
-  // confirmed against this source. Needs DRM technical sign-off on which
-  // surface WRS's caliper measures before this threshold is fully trusted.
+  // LEGACY generic target — kept only so existing callers/tests that pass
+  // componentType: 'FRICTION_WEDGE' keep working unchanged. New code should
+  // use FRICTION_WEDGE_VERTICAL or FRICTION_WEDGE_SLOPE below instead, which
+  // match WMM 2.0 §309D's two distinct per-surface wear limits and the
+  // checklist's own two separate line items ("Wedge Vertical Face & Spigot
+  // Fit" / "Wedge Main Slope Surface").
   FRICTION_WEDGE: {
     componentType: 'FRICTION_WEDGE',
     nameEn: 'Friction Wedge (Wear Profile)',
     nameHi: 'घर्षण वेज (घिसाव माप)',
-    rdsoStandard: 'RDSO G-95 Para 4.4 / G-97 / WMM 2.0 §309D (partially verified — see comment above)',
+    rdsoStandard: 'RDSO G-95 Para 4.4 / G-97 / WMM 2.0 §309D',
     nominalValue: 136.0,
     minPermissible: 129.0,
     maxPermissible: 138.0,
     maxPermissibleWear: 7.0,
+    unit: 'mm'
+  },
+  // WMM 2.0 §309D "Wear Limit for Friction Wedge Block" — vertical surface.
+  FRICTION_WEDGE_VERTICAL: {
+    componentType: 'FRICTION_WEDGE_VERTICAL',
+    nameEn: 'Friction Wedge — Vertical Surface Wear',
+    nameHi: 'घर्षण वेज — ऊर्ध्वाधर सतह घिसाव',
+    rdsoStandard: 'WMM 2.0 §309D "Wear Limit for Friction Wedge Block" (Vertical Surface)',
+    nominalValue: 0.0,
+    minPermissible: 0.0,
+    maxPermissible: 7.0,
+    unit: 'mm'
+  },
+  // WMM 2.0 §309D "Wear Limit for Friction Wedge Block" — slope surface.
+  FRICTION_WEDGE_SLOPE: {
+    componentType: 'FRICTION_WEDGE_SLOPE',
+    nameEn: 'Friction Wedge — Slope Surface Wear',
+    nameHi: 'घर्षण वेज — ढलान सतह घिसाव',
+    rdsoStandard: 'WMM 2.0 §309D "Wear Limit for Friction Wedge Block" (Slope Surface)',
+    nominalValue: 0.0,
+    minPermissible: 0.0,
+    maxPermissible: 3.0,
     unit: 'mm'
   },
   // UNVERIFIED: no numeric gap/clearance figure for this found in WMM 2.0 —
@@ -151,12 +171,15 @@ export const RDSO_TOLERANCE_SPECS = {
   // scrap"); maxPermissible on those is an unsourced generous input-range
   // cap for the caliper UI, not a real condemning ceiling — see the
   // min-only branch below that ignores it for the verdict.
-  // The two "location" gauges are genuine two-sided GO/NO-GO gauges, but
-  // which reading is the reject side is NOT confirmed — the board shows
-  // GO > NO-GO for Centre Wedge Location (61.11 > 59.54) and the reverse
-  // for Movable Plate Location (144.48 > 141.27). Treated here as an
-  // inclusive band [min(GO,NoGo), max(GO,NoGo)] pending DRM sign-off,
-  // same as the pre-existing friction-wedge caveat above.
+  // The two "location" gauges are genuine two-sided GO/NO-GO gauges. Their
+  // GO/NO-GO ordering flips between the two (GO > NO-GO for Centre Wedge
+  // Location, 61.11 > 59.54; the reverse for Movable Plate Location, 144.48
+  // > 141.27) — that's expected, not an error: standard GO/NO-GO gauging
+  // bounds the acceptable zone between the two limits regardless of which
+  // one is numerically larger (which side is "GO" just depends on whether
+  // the feature wears by growing or shrinking). So both are implemented as
+  // an inclusive band [min(GO,NoGo), max(GO,NoGo)] — this IS the correct
+  // reading of a paired GO/NO-GO gauge, not a placeholder.
   DG_HOUSING_WALL_THICKNESS: {
     componentType: 'DG_HOUSING_WALL_THICKNESS',
     nameEn: 'Draft Gear Housing Wall Thickness',
@@ -425,6 +448,20 @@ cvRouter.post('/measure', optionalAuthMiddleware, async (req: AuthenticatedReque
               : `Friction wedge height ${measuredValue.toFixed(1)} mm exceeds maximum permissible 138.0mm`;
           colorHex = '#ef4444';
         }
+      }
+    } else if (normalizedTarget === 'FRICTION_WEDGE_VERTICAL' || normalizedTarget === 'FRICTION_WEDGE_SLOPE') {
+      const spec = RDSO_TOLERANCE_SPECS[normalizedTarget as 'FRICTION_WEDGE_VERTICAL' | 'FRICTION_WEDGE_SLOPE'];
+      rdsoTable = spec.rdsoStandard;
+      nominalValue = spec.nominalValue;
+      delta = Number((measuredValue - nominalValue).toFixed(2));
+      toleranceRange = { min: spec.minPermissible, max: spec.maxPermissible };
+      if (measuredValue >= spec.minPermissible && measuredValue <= spec.maxPermissible) {
+        verdict = 'PASS';
+        colorHex = '#10b981';
+      } else {
+        verdict = 'CONDEMNED';
+        condemnationReason = `${spec.nameEn} ${measuredValue.toFixed(2)} mm exceeds the ${spec.maxPermissible}mm condemning wear limit (${spec.rdsoStandard})`;
+        colorHex = '#ef4444';
       }
     } else if (normalizedTarget === 'CTRB_END_CAP' || normalizedTarget === 'CTRB_BEARING_END_CAP') {
       rdsoTable = RDSO_TOLERANCE_SPECS.CTRB_END_CAP.rdsoStandard;

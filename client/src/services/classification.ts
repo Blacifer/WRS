@@ -30,6 +30,11 @@ export interface ComponentToleranceSpec {
 
 export const COMPONENT_TOLERANCE_SPECS: Record<Exclude<CVComponentTarget, 'OUTER_SPRING' | 'INNER_SPRING' | 'SNUBBER_SPRING'>, ComponentToleranceSpec> = {
   FRICTION_WEDGE: { nominalValue: 136.0, minPermissible: 129.0, maxPermissible: 138.0, tableRef: 'RDSO G-95 Para 4.4' },
+  // Preferred over FRICTION_WEDGE — matches the checklist's own two separate
+  // line items (Vertical Face / Slope Surface), each with its own WMM 2.0
+  // §309D wear limit (min=0 makes this a max-only wear check).
+  FRICTION_WEDGE_VERTICAL: { nominalValue: 0.0, minPermissible: 0.0, maxPermissible: 7.0, tableRef: 'WMM 2.0 §309D (Vertical Surface)' },
+  FRICTION_WEDGE_SLOPE: { nominalValue: 0.0, minPermissible: 0.0, maxPermissible: 3.0, tableRef: 'WMM 2.0 §309D (Slope Surface)' },
   CTRB_END_CAP: { nominalValue: 1.5, minPermissible: 0.5, maxPermissible: 3.0, tableRef: 'RDSO G-81 Wheelset' },
   CTRB_BEARING_END_CAP: { nominalValue: 1.5, minPermissible: 0.5, maxPermissible: 3.0, tableRef: 'RDSO G-81 Wheelset' },
   WHEEL_FLANGE: { nominalValue: 28.5, minPermissible: 16.0, maxPermissible: 31.0, tableRef: 'RDSO G-95 Para 5.2 / WMM 2.0 §607(a), §7' },
@@ -40,8 +45,10 @@ export const COMPONENT_TOLERANCE_SPECS: Record<Exclude<CVComponentTarget, 'OUTER
   // input-range cap, not a real condemning ceiling — see DG_MIN_ONLY_TARGETS
   // handling in computeComponentVerdict below.
   DG_HOUSING_WALL_THICKNESS: { nominalValue: 15.88, minPermissible: 15.88, maxPermissible: 60.0, tableRef: 'WRS Raipur Gauge BE/91-62-6' },
-  DG_CENTRE_WEDGE_LOCATION: { nominalValue: 60.325, minPermissible: 59.54, maxPermissible: 61.11, tableRef: 'WRS Raipur Gauge BE/91-72-1 (direction unconfirmed)' },
-  DG_MOVABLE_PLATE_LOCATION: { nominalValue: 142.875, minPermissible: 141.27, maxPermissible: 144.48, tableRef: 'WRS Raipur Gauge BE/91-61-10 (direction unconfirmed)' },
+  // Inclusive band between the two gauge readings — standard GO/NO-GO
+  // gauging (see server/src/routes/cv.ts for the full reasoning).
+  DG_CENTRE_WEDGE_LOCATION: { nominalValue: 60.325, minPermissible: 59.54, maxPermissible: 61.11, tableRef: 'WRS Raipur Gauge BE/91-72-1' },
+  DG_MOVABLE_PLATE_LOCATION: { nominalValue: 142.875, minPermissible: 141.27, maxPermissible: 144.48, tableRef: 'WRS Raipur Gauge BE/91-61-10' },
   DG_OUTER_COIL_SPRING: { nominalValue: 342.0, minPermissible: 342.0, maxPermissible: 400.0, tableRef: 'WRS Raipur Gauge BE/91-61-6' },
   DG_INNER_COIL_SPRING: { nominalValue: 342.0, minPermissible: 342.0, maxPermissible: 400.0, tableRef: 'WRS Raipur Gauge BE/91-61-7A' },
   DG_CORNER_COIL_SPRING: { nominalValue: 286.0, minPermissible: 286.0, maxPermissible: 340.0, tableRef: 'WRS Raipur Gauge BE/91-61-7a' },

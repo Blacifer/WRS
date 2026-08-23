@@ -63,6 +63,11 @@ export function resolveComponentTarget(partName: string, category: string): CVCo
     return 'OUTER_SPRING';
   }
   if (category === 'FRICTION_WEDGES' || name.includes('wedge') || name.includes('घर्षण') || name.includes('वेज')) {
+    // WMM 2.0 §309D gives distinct per-surface wear limits and the
+    // checklist already names the two surfaces separately — route each to
+    // its own spec instead of the shared legacy FRICTION_WEDGE target.
+    if (name.includes('slope')) return 'FRICTION_WEDGE_SLOPE';
+    if (name.includes('vertical')) return 'FRICTION_WEDGE_VERTICAL';
     return 'FRICTION_WEDGE';
   }
   if (category === 'BEARINGS' || name.includes('end cap') || name.includes('ctrb') || name.includes('bearing') || name.includes('कैप')) {

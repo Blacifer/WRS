@@ -129,6 +129,8 @@ export const CV_COMPONENT_RANGES: Record<string, MeasurementRange> = {
   INNER_SPRING: DEFAULT_CALIPER_RANGE,
   SNUBBER_SPRING: DEFAULT_CALIPER_RANGE,
   FRICTION_WEDGE: { min: 0.0, max: 150.0 },
+  FRICTION_WEDGE_VERTICAL: { min: 0.0, max: 20.0 },
+  FRICTION_WEDGE_SLOPE: { min: 0.0, max: 20.0 },
   CTRB_END_CAP: { min: 0.0, max: 200.0 },
   CTRB_BEARING_END_CAP: { min: 0.0, max: 200.0 },
   WHEEL_FLANGE: { min: 10.0, max: 40.0 },
