@@ -49,10 +49,13 @@ export class AcousticDiagnosticEngine {
 
   // DSP buffers
   private fftSize: number = 2048;
-  private freqData: Uint8Array = new Uint8Array(1024);
-  private floatFreqData: Float32Array = new Float32Array(1024);
-  private timeData: Uint8Array = new Uint8Array(2048);
-  private floatTimeData: Float32Array = new Float32Array(2048);
+  // Explicitly parameterised over ArrayBuffer: the Web Audio getXxxData()
+  // methods require a view backed by a real ArrayBuffer, and the default
+  // ArrayBufferLike (which admits SharedArrayBuffer) does not satisfy them.
+  private freqData: Uint8Array<ArrayBuffer> = new Uint8Array(1024);
+  private floatFreqData: Float32Array<ArrayBuffer> = new Float32Array(1024);
+  private timeData: Uint8Array<ArrayBuffer> = new Uint8Array(2048);
+  private floatTimeData: Float32Array<ArrayBuffer> = new Float32Array(2048);
 
   // Peak hold array for 32 equalizer bands
   private peakHoldValues: number[] = new Array(32).fill(0);

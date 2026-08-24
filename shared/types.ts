@@ -480,6 +480,8 @@ export const LIFECYCLE_STAGES: readonly LifecycleStage[] = [
 ] as const;
 
 export interface WagonRecord {
+  /** Hours since entry, computed server-side (wagonRepository.mapWagonRow). */
+  totalElapsedHours?: number;
   id: string;
   wagonNumber: string; // e.g. 'NR/BOXNHL/12345'
   wagonType: string;   // e.g. 'BOXNHL', 'BCNHL', 'BOBRN'

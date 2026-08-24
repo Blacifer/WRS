@@ -709,7 +709,8 @@ export function parseVoiceCommand(
       CONDEMNED: 'CONDEMNED / Scrap',
       REPAIRED: 'REPAIRED & Tested',
       REPLACED: 'REPLACED with New',
-      FAIL: 'DEFECTIVE / Fail'
+      FAIL: 'DEFECTIVE / Fail',
+      PENDING: 'PENDING Inspection'
     };
 
     const statusMapHi: Record<PartInspectionStatus, string> = {
@@ -717,7 +718,8 @@ export function parseVoiceCommand(
       CONDEMNED: 'कंडम / स्क्रैप',
       REPAIRED: 'मरम्मत पूर्ण',
       REPLACED: 'नया प्रतिस्थापित',
-      FAIL: 'दोषपूर्ण'
+      FAIL: 'दोषपूर्ण',
+      PENDING: 'निरीक्षण लंबित'
     };
 
     const feedbackEn = defectNotes

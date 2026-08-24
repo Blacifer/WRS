@@ -68,7 +68,10 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
   onUndo,
   lang: initialLang = 'en'
 }) => {
-  const { t, currentLang } = useI18n();
+  // useI18n() exposes `lang`; `currentLang` never existed, so this silently
+  // resolved to undefined and Hindi speech recognition fell back to English
+  // whenever the lang prop was not explicitly passed.
+  const { t, lang: currentLang } = useI18n();
   const effectiveLang = initialLang || currentLang;
 
   // Recognition Language State

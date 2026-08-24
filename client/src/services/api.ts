@@ -499,6 +499,30 @@ export class ApiClient {
     return this.request<string>(`/analytics/export?format=${format}`);
   }
 
+  /**
+   * OTP-gated audit export of inspection records (admin only).
+   *
+   * AdminExportModal has always called this method, but it was never defined
+   * on the client — so the export button threw a TypeError at runtime and the
+   * compliance export simply did not work. Returns a CSV string or a parsed
+   * JSON payload depending on the requested format.
+   */
+  public async exportInspections(
+    format: 'csv' | 'json',
+    otpToken: string,
+    filters: { startDate?: string; endDate?: string; wagonNumber?: string } = {}
+  ): Promise<string | Record<string, unknown>> {
+    const params = new URLSearchParams({ format, otpToken });
+    if (filters.startDate) params.set('startDate', filters.startDate);
+    if (filters.endDate) params.set('endDate', filters.endDate);
+    if (filters.wagonNumber) params.set('wagonNumber', filters.wagonNumber);
+
+    return this.request<string | Record<string, unknown>>(
+      `/inspections/export?${params.toString()}`,
+      { headers: { 'x-otp-token': otpToken } }
+    );
+  }
+
   // =========================================================================
   // Phase 3 (M1): Stores Depot Inventory & Pre-Arrival OMRS AI Triage APIs
   // =========================================================================
