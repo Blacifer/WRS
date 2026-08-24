@@ -124,6 +124,8 @@ export class InspectionRepository {
     // Which spring within its nest. Optional for callers that measure a single
     // representative spring, required for a full nest sweep to be countable.
     const nestIndex = data.nestIndex ?? data.nest_index ?? null;
+    const heightIsApproximate =
+      (data.heightIsApproximate ?? data.height_is_approximate) ? 1 : 0;
     const measurementSource = data.measurementSource ?? data.measurement_source ?? 'MANUAL';
     const ocrConfidence = data.ocrConfidence ?? data.ocr_confidence ?? null;
     const ocrImageRef = data.ocrImageRef ?? data.ocr_image_ref ?? null;
@@ -152,7 +154,7 @@ export class InspectionRepository {
         inspector_id, inspector_name, supervisor_override, original_band, override_band,
         override_reason, override_supervisor_id, override_supervisor_name, otp_token_ref,
         measurement_source, ocr_confidence, ocr_image_ref, offline_created_at, created_at, synced_at, audit_hash,
-        bogie_position, nest_index
+        bogie_position, nest_index, height_is_approximate
       ) VALUES (
         ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?,
@@ -160,7 +162,7 @@ export class InspectionRepository {
         ?, ?, ?, ?, ?,
         ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?, ?,
-        ?, ?
+        ?, ?, ?
       )
     `);
 
@@ -171,7 +173,7 @@ export class InspectionRepository {
       inspectorId, inspectorName, supervisorOverride, originalBand, overrideBand,
       overrideReason, overrideSupervisorId, overrideSupervisorName, otpTokenRef,
       measurementSource, ocrConfidence, ocrImageRef, offlineCreatedAt, timestamp, syncedAt, auditHash,
-      bogiePosition, nestIndex
+      bogiePosition, nestIndex, heightIsApproximate
     );
 
     // Chained audit trail entry — this is the highest-volume event type in
@@ -689,6 +691,18 @@ export class InspectionRepository {
       bogie_type: row.bogie_type,
       springPosition: row.spring_position,
       spring_position: row.spring_position,
+      // Which bogie, and which spring within its nest. Stored since per-spring
+      // indexing landed, but never surfaced here — so anything reading a wagon
+      // through the API saw twelve indistinguishable outer springs.
+      bogiePosition: row.bogie_position ?? null,
+      bogie_position: row.bogie_position ?? null,
+      nestIndex: row.nest_index ?? null,
+      nest_index: row.nest_index ?? null,
+      // Whether the height is a band midpoint from the strip rather than a
+      // measurement. A reader that cannot tell the difference will treat an
+      // approximate value as precise.
+      heightIsApproximate: row.height_is_approximate === 1,
+      height_is_approximate: row.height_is_approximate ?? 0,
       condition: row.spring_condition,
       spring_condition: row.spring_condition,
       measuredFreeHeight: row.measured_height,

@@ -1144,13 +1144,14 @@ export class WagonRepository {
     //   1. The manual's own wording is "it is recommended that springs having
     //      not more than 3 mm free height variation should be assembled in the
     //      same group" — advisory language, not a condemning limit.
-    //   2. Inspection records carry no per-spring identity, so two rows at the
-    //      same position may be two springs OR one spring measured twice.
-    //      Hard-blocking on an ambiguous signal would wrongly detain wagons.
-    // Adding a per-spring nest index would let this become a hard blocker.
+    //   2. Records written before per-spring indexing carry no nest index, so
+    //      two rows at the same position may be two springs OR one spring
+    //      measured twice. Hard-blocking on an ambiguous signal would wrongly
+    //      detain wagons carrying that older data.
     // -----------------------------------------------------------------------
     const allWagonSprings = this.db.prepare(`
-      SELECT id, spring_position, spring_condition, measured_height, classified_band, status
+      SELECT id, bogie_position, spring_position, spring_condition, measured_height,
+             classified_band, height_is_approximate, status
       FROM inspections WHERE wagon_number = ?
     `).all(normalizedWagonNumber) as any[];
 
@@ -1158,9 +1159,13 @@ export class WagonRepository {
       allWagonSprings.map((s) => ({
         id: s.id,
         springPosition: s.spring_position,
+        bogiePosition: s.bogie_position,
         condition: s.spring_condition,
         measuredFreeHeight: s.measured_height,
         classifiedBand: s.classified_band,
+        // Without this the nest check cannot tell a strip reading from a
+        // measurement, and silently passes a nest of mixed bands.
+        heightIsApproximate: s.height_is_approximate === 1,
         status: s.status
       }))
     );

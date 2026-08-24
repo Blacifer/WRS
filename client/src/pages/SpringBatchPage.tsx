@@ -27,6 +27,7 @@ import { DefectPhotoCapture } from '../components/DefectPhotoCapture.tsx';
 import { VoiceInspectionToolbar } from '../components/VoiceInspectionToolbar.tsx';
 import type { VoiceParseResult } from '../../../shared/types.ts';
 import { classifySpringLocally, getRDSOTable } from '../services/classification.ts';
+import { getBandOptions, recordByBand, recordAsCondemned } from '../../../shared/classification/bandEntry.ts';
 import { getReplacementGuidance } from '../../../shared/classification/nestGrouping.ts';
 import {
   getSpringCountOptions,
@@ -83,6 +84,8 @@ interface CompletedStep extends QueueStep {
   measuredHeight: number;
   status: 'PASS' | 'CONDEMNED';
   band: ClassificationResult['band'];
+  /** True when the height is a band midpoint from the strip, not a measurement. */
+  heightIsApproximate: boolean;
 }
 
 const BOGIE_TYPES: BogieType[] = ['CASNUB_22_NLB', 'CASNUB_22_HS', 'CASNUB_22_RFT'];
@@ -116,6 +119,11 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
   // saved — it is both the proof behind the verdict and a labelled training
   // sample for future automatic defect detection.
   const [defectPhoto, setDefectPhoto] = useState<string | null>(null);
+  // Band-first is the default because it matches the strip an inspector is
+  // already holding. Exact height stays available for a borderline spring or a
+  // disputed reading.
+  const [entryMode, setEntryMode] = useState<'BAND' | 'HEIGHT'>('BAND');
+  const [heightIsApproximate, setHeightIsApproximate] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -244,6 +252,10 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
         springPosition: c.position,
         condition,
         measuredFreeHeight: c.measuredHeight,
+        classifiedBand: c.band,
+        // Carried through so the guidance knows whether it may do arithmetic
+        // on this height or must treat the band as the constraint.
+        heightIsApproximate: c.heightIsApproximate ?? false,
         status: c.status
       }));
 
@@ -255,7 +267,12 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
       return b ? b.band : null;
     };
 
-    return getReplacementGuidance(sameNest, bandLookup);
+    const bandRange = (band: string) => {
+      const b = table?.bands.find((x) => x.band === band);
+      return b ? { min: b.minHeight, max: b.maxHeight } : null;
+    };
+
+    return getReplacementGuidance(sameNest, bandLookup, bandRange);
   }, [currentStep, classification, completed, bogieType, condition]);
 
   const handleMeasurementChange = (height: number, source: 'OCR' | 'MANUAL', confidence?: number) => {
@@ -308,6 +325,32 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
     }
   };
 
+  const bandOptions = useMemo(
+    () => (currentStep ? getBandOptions(bogieType, condition, currentStep.position) : []),
+    [bogieType, condition, currentStep]
+  );
+
+  /** The strip said this band — record it and move on. One tap. */
+  const handleBandTap = (band: string) => {
+    if (!currentStep) return;
+    const r = recordByBand(bogieType, condition, currentStep.position, band as any);
+    if (!r) return;
+    setMeasuredHeight(r.measuredFreeHeight);
+    setHeightIsApproximate(true);
+    setMeasurementSource('MANUAL');
+    setDamageType('NONE');
+  };
+
+  /** The spring is off the strip entirely. */
+  const handleOffStrip = () => {
+    if (!currentStep) return;
+    const r = recordAsCondemned(bogieType, condition, currentStep.position, 'BELOW');
+    if (!r) return;
+    setMeasuredHeight(r.measuredFreeHeight);
+    setHeightIsApproximate(true);
+    setMeasurementSource('MANUAL');
+  };
+
   const resetStepInputs = () => {
     setMeasuredHeight(null);
     setOcrConfidence(undefined);
@@ -317,6 +360,7 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
     setDamageNotes('');
     setShowDefectPanel(false);
     setDefectPhoto(null);
+    setHeightIsApproximate(false);
     setSaveError(null);
   };
 
@@ -353,6 +397,7 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
       // satisfy both checklist items.
       bogiePosition: currentStep.bogiePosition,
       nestIndex: currentStep.indexInNest,
+      heightIsApproximate,
       measuredHeight,
       measuredFreeHeight: measuredHeight,
       damageType,
@@ -479,7 +524,13 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
 
     setCompleted((prev) => [
       ...prev,
-      { ...currentStep, measuredHeight, status: classification.status, band: classification.band }
+      {
+        ...currentStep,
+        measuredHeight,
+        status: classification.status,
+        band: classification.band,
+        heightIsApproximate
+      }
     ]);
     setWagonLocked(true);
     setIsSaving(false);
@@ -762,6 +813,93 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
             </span>
           </div>
 
+          {/* Entry mode. Band-first mirrors the strip the inspector is already
+              holding: checking a spring against it gives the band directly, so
+              asking for a three-digit height and re-deriving that band is more
+              work than the tool requires — nine hundred times a day. */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-950 rounded-lg border border-slate-800">
+            {([
+              ['BAND', isHi ? 'स्ट्रिप बैंड' : 'Band from strip'],
+              ['HEIGHT', isHi ? 'सटीक ऊंचाई' : 'Exact height']
+            ] as const).map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => {
+                  setEntryMode(mode);
+                  setMeasuredHeight(null);
+                  setHeightIsApproximate(false);
+                }}
+                className={`flex-1 min-h-[44px] px-3 py-2 text-sm font-bold rounded-md transition-all ${
+                  entryMode === mode
+                    ? 'bg-blue-600 text-white shadow'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {entryMode === 'BAND' && (
+            <div className="glass-panel rounded-2xl p-4 space-y-3">
+              <div>
+                <h3 className="text-white font-extrabold text-base flex items-center gap-2">
+                  <span>📊</span>
+                  {isHi ? 'स्ट्रिप पर कौन सा बैंड?' : 'Which band does the strip show?'}
+                </h3>
+                <p className="text-slate-400 text-xs mt-0.5">
+                  {isHi
+                    ? 'स्प्रिंग को स्ट्रिप से मिलाएँ और वही बैंड चुनें।'
+                    : 'Check the spring against the strip and tap the band it falls in.'}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {bandOptions.map((b) => {
+                  const selected =
+                    measuredHeight !== null && measuredHeight >= b.minHeight && measuredHeight < b.maxHeight;
+                  return (
+                    <button
+                      key={b.band}
+                      type="button"
+                      onClick={() => handleBandTap(b.band)}
+                      className={`min-h-[64px] px-3 py-2.5 rounded-xl border-2 text-left transition-all active:scale-95 ${
+                        selected ? 'border-white bg-white/10' : 'border-slate-700 hover:border-slate-500'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <span
+                          className="w-7 h-7 rounded-md shrink-0 border-2 border-white/30"
+                          style={{ backgroundColor: BAND_PAINT_HEX[b.band] || '#64748b' }}
+                        />
+                        <div className="min-w-0">
+                          <div className="text-sm font-black text-white leading-tight">
+                            {isHi ? b.labelHi : b.label}
+                          </div>
+                          <div className="text-[11px] text-slate-400 font-mono tabular-nums">
+                            {b.maxHeight}–{b.minHeight} mm
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleOffStrip}
+                className="w-full min-h-[52px] px-3 py-2.5 rounded-xl border-2 border-rose-800 bg-rose-950/30 text-rose-300 font-black text-sm transition-all active:scale-95 hover:bg-rose-950/60"
+              >
+                {isHi
+                  ? 'स्ट्रिप से बाहर — कंडम'
+                  : 'Off the strip — condemn'}
+              </button>
+            </div>
+          )}
+
+          {entryMode === 'HEIGHT' && (
           <CaliperCamera
             key={stepIndex}
             lang={lang}
@@ -784,6 +922,7 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
             // which no camera can do.
             hideCamera
           />
+          )}
 
           {classification && (
             <div

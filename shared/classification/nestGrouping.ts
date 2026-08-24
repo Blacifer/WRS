@@ -48,13 +48,25 @@ export const SPRING_REPLACE_NOT_REPAIR_REFERENCE =
 export interface NestSpringInput {
   id: string;
   springPosition: SpringPosition;
+  /**
+   * Which bogie the spring belongs to. A nest lives on one bogie, so two
+   * bogies on the same wagon are separate groups and may legitimately carry
+   * different bands.
+   */
+  bogiePosition?: string | null;
   condition: SpringCondition;
   measuredFreeHeight: number;
   classifiedBand?: string | null;
   status?: string;
+  /**
+   * True when the height is a band midpoint recorded via the strip, not a
+   * number anyone measured. Arithmetic that treats it as exact is unsound —
+   * see getReplacementGuidance.
+   */
+  heightIsApproximate?: boolean;
 }
 
-export type NestViolationType = 'HEIGHT_VARIATION_EXCEEDED' | 'NEW_OLD_MIXED';
+export type NestViolationType = 'HEIGHT_VARIATION_EXCEEDED' | 'NEW_OLD_MIXED' | 'BAND_MIXED';
 
 export interface NestViolation {
   type: NestViolationType;
@@ -69,6 +81,8 @@ export interface NestViolation {
   maxHeight?: number;
   /** Present for NEW_OLD_MIXED. */
   conditionsFound?: SpringCondition[];
+  /** Present for BAND_MIXED. */
+  bandsFound?: string[];
 }
 
 export interface NestGroupSummary {
@@ -96,9 +110,18 @@ export interface NestValidationResult {
  * but share identical tolerance tables. They are kept as distinct groups
  * here — an outer snubber and an inner snubber are not interchangeable
  * members of one nest.
+ *
+ * A nest is also bounded by its bogie: the twelve outer springs on bogie 1
+ * are one assembly group, and bogie 2's twelve are another. Grouping across
+ * both would flag a wagon whose bogies are each internally matched to
+ * different bands — which is perfectly acceptable, since they are never
+ * assembled together. Records predating per-spring indexing carry no bogie,
+ * and fall back to the older wagon-wide grouping rather than being dropped.
  */
 function groupKeyFor(spring: NestSpringInput): string {
-  return spring.springPosition;
+  return spring.bogiePosition
+    ? `${spring.bogiePosition} ${spring.springPosition}`
+    : spring.springPosition;
 }
 
 /**
@@ -109,13 +132,10 @@ function groupKeyFor(spring: NestSpringInput): string {
  * already blocked by the gate's per-spring check and must be replaced, so
  * including them would produce a duplicate, confusing blocker.
  *
- * NOTE ON PRECISION: inspection records do not currently carry a bogie
- * identifier, so springs are grouped per wagon+position rather than per
- * bogie+position. For a two-bogie wagon this is the stricter reading (it
- * requires all outer springs on the wagon to match, not just those on one
- * bogie). It can never mask a genuine mismatch, but it can flag a wagon
- * whose two bogies are each internally matched to different bands. Adding a
- * bogie number to the inspection record would let this narrow correctly.
+ * Springs are grouped per bogie+position, which is what a nest physically is.
+ * Records written before per-spring indexing carry no bogie and fall back to
+ * wagon-wide grouping: the stricter reading, which can over-report on an old
+ * record but never mask a genuine mismatch.
  */
 export function validateSpringNests(springs: NestSpringInput[]): NestValidationResult {
   const violations: NestViolation[] = [];
@@ -179,7 +199,37 @@ export function validateSpringNests(springs: NestSpringInput[]): NestValidationR
       });
     }
 
-    // Rule 2 — new and used springs must not share a group.
+    // Rule 2 — springs recorded off the strip must all carry the same band.
+    //
+    // This check exists because the height arithmetic above cannot see the
+    // fault when heights are approximate. A band-entered spring stores its
+    // band's midpoint, and adjacent midpoints are exactly 3 mm apart — so a
+    // nest of six GREEN and six BLUE springs computes a 3.00 mm variation and
+    // passes, while the real springs could be 257 mm and 263 mm: 6 mm apart,
+    // double the limit. The band is what was actually observed, so when the
+    // heights are approximate the band is what must be checked.
+    //
+    // Measured nests are deliberately left to the height rule. Two genuinely
+    // measured springs either side of a band boundary (259.5 and 260.5) are
+    // 1 mm apart and perfectly matched; failing them would be wrong.
+    const approximateMembers = members.filter((m) => m.heightIsApproximate);
+    if (approximateMembers.length > 0 && bandsFound.length > 1) {
+      isMatched = false;
+      violations.push({
+        type: 'BAND_MIXED',
+        groupKey,
+        springPosition: members[0].springPosition,
+        message:
+          `${groupKey} spring group mixes ${bandsFound.length} bands (${bandsFound.join(', ')}). ` +
+          `Springs recorded off the strip are known only to their band, and two different ` +
+          `bands can be up to ${(MAX_NEST_HEIGHT_VARIATION_MM * 2).toFixed(0)} mm apart in free height. ` +
+          `All springs in one nest must come from a single band.`,
+        springIds: members.map((m) => m.id),
+        bandsFound
+      });
+    }
+
+    // Rule 3 — new and used springs must not share a group.
     if (conditionsFound.length > 1) {
       isMatched = false;
       violations.push({
@@ -236,6 +286,79 @@ export interface ReplacementGuidance {
 }
 
 /**
+ * Replacement guidance for a nest recorded by band rather than by measurement.
+ *
+ * The rule is simply the grouping rule read directly: all springs in one nest
+ * belong to one band. So the replacement must carry the band the rest of the
+ * nest already carries, and the window quoted is that band's own range from
+ * the RDSO table -- never a computed one.
+ */
+function bandBasedGuidance(
+  serviceable: NestSpringInput[],
+  bandLookup?: (height: number) => string | null,
+  bandRange?: (band: string) => { min: number; max: number } | null
+): ReplacementGuidance {
+  const heights = serviceable.map((s) => s.measuredFreeHeight).sort((a, b) => a - b);
+
+  // A measured spring in a mixed nest still has a band -- look it up so the
+  // whole nest is judged on the same footing.
+  const bands = [
+    ...new Set(
+      serviceable
+        .map((s) => s.classifiedBand ?? (bandLookup ? bandLookup(s.measuredFreeHeight) : null))
+        .filter(Boolean) as string[]
+    )
+  ];
+
+  if (bands.length === 0) {
+    return {
+      action: 'REPLACE',
+      targetRange: null,
+      targetBand: null,
+      message:
+        'Replace this spring — a defective coil spring is renewed, not repaired. ' +
+        'The band of the other springs in this nest has not been recorded, so the ' +
+        'group is not established — record the rest of the nest first, then match ' +
+        'the replacement to its band.',
+      nestHeights: heights,
+      reference: NEST_RULE_REFERENCE
+    };
+  }
+
+  if (bands.length > 1) {
+    return {
+      action: 'REPLACE',
+      targetRange: null,
+      targetBand: null,
+      message:
+        `Replace this spring — a defective coil spring is renewed, not repaired. ` +
+        `The rest of this nest is already spread across ${bands.length} bands ` +
+        `(${bands.join(', ')}), so no single replacement can bring it into one group. ` +
+        `Re-group the whole nest onto one band.`,
+      nestHeights: heights,
+      reference: NEST_RULE_REFERENCE
+    };
+  }
+
+  const band = bands[0];
+  const range = bandRange ? bandRange(band) : null;
+
+  return {
+    action: 'REPLACE',
+    targetRange: range,
+    targetBand: band,
+    message:
+      `Replace this spring — a defective coil spring is renewed, not repaired. ` +
+      `Fit a spring from the ${band} band` +
+      (range ? ` (${range.min.toFixed(1)}–${range.max.toFixed(1)} mm)` : '') +
+      ` — the other ${serviceable.length} spring${serviceable.length === 1 ? '' : 's'} ` +
+      `in this nest are ${band}, and all springs in one nest must come from the same band.`,
+    nestHeights: heights,
+    reference: NEST_RULE_REFERENCE
+  };
+}
+
+/**
  * Works out what a replacement spring has to be, given the rest of its nest.
  *
  * A condemned spring is replaced, never repaired — WMM 2.0's overhaul steps say
@@ -253,10 +376,25 @@ export interface ReplacementGuidance {
  */
 export function getReplacementGuidance(
   nestSprings: NestSpringInput[],
-  bandLookup?: (height: number) => string | null
+  bandLookup?: (height: number) => string | null,
+  bandRange?: (band: string) => { min: number; max: number } | null
 ): ReplacementGuidance {
   const serviceable = nestSprings.filter((s) => s.status !== 'CONDEMNED');
   const heights = serviceable.map((s) => s.measuredFreeHeight).sort((a, b) => a - b);
+
+  // A nest recorded off the strip cannot be reasoned about arithmetically.
+  // Every band-entered spring stores its band's midpoint, so twelve springs
+  // genuinely spread across the full 3 mm of GREEN all read as one identical
+  // number. Applying the +/-3 mm window to that midpoint yields a range wider
+  // than the band itself -- for GREEN (257-260) it admits 255.5, which is a
+  // YELLOW spring. Fitting it would produce exactly the mismatched nest the
+  // rule exists to prevent, while the arithmetic claimed a pass.
+  //
+  // The band is what was actually observed, and one band IS one assembly
+  // group, so for these nests the band is the constraint.
+  if (serviceable.length > 0 && serviceable.some((s) => s.heightIsApproximate)) {
+    return bandBasedGuidance(serviceable, bandLookup, bandRange);
+  }
 
   if (heights.length === 0) {
     return {

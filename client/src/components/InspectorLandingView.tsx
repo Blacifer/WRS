@@ -317,7 +317,7 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-extrabold uppercase px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
-                    {isHi ? 'एक बोगी · 6 स्प्रिंग' : 'One bogie · 6 springs'}
+                    {isHi ? 'पूरा वैगन · हर स्प्रिंग' : 'Whole wagon · every spring'}
                   </span>
                 </div>
                 <h3 className="text-xl font-extrabold text-white group-hover:text-emerald-300 transition-colors">
@@ -325,8 +325,8 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-300 font-medium line-clamp-2">
                   {isHi
-                    ? 'एक बोगी के सभी 6 स्प्रिंग एक के बाद एक — कैमरा OCR या मैनुअल एंट्री'
-                    : 'All 6 springs in a bogie, one after another — camera OCR or manual entry'}
+                    ? 'पट्टी पर बैंड देखें और टैप करें — नेस्ट दर नेस्ट, पूरा वैगन'
+                    : 'Tap the band you read off the strip — nest by nest, through the whole wagon'}
                 </p>
               </div>
             </div>

@@ -574,6 +574,12 @@ export function runMigrations(db: DatabaseSync): void {
   // measurement satisfied both bogies' checklist items. Added nullable so
   // existing rows stay honest about not knowing which bogie they came from.
   const inspectionCols = db.prepare('PRAGMA table_info(inspections)').all() as any[];
+  if (!inspectionCols.some((c) => c.name === 'height_is_approximate')) {
+    db.exec(
+      'ALTER TABLE inspections ADD COLUMN height_is_approximate INTEGER NOT NULL DEFAULT 0 ' +
+      'CHECK(height_is_approximate IN (0, 1));'
+    );
+  }
   if (!inspectionCols.some((c) => c.name === 'nest_index')) {
     db.exec(
       'ALTER TABLE inspections ADD COLUMN nest_index INTEGER DEFAULT NULL ' +

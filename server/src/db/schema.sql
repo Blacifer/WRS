@@ -48,6 +48,10 @@ CREATE TABLE IF NOT EXISTS inspections (
   -- it, twelve outer springs collapse to one row and the exit gate sees a
   -- single reading standing in for the whole nest.
   nest_index INTEGER DEFAULT NULL CHECK(nest_index IS NULL OR nest_index >= 1),
+  -- 1 when the height is a band midpoint recorded from the strip rather than a
+  -- measured figure. The band is what the inspector actually observed; storing
+  -- a representative height without saying so would overstate the precision.
+  height_is_approximate INTEGER NOT NULL DEFAULT 0 CHECK(height_is_approximate IN (0, 1)),
   measured_height REAL NOT NULL CHECK(measured_height >= 0.0 AND measured_height <= 1000.0),
   classified_band TEXT CHECK(classified_band IN ('BLUE', 'GREEN', 'YELLOW', 'ORANGE', 'WHITE', 'RED') OR classified_band IS NULL),
   band_roman TEXT CHECK(band_roman IN ('Band I', 'Band II', 'Band III', 'Band IV', 'Band V', 'Band VI') OR band_roman IS NULL),
