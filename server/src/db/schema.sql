@@ -39,6 +39,11 @@ CREATE TABLE IF NOT EXISTS inspections (
   bogie_type TEXT NOT NULL CHECK(bogie_type IN ('CASNUB_22_NLB', 'CASNUB_22_HS', 'CASNUB_22_RFT')),
   spring_condition TEXT NOT NULL CHECK(spring_condition IN ('USED', 'NEW')),
   spring_position TEXT NOT NULL CHECK(spring_position IN ('OUTER', 'INNER', 'SNUBBER', 'SNUBBER_OUTER', 'SNUBBER_INNER')),
+  -- Which bogie this spring came off. Without it a single OUTER measurement
+  -- was matched to BOTH bogies' checklist items, so measuring one spring
+  -- marked two as verified. Nullable because rows created before this column
+  -- existed genuinely do not know, and must not be guessed at.
+  bogie_position TEXT DEFAULT NULL CHECK(bogie_position IS NULL OR bogie_position IN ('BOGIE_1', 'BOGIE_2')),
   measured_height REAL NOT NULL CHECK(measured_height >= 0.0 AND measured_height <= 1000.0),
   classified_band TEXT CHECK(classified_band IN ('BLUE', 'GREEN', 'YELLOW', 'ORANGE', 'WHITE', 'RED') OR classified_band IS NULL),
   band_roman TEXT CHECK(band_roman IN ('Band I', 'Band II', 'Band III', 'Band IV', 'Band V', 'Band VI') OR band_roman IS NULL),

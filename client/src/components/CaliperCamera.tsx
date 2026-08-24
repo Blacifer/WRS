@@ -28,6 +28,17 @@ interface CaliperCameraProps {
   condition?: SpringCondition;
   initialTarget?: CVComponentTarget;
   onClose?: () => void;
+  /**
+   * Which input mode opens first.
+   *
+   * Springs at WRS Raipur are measured with a manual gauge, not a digital
+   * caliper — there is no LCD to photograph. Opening the camera for them
+   * costs an extra tap on every spring (~900/day) and triggers a pointless
+   * camera-permission prompt. Callers measuring springs should pass
+   * 'manual'. Components that genuinely use a digital caliper can keep the
+   * camera default.
+   */
+  defaultMode?: 'camera' | 'manual';
 }
 
 export const CaliperCamera: React.FC<CaliperCameraProps> = ({
@@ -35,14 +46,15 @@ export const CaliperCamera: React.FC<CaliperCameraProps> = ({
   measuredHeight,
   onMeasurementChange,
   onClose,
-  initialTarget
+  initialTarget,
+  defaultMode = 'camera'
 }) => {
   const dict = getDictionary(lang);
   const isHi = lang === 'hi';
   const measurementRange: MeasurementRange = (initialTarget && CV_COMPONENT_RANGES[initialTarget]) || DEFAULT_CALIPER_RANGE;
 
   // State
-  const [activeMode, setActiveMode] = useState<'camera' | 'manual'>('camera');
+  const [activeMode, setActiveMode] = useState<'camera' | 'manual'>(defaultMode);
   const [isProcessing, setIsProcessing] = useState(false);
   const [ocrConfidence, setOcrConfidence] = useState<number | null>(null);
   const [ocrLatencyMs, setOcrLatencyMs] = useState<number | null>(null);

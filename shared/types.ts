@@ -198,6 +198,8 @@ export interface InspectionRecord {
   bogie_type?: BogieType;
   springPosition: SpringPosition;
   spring_position?: SpringPosition;
+  bogiePosition?: 'BOGIE_1' | 'BOGIE_2' | null;
+  bogie_position?: 'BOGIE_1' | 'BOGIE_2' | null;
   condition: SpringCondition;
   spring_condition?: SpringCondition;
   measuredFreeHeight: number;
@@ -250,6 +252,8 @@ export interface InspectionCreateRequest {
   condition: SpringCondition;
   position?: SpringPosition;
   springPosition?: SpringPosition;
+  /** Which bogie the spring came off — required to link it to the right checklist item. */
+  bogiePosition?: 'BOGIE_1' | 'BOGIE_2';
   measuredHeight?: number;
   measuredFreeHeight?: number;
   damageType?: DamageType;

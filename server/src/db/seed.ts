@@ -1613,18 +1613,20 @@ export function seedDemoData(db?: DatabaseSync): void {
       table_reference, valid_range_min, valid_range_max, condemnation_reason,
       inspector_id, inspector_name, supervisor_override, original_band, override_band,
       override_reason, override_supervisor_id, override_supervisor_name, otp_token_ref,
-      measurement_source, ocr_confidence, ocr_image_ref, offline_created_at, created_at, synced_at, audit_hash
+      measurement_source, ocr_confidence, ocr_image_ref, offline_created_at, created_at, synced_at, audit_hash,
+      bogie_position
     ) VALUES (
       ?, ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?, ?, ?,
       ?, ?, ?, ?,
       ?, ?, ?, ?, ?,
       ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?, ?
+      ?, ?, ?, ?, ?, ?, ?,
+      ?
     )
   `);
 
-  for (const sp of DEMO_SPRINGS) {
+  for (const [springIdx, sp] of DEMO_SPRINGS.entries()) {
     const inspId = `insp_${sp.syncId}`;
     const existing = checkInspStmt.get(inspId, sp.syncId);
     if (!existing) {
@@ -1688,7 +1690,10 @@ export function seedDemoData(db?: DatabaseSync): void {
         null,
         createdAt,
         createdAt,
-        auditHash
+        auditHash,
+        // Demo springs alternate across the two bogies so seeded data
+        // exercises the same per-bogie checklist linkage real measurements do.
+        (sp as any).bogiePosition || (springIdx % 2 === 0 ? 'BOGIE_1' : 'BOGIE_2')
       );
     }
   }

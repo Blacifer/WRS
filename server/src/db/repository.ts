@@ -110,6 +110,10 @@ export class InspectionRepository {
       throw err;
     }
 
+    // Which bogie this spring came from. Optional so existing callers keep
+    // working, but without it the spring cannot be matched to a specific
+    // bogie's checklist item — see syncPhase1SpringsToChecklist.
+    const bogiePosition = data.bogiePosition ?? data.bogie_position ?? null;
     const measurementSource = data.measurementSource ?? data.measurement_source ?? 'MANUAL';
     const ocrConfidence = data.ocrConfidence ?? data.ocr_confidence ?? null;
     const ocrImageRef = data.ocrImageRef ?? data.ocr_image_ref ?? null;
@@ -137,14 +141,16 @@ export class InspectionRepository {
         table_reference, valid_range_min, valid_range_max, condemnation_reason,
         inspector_id, inspector_name, supervisor_override, original_band, override_band,
         override_reason, override_supervisor_id, override_supervisor_name, otp_token_ref,
-        measurement_source, ocr_confidence, ocr_image_ref, offline_created_at, created_at, synced_at, audit_hash
+        measurement_source, ocr_confidence, ocr_image_ref, offline_created_at, created_at, synced_at, audit_hash,
+        bogie_position
       ) VALUES (
         ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?,
         ?, ?, ?, ?, ?,
         ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?,
+        ?
       )
     `);
 
@@ -154,7 +160,8 @@ export class InspectionRepository {
       tableReference, validRangeMin, validRangeMax, condemnationReason,
       inspectorId, inspectorName, supervisorOverride, originalBand, overrideBand,
       overrideReason, overrideSupervisorId, overrideSupervisorName, otpTokenRef,
-      measurementSource, ocrConfidence, ocrImageRef, offlineCreatedAt, timestamp, syncedAt, auditHash
+      measurementSource, ocrConfidence, ocrImageRef, offlineCreatedAt, timestamp, syncedAt, auditHash,
+      bogiePosition
     );
 
     // Chained audit trail entry — this is the highest-volume event type in
@@ -172,6 +179,7 @@ export class InspectionRepository {
         bogieType,
         springCondition,
         springPosition,
+        bogiePosition,
         measuredHeight,
         classifiedBand,
         status,

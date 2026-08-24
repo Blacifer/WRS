@@ -568,4 +568,16 @@ export function runMigrations(db: DatabaseSync): void {
   // (it wrote unchained audit rows — no previous_hash/hash — which would
   // now duplicate the chained entry written by InspectionRepository).
   db.exec('DROP TRIGGER IF EXISTS trg_auto_log_inspection_insert;');
+
+  // Additive migration: inspections.bogie_position. Older databases were
+  // created before spring records carried a bogie identity, which meant one
+  // measurement satisfied both bogies' checklist items. Added nullable so
+  // existing rows stay honest about not knowing which bogie they came from.
+  const inspectionCols = db.prepare('PRAGMA table_info(inspections)').all() as any[];
+  if (!inspectionCols.some((c) => c.name === 'bogie_position')) {
+    db.exec(
+      "ALTER TABLE inspections ADD COLUMN bogie_position TEXT DEFAULT NULL " +
+      "CHECK(bogie_position IS NULL OR bogie_position IN ('BOGIE_1', 'BOGIE_2'));"
+    );
+  }
 }

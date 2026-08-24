@@ -95,7 +95,7 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
   const [completed, setCompleted] = useState<CompletedStep[]>([]);
 
   const [measuredHeight, setMeasuredHeight] = useState<number | null>(null);
-  const [measurementSource, setMeasurementSource] = useState<'OCR' | 'MANUAL'>('OCR');
+  const [measurementSource, setMeasurementSource] = useState<'OCR' | 'MANUAL'>('MANUAL');
   const [ocrConfidence, setOcrConfidence] = useState<number | undefined>(undefined);
   // What OCR proposed before any human edit — used to feed the learning loop.
   const [ocrProposedHeight, setOcrProposedHeight] = useState<number | null>(null);
@@ -162,6 +162,10 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
       bogieType,
       condition,
       position: currentStep.position,
+      // Which bogie this spring came off. Without it the server cannot tell
+      // Bogie 1's outer spring from Bogie 2's, and one measurement would
+      // satisfy both checklist items.
+      bogiePosition: currentStep.bogiePosition,
       measuredHeight,
       measuredFreeHeight: measuredHeight,
       damageType,
@@ -387,6 +391,17 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
             lang={lang}
             measuredHeight={measuredHeight}
             onMeasurementChange={handleMeasurementChange}
+            initialTarget={
+              currentStep.position === 'INNER'
+                ? 'INNER_SPRING'
+                : currentStep.position === 'SNUBBER'
+                ? 'SNUBBER_SPRING'
+                : 'OUTER_SPRING'
+            }
+            // Springs are measured with a manual gauge here — there is no
+            // caliper LCD to photograph, so opening the camera would just
+            // cost a tap and a permission prompt on every spring.
+            defaultMode="manual"
           />
 
           {classification && (

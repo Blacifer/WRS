@@ -161,6 +161,7 @@ describe('Phase 2 R2: CASNUB Bogie Parts Checklist & Phase 1 Integration', () =>
         bogieType: 'CASNUB_22_NLB',
         condition: 'USED',
         springPosition: 'OUTER',
+        bogiePosition: 'BOGIE_1',
         measuredFreeHeight: 241.0 // Below Band VI 245mm -> CONDEMNED
       }
     });
@@ -174,7 +175,7 @@ describe('Phase 2 R2: CASNUB Bogie Parts Checklist & Phase 1 Integration', () =>
       headers: { authorization: `Bearer ${inspectorToken}` }
     });
 
-    const outerSpringItem = chkRes.body.data.allItems.find((i: any) => i.category === 'SPRINGS' && i.partName.includes('Outer Spring'));
+    const outerSpringItem = chkRes.body.data.allItems.find((i: any) => i.category === 'SPRINGS' && i.partName.includes('Outer Spring (Bogie 1)'));
     assert.ok(outerSpringItem, 'Outer spring item not found in checklist');
     assert.equal(outerSpringItem.status, 'CONDEMNED');
 
@@ -191,6 +192,7 @@ describe('Phase 2 R2: CASNUB Bogie Parts Checklist & Phase 1 Integration', () =>
         bogieType: 'CASNUB_22_NLB',
         condition: 'USED',
         springPosition: 'OUTER',
+        bogiePosition: 'BOGIE_1',
         measuredFreeHeight: 257.5 // Band III Yellow -> PASS
       }
     });
@@ -204,7 +206,7 @@ describe('Phase 2 R2: CASNUB Bogie Parts Checklist & Phase 1 Integration', () =>
       headers: { authorization: `Bearer ${inspectorToken}` }
     });
 
-    const outerSpringItem2 = chkRes2.body.data.allItems.find((i: any) => i.category === 'SPRINGS' && i.partName.includes('Outer Spring'));
+    const outerSpringItem2 = chkRes2.body.data.allItems.find((i: any) => i.category === 'SPRINGS' && i.partName.includes('Outer Spring (Bogie 1)'));
     assert.equal(outerSpringItem2.status, 'PASS');
   });
 

@@ -479,40 +479,98 @@ export class WagonRepository {
   }
 
   private syncPhase1SpringsToChecklist(wagonNumber: string, checklistRows: any[]): void {
+    // Latest measurement per (bogie, position). bogie_position MUST be in the
+    // grouping key: without it, measuring the same position on both bogies
+    // collapsed to a single row and one bogie's measurement was discarded.
+    // COALESCE keeps legacy rows (bogie_position NULL) as their own group.
     const springInspections = this.db.prepare(`
       SELECT i.* FROM inspections i
       INNER JOIN (
-        SELECT wagon_number, bogie_type, spring_position, MAX(sequence_number) as max_seq
+        SELECT wagon_number, bogie_type, spring_position,
+               COALESCE(bogie_position, '__NONE__') AS bogie_key,
+               MAX(sequence_number) as max_seq
         FROM inspections
         WHERE wagon_number = ?
-        GROUP BY wagon_number, bogie_type, spring_position
+        GROUP BY wagon_number, bogie_type, spring_position, bogie_key
       ) latest ON i.wagon_number = latest.wagon_number
               AND i.bogie_type = latest.bogie_type
               AND i.spring_position = latest.spring_position
+              AND COALESCE(i.bogie_position, '__NONE__') = latest.bogie_key
               AND i.sequence_number = latest.max_seq
     `).all(wagonNumber) as any[];
 
     if (springInspections.length === 0) return;
 
-    for (const row of checklistRows) {
-      if (row.category === 'SPRINGS') {
-        const matched = springInspections.find(si => {
-          const partLower = row.part_name.toLowerCase();
-          const posLower = si.spring_position.toLowerCase();
-          return partLower.includes(posLower) || (partLower.includes('outer') && posLower.includes('outer'))
-            || (partLower.includes('inner') && posLower.includes('inner'))
-            || (partLower.includes('snubber') && posLower.includes('snubber'));
-        });
+    const persistStmt = this.db.prepare(`
+      UPDATE checklist_items
+      SET status = ?, condition_notes = ?, phase1_inspection_id = ?, updated_at = ?
+      WHERE id = ? AND status != ?
+    `);
+    const now = new Date().toISOString();
 
-        if (matched) {
-          row.phase1_inspection_id = matched.id;
-          if (matched.status === 'CONDEMNED' && row.status !== 'REPLACED') {
-            row.status = 'CONDEMNED';
-            row.condition_notes = matched.condemnation_reason || 'Condemned in Phase 1 Spring Classification';
-          } else if (matched.status === 'PASS') {
-            row.status = 'PASS';
-          }
+    for (const row of checklistRows) {
+      if (row.category !== 'SPRINGS') continue;
+
+      const partLower = row.part_name.toLowerCase();
+      // Which spring position does this checklist item describe?
+      const wantedPosition = partLower.includes('snubber')
+        ? 'SNUBBER'
+        : partLower.includes('inner')
+        ? 'INNER'
+        : partLower.includes('outer')
+        ? 'OUTER'
+        : null;
+      if (!wantedPosition) continue;
+
+      // Which bogie does it describe? Part names read "Outer Spring (Bogie 1)".
+      const wantedBogie = /bogie\s*1/.test(partLower)
+        ? 'BOGIE_1'
+        : /bogie\s*2/.test(partLower)
+        ? 'BOGIE_2'
+        : null;
+
+      const matched = springInspections.find((si) => {
+        const pos = String(si.spring_position || '').toUpperCase();
+        const positionMatches =
+          pos === wantedPosition ||
+          (wantedPosition === 'SNUBBER' && pos.startsWith('SNUBBER'));
+        if (!positionMatches) return false;
+
+        // CRITICAL: only link when the bogie is actually known to match.
+        // Previously any OUTER measurement satisfied BOTH bogies' items, so
+        // measuring one spring marked two as verified — the exit gate would
+        // then pass a bogie whose springs were never measured at all.
+        if (wantedBogie) {
+          return si.bogie_position === wantedBogie;
         }
+        // Item does not name a bogie — a position match is sufficient.
+        return true;
+      });
+
+      if (!matched) continue;
+
+      row.phase1_inspection_id = matched.id;
+
+      let newStatus: string | null = null;
+      let notes = row.condition_notes;
+
+      if (matched.status === 'CONDEMNED' && row.status !== 'REPLACED') {
+        newStatus = 'CONDEMNED';
+        notes = matched.condemnation_reason || 'Condemned in Phase 1 Spring Classification';
+      } else if (matched.status === 'PASS') {
+        newStatus = 'PASS';
+        notes =
+          `Auto-linked from spring measurement: ${matched.measured_height}mm ` +
+          `(${matched.classified_band || 'band not recorded'}, ${matched.table_reference || 'RDSO G-95'})`;
+      }
+
+      if (newStatus && row.status !== newStatus) {
+        row.status = newStatus;
+        row.condition_notes = notes;
+        // Persist, so the linkage is real rather than a display-time illusion.
+        // Anything reading checklist_items directly previously saw PENDING
+        // even though the UI and gate showed the spring as cleared.
+        persistStmt.run(newStatus, notes, matched.id, now, row.id, 'REPLACED');
       }
     }
   }

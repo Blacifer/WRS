@@ -46,6 +46,10 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
   const [bogieType, setBogieType] = useState<BogieType>('CASNUB_22_NLB');
   const [condition, setCondition] = useState<SpringCondition>('USED');
   const [position, setPosition] = useState<SpringPosition>('OUTER');
+  // Which bogie the spring came off. Required for the measurement to link to
+  // the correct checklist item — without it the spring is recorded but the
+  // wagon's checklist cannot know which of its two bogies was verified.
+  const [bogiePosition, setBogiePosition] = useState<'BOGIE_1' | 'BOGIE_2'>('BOGIE_1');
   const [measuredHeight, setMeasuredHeight] = useState<number | null>(260.00);
   const [measurementSource, setMeasurementSource] = useState<'OCR' | 'MANUAL'>('OCR');
   const [ocrConfidence, setOcrConfidence] = useState<number | undefined>(0.99);
@@ -149,6 +153,7 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
       bogieType,
       condition,
       position,
+      bogiePosition,
       measuredHeight,
       measuredFreeHeight: measuredHeight,
       damageType,
@@ -392,6 +397,29 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
                   }`}
                 >
                   {getPositionText(p, lang)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Which bogie — needed to link this reading to the right checklist item */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-300">
+              {lang === 'hi' ? 'बोगी' : 'Bogie'}
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {(['BOGIE_1', 'BOGIE_2'] as const).map((b) => (
+                <button
+                  key={b}
+                  type="button"
+                  onClick={() => setBogiePosition(b)}
+                  className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                    bogiePosition === b
+                      ? 'bg-white text-black border-white'
+                      : 'bg-transparent border-white/10 text-neutral-400 hover:text-white hover:border-white/30'
+                  }`}
+                >
+                  {lang === 'hi' ? (b === 'BOGIE_1' ? 'बोगी 1' : 'बोगी 2') : b === 'BOGIE_1' ? 'Bogie 1' : 'Bogie 2'}
                 </button>
               ))}
             </div>
