@@ -1395,7 +1395,8 @@ export type NavigationTab =
   | 'admin'
   | 'smart_vision'
   | 'users'
-  | 'learning';
+  | 'learning'
+  | 'manual';
 
 export interface AdminUserRecord {
   id: string;
@@ -1421,6 +1422,8 @@ export function canAccessTab(role: string | undefined, tab: NavigationTab, hasSe
   const roleUpper = role?.toUpperCase();
   if (roleUpper === 'INSPECTOR') {
     if (tab === 'inspector_home' || tab === 'inspection' || tab === 'smart_vision') return true;
+    // The manual is for the person holding the component — inspectors included.
+    if (tab === 'manual') return true;
     // An inspector can access 'wagons' ONLY when a specific wagon is active/selected (WagonDetailPage)
     if (tab === 'wagons' && hasSelectedWagon) return true;
     return false;

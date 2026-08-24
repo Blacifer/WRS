@@ -24,6 +24,7 @@ import { InspectorLandingView } from './components/InspectorLandingView.tsx';
 import { PassportQRScannerModal } from './components/PassportQRScannerModal.tsx';
 import { UserManagementPage } from './pages/UserManagementPage.tsx';
 import { LearningDashboardPage } from './pages/LearningDashboardPage.tsx';
+import { ManualSearchPage } from './pages/ManualSearchPage.tsx';
 
 export { isUserInspector, isUserSupervisorOrAdmin, canAccessTab };
 
@@ -227,6 +228,7 @@ export const App: React.FC = () => {
           />
         )}
         {activeTab === 'learning' && !isInspector && <LearningDashboardPage lang={currentLang} user={user} />}
+        {activeTab === 'manual' && <ManualSearchPage lang={currentLang} />}
         {activeTab === 'inspection' && <InspectionPage lang={currentLang} user={user} />}
         {activeTab === 'history' && !isInspector && <HistoryPage lang={currentLang} />}
         {activeTab === 'analytics' && !isInspector && <AnalyticsPage lang={currentLang} user={user} />}

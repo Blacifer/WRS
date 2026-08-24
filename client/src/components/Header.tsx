@@ -167,6 +167,19 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
 
               <button
+                data-testid="nav-manual"
+                onClick={() => onSelectTab('manual')}
+                className={`min-h-[44px] px-4 py-2 text-sm font-extrabold rounded-xl flex items-center gap-2 whitespace-nowrap transition-all ${
+                  activeTab === 'manual'
+                    ? 'bg-teal-600/40 text-teal-300 border border-teal-500/60 shadow-md'
+                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                }`}
+              >
+                <span>📖</span>
+                <span>{currentLang === 'hi' ? 'मैनुअल' : 'Manual'}</span>
+              </button>
+
+              <button
                 data-testid="nav-inspection"
                 onClick={() => onSelectTab('inspection')}
                 className={`min-h-[44px] px-4 py-2 text-sm font-extrabold rounded-xl flex items-center gap-2 whitespace-nowrap transition-all ${
@@ -315,6 +328,18 @@ export const Header: React.FC<HeaderProps> = ({
                   {dict.nav.admin}
                 </button>
               )}
+
+              <button
+                data-testid="nav-manual-sup"
+                onClick={() => onSelectTab('manual')}
+                className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
+                  activeTab === 'manual'
+                    ? 'text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                📖 {dict.nav.manual || 'Ask the Manual'}
+              </button>
 
               {isSupervisorOrAdmin && (
                 <button

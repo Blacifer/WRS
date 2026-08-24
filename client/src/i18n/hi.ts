@@ -25,6 +25,7 @@ export const hi = {
     history: 'इतिहास व लॉग्स',
     analytics: 'स्प्रिंग विश्लेषण',
     admin: 'प्रशासक कंसोल',
+    manual: 'मैनुअल से पूछें',
     learning: 'सिस्टम अधिगम',
     users: 'उपयोगकर्ता खाते',
     logout: 'लॉग आउट',

@@ -209,6 +209,18 @@ export class ApiClient {
   }
 
   // =========================================================================
+  // Maintenance Manual Search
+  // =========================================================================
+
+  public async getManualStatus(): Promise<{ success: boolean; data: any }> {
+    return this.request('/manual/status');
+  }
+
+  public async searchManual(q: string, limit = 5): Promise<{ success: boolean; data: any }> {
+    return this.request(`/manual/search?q=${encodeURIComponent(q)}&limit=${limit}`);
+  }
+
+  // =========================================================================
   // Machine Learning Feedback Loop
   // =========================================================================
 

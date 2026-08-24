@@ -12,7 +12,8 @@
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "test:unit": "node --experimental-strip-types --test tests/classification.test.ts tests/db-triggers.test.ts",
     "test:integration": "node --experimental-strip-types --test tests/inspections-api.test.ts tests/auth-rbac.test.ts",
-    "test:all": "node --experimental-strip-types --test tests/*.test.ts"
+    "test:all": "node --experimental-strip-types --test tests/*.test.ts",
+    "index-manual": "node --experimental-strip-types scripts/index-manual.ts"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
