@@ -781,6 +781,24 @@ describe('Tier 5 Adversarial — Phase 2 Lifecycle State Machine, Exit Gate & DB
       )
     `).run();
 
+    // 6. Seed an audit log row.
+    //
+    // Without this, ATTACKS 7 and 8 below fire UPDATE/DELETE at an empty
+    // table: zero rows match, so a BEFORE UPDATE/DELETE trigger never runs
+    // and the statement succeeds harmlessly. The test then failed while the
+    // trigger it was checking was perfectly healthy. An immutability test
+    // that passes over an empty table proves nothing either way — the row
+    // has to exist for the trigger to have something to refuse.
+    rawDb.prepare(`
+      INSERT INTO inspection_audit_log (
+        id, inspection_id, event_type, user_id, user_role, payload_json,
+        previous_hash, hash
+      ) VALUES (
+        'audit_test_1', 'insp_test_1', 'INSPECTION_CREATED', 'usr_test_1', 'SUPERVISOR', '{}',
+        'GENESIS_BLOCK', 'deadbeefcafe0000deadbeefcafe0000deadbeefcafe0000deadbeefcafe0000'
+      )
+    `).run();
+
     // -----------------------------------------------------------------------
     // ATTACK 1: UPDATE on wagon_transitions
     // -----------------------------------------------------------------------

@@ -20,6 +20,7 @@ import { acousticRouter } from './acoustic.ts';
 import { componentsRouter } from './components.ts';
 import { learningRouter } from './learning.ts';
 import { manualRouter } from './manual.ts';
+import { auditRouter } from './audit.ts';
 
 export const apiRouter = Router();
 
@@ -37,6 +38,7 @@ apiRouter.use('/acoustic', acousticRouter);
 apiRouter.use('/components', componentsRouter);
 apiRouter.use('/learning', learningRouter);
 apiRouter.use('/manual', manualRouter);
+apiRouter.use('/audit', auditRouter);
 apiRouter.use('/classification', classifyRouter);
 apiRouter.use('/', classifyRouter);
 apiRouter.use('/', healthRouter);

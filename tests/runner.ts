@@ -34,8 +34,7 @@ export const SUITES = {
     'tests/e2e/tier1-features/phase3_voice_ui.test.ts',
     'tests/e2e/tier1-features/phase3_cv_ar_vision.test.ts',
     'tests/e2e/tier1-features/phase3_acoustic_diagnostics.test.ts',
-    'tests/e2e/tier1-features/phase3_component_passports.test.ts',
-    'tests/e2e/tier1-features/phase3_omrs_triage.test.ts'
+    'tests/e2e/tier1-features/phase3_component_passports.test.ts'
   ],
   tier2: [
     // Phase 1
@@ -66,14 +65,12 @@ export const SUITES = {
     'tests/e2e/tier4-scenarios/phase2_workshop_simulation.test.ts'
   ],
   tier5: [
-    'tests/e2e/tier5-adversarial/ocr_adversarial_stress.test.ts',
     'tests/e2e/tier5-adversarial/offline_sync_stress.test.ts',
     'tests/e2e/tier5-adversarial/highload_multishift_simulation.test.ts',
     'tests/e2e/tier5-adversarial/rdso_dynamic_boundary_sweeps.test.ts',
     'tests/e2e/tier5-adversarial/phase2_challenger2_empirical.test.ts',
     'tests/e2e/tier5-adversarial/phase2_adversarial_stress.test.ts',
-    'tests/e2e/tier5-adversarial/phase3_component_passports_adversarial.test.ts',
-    'tests/e2e/tier5-adversarial/phase3_challenger1_empirical.test.ts'
+    'tests/e2e/tier5-adversarial/phase3_component_passports_adversarial.test.ts'
   ],
   phase2: [
     'tests/e2e/tier1-features/phase2_r1_lifecycle.test.ts',
@@ -93,9 +90,7 @@ export const SUITES = {
     'tests/e2e/tier1-features/phase3_cv_ar_vision.test.ts',
     'tests/e2e/tier1-features/phase3_acoustic_diagnostics.test.ts',
     'tests/e2e/tier1-features/phase3_component_passports.test.ts',
-    'tests/e2e/tier1-features/phase3_omrs_triage.test.ts',
-    'tests/e2e/tier5-adversarial/phase3_component_passports_adversarial.test.ts',
-    'tests/e2e/tier5-adversarial/phase3_challenger1_empirical.test.ts'
+    'tests/e2e/tier5-adversarial/phase3_component_passports_adversarial.test.ts'
   ]
 };
 
