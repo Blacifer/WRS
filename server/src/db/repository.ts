@@ -67,7 +67,14 @@ export class InspectionRepository {
     const id = data.id || `insp_${crypto.randomUUID()}`;
     const sequenceNumber = data.sequenceNumber || data.sequence_number || this.getNextSequenceNumber();
     const timestamp = data.timestamp || data.created_at || new Date().toISOString();
-    const syncId = data.sync_id || data.syncStatus === 'SYNCED' ? null : data.sync_id || null;
+    // Operator precedence made this always evaluate to null: `||` binds tighter
+    // than `?:`, so it read as ((sync_id || SYNCED) ? null : ...). The column
+    // was therefore never populated, and the sync endpoint's duplicate
+    // suppression — which catches the UNIQUE violation on sync_id — could not
+    // fire. A retried offline batch inserted every spring a second time, which
+    // now also corrupts nest counting: twelve outer springs appear as
+    // twenty-four. Also accepts the camelCase form the sync route sends.
+    const syncId = data.syncId ?? data.sync_id ?? null;
 
     const wagonNumber = data.wagonNumber || data.wagon_number || '';
     const bogieType = data.bogieType || data.bogie_type || 'CASNUB_22_NLB';

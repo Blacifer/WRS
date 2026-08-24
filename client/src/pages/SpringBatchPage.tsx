@@ -9,7 +9,7 @@
  * auto-advance loop per spring, instead of re-filling a form each time.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type {
   BogieType,
   SpringCondition,
@@ -140,6 +140,71 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
     [activeCount]
   );
 
+  // A full sweep is forty-eight springs — twenty minutes or more of work. A
+  // locked phone, a backgrounded browser or an accidental reload used to
+  // discard all of it, and an inspector who has to start over may simply not.
+  // The saved readings are already safe on the server or in the offline queue;
+  // what is restored here is the inspector's place in the queue.
+  const PROGRESS_KEY = 'wrs_spring_batch_progress_v1';
+
+  useEffect(() => {
+    if (!wagonLocked) return;
+    try {
+      localStorage.setItem(
+        PROGRESS_KEY,
+        JSON.stringify({ wagonNumber, bogieType, condition, axleLoad, manualCounts, stepIndex, completed })
+      );
+    } catch {
+      // Storage unavailable (private window, blocked site data) — the sweep
+      // still works, it just will not survive a reload.
+    }
+  }, [wagonLocked, wagonNumber, bogieType, condition, axleLoad, manualCounts, stepIndex, completed]);
+
+  const [resumable, setResumable] = useState<null | {
+    wagonNumber: string;
+    stepIndex: number;
+    total: number;
+  }>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PROGRESS_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (saved?.wagonNumber && saved.stepIndex > 0) {
+        setResumable({
+          wagonNumber: saved.wagonNumber,
+          stepIndex: saved.stepIndex,
+          total: Array.isArray(saved.completed) ? saved.stepIndex : saved.stepIndex
+        });
+      }
+    } catch {
+      /* ignore malformed state */
+    }
+  }, []);
+
+  const resumeSweep = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{}');
+      setWagonNumber(saved.wagonNumber || '');
+      setBogieType(saved.bogieType || 'CASNUB_22_NLB');
+      setCondition(saved.condition || 'USED');
+      setAxleLoad(saved.axleLoad || '20.32t');
+      if (saved.manualCounts) setManualCounts(saved.manualCounts);
+      setCompleted(Array.isArray(saved.completed) ? saved.completed : []);
+      setStepIndex(saved.stepIndex || 0);
+      setWagonLocked(true);
+      setResumable(null);
+    } catch {
+      setResumable(null);
+    }
+  };
+
+  const discardSweep = () => {
+    try { localStorage.removeItem(PROGRESS_KEY); } catch { /* ignore */ }
+    setResumable(null);
+  };
+
   const currentStep = stepIndex < QUEUE.length ? QUEUE[stepIndex] : null;
   const batchDone = QUEUE.length > 0 && stepIndex >= QUEUE.length;
 
@@ -234,6 +299,8 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
           bogieType: inspectionPayload.bogieType,
           condition: inspectionPayload.condition,
           springPosition: inspectionPayload.position,
+          bogiePosition: inspectionPayload.bogiePosition,
+          nestIndex: inspectionPayload.nestIndex,
           measuredFreeHeight: inspectionPayload.measuredFreeHeight,
           classifiedBand: classification.band,
           bandRoman: classification.bandRoman,
@@ -257,6 +324,8 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
           bogieType: inspectionPayload.bogieType,
           condition: inspectionPayload.condition,
           springPosition: inspectionPayload.position,
+          bogiePosition: inspectionPayload.bogiePosition,
+          nestIndex: inspectionPayload.nestIndex,
           measuredFreeHeight: inspectionPayload.measuredFreeHeight,
           classifiedBand: classification.band,
           bandRoman: classification.bandRoman,
@@ -345,6 +414,8 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
   };
 
   const handleStartNextWagon = () => {
+    // The sweep is finished, so the saved place is no longer meaningful.
+    try { localStorage.removeItem(PROGRESS_KEY); } catch { /* ignore */ }
     setWagonNumber('');
     setWagonLocked(false);
     setCompleted([]);
@@ -555,6 +626,43 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
           </span>
         </div>
       </div>
+
+      {/* An unfinished sweep from a previous session. Readings already taken
+          are safely recorded — this only restores the inspector's place. */}
+      {resumable && !wagonLocked && (
+        <div className="rounded-2xl border border-blue-700/60 bg-blue-950/25 p-4 space-y-3">
+          <div>
+            <p className="text-sm font-black text-white">
+              {isHi ? 'अधूरा निरीक्षण मिला' : 'Unfinished sweep found'}
+            </p>
+            <p className="text-xs text-slate-300 mt-1">
+              {resumable.wagonNumber} — {resumable.stepIndex}{' '}
+              {isHi ? 'स्प्रिंग पहले ही दर्ज' : 'springs already recorded'}
+            </p>
+            <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+              {isHi
+                ? 'दर्ज की गई रीडिंग सुरक्षित हैं। जारी रखने पर आप वहीं से शुरू करेंगे जहाँ छोड़ा था।'
+                : 'Those readings are already saved. Continuing picks up from where you stopped.'}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={resumeSweep}
+              className="min-h-[44px] px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition"
+            >
+              {isHi ? 'जारी रखें' : 'Continue'}
+            </button>
+            <button
+              type="button"
+              onClick={discardSweep}
+              className="min-h-[44px] px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold border border-slate-700 transition"
+            >
+              {isHi ? 'नया शुरू करें' : 'Start fresh'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {!batchDone && currentStep && (
         <>

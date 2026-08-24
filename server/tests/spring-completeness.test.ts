@@ -180,6 +180,77 @@ describe('Spring Completeness at the Exit Gate', () => {
   });
 
   // -------------------------------------------------------------------------
+  // Offline sync integrity
+  // -------------------------------------------------------------------------
+  it('TC-CMP-10: a spring synced from the offline queue keeps its bogie and nest', () => {
+    // Offline work used to drop both, so springs recorded without a connection
+    // were invisible to the completeness check — worse data than online work,
+    // silently.
+    inspectionRepo.insertInspection({
+      wagonNumber: wagon,
+      bogieType: 'CASNUB_22_NLB',
+      condition: 'USED',
+      springPosition: 'OUTER',
+      bogiePosition: 'BOGIE_2',
+      nestIndex: 7,
+      measuredFreeHeight: 259,
+      classifiedBand: 'GREEN',
+      bandRoman: 'Band II',
+      status: 'PASS',
+      tableReference: 'Table 28',
+      valid_range_min: 245,
+      valid_range_max: 263,
+      inspectorId: 'usr_insp_001',
+      syncId: 'offline-1',
+      syncStatus: 'SYNCED'
+    } as any);
+
+    const row = db.prepare(
+      'SELECT bogie_position, nest_index, sync_id FROM inspections WHERE sync_id = ?'
+    ).get('offline-1') as any;
+
+    assert.ok(row, 'sync_id must be persisted or duplicate suppression cannot work');
+    assert.strictEqual(row.bogie_position, 'BOGIE_2');
+    assert.strictEqual(row.nest_index, 7);
+  });
+
+  it('TC-CMP-11: re-syncing the same offline batch does not duplicate springs', () => {
+    // A precedence bug left sync_id always null, so the UNIQUE constraint the
+    // sync endpoint relies on never fired. A retried batch inserted every
+    // spring twice — which now also corrupts nest counting, since twelve outer
+    // springs would present as twenty-four.
+    const record = {
+      wagonNumber: wagon,
+      bogieType: 'CASNUB_22_NLB',
+      condition: 'USED',
+      springPosition: 'OUTER',
+      bogiePosition: 'BOGIE_1',
+      nestIndex: 1,
+      measuredFreeHeight: 260,
+      classifiedBand: 'BLUE',
+      bandRoman: 'Band I',
+      status: 'PASS',
+      tableReference: 'Table 28',
+      valid_range_min: 245,
+      valid_range_max: 263,
+      inspectorId: 'usr_insp_001',
+      syncId: 'batch-1-spring-1'
+    } as any;
+
+    inspectionRepo.insertInspection(record);
+    assert.throws(
+      () => inspectionRepo.insertInspection(record),
+      /UNIQUE constraint failed: inspections\.sync_id/,
+      'a replayed offline batch must be rejected, not inserted again'
+    );
+
+    const count = db.prepare(
+      'SELECT COUNT(*) c FROM inspections WHERE sync_id = ?'
+    ).get('batch-1-spring-1') as any;
+    assert.strictEqual(count.c, 1);
+  });
+
+  // -------------------------------------------------------------------------
   // Nest grouping, now that a nest genuinely has members
   // -------------------------------------------------------------------------
   it('TC-CMP-09: a nest spread beyond 3 mm is flagged even when every spring passes', () => {

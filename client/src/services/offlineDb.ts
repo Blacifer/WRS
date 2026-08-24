@@ -38,6 +38,10 @@ export interface PendingChecklistAction {
   category: string;
   partName: string;
   bogiePosition?: string;
+  /** Which spring within its nest. Without it a synced spring is invisible to
+   *  the exit gate's completeness check, so offline work would silently
+   *  produce weaker data than online work. */
+  nestIndex?: number;
   status: string;
   isMandatory?: boolean;
   conditionNotes?: string;
