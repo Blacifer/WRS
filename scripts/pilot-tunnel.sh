@@ -159,6 +159,9 @@ curl -sf "http://localhost:$PORT/" 2>/dev/null | grep -qi '<div id="root"' \
 # taking the server down with it. localtunnel in particular drops fairly
 # often, and losing an inspection session because of that would be absurd.
 TUNNEL_KIND=""
+# Set once a provider is proven to route on this network, so a reconnect does
+# not go back to one that already failed.
+WORKING_KIND=""
 start_tunnel() {
   # $1 optionally forces a kind ("cloudflared" | "localtunnel"); default: prefer
   # cloudflared when installed.
@@ -219,6 +222,7 @@ if [[ -z "$PUBLIC_URL" ]]; then
 else
   say "waiting for the tunnel to start routing…"
   if wait_for_tunnel; then
+    WORKING_KIND="$TUNNEL_KIND"
     ok "tunnel is live via $TUNNEL_KIND and serving"
   else
     # A registered-but-unroutable tunnel is worse than a slower one that works,
@@ -234,6 +238,7 @@ else
       sleep 2
       start_tunnel localtunnel
       if wait_for_tunnel; then
+        WORKING_KIND="$TUNNEL_KIND"
         ok "tunnel is live via $TUNNEL_KIND and serving"
       else
         warn "neither tunnel routed — the app still works locally at http://localhost:$PORT"
@@ -292,8 +297,16 @@ while true; do
     TUNNEL_RESTARTS=$((TUNNEL_RESTARTS + 1))
     warn "tunnel dropped (#$TUNNEL_RESTARTS) — reconnecting; the server is untouched"
     OLD_URL="$PUBLIC_URL"
-    start_tunnel
-    wait_for_tunnel || true
+    start_tunnel "${WORKING_KIND:-auto}"
+    if ! wait_for_tunnel && [[ -n "$WORKING_KIND" ]]; then
+      # Even the known-good provider can stall; try the other one before giving up.
+      warn "$TUNNEL_KIND did not come back — trying the alternative"
+      kill "$TUNNEL_PID" 2>/dev/null
+      for _ in $(seq 1 10); do kill -0 "$TUNNEL_PID" 2>/dev/null || break; sleep 1; done
+      sleep 2
+      start_tunnel "$([[ "$WORKING_KIND" == "localtunnel" ]] && echo cloudflared || echo localtunnel)"
+      wait_for_tunnel || true
+    fi
     if [[ -n "$PUBLIC_URL" ]]; then
       if [[ "$PUBLIC_URL" != "$OLD_URL" ]]; then
         printf '\n%s  THE URL CHANGED — reopen this on the device:%s\n' "${BLD}" "${NC}"
