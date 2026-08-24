@@ -17,7 +17,7 @@ export const en = {
     syncedSuccess: 'Synced successfully'
   },
   nav: {
-    inspection: 'Spring Inspection',
+    inspection: 'Single Spring',
     wagons: 'Wagons Pipeline',
     dashboard: 'DRM Dashboard',
     inventory: 'Stores & Depot Inventory',
@@ -112,7 +112,7 @@ export const en = {
     takePhoto: 'Capture Photo Evidence',
     comparePhotos: 'Compare Photos',
     printCertificate: 'Print Certificate',
-    smartVision: 'Smart Vision (AR)',
+    smartVision: 'Spring Batch',
     openArCaliper: 'Launch Smart Vision AR',
     freezeReading: 'Freeze Reading',
     autoPopulate: 'Auto-Populate Checklist'

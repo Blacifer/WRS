@@ -373,11 +373,11 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-extrabold uppercase px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
-                    {isHi ? 'तेज़ बैच प्रोसेसिंग' : 'Fast Batch Processing'}
+                    {isHi ? 'एक बोगी · 6 स्प्रिंग' : 'One bogie · 6 springs'}
                   </span>
                 </div>
                 <h3 className="text-xl font-extrabold text-white group-hover:text-emerald-300 transition-colors">
-                  {isHi ? 'स्प्रिंग बैच निरीक्षण' : 'Spring Batch Inspection'}
+                  {isHi ? 'स्प्रिंग बैच' : 'Spring Batch'}
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-300 font-medium line-clamp-2">
                   {isHi
@@ -408,7 +408,7 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
                   </span>
                 </div>
                 <h3 className="text-xl font-extrabold text-white group-hover:text-purple-300 transition-colors">
-                  {isHi ? 'त्वरित स्प्रिंग गुणवत्ता जांच' : 'Quick Spring QC (RDSO G-95)'}
+                  {isHi ? 'एक स्प्रिंग' : 'Single Spring'}
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-300 font-medium line-clamp-2">
                   {isHi 

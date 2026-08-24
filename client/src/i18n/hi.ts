@@ -21,7 +21,7 @@ export const hi = {
     dashboard: 'डीआरएम डैशबोर्ड',
     inventory: 'स्टोर्स एवं डिपो इन्वेंट्री',
     passports: 'हेल्थ पासपोर्ट्स',
-    inspection: 'स्प्रिंग निरीक्षण',
+    inspection: 'एक स्प्रिंग',
     history: 'इतिहास व लॉग्स',
     analytics: 'स्प्रिंग विश्लेषण',
     admin: 'प्रशासक कंसोल',
@@ -112,7 +112,7 @@ export const hi = {
     takePhoto: 'फोटो साक्ष्य लें',
     comparePhotos: 'फोटो तुलना करें',
     printCertificate: 'प्रमाणपत्र प्रिंट करें',
-    smartVision: 'स्मार्ट विज़न (एआर)',
+    smartVision: 'स्प्रिंग बैच',
     openArCaliper: 'एआर कैलीपर स्कैन',
     freezeReading: 'रीडिंग फ़्रीज़ करें',
     autoPopulate: 'चेकलिस्ट स्वतः भरें'

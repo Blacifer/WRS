@@ -14,9 +14,11 @@ import {
   indexManualText,
   searchManual,
   buildPassages,
+  buildSpringTablePassages,
   isManualIndexed,
   getManualStats
 } from '../src/manual/manualIndex.ts';
+import { RDSO_TABLES } from '../../shared/classification/tables.ts';
 
 // A small stand-in for the manual, using its real structure: form-feed page
 // breaks, chapter headings, and clause tables.
@@ -100,8 +102,12 @@ describe('Maintenance Manual Search', () => {
     assert.ok(hits[0].snippet.includes('«'), 'matched terms should be marked for highlighting');
   });
 
-  it('TC-MAN-07: NEVER returns text that is not in the source', () => {
+  it('TC-MAN-07: manual passages are returned verbatim, never paraphrased', () => {
     // The guarantee that makes this safe to consult for a safety limit.
+    // Two sources are indexed and each has its own guarantee:
+    //   WMM passages must exist character-for-character in the PDF text.
+    //   G-95 passages are rendered from the verified band tables, and are
+    //   checked against those tables in TC-MAN-14 below.
     const queries = [
       'brake block condemning limit',
       'friction wedge wear',
@@ -111,10 +117,54 @@ describe('Maintenance Manual Search', () => {
     for (const q of queries) {
       const { hits } = searchManual(db, q, 5);
       for (const h of hits) {
+        if (h.citation.includes('G-95')) continue; // covered by TC-MAN-14
         assert.ok(
           FAKE_MANUAL.includes(h.text),
-          `Returned a passage that does not exist verbatim in the source: "${h.text.slice(0, 60)}"`
+          `Returned a manual passage that is not verbatim in the source: "${h.text.slice(0, 60)}"`
         );
+      }
+    }
+  });
+
+  it('TC-MAN-13: G-95 spring tables are searchable and cited to the pamphlet', () => {
+    const { hits } = searchManual(db, 'NLB outer spring blue band grouping', 5);
+    const g95 = hits.find((h) => h.citation.includes('G-95'));
+
+    assert.ok(g95, 'a spring grouping question should reach the G-95 tables');
+    assert.ok(
+      !g95!.citation.includes('page'),
+      'the pamphlet is not the WMM and must not be cited with a WMM page number'
+    );
+  });
+
+  it('TC-MAN-14: every figure in a G-95 passage matches the verified band tables', () => {
+    // The equivalent guarantee for the generated source: no number may appear
+    // that is not already in the RDSO tables this system classifies against.
+    const passages = buildSpringTablePassages();
+    assert.strictEqual(passages.length, Object.keys(RDSO_TABLES).length);
+
+    for (const p of passages) {
+      const table = Object.values(RDSO_TABLES).find(
+        (t: any) => p.heading!.startsWith(`${t.tableNumber} —`) && p.heading!.includes(t.position)
+      ) as any;
+      assert.ok(table, `no source table for passage "${p.heading}"`);
+
+      assert.ok(
+        p.text.includes(`Nominal free height: ${table.nominalFreeHeight} mm`),
+        `${p.heading}: nominal free height does not match the table`
+      );
+      assert.ok(
+        p.text.includes(`below ${table.condemningMinHeight} mm`),
+        `${p.heading}: condemning minimum does not match the table`
+      );
+      assert.ok(
+        p.text.includes(`above ${table.condemningMaxHeight} mm`),
+        `${p.heading}: condemning maximum does not match the table`
+      );
+
+      for (const b of table.bands) {
+        const row = `${b.bandRoman} — ${b.band} band: ${b.maxHeight.toFixed(0)}-${b.minHeight.toFixed(0)} mm`;
+        assert.ok(p.text.includes(row), `${p.heading}: band row missing or altered — expected "${row}"`);
       }
     }
   });

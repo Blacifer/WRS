@@ -21,6 +21,7 @@
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
+import { RDSO_TABLES } from '../../../shared/classification/tables.ts';
 
 /** Roughly one screenful of context — big enough to hold a table, small enough to read. */
 const MAX_CHUNK_CHARS = 800;
@@ -60,6 +61,7 @@ export function createManualTables(db: DatabaseSync): void {
     CREATE VIRTUAL TABLE IF NOT EXISTS manual_passages USING fts5(
       passage_id UNINDEXED,
       page UNINDEXED,
+      source UNINDEXED,
       chapter,
       heading,
       body
@@ -172,6 +174,55 @@ export function buildPassages(rawText: string): ManualPassage[] {
   return passages;
 }
 
+/**
+ * Renders the G-95 spring grouping tables as searchable passages.
+ *
+ * These are what an inspector actually needs at the bench — "which band does
+ * this height fall in" — and they are not in the WMM PDF, so without this the
+ * manual search cannot answer the most common spring question in the shop.
+ *
+ * Written out in words as well as numbers so that a natural question ("blue
+ * band outer spring NLB") matches, not only an exact figure.
+ */
+export function buildSpringTablePassages(): ManualPassage[] {
+  const BOGIE_WORDS: Record<string, string> = {
+    CASNUB_22_NLB: 'CASNUB 22 NLB NLB(M)',
+    CASNUB_22_HS: 'CASNUB 22 HS HS(M)',
+    CASNUB_22_RFT: 'CASNUB 22 RFT'
+  };
+
+  return Object.values(RDSO_TABLES).map((t: any, i: number) => {
+    const bogieWords = BOGIE_WORDS[t.bogieType] || t.bogieType;
+    const conditionWords =
+      t.condition === 'NEW' ? 'new springs' : 'used in-service springs (maintenance group)';
+
+    const rows = t.bands
+      .map(
+        (b: any) =>
+          `  ${b.bandRoman} — ${b.band} band: ${b.maxHeight.toFixed(0)}-${b.minHeight.toFixed(0)} mm` +
+          ` (paint a ${b.band.toLowerCase()} colour band on the spring)`
+      )
+      .join('\n');
+
+    const text =
+      `${t.tableNumber}: Grouping of ${bogieWords} ${t.position} springs — ${conditionWords}.\n` +
+      `Spring position: ${t.position}. Bogie type: ${bogieWords}. Condition: ${t.condition}.\n` +
+      `Nominal free height: ${t.nominalFreeHeight} mm. ` +
+      `Condemning limits: below ${t.condemningMinHeight} mm or above ${t.condemningMaxHeight} mm is CONDEMNED.\n` +
+      `Colour band grouping by free height:\n${rows}\n` +
+      `Springs assembled in the same nest must not vary by more than 3 mm in free height. ` +
+      `Mixing new and old springs in one group must be avoided.`;
+
+    return {
+      id: `g95_${t.tableNumber.replace(/\s+/g, '')}_${t.position}_${i}`,
+      page: 0,
+      chapter: 'RDSO G-95 Rev-II spring grouping',
+      heading: `${t.tableNumber} — ${bogieWords} ${t.position} (${t.condition})`,
+      text
+    };
+  });
+}
+
 /** Builds (or rebuilds) the index from already-extracted manual text. */
 export function indexManualText(
   db: DatabaseSync,
@@ -180,17 +231,29 @@ export function indexManualText(
 ): { passageCount: number; pageCount: number } {
   createManualTables(db);
 
-  db.exec('DELETE FROM manual_passages;');
+  // Drop rather than DELETE: an older database may hold the previous column
+  // layout, and CREATE VIRTUAL TABLE IF NOT EXISTS would silently keep it,
+  // making every insert fail. Re-indexing rebuilds the content anyway.
+  db.exec('DROP TABLE IF EXISTS manual_passages;');
   db.exec('DELETE FROM manual_meta;');
+  createManualTables(db);
 
   const passages = buildPassages(rawText);
   const insert = db.prepare(`
-    INSERT INTO manual_passages (passage_id, page, chapter, heading, body)
-    VALUES (?, ?, ?, ?, ?)
+    INSERT INTO manual_passages (passage_id, page, source, chapter, heading, body)
+    VALUES (?, ?, ?, ?, ?, ?)
   `);
 
   for (const p of passages) {
-    insert.run(p.id, p.page, p.chapter, p.heading, p.text);
+    insert.run(p.id, p.page, 'WMM', p.chapter, p.heading, p.text);
+  }
+
+  // The G-95 spring grouping tables are not in the WMM PDF — they come from
+  // the Technical Pamphlet, transcribed and verified separately. An inspector
+  // asking "what band is a 258mm NLB outer spring" should get the actual
+  // table, so they are indexed alongside the manual and cited to the pamphlet.
+  for (const t of buildSpringTablePassages()) {
+    insert.run(t.id, 0, 'G95', t.chapter, t.heading, t.text);
   }
 
   const pageCount = rawText.split('\f').length;
@@ -272,8 +335,8 @@ export function searchManual(
   // snippet() returns the part of the passage that actually matched, so the
   // answer is not buried in the middle of a wall of text. Column 4 is `body`.
   const stmt = db.prepare(`
-    SELECT page, chapter, heading, body,
-           snippet(manual_passages, 4, '«', '»', ' … ', 40) AS excerpt,
+    SELECT page, source, chapter, heading, body,
+           snippet(manual_passages, 5, '«', '»', ' … ', 40) AS excerpt,
            bm25(manual_passages) AS score
     FROM manual_passages
     WHERE manual_passages MATCH ?
@@ -300,7 +363,10 @@ export function searchManual(
       snippet: String(r.excerpt || '').replace(/\s+/g, ' ').trim(),
       text: r.body,
       score: Number(r.score),
-      citation: `RDSO Wagon Maintenance Manual, page ${r.page}${r.chapter ? ` — ${r.chapter}` : ''}`
+      citation:
+        r.source === 'G95'
+          ? `RDSO Technical Pamphlet G-95 Rev-II — ${r.heading || r.chapter || 'spring grouping table'}`
+          : `RDSO Wagon Maintenance Manual, page ${r.page}${r.chapter ? ` — ${r.chapter}` : ''}`
     }))
   };
 }

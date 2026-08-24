@@ -202,7 +202,7 @@ export const Header: React.FC<HeaderProps> = ({
                 }`}
               >
                 <span>🔬</span>
-                <span>{currentLang === 'hi' ? 'स्मार्ट विज़न' : 'Smart Vision'}</span>
+                <span>{currentLang === 'hi' ? 'स्प्रिंग बैच' : 'Spring Batch'}</span>
               </button>
             </>
           ) : (
@@ -283,7 +283,7 @@ export const Header: React.FC<HeaderProps> = ({
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                🔬 {currentLang === 'hi' ? 'स्मार्ट विज़न' : 'Smart Vision'}
+                🔬 {currentLang === 'hi' ? 'स्प्रिंग बैच' : 'Spring Batch'}
               </button>
 
               {isSupervisorOrAdmin && (
