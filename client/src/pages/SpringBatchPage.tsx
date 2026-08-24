@@ -23,6 +23,7 @@ import type { LanguageCode } from '../i18n/index.ts';
 import { CaliperCamera } from '../components/CaliperCamera.tsx';
 import { ClassificationBadge } from '../components/ClassificationBadge.tsx';
 import { DefectSelector } from '../components/DefectSelector.tsx';
+import { DefectPhotoCapture } from '../components/DefectPhotoCapture.tsx';
 import { classifySpringLocally } from '../services/classification.ts';
 import { api } from '../services/api.ts';
 import { offlineDb } from '../services/offlineDb.ts';
@@ -103,6 +104,10 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
   const [damageType, setDamageType] = useState<DamageType>('NONE');
   const [damageNotes, setDamageNotes] = useState<string>('');
   const [showDefectPanel, setShowDefectPanel] = useState<boolean>(false);
+  // Evidence for a condemnation. Required before a CONDEMNED spring can be
+  // saved — it is both the proof behind the verdict and a labelled training
+  // sample for future automatic defect detection.
+  const [defectPhoto, setDefectPhoto] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -143,13 +148,26 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
     setDamageType('NONE');
     setDamageNotes('');
     setShowDefectPanel(false);
+    setDefectPhoto(null);
     setSaveError(null);
   };
+
+  // A condemnation must carry evidence. Blocking here rather than nagging
+  // later is what makes the dataset accumulate at all.
+  const needsDefectPhoto = classification?.status === 'CONDEMNED' && !defectPhoto;
 
   const handleConfirmAndNext = async () => {
     if (!currentStep || !classification || measuredHeight === null) return;
     if (!wagonNumber.trim()) {
       setSaveError(isHi ? 'कृपया वैगन नंबर दर्ज करें' : 'Please enter a wagon number');
+      return;
+    }
+    if (needsDefectPhoto) {
+      setSaveError(
+        isHi
+          ? 'कंडम स्प्रिंग के लिए दोष फ़ोटो आवश्यक है'
+          : 'A defect photo is required before condemning this spring'
+      );
       return;
     }
 
@@ -229,6 +247,29 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
         setIsSaving(false);
         return;
       }
+    }
+
+    // Attach the condemnation evidence. Best-effort and after the record is
+    // safely saved — a photo upload failure must never cost the inspector
+    // their measurement. The defect type travels as a tag so the image is a
+    // labelled sample rather than an anonymous picture.
+    if (defectPhoto && classification.status === 'CONDEMNED') {
+      api
+        .uploadPhoto({
+          wagonNumber: inspectionPayload.wagonNumber,
+          partCategory: 'SPRINGS',
+          partName: `${currentStep.position} Spring (${currentStep.bogiePosition.replace('_', ' ')})`,
+          imageBase64: defectPhoto,
+          tags: [
+            'DEFECT_EVIDENCE',
+            `DAMAGE_${damageType}`,
+            `POSITION_${currentStep.position}`,
+            `BOGIE_TYPE_${bogieType}`,
+            `BAND_${classification.band || 'CONDEMNED'}`,
+            `HEIGHT_${measuredHeight}`
+          ]
+        })
+        .catch((e) => console.warn('[SpringBatch] defect photo not uploaded:', e));
     }
 
     // Feed the learning loop: did the inspector keep what OCR read, or fix it?
@@ -485,6 +526,17 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
             )}
           </div>
 
+          {/* Evidence is mandatory for a condemnation — shown the moment the
+              verdict turns CONDEMNED, not buried behind the optional defect panel. */}
+          {classification?.status === 'CONDEMNED' && (
+            <DefectPhotoCapture
+              lang={lang}
+              damageType={damageType}
+              imageBase64={defectPhoto}
+              onPhotoChange={setDefectPhoto}
+            />
+          )}
+
           {saveError && (
             <div className="p-3 bg-rose-950/70 border border-rose-600 rounded-xl text-rose-200 text-xs font-bold">
               {saveError}
@@ -494,7 +546,7 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
           <button
             type="button"
             onClick={handleConfirmAndNext}
-            disabled={!classification || isSaving}
+            disabled={!classification || isSaving || needsDefectPhoto}
             className="w-full min-h-[56px] px-6 py-3.5 bg-white hover:bg-neutral-200 disabled:opacity-40 text-black font-extrabold text-base rounded-2xl flex items-center justify-center gap-2 transition-transform active:scale-95"
           >
             {isSaving ? (
