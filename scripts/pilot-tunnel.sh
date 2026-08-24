@@ -1,0 +1,193 @@
+#!/usr/bin/env bash
+#
+# Real-device test tunnel for WRS Raipur
+# ---------------------------------------
+# Puts the app on a public HTTPS URL so it can be opened on an actual phone
+# or workshop tablet. HTTPS is the point: browsers refuse camera access over
+# plain HTTP from anything but localhost, so QR scanning and photo capture
+# cannot be tested any other way.
+#
+# This serves the PRODUCTION BUILD through the single Node server, exactly as
+# a real deployment would — client and API on one origin. Tunnelling the Vite
+# dev server instead would test a code path that never runs in production and
+# would need host-allowlist fiddling on every new tunnel URL.
+#
+# Free, no account, nothing provisioned, nothing billed. Ctrl-C tears it all
+# down.
+#
+#   ./scripts/pilot-tunnel.sh
+#
+set -uo pipefail
+
+PORT="${PORT:-3000}"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+RED=$'\033[0;31m'; GRN=$'\033[0;32m'; YEL=$'\033[1;33m'; CYA=$'\033[0;36m'; BLD=$'\033[1m'; NC=$'\033[0m'
+
+say()  { printf '%s\n' "$*"; }
+step() { printf '\n%s==>%s %s%s%s\n' "$CYA" "$NC" "$BLD" "$*" "$NC"; }
+warn() { printf '%s!%s  %s\n' "$YEL" "$NC" "$*"; }
+die()  { printf '%s✗%s  %s\n' "$RED" "$NC" "$*" >&2; exit 1; }
+ok()   { printf '%s✓%s  %s\n' "$GRN" "$NC" "$*"; }
+
+SERVER_PID=""
+TUNNEL_PID=""
+cleanup() {
+  printf '\n'
+  step "Shutting down"
+  [[ -n "$TUNNEL_PID" ]] && kill "$TUNNEL_PID" 2>/dev/null && ok "tunnel closed"
+  [[ -n "$SERVER_PID" ]] && kill "$SERVER_PID" 2>/dev/null && ok "server stopped"
+  # The npm wrapper does not forward signals to the node child, so free the port directly.
+  lsof -ti:"$PORT" -sTCP:LISTEN 2>/dev/null | xargs -r kill 2>/dev/null
+  ok "port $PORT released"
+  exit 0
+}
+trap cleanup INT TERM
+
+# ---------------------------------------------------------------- node version
+step "Checking Node"
+if [[ -s "$HOME/.nvm/nvm.sh" ]]; then
+  # shellcheck disable=SC1091
+  export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"; nvm use 22 >/dev/null 2>&1 || true
+fi
+NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+[[ "$NODE_MAJOR" -ge 22 ]] || die "Node 22+ required (found $(node -v 2>/dev/null || echo none)). The server uses the built-in node:sqlite module."
+ok "node $(node -v)"
+
+# ------------------------------------------------------------------- jwt secret
+step "Session secret"
+if [[ -z "${JWT_SECRET:-}" ]]; then
+  JWT_SECRET="$(openssl rand -hex 32)"
+  export JWT_SECRET
+  warn "JWT_SECRET was not set — generated a throwaway one for this session."
+  warn "Everyone is logged out when this script restarts. That is intended for a test."
+else
+  ok "using the JWT_SECRET already in the environment"
+fi
+
+# ------------------------------------------------------------------------ build
+step "Building the client"
+( cd client && npm run build >/tmp/wrs_pilot_build.log 2>&1 ) \
+  || die "client build failed — see /tmp/wrs_pilot_build.log"
+ok "production bundle built"
+
+# ------------------------------------------------------------------------- data
+step "Database"
+if [[ ! -f server/data/wrs_inspections.db ]]; then
+  ( cd server && npm run seed >/tmp/wrs_pilot_seed.log 2>&1 ) \
+    && ok "seeded demo data (13 wagons)" \
+    || warn "seeding failed — see /tmp/wrs_pilot_seed.log"
+else
+  ok "existing database kept — delete server/data/wrs_inspections.db to start fresh"
+fi
+
+MANUAL_PAGES="$(cd server && node --experimental-strip-types -e "
+import { getDatabase } from './src/db/connection.ts';
+import { getManualStats } from './src/manual/manualIndex.ts';
+try { const s = getManualStats(getDatabase()); process.stdout.write(String(s.passageCount || 0)); }
+catch { process.stdout.write('0'); }
+" 2>/dev/null || echo 0)"
+if [[ "$MANUAL_PAGES" == "0" ]]; then
+  warn "Maintenance manual is not indexed — 'Ask the Manual' will say so instead of answering."
+  warn "To enable it:  cd server && npm run index-manual -- \"/path/to/Vol-I (System Documentation).pdf\""
+else
+  ok "manual indexed ($MANUAL_PAGES passages)"
+fi
+
+# ----------------------------------------------------------------------- server
+step "Starting the server on :$PORT"
+lsof -ti:"$PORT" -sTCP:LISTEN 2>/dev/null | xargs -r kill 2>/dev/null
+( cd server && NODE_ENV=production PORT="$PORT" node --experimental-strip-types src/index.ts \
+    >/tmp/wrs_pilot_server.log 2>&1 ) &
+SERVER_PID=$!
+
+for _ in $(seq 1 40); do
+  curl -sf "http://localhost:$PORT/api/health" >/dev/null 2>&1 && break
+  sleep 1
+done
+curl -sf "http://localhost:$PORT/api/health" >/dev/null 2>&1 \
+  || die "server did not come up — see /tmp/wrs_pilot_server.log"
+ok "API healthy"
+
+curl -sf "http://localhost:$PORT/" 2>/dev/null | grep -qi '<div id="root"' \
+  && ok "client is being served on the same origin" \
+  || warn "the built client did not load — check that client/dist exists"
+
+# ----------------------------------------------------------------------- tunnel
+step "Opening a public HTTPS tunnel"
+
+PUBLIC_URL=""
+if command -v cloudflared >/dev/null 2>&1; then
+  say "using cloudflared (most reliable — no interstitial page)"
+  cloudflared tunnel --url "http://localhost:$PORT" --no-autoupdate \
+    >/tmp/wrs_pilot_tunnel.log 2>&1 &
+  TUNNEL_PID=$!
+  for _ in $(seq 1 40); do
+    PUBLIC_URL="$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/wrs_pilot_tunnel.log 2>/dev/null | head -1)"
+    [[ -n "$PUBLIC_URL" ]] && break
+    sleep 1
+  done
+else
+  warn "cloudflared not installed — falling back to localtunnel via npx."
+  warn "localtunnel shows a one-time click-through page and drops connections more often."
+  warn "For a smoother test:  brew install cloudflared"
+  npx --yes localtunnel --port "$PORT" >/tmp/wrs_pilot_tunnel.log 2>&1 &
+  TUNNEL_PID=$!
+  for _ in $(seq 1 45); do
+    PUBLIC_URL="$(grep -oE 'https://[a-z0-9-]+\.loca\.lt' /tmp/wrs_pilot_tunnel.log 2>/dev/null | head -1)"
+    [[ -n "$PUBLIC_URL" ]] && break
+    sleep 1
+  done
+fi
+
+if [[ -z "$PUBLIC_URL" ]]; then
+  warn "Could not read a public URL from the tunnel (see /tmp/wrs_pilot_tunnel.log)."
+  warn "The app is still reachable on this machine at http://localhost:$PORT"
+else
+  ok "tunnel is live"
+fi
+
+# ------------------------------------------------------------------------- brief
+cat <<BRIEF
+
+$BLD────────────────────────────────────────────────────────────────$NC
+$BLD  OPEN THIS ON THE PHONE OR TABLET$NC
+
+     ${GRN}${PUBLIC_URL:-<no public URL — see the log>}${NC}
+
+$BLD  Sign in$NC
+     inspector1  / password123    (shop-floor view)
+     supervisor1 / password123    (pipeline, gate, learning)
+     admin1      / password123    (everything + user accounts)
+
+$BLD  Worth testing on the real device — these cannot be tested here$NC
+     1. Add to Home Screen, then open it from the icon
+     2. Spring Batch — is manual entry fast enough with gloves on?
+     3. QR scan on a real wagon plate or component tag
+     4. Photograph a genuinely condemned component (mandatory now)
+     5. Switch to Hindi and re-walk the same screens
+     6. Turn airplane mode on mid-inspection, save a reading, turn it back
+        on — the queue should sync on its own
+     7. Ask the Manual: "brake block condemning limit"
+
+$BLD  The question that matters most$NC
+     How is spring free height actually measured at Raipur? If it is a
+     manual gauge with no digital display, the app is now built for that —
+     please confirm the flow matches what an inspector really does.
+
+$YEL  Ctrl-C stops the server and closes the tunnel.$NC
+$BLD────────────────────────────────────────────────────────────────$NC
+
+BRIEF
+
+# Keep running until interrupted; report if either process dies underneath us.
+while true; do
+  sleep 5
+  if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+    warn "the server exited — see /tmp/wrs_pilot_server.log"; cleanup
+  fi
+  if [[ -n "$TUNNEL_PID" ]] && ! kill -0 "$TUNNEL_PID" 2>/dev/null; then
+    warn "the tunnel exited — see /tmp/wrs_pilot_tunnel.log"; cleanup
+  fi
+done
