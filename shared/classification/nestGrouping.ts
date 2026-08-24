@@ -200,3 +200,100 @@ export function validateSpringNests(springs: NestSpringInput[]): NestValidationR
     maxVariationMm: MAX_NEST_HEIGHT_VARIATION_MM
   };
 }
+
+// ---------------------------------------------------------------------------
+// Replacement guidance
+// ---------------------------------------------------------------------------
+
+export interface ReplacementGuidance {
+  /** What the inspector must do with the condemned spring. */
+  action: 'REPLACE';
+  /** Free-height window the replacement must fall in to keep the nest matched. */
+  targetRange: { min: number; max: number } | null;
+  /** Band the replacement should carry, when the nest already defines one. */
+  targetBand: string | null;
+  /** Plain-language instruction, ready to show. */
+  message: string;
+  /** Heights of the springs already measured in this nest, for context. */
+  nestHeights: number[];
+  reference: string;
+}
+
+/**
+ * Works out what a replacement spring has to be, given the rest of its nest.
+ *
+ * A condemned spring is replaced, never repaired — WMM 2.0's overhaul steps say
+ * "check the springs and replace the defective ones", and to do so "such that
+ * variation in the height of springs in the same group" stays within limit.
+ *
+ * That second clause is the part an inspector cannot work out at a glance: the
+ * replacement is not simply "any serviceable spring", it has to sit inside the
+ * 3 mm window already established by the eleven springs still in the nest.
+ * Fitting a good spring from the wrong band produces exactly the mismatched
+ * nest the grouping rule exists to prevent.
+ *
+ * Everything here is computed from measurements already taken. Nothing is
+ * predicted or inferred.
+ */
+export function getReplacementGuidance(
+  nestSprings: NestSpringInput[],
+  bandLookup?: (height: number) => string | null
+): ReplacementGuidance {
+  const serviceable = nestSprings.filter((s) => s.status !== 'CONDEMNED');
+  const heights = serviceable.map((s) => s.measuredFreeHeight).sort((a, b) => a - b);
+
+  if (heights.length === 0) {
+    return {
+      action: 'REPLACE',
+      targetRange: null,
+      targetBand: null,
+      message:
+        'Replace this spring. No other spring in this nest has been measured yet, ' +
+        'so the group height is not established — measure the rest of the nest first, ' +
+        'then match the replacement to it.',
+      nestHeights: [],
+      reference: NEST_RULE_REFERENCE
+    };
+  }
+
+  const lo = heights[0];
+  const hi = heights[heights.length - 1];
+  const spread = Number((hi - lo).toFixed(2));
+
+  // The replacement must keep the whole nest inside the limit, so its window is
+  // bounded by the existing extremes, not merely near the average.
+  const allowedMin = Number((hi - MAX_NEST_HEIGHT_VARIATION_MM).toFixed(2));
+  const allowedMax = Number((lo + MAX_NEST_HEIGHT_VARIATION_MM).toFixed(2));
+
+  if (allowedMin > allowedMax) {
+    return {
+      action: 'REPLACE',
+      targetRange: null,
+      targetBand: null,
+      message:
+        `Replace this spring. The rest of this nest already spans ${spread.toFixed(2)} mm ` +
+        `(${lo.toFixed(1)}–${hi.toFixed(1)} mm), which is wider than the ${MAX_NEST_HEIGHT_VARIATION_MM} mm limit — ` +
+        `no single replacement can bring it back into one group. Re-group the whole nest.`,
+      nestHeights: heights,
+      reference: NEST_RULE_REFERENCE
+    };
+  }
+
+  const midpoint = Number(((allowedMin + allowedMax) / 2).toFixed(1));
+  const targetBand = bandLookup ? bandLookup(midpoint) : null;
+
+  return {
+    action: 'REPLACE',
+    targetRange: { min: allowedMin, max: allowedMax },
+    targetBand,
+    message:
+      `Replace this spring. The replacement must measure between ` +
+      `${allowedMin.toFixed(1)} and ${allowedMax.toFixed(1)} mm` +
+      (targetBand ? ` (${targetBand} band)` : '') +
+      ` to keep this nest within ${MAX_NEST_HEIGHT_VARIATION_MM} mm — the other ` +
+      `${heights.length} spring${heights.length === 1 ? '' : 's'} here measure ` +
+      `${lo.toFixed(1)}–${hi.toFixed(1)} mm.`,
+    nestHeights: heights,
+    reference: NEST_RULE_REFERENCE
+  };
+}

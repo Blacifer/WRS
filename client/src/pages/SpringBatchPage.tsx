@@ -24,7 +24,8 @@ import { CaliperCamera } from '../components/CaliperCamera.tsx';
 import { ClassificationBadge } from '../components/ClassificationBadge.tsx';
 import { DefectSelector } from '../components/DefectSelector.tsx';
 import { DefectPhotoCapture } from '../components/DefectPhotoCapture.tsx';
-import { classifySpringLocally } from '../services/classification.ts';
+import { classifySpringLocally, getRDSOTable } from '../services/classification.ts';
+import { getReplacementGuidance } from '../../../shared/classification/nestGrouping.ts';
 import {
   getSpringCountOptions,
   getSpringCount,
@@ -219,6 +220,41 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
       damageNotes
     });
   }, [currentStep, bogieType, condition, measuredHeight, damageType, damageNotes]);
+
+  // When a spring is condemned, work out what its replacement has to be.
+  // The manual says to replace defective springs "such that variation in the
+  // height of springs in the same group" stays within limit — so the
+  // replacement is not just any serviceable spring, it has to sit inside the
+  // window the rest of the nest already defines. That is the part an inspector
+  // cannot judge by eye, and getting it wrong recreates the mismatched nest
+  // the grouping rule exists to prevent.
+  const replacementGuidance = useMemo(() => {
+    if (!currentStep || classification?.status !== 'CONDEMNED') return null;
+
+    const sameNest = completed
+      .filter(
+        (c) =>
+          c.bogiePosition === currentStep.bogiePosition &&
+          c.position === currentStep.position
+      )
+      .map((c, i) => ({
+        id: `done_${i}`,
+        springPosition: c.position,
+        condition,
+        measuredFreeHeight: c.measuredHeight,
+        status: c.status
+      }));
+
+    const table = getRDSOTable(bogieType, condition, currentStep.position);
+    const bandLookup = (h: number) => {
+      const b = table?.bands.find((x) =>
+        x.isHighestBand ? h >= x.minHeight && h <= x.maxHeight : h >= x.minHeight && h < x.maxHeight
+      );
+      return b ? b.band : null;
+    };
+
+    return getReplacementGuidance(sameNest, bandLookup);
+  }, [currentStep, classification, completed, bogieType, condition]);
 
   const handleMeasurementChange = (height: number, source: 'OCR' | 'MANUAL', confidence?: number) => {
     setMeasuredHeight(height);
@@ -776,6 +812,46 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
               />
             )}
           </div>
+
+          {/* What to do about it. A verdict without an action leaves the
+              inspector to work out the replacement band themselves. */}
+          {classification?.status === 'CONDEMNED' && replacementGuidance && (
+            <div className="rounded-xl border border-amber-700/60 bg-amber-950/20 p-3.5 space-y-2">
+              <div className="flex items-start gap-2.5">
+                <span className="text-amber-400 text-lg leading-none shrink-0">→</span>
+                <div className="min-w-0">
+                  <p className="text-xs font-black text-amber-300 mb-1">
+                    {isHi ? 'क्या करें' : 'What to do'}
+                  </p>
+                  <p className="text-xs text-slate-200 leading-relaxed">
+                    {replacementGuidance.message}
+                  </p>
+                  {replacementGuidance.targetRange && (
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      <span className="text-[11px] font-mono text-white bg-slate-950 border border-slate-700 rounded px-2 py-1 tabular-nums">
+                        {replacementGuidance.targetRange.min.toFixed(1)}–
+                        {replacementGuidance.targetRange.max.toFixed(1)} mm
+                      </span>
+                      {replacementGuidance.targetBand && (
+                        <span
+                          className="text-[11px] font-black rounded px-2 py-1 border"
+                          style={{
+                            color: BAND_PAINT_HEX[replacementGuidance.targetBand] || '#e2e8f0',
+                            borderColor: BAND_PAINT_HEX[replacementGuidance.targetBand] || '#334155'
+                          }}
+                        >
+                          {isHi
+                            ? BAND_LABEL_HI[replacementGuidance.targetBand] || replacementGuidance.targetBand
+                            : replacementGuidance.targetBand}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <p className="text-[10px] text-slate-500 mt-1.5">{replacementGuidance.reference}</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Evidence is mandatory for a condemnation — shown the moment the
               verdict turns CONDEMNED, not buried behind the optional defect panel. */}

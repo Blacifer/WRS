@@ -22,6 +22,7 @@ import {
   requiresManualCounts,
   isPlausibleCount
 } from '../../shared/classification/springCounts.ts';
+import { getReplacementGuidance } from '../../shared/classification/nestGrouping.ts';
 
 describe('CASNUB Spring Counts', () => {
   it('TC-CNT-01: NLB at 20.32t matches WMM 2.0 §601 exactly', () => {
@@ -144,5 +145,69 @@ describe('CASNUB Spring Counts', () => {
       }
     }
     assert.strictEqual(seen.length, 6, 'two bogies x three positions = six contiguous nests');
+  });
+});
+
+describe('Replacement Guidance', () => {
+  const mk = (h: number, status = 'PASS') => ({
+    id: String(h),
+    springPosition: 'OUTER' as const,
+    condition: 'USED' as const,
+    measuredFreeHeight: h,
+    status
+  });
+
+  it('TC-REP-01: names the window a replacement must fall in', () => {
+    // Eleven serviceable springs at 258-260 leave a 3 mm window the twelfth
+    // must land in. Fitting a merely-serviceable spring outside it recreates
+    // the mismatched nest the grouping rule exists to prevent.
+    const g = getReplacementGuidance(
+      [...[258, 259, 259, 260, 258, 259, 260, 259, 258, 259, 260].map((h) => mk(h)), mk(240, 'CONDEMNED')]
+    );
+
+    assert.strictEqual(g.action, 'REPLACE');
+    assert.ok(g.targetRange, 'a window must be computed');
+    assert.strictEqual(g.targetRange!.min, 257);
+    assert.strictEqual(g.targetRange!.max, 261);
+    assert.ok(/must measure between/.test(g.message));
+  });
+
+  it('TC-REP-02: the window keeps the WHOLE nest inside the limit', () => {
+    // Bounded by the existing extremes, not the average: any spring inside
+    // the window must be within 3 mm of both the lowest and highest already there.
+    const g = getReplacementGuidance([mk(257), mk(259), mk(240, 'CONDEMNED')]);
+    const { min, max } = g.targetRange!;
+
+    for (const candidate of [min, max, (min + max) / 2]) {
+      assert.ok(Math.abs(candidate - 257) <= 3.0001, `${candidate} too far from the lowest spring`);
+      assert.ok(Math.abs(candidate - 259) <= 3.0001, `${candidate} too far from the highest spring`);
+    }
+  });
+
+  it('TC-REP-03: says so when the nest height is not yet established', () => {
+    const g = getReplacementGuidance([mk(240, 'CONDEMNED')]);
+    assert.strictEqual(g.targetRange, null, 'must not invent a window from nothing');
+    assert.ok(/no other spring in this nest has been measured/i.test(g.message));
+  });
+
+  it('TC-REP-04: refuses to pretend one spring can fix an already-spread nest', () => {
+    // 251-260 is 9 mm apart. No single replacement brings that within 3 mm,
+    // and claiming otherwise would send the inspector after an impossible part.
+    const g = getReplacementGuidance([mk(251), mk(260), mk(240, 'CONDEMNED')]);
+    assert.strictEqual(g.targetRange, null);
+    assert.ok(/re-group the whole nest/i.test(g.message));
+  });
+
+  it('TC-REP-05: the condemned spring never influences its own replacement window', () => {
+    const withCondemned = getReplacementGuidance([mk(259), mk(260), mk(200, 'CONDEMNED')]);
+    const without = getReplacementGuidance([mk(259), mk(260)]);
+    assert.deepStrictEqual(withCondemned.targetRange, without.targetRange);
+  });
+
+  it('TC-REP-06: reports the band a replacement should carry', () => {
+    const bandLookup = (h: number) => (h >= 257 && h < 260 ? 'GREEN' : 'BLUE');
+    const g = getReplacementGuidance([mk(258), mk(259), mk(240, 'CONDEMNED')], bandLookup);
+    assert.strictEqual(g.targetBand, 'GREEN');
+    assert.ok(g.message.includes('GREEN band'));
   });
 });
