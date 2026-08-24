@@ -24,6 +24,12 @@ set -uo pipefail
 export LC_ALL="${LC_ALL:-en_US.UTF-8}"
 export LANG="${LANG:-en_US.UTF-8}"
 
+# Homebrew's bin is not always on PATH in a non-interactive shell, which made
+# the script fall back to localtunnel even with cloudflared installed.
+for brewbin in /opt/homebrew/bin /usr/local/bin; do
+  [[ -d "$brewbin" ]] && [[ ":$PATH:" != *":$brewbin:"* ]] && export PATH="$brewbin:$PATH"
+done
+
 PORT="${PORT:-3000}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -154,10 +160,13 @@ curl -sf "http://localhost:$PORT/" 2>/dev/null | grep -qi '<div id="root"' \
 # often, and losing an inspection session because of that would be absurd.
 TUNNEL_KIND=""
 start_tunnel() {
+  # $1 optionally forces a kind ("cloudflared" | "localtunnel"); default: prefer
+  # cloudflared when installed.
+  local want="${1:-auto}"
   PUBLIC_URL=""
   : > /tmp/wrs_pilot_tunnel.log
 
-  if command -v cloudflared >/dev/null 2>&1; then
+  if [[ "$want" != "localtunnel" ]] && command -v cloudflared >/dev/null 2>&1; then
     TUNNEL_KIND="cloudflared"
     cloudflared tunnel --url "http://localhost:$PORT" --no-autoupdate \
       >/tmp/wrs_pilot_tunnel.log 2>&1 &
@@ -212,8 +221,26 @@ else
   if wait_for_tunnel; then
     ok "tunnel is live via $TUNNEL_KIND and serving"
   else
-    warn "tunnel published a URL but is not routing yet — give it a minute and retry."
-    warn "It often starts working shortly after this message."
+    # A registered-but-unroutable tunnel is worse than a slower one that works,
+    # so fall back to the other provider rather than handing over a dead link.
+    warn "$TUNNEL_KIND published a URL but never started routing."
+    if [[ "$TUNNEL_KIND" == "cloudflared" ]]; then
+      warn "falling back to localtunnel…"
+      kill "$TUNNEL_PID" 2>/dev/null
+      for _ in $(seq 1 10); do
+        kill -0 "$TUNNEL_PID" 2>/dev/null || break
+        sleep 1
+      done
+      sleep 2
+      start_tunnel localtunnel
+      if wait_for_tunnel; then
+        ok "tunnel is live via $TUNNEL_KIND and serving"
+      else
+        warn "neither tunnel routed — the app still works locally at http://localhost:$PORT"
+      fi
+    else
+      warn "the app still works locally at http://localhost:$PORT"
+    fi
   fi
 fi
 
