@@ -6,7 +6,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import crypto from 'node:crypto';
 import { logAuditEvent } from './auditLog.ts';
-import { CASNUB_CHECKLIST_TEMPLATE } from './seed.ts';
+import { CASNUB_CHECKLIST_TEMPLATE } from './checklistTemplate.ts';
 import { validateSpringNests } from '../../../shared/classification/nestGrouping.ts';
 import type {
   LifecycleStage,

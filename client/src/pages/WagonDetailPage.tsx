@@ -13,7 +13,7 @@ import { ReleaseCertificateModal } from '../components/ReleaseCertificateModal.t
 import { SoundDiagnosticTool } from '../components/SoundDiagnosticTool.tsx';
 import { VoiceInspectionToolbar } from '../components/VoiceInspectionToolbar.tsx';
 import { CaliperCamera } from '../components/CaliperCamera.tsx';
-import { computeComponentVerdict } from '../services/classification.ts';
+import { computeComponentVerdict, resolveComponentTarget } from '../services/classification.ts';
 import { playPassChime, playCondemnedBuzz } from '../utils/audioFeedback.ts';
 import { PassportQRScannerModal } from '../components/PassportQRScannerModal.tsx';
 import type {
@@ -34,63 +34,6 @@ import type {
   ComponentHealthStatus
 } from '../../../shared/types.ts';
 
-export function resolveComponentTarget(partName: string, category: string): CVComponentTarget | null {
-  const name = partName.toLowerCase();
-
-  // Draft Gear items are handled as a dedicated block, checked first and
-  // always returning (a DG_* target or null), so a name like "Spring Seat
-  // Gap Gauge" can't fall through into the generic spring-branch default
-  // below just because it contains the word "spring".
-  if (category === 'COUPLERS_DRAFT_GEAR' || name.includes('draft gear')) {
-    if (name.includes('wall thickness')) return 'DG_HOUSING_WALL_THICKNESS';
-    if (name.includes('centre wedge location')) return 'DG_CENTRE_WEDGE_LOCATION';
-    if (name.includes('movable plate location')) return 'DG_MOVABLE_PLATE_LOCATION';
-    if (name.includes('outer coil spring')) return 'DG_OUTER_COIL_SPRING';
-    if (name.includes('inner coil spring')) return 'DG_INNER_COIL_SPRING';
-    if (name.includes('corner coil spring')) return 'DG_CORNER_COIL_SPRING';
-    if (name.includes('release spring')) return 'DG_RELEASE_SPRING';
-    // Housing box profile gauge, the gap/contact gauges (wedge shoe, centre
-    // wedge, outer stationary plate, taper stationary plate, spring seat),
-    // the movable-plate 180° rotation check, and the pre-existing
-    // coupler/knuckle/lock/housing items are physical GO/NO-GO or visual
-    // checks with no digital caliper reading defined — no AR Caliper button.
-    return null;
-  }
-
-  if (category === 'SPRINGS' || name.includes('spring') || name.includes('स्प्रिंग')) {
-    if (name.includes('snubber') || name.includes('स्नबर')) return 'SNUBBER_SPRING';
-    if (name.includes('inner') || name.includes('भीतरी') || name.includes('इनर')) return 'INNER_SPRING';
-    return 'OUTER_SPRING';
-  }
-  if (category === 'FRICTION_WEDGES' || name.includes('wedge') || name.includes('घर्षण') || name.includes('वेज')) {
-    // WMM 2.0 §309D gives distinct per-surface wear limits and the
-    // checklist already names the two surfaces separately — route each to
-    // its own spec instead of the shared legacy FRICTION_WEDGE target.
-    if (name.includes('slope')) return 'FRICTION_WEDGE_SLOPE';
-    if (name.includes('vertical')) return 'FRICTION_WEDGE_VERTICAL';
-    return 'FRICTION_WEDGE';
-  }
-  if (category === 'BEARINGS' || name.includes('end cap') || name.includes('ctrb') || name.includes('bearing') || name.includes('कैप')) {
-    // None of the current BEARINGS checklist items are actually a caliper-
-    // measurable CTRB end-cap gap: "CTRB Cartridge Bearing Rotation" is a
-    // spin/rotation test, "Axle Box Adapter Crown Wear" has no verified
-    // numeric limit sourced anywhere, and Locking Plate/Grease Seal/End Cap
-    // Screws are 100%-replace items, not measurements. CTRB_END_CAP's own
-    // tolerance spec (server/src/routes/cv.ts) is itself flagged UNVERIFIED
-    // — no gap/clearance figure exists in WMM 2.0, only a must-change-screw
-    // procedure — so routing any of these to it would show a confidently
-    // precise but fabricated verdict. No AR Caliper button until a real
-    // number exists; these stay manual PASS/FAIL/REPLACED like the rest.
-    return null;
-  }
-  if (category === 'WHEELS_AXLES' || name.includes('flange') || name.includes('wheel') || name.includes('पहिया')) {
-    return 'WHEEL_FLANGE';
-  }
-  if (category === 'BRAKE_SYSTEM' || name.includes('brake') || name.includes('ब्रेक')) {
-    return 'BRAKE_BLOCK';
-  }
-  return 'OUTER_SPRING';
-}
 
 interface WagonDetailPageProps {
   wagonNumber: string;
