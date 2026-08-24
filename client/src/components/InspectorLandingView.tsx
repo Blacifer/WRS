@@ -286,81 +286,25 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
         )}
       </div>
 
-      {/* 3. 4 Primary Large Action Cards (Touch Target >= 96px, High Contrast) */}
-      <div>
-        <div className="flex items-center justify-between mb-3 px-1">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">
-            {isHi ? 'शॉप-फ्लोर त्वरित क्रियाएं' : 'Shop-Floor Primary Actions'}
-          </h2>
-          <span className="text-xs text-slate-500 font-mono">
-            {isHi ? 'टच-अनुकूल नियंत्रण' : 'Touch-Optimized Controls'}
-          </span>
-        </div>
+      {/* 3. Primary actions.
+             Springs lead because that is the live workflow at Raipur and the
+             one being piloted. The wagon-checklist entry points sit below and
+             say plainly that they depend on wagon QR codes, which the workshop
+             has not put in place yet — better than a card that looks ready and
+             leads nowhere. */}
+      <div className="space-y-8">
+        <div>
+          <div className="flex items-center justify-between mb-3 px-1">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">
+              {isHi ? 'स्प्रिंग निरीक्षण' : 'Spring Inspection'}
+            </h2>
+            <span className="text-xs text-slate-500 font-mono">
+              {isHi ? 'आरडीएसओ जी-95' : 'RDSO G-95'}
+            </span>
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
-          {/* Card 1: Scan Wagon QR Code (Orange/Amber) */}
-          <button
-            data-testid="cta-scan-wagon-qr"
-            onClick={onOpenQRScanner}
-            className="min-h-[120px] p-6 rounded-3xl border-2 border-amber-500/40 bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 hover:border-amber-400 hover:bg-amber-950/60 active:scale-[0.98] transition-all text-left shadow-xl flex items-center justify-between group cursor-pointer"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-3xl shadow-inner shrink-0 group-hover:scale-105 transition-transform">
-                📷
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-extrabold uppercase px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800">
-                    QR / RFID
-                  </span>
-                </div>
-                <h3 className="text-xl font-extrabold text-white group-hover:text-amber-300 transition-colors">
-                  {isHi ? 'वैगन क्यूआर स्कैन करें' : 'Scan Wagon QR Code'}
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-300 font-medium line-clamp-2">
-                  {isHi 
-                    ? 'त्वरित वैगन खोज, आरएफआईडी इनटेक और घटक पासपोर्ट लिंकिंग' 
-                    : 'Instant wagon lookup, RFID intake & component passport linking'}
-                </p>
-              </div>
-            </div>
-            <div className="hidden sm:flex items-center justify-center w-10 h-10 rounded-xl bg-slate-800 text-amber-400 text-lg group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors shrink-0 ml-2">
-              ➔
-            </div>
-          </button>
-
-          {/* Card 2: Start Voice Inspection (Cyan/Blue) */}
-          <button
-            data-testid="cta-start-voice"
-            onClick={onOpenVoiceInspection}
-            className="min-h-[120px] p-6 rounded-3xl border-2 border-cyan-500/40 bg-gradient-to-br from-cyan-950/40 via-slate-900 to-slate-950 hover:border-cyan-400 hover:bg-cyan-950/60 active:scale-[0.98] transition-all text-left shadow-xl flex items-center justify-between group cursor-pointer"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-cyan-500/20 border border-cyan-500/50 flex items-center justify-center text-3xl shadow-inner shrink-0 group-hover:scale-105 transition-transform">
-                🎙️
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-extrabold uppercase px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
-                    {isHi ? 'हैंड्स-फ्री वॉयस' : 'Hands-Free Voice'}
-                  </span>
-                </div>
-                <h3 className="text-xl font-extrabold text-white group-hover:text-cyan-300 transition-colors">
-                  {isHi ? 'ध्वनि निरीक्षण शुरू करें' : 'Start Voice Inspection'}
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-300 font-medium line-clamp-2">
-                  {isHi 
-                    ? 'ग्रीसी ग्लव्स द्विभाषी भाषण कमांड्स (कासनब चेकलिस्ट ऑटो-अपडेट)' 
-                    : 'Hands-free "Greasy Gloves" bilingual speech commands for CASNUB checklist'}
-                </p>
-              </div>
-            </div>
-            <div className="hidden sm:flex items-center justify-center w-10 h-10 rounded-xl bg-slate-800 text-cyan-400 text-lg group-hover:bg-cyan-500 group-hover:text-slate-950 transition-colors shrink-0 ml-2">
-              ➔
-            </div>
-          </button>
-
-          {/* Card 3: Spring Batch Inspection (Emerald Green) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+            {/* Card 3: Spring Batch Inspection (Emerald Green) */}
           <button
             data-testid="cta-smart-vision"
             onClick={onOpenSmartVision}
@@ -391,7 +335,7 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
             </div>
           </button>
 
-          {/* Card 4: Quick Spring QC (RDSO G-95) (Purple/Indigo) */}
+            {/* Card 4: Quick Spring QC (RDSO G-95) (Purple/Indigo) */}
           <button
             data-testid="cta-spring-qc"
             onClick={onOpenSpringQC}
@@ -421,6 +365,92 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
               ➔
             </div>
           </button>
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-3 px-1">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">
+              {isHi ? 'वैगन चेकलिस्ट' : 'Wagon Checklist'}
+            </h2>
+            <span className="text-[11px] text-amber-500/80 font-semibold">
+              {isHi ? 'वैगन क्यूआर कोड लगने के बाद' : 'Needs wagon QR codes — not in place yet'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 opacity-75">
+            {/* Card 1: Scan Wagon QR Code (Orange/Amber) */}
+          <button
+            data-testid="cta-scan-wagon-qr"
+            onClick={onOpenQRScanner}
+            className="min-h-[120px] p-6 rounded-3xl border-2 border-amber-500/40 bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 hover:border-amber-400 hover:bg-amber-950/60 active:scale-[0.98] transition-all text-left shadow-xl flex items-center justify-between group cursor-pointer"
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-3xl shadow-inner shrink-0 group-hover:scale-105 transition-transform">
+                📷
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-extrabold uppercase px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800">
+                    QR / RFID
+                  </span>
+                </div>
+                <h3 className="text-xl font-extrabold text-white group-hover:text-amber-300 transition-colors">
+                  {isHi ? 'वैगन क्यूआर स्कैन करें' : 'Scan Wagon QR Code'}
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-300 font-medium line-clamp-2">
+                  {isHi 
+                    ? 'त्वरित वैगन खोज, आरएफआईडी इनटेक और घटक पासपोर्ट लिंकिंग' 
+                    : 'Instant wagon lookup, RFID intake & component passport linking'}
+                </p>
+              </div>
+            </div>
+            <div className="hidden sm:flex items-center justify-center w-10 h-10 rounded-xl bg-slate-800 text-amber-400 text-lg group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors shrink-0 ml-2">
+              ➔
+            </div>
+          </button>
+
+            {/* Card 2: Start Voice Inspection (Cyan/Blue) */}
+          <button
+            data-testid="cta-start-voice"
+            onClick={() => {
+              // A voice inspection needs a wagon. Without one this used to
+              // hand the inspector a QR scanner, which is both a confusing
+              // response to this button and useless at Raipur, where wagons
+              // carry no QR codes yet. Open the wagon picker instead.
+              if (activeWagonNumber) {
+                onOpenVoiceInspection();
+              } else {
+                setIsWagonSelectorOpen(true);
+              }
+            }}
+            className="min-h-[120px] p-6 rounded-3xl border-2 border-cyan-500/40 bg-gradient-to-br from-cyan-950/40 via-slate-900 to-slate-950 hover:border-cyan-400 hover:bg-cyan-950/60 active:scale-[0.98] transition-all text-left shadow-xl flex items-center justify-between group cursor-pointer"
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-cyan-500/20 border border-cyan-500/50 flex items-center justify-center text-3xl shadow-inner shrink-0 group-hover:scale-105 transition-transform">
+                🎙️
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-extrabold uppercase px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
+                    {isHi ? 'हैंड्स-फ्री वॉयस' : 'Hands-Free Voice'}
+                  </span>
+                </div>
+                <h3 className="text-xl font-extrabold text-white group-hover:text-cyan-300 transition-colors">
+                  {isHi ? 'ध्वनि निरीक्षण शुरू करें' : 'Start Voice Inspection'}
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-300 font-medium line-clamp-2">
+                  {isHi 
+                    ? 'ग्रीसी ग्लव्स द्विभाषी भाषण कमांड्स (कासनब चेकलिस्ट ऑटो-अपडेट)' 
+                    : 'Hands-free "Greasy Gloves" bilingual speech commands for CASNUB checklist'}
+                </p>
+              </div>
+            </div>
+            <div className="hidden sm:flex items-center justify-center w-10 h-10 rounded-xl bg-slate-800 text-cyan-400 text-lg group-hover:bg-cyan-500 group-hover:text-slate-950 transition-colors shrink-0 ml-2">
+              ➔
+            </div>
+          </button>
+          </div>
         </div>
       </div>
 

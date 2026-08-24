@@ -134,13 +134,9 @@ export const App: React.FC = () => {
               setSelectedWagonNumber(wNum);
             }}
             onOpenVoiceInspection={() => {
-              // Voice inspection happens on a wagon's checklist — if none is
-              // active yet, prompt a scan instead of fabricating a wagon number.
-              if (selectedWagonNumber) {
-                setActiveTab('wagons');
-              } else {
-                setIsQRScannerModalOpen(true);
-              }
+              // Requires a wagon; InspectorLandingView opens its own picker
+              // first when none is selected.
+              setActiveTab('wagons');
             }}
             onOpenSmartVision={() => {
               setActiveTab('smart_vision');
