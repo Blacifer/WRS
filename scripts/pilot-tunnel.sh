@@ -179,6 +179,22 @@ start_tunnel() {
   fi
 }
 
+# The URL appearing is not the same as the tunnel being usable — cloudflared in
+# particular publishes its hostname ~20s before the edge can route to it.
+# Handing someone a link that 404s is worse than making them wait.
+wait_for_tunnel() {
+  [[ -z "$PUBLIC_URL" ]] && return 1
+  local i code
+  for i in $(seq 1 20); do
+    code="$(curl -s -o /dev/null -w '%{http_code}' \
+              -H 'bypass-tunnel-reminder: 1' \
+              "$PUBLIC_URL/api/health" --max-time 10 2>/dev/null)"
+    [[ "$code" == "200" ]] && return 0
+    sleep 3
+  done
+  return 1
+}
+
 step "Opening a public HTTPS tunnel"
 if ! command -v cloudflared >/dev/null 2>&1; then
   warn "cloudflared not installed — falling back to localtunnel via npx."
@@ -192,7 +208,13 @@ if [[ -z "$PUBLIC_URL" ]]; then
   warn "Could not read a public URL from the tunnel (see /tmp/wrs_pilot_tunnel.log)."
   warn "The app is still reachable on this machine at http://localhost:$PORT"
 else
-  ok "tunnel is live via $TUNNEL_KIND"
+  say "waiting for the tunnel to start routing…"
+  if wait_for_tunnel; then
+    ok "tunnel is live via $TUNNEL_KIND and serving"
+  else
+    warn "tunnel published a URL but is not routing yet — give it a minute and retry."
+    warn "It often starts working shortly after this message."
+  fi
 fi
 
 # ------------------------------------------------------------------------- brief
@@ -244,6 +266,7 @@ while true; do
     warn "tunnel dropped (#$TUNNEL_RESTARTS) — reconnecting; the server is untouched"
     OLD_URL="$PUBLIC_URL"
     start_tunnel
+    wait_for_tunnel || true
     if [[ -n "$PUBLIC_URL" ]]; then
       if [[ "$PUBLIC_URL" != "$OLD_URL" ]]; then
         printf '\n%s  THE URL CHANGED — reopen this on the device:%s\n' "${BLD}" "${NC}"
