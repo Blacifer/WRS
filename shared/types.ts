@@ -200,6 +200,8 @@ export interface InspectionRecord {
   spring_position?: SpringPosition;
   bogiePosition?: 'BOGIE_1' | 'BOGIE_2' | null;
   bogie_position?: 'BOGIE_1' | 'BOGIE_2' | null;
+  nestIndex?: number | null;
+  nest_index?: number | null;
   condition: SpringCondition;
   spring_condition?: SpringCondition;
   measuredFreeHeight: number;
@@ -254,6 +256,8 @@ export interface InspectionCreateRequest {
   springPosition?: SpringPosition;
   /** Which bogie the spring came off — required to link it to the right checklist item. */
   bogiePosition?: 'BOGIE_1' | 'BOGIE_2';
+  /** Which spring within its nest (1..n), so a full nest sweep is countable. */
+  nestIndex?: number;
   measuredHeight?: number;
   measuredFreeHeight?: number;
   damageType?: DamageType;

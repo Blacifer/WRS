@@ -44,6 +44,10 @@ CREATE TABLE IF NOT EXISTS inspections (
   -- marked two as verified. Nullable because rows created before this column
   -- existed genuinely do not know, and must not be guessed at.
   bogie_position TEXT DEFAULT NULL CHECK(bogie_position IS NULL OR bogie_position IN ('BOGIE_1', 'BOGIE_2')),
+  -- Which spring within its nest (1..12 for a 20.32t NLB outer nest). Without
+  -- it, twelve outer springs collapse to one row and the exit gate sees a
+  -- single reading standing in for the whole nest.
+  nest_index INTEGER DEFAULT NULL CHECK(nest_index IS NULL OR nest_index >= 1),
   measured_height REAL NOT NULL CHECK(measured_height >= 0.0 AND measured_height <= 1000.0),
   classified_band TEXT CHECK(classified_band IN ('BLUE', 'GREEN', 'YELLOW', 'ORANGE', 'WHITE', 'RED') OR classified_band IS NULL),
   band_roman TEXT CHECK(band_roman IN ('Band I', 'Band II', 'Band III', 'Band IV', 'Band V', 'Band VI') OR band_roman IS NULL),

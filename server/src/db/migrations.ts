@@ -574,6 +574,12 @@ export function runMigrations(db: DatabaseSync): void {
   // measurement satisfied both bogies' checklist items. Added nullable so
   // existing rows stay honest about not knowing which bogie they came from.
   const inspectionCols = db.prepare('PRAGMA table_info(inspections)').all() as any[];
+  if (!inspectionCols.some((c) => c.name === 'nest_index')) {
+    db.exec(
+      'ALTER TABLE inspections ADD COLUMN nest_index INTEGER DEFAULT NULL ' +
+      'CHECK(nest_index IS NULL OR nest_index >= 1);'
+    );
+  }
   if (!inspectionCols.some((c) => c.name === 'bogie_position')) {
     db.exec(
       "ALTER TABLE inspections ADD COLUMN bogie_position TEXT DEFAULT NULL " +

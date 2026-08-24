@@ -194,6 +194,7 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
       // Bogie 1's outer spring from Bogie 2's, and one measurement would
       // satisfy both checklist items.
       bogiePosition: currentStep.bogiePosition,
+      nestIndex: currentStep.indexInNest,
       measuredHeight,
       measuredFreeHeight: measuredHeight,
       damageType,

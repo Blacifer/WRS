@@ -114,6 +114,9 @@ export class InspectionRepository {
     // working, but without it the spring cannot be matched to a specific
     // bogie's checklist item — see syncPhase1SpringsToChecklist.
     const bogiePosition = data.bogiePosition ?? data.bogie_position ?? null;
+    // Which spring within its nest. Optional for callers that measure a single
+    // representative spring, required for a full nest sweep to be countable.
+    const nestIndex = data.nestIndex ?? data.nest_index ?? null;
     const measurementSource = data.measurementSource ?? data.measurement_source ?? 'MANUAL';
     const ocrConfidence = data.ocrConfidence ?? data.ocr_confidence ?? null;
     const ocrImageRef = data.ocrImageRef ?? data.ocr_image_ref ?? null;
@@ -142,7 +145,7 @@ export class InspectionRepository {
         inspector_id, inspector_name, supervisor_override, original_band, override_band,
         override_reason, override_supervisor_id, override_supervisor_name, otp_token_ref,
         measurement_source, ocr_confidence, ocr_image_ref, offline_created_at, created_at, synced_at, audit_hash,
-        bogie_position
+        bogie_position, nest_index
       ) VALUES (
         ?, ?, ?, ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?,
@@ -150,7 +153,7 @@ export class InspectionRepository {
         ?, ?, ?, ?, ?,
         ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?, ?,
-        ?
+        ?, ?
       )
     `);
 
@@ -161,7 +164,7 @@ export class InspectionRepository {
       inspectorId, inspectorName, supervisorOverride, originalBand, overrideBand,
       overrideReason, overrideSupervisorId, overrideSupervisorName, otpTokenRef,
       measurementSource, ocrConfidence, ocrImageRef, offlineCreatedAt, timestamp, syncedAt, auditHash,
-      bogiePosition
+      bogiePosition, nestIndex
     );
 
     // Chained audit trail entry — this is the highest-volume event type in
@@ -180,6 +183,7 @@ export class InspectionRepository {
         springCondition,
         springPosition,
         bogiePosition,
+        nestIndex,
         measuredHeight,
         classifiedBand,
         status,

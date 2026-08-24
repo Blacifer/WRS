@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import { logAuditEvent } from './auditLog.ts';
 import { CASNUB_CHECKLIST_TEMPLATE } from './checklistTemplate.ts';
 import { validateSpringNests } from '../../../shared/classification/nestGrouping.ts';
+import { getSpringCountOptions, buildSpringQueue } from '../../../shared/classification/springCounts.ts';
 import type {
   LifecycleStage,
   CASNUBCategory,
@@ -483,19 +484,26 @@ export class WagonRepository {
     // grouping key: without it, measuring the same position on both bogies
     // collapsed to a single row and one bogie's measurement was discarded.
     // COALESCE keeps legacy rows (bogie_position NULL) as their own group.
+    // Latest measurement per INDIVIDUAL spring. nest_index must be in the
+    // grouping key: a 20.32t NLB bogie carries twelve outer springs, and
+    // without it all twelve collapsed into one row — the gate saw a single
+    // reading standing in for the whole nest, so eleven condemned springs
+    // could hide behind one passing re-measurement.
     const springInspections = this.db.prepare(`
       SELECT i.* FROM inspections i
       INNER JOIN (
         SELECT wagon_number, bogie_type, spring_position,
                COALESCE(bogie_position, '__NONE__') AS bogie_key,
+               COALESCE(nest_index, 0) AS nest_key,
                MAX(sequence_number) as max_seq
         FROM inspections
         WHERE wagon_number = ?
-        GROUP BY wagon_number, bogie_type, spring_position, bogie_key
+        GROUP BY wagon_number, bogie_type, spring_position, bogie_key, nest_key
       ) latest ON i.wagon_number = latest.wagon_number
               AND i.bogie_type = latest.bogie_type
               AND i.spring_position = latest.spring_position
               AND COALESCE(i.bogie_position, '__NONE__') = latest.bogie_key
+              AND COALESCE(i.nest_index, 0) = latest.nest_key
               AND i.sequence_number = latest.max_seq
     `).all(wagonNumber) as any[];
 
@@ -1035,19 +1043,94 @@ export class WagonRepository {
       }
     }
 
-    // Check Phase 1 Spring Classification
+    // Latest measurement per INDIVIDUAL spring.
+    //
+    // This grouping key decides what the exit gate can see, and it was far too
+    // coarse: every outer spring on the wagon collapsed into a single row.
+    // A 20.32t NLB carries twelve outer springs per bogie, so eleven of them
+    // — including condemned ones — were invisible here, and even the two
+    // bogies were indistinguishable from each other.
+    //
+    // COALESCE keeps rows recorded before bogie/nest indexing as their own
+    // group rather than silently merging them.
     const latestSprings = this.db.prepare(`
       SELECT i.* FROM inspections i
       INNER JOIN (
-        SELECT wagon_number, bogie_type, spring_position, MAX(sequence_number) as max_seq
+        SELECT wagon_number, bogie_type, spring_position,
+               COALESCE(bogie_position, '__NONE__') AS bogie_key,
+               COALESCE(nest_index, 0) AS nest_key,
+               MAX(sequence_number) as max_seq
         FROM inspections
         WHERE wagon_number = ?
-        GROUP BY wagon_number, bogie_type, spring_position
+        GROUP BY wagon_number, bogie_type, spring_position, bogie_key, nest_key
       ) latest ON i.wagon_number = latest.wagon_number
               AND i.bogie_type = latest.bogie_type
               AND i.spring_position = latest.spring_position
+              AND COALESCE(i.bogie_position, '__NONE__') = latest.bogie_key
+              AND COALESCE(i.nest_index, 0) = latest.nest_key
               AND i.sequence_number = latest.max_seq
     `).all(normalizedWagonNumber) as any[];
+
+    // -----------------------------------------------------------------------
+    // Spring completeness. A bogie carries far more than one spring per
+    // position — a 20.32t NLB has twelve outer, eight inner, four snubber —
+    // so a wagon can have springs recorded and still be largely unmeasured.
+    // Releasing on a partial sweep is the failure this check exists to stop.
+    //
+    // Only enforced once at least one indexed spring exists, so wagons
+    // recorded before per-spring indexing are not retrospectively blocked on
+    // data that was never captured.
+    // -----------------------------------------------------------------------
+    const indexedSprings = latestSprings.filter((s: any) => s.nest_index != null);
+    if (indexedSprings.length > 0) {
+      const bogieTypeOfRecord = String(indexedSprings[0].bogie_type);
+      const options = getSpringCountOptions(bogieTypeOfRecord as any);
+
+      // Without a recorded axle load, judge against the smallest documented
+      // configuration so the gate never demands springs the bogie may not have.
+      const smallest = options
+        .slice()
+        .sort((a, b) => (a.counts.outer + a.counts.inner + a.counts.snubber) -
+                        (b.counts.outer + b.counts.inner + b.counts.snubber))[0];
+
+      if (smallest) {
+        const expected = buildSpringQueue(smallest.counts);
+        const measured = new Set(
+          indexedSprings.map((s: any) => `${s.bogie_position}|${s.spring_position}|${s.nest_index}`)
+        );
+        const missing = expected.filter(
+          (e) => !measured.has(`${e.bogiePosition}|${e.position}|${e.indexInNest}`)
+        );
+
+        if (missing.length > 0) {
+          const byNest = new Map<string, number>();
+          for (const m of missing) {
+            const key = `${m.bogiePosition.replace('_', ' ')} ${m.position.toLowerCase()}`;
+            byNest.set(key, (byNest.get(key) || 0) + 1);
+          }
+          const detail = [...byNest.entries()]
+            .map(([nest, n]) => `${n} × ${nest}`)
+            .join(', ');
+
+          const msg =
+            `${missing.length} of ${expected.length} springs have not been measured ` +
+            `(${detail}). A ${bogieTypeOfRecord} at ${smallest.axleLoad} carries ` +
+            `${smallest.counts.outer} outer, ${smallest.counts.inner} inner and ` +
+            `${smallest.counts.snubber} snubber springs per bogie.`;
+
+          blockers.push(msg);
+          blockerDetails.push({
+            id: 'springs_incomplete',
+            category: 'SPRINGS',
+            partName: 'Spring nest sweep',
+            issueType: 'SPRINGS_NOT_FULLY_MEASURED',
+            description: msg,
+            severity: 'CRITICAL_BLOCKER',
+            remediationAction: 'Complete the spring batch for both bogies before requesting release.'
+          });
+        }
+      }
+    }
 
     // -----------------------------------------------------------------------
     // Spring nest grouping / segregation check (RDSO WMM 2.0).
