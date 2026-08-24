@@ -18,7 +18,9 @@ import {
   getSpringCount,
   getSpringCountOptions,
   buildSpringQueue,
-  totalPerBogie
+  totalPerBogie,
+  requiresManualCounts,
+  isPlausibleCount
 } from '../../shared/classification/springCounts.ts';
 
 describe('CASNUB Spring Counts', () => {
@@ -42,13 +44,37 @@ describe('CASNUB Spring Counts', () => {
     assert.strictEqual(o.verified, true);
   });
 
-  it('TC-CNT-04: RFT is flagged unverified — it is absent from the manual', () => {
-    // RFT appears in the G-95 band tables but not in the WMM spring-count
-    // table, so its counts must never be presented as documented fact.
-    for (const o of getSpringCountOptions('CASNUB_22_RFT')) {
-      assert.strictEqual(o.verified, false, 'RFT counts are not sourced and must say so');
-      assert.ok(/NOT IN WMM/i.test(o.source), 'the source note must state it is unsourced');
-    }
+  it('TC-CNT-04: RFT ships NO count, because none is published', () => {
+    // RFT appears in the G-95 band tables but in no spring-count table — not
+    // WMM 2.0 §601, not IRIMEE's identical training table, nor any public RDSO
+    // source found. It must be asked for, never assumed.
+    assert.deepStrictEqual(
+      getSpringCountOptions('CASNUB_22_RFT'),
+      [],
+      'shipping a guessed RFT count would produce a confident, wrong gate check'
+    );
+    assert.strictEqual(requiresManualCounts('CASNUB_22_RFT'), true);
+  });
+
+  it('TC-CNT-04b: RFT must not silently inherit another type’s configuration', () => {
+    // Guards the specific mistake that was shipped and reverted: defaulting RFT
+    // to NLB. G-95 gives RFT different springs entirely (272 mm outer against
+    // NLB's 260), so the suspension is not the same and the counts cannot be
+    // assumed to be either.
+    const rft = getSpringCount('CASNUB_22_RFT', '20.32t');
+    assert.strictEqual(rft, null, 'RFT must resolve to no configuration at all');
+  });
+
+  it('TC-CNT-04c: documented types never ask for a hand count', () => {
+    assert.strictEqual(requiresManualCounts('CASNUB_22_NLB'), false);
+    assert.strictEqual(requiresManualCounts('CASNUB_22_HS'), false);
+  });
+
+  it('TC-CNT-04d: hand-entered counts are bounds-checked', () => {
+    assert.strictEqual(isPlausibleCount({ outer: 12, inner: 8, snubber: 4 }), true);
+    assert.strictEqual(isPlausibleCount({ outer: 0, inner: 8, snubber: 4 }), false, 'zero is not a nest');
+    assert.strictEqual(isPlausibleCount({ outer: 99, inner: 8, snubber: 4 }), false, 'implausibly large');
+    assert.strictEqual(isPlausibleCount({ outer: 12.5, inner: 8, snubber: 4 }), false, 'springs are whole');
   });
 
   it('TC-CNT-05: every verified entry cites the manual section it came from', () => {

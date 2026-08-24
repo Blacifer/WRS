@@ -31,7 +31,12 @@ import {
   buildSpringQueue,
   totalPerBogie
 } from '../../../shared/classification/springCounts.ts';
-import type { AxleLoad, QueuedSpring } from '../../../shared/classification/springCounts.ts';
+import {
+  requiresManualCounts,
+  isPlausibleCount,
+  MANUAL_COUNT_LIMITS
+} from '../../../shared/classification/springCounts.ts';
+import type { AxleLoad, QueuedSpring, SpringCount } from '../../../shared/classification/springCounts.ts';
 import { api } from '../services/api.ts';
 import { offlineDb } from '../services/offlineDb.ts';
 import { CheckCircleIcon, AlertTriangleIcon, RefreshCwIcon } from '../components/Icons.tsx';
@@ -88,6 +93,8 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
   const [bogieType, setBogieType] = useState<BogieType>('CASNUB_22_NLB');
   const [condition, setCondition] = useState<SpringCondition>('USED');
   const [axleLoad, setAxleLoad] = useState<AxleLoad>('20.32t');
+  // Counts entered by hand for bogie types with no documented configuration.
+  const [manualCounts, setManualCounts] = useState<SpringCount>({ outer: 12, inner: 8, snubber: 4 });
   const [wagonLocked, setWagonLocked] = useState<boolean>(false);
 
   const [stepIndex, setStepIndex] = useState<number>(0);
@@ -111,10 +118,22 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
 
   // Available axle-load configurations depend on the bogie type.
   const countOptions = useMemo(() => getSpringCountOptions(bogieType), [bogieType]);
-  const activeCount = useMemo(
-    () => getSpringCount(bogieType, axleLoad) || countOptions[0] || null,
-    [bogieType, axleLoad, countOptions]
-  );
+  const needsManualCounts = useMemo(() => requiresManualCounts(bogieType), [bogieType]);
+  const manualCountsValid = useMemo(() => isPlausibleCount(manualCounts), [manualCounts]);
+
+  const activeCount = useMemo(() => {
+    if (needsManualCounts) {
+      return manualCountsValid
+        ? {
+            axleLoad,
+            counts: manualCounts,
+            source: 'Counted on the bogie by the inspector — no published figure for this type.',
+            verified: false
+          }
+        : null;
+    }
+    return getSpringCount(bogieType, axleLoad) || countOptions[0] || null;
+  }, [needsManualCounts, manualCountsValid, manualCounts, bogieType, axleLoad, countOptions]);
 
   const QUEUE: QueueStep[] = useMemo(
     () => (activeCount ? buildSpringQueue(activeCount.counts) : []),
@@ -413,8 +432,9 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
           </div>
 
           {/* Axle load decides how many springs the bogie carries (WMM 2.0
-              §601), so it decides the length of this queue. */}
-          <div className="space-y-1.5">
+              §601), so it decides the length of this queue. Hidden for types
+              with no published configuration — those are counted by hand. */}
+          <div className={`space-y-1.5 ${needsManualCounts ? 'hidden' : ''}`}>
             <label className="block text-xs font-bold text-slate-300">
               {isHi ? 'एक्सल भार' : 'Axle Load'}
             </label>
@@ -436,6 +456,54 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
               ))}
             </div>
           </div>
+
+          {/* No published count for this bogie type — ask rather than guess.
+              Defaulting it to another type's numbers would produce a
+              confident, wrong completeness check at the exit gate. */}
+          {needsManualCounts && (
+            <div className="sm:col-span-2 rounded-xl border border-amber-800/70 bg-amber-950/20 px-3.5 py-3 space-y-2.5">
+              <div>
+                <p className="text-xs font-black text-amber-300">
+                  {isHi ? 'इस बोगी के स्प्रिंग गिनें' : 'Count the springs on this bogie'}
+                </p>
+                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                  {isHi
+                    ? 'इस प्रकार की स्प्रिंग संख्या आरडीएसओ दस्तावेज़ में प्रकाशित नहीं है। अनुमान लगाने के बजाय, कृपया बोगी पर गिनकर दर्ज करें।'
+                    : 'The spring count for this bogie type is not published in RDSO documentation. Rather than assume another type’s figures, count them on the bogie and enter them here — one bogie only.'}
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  ['outer', isHi ? 'बाहरी' : 'Outer'],
+                  ['inner', isHi ? 'भीतरी' : 'Inner'],
+                  ['snubber', isHi ? 'स्नबर' : 'Snubber']
+                ] as const).map(([key, label]) => (
+                  <label key={key} className="block">
+                    <span className="block text-[11px] font-bold text-slate-300 mb-1">{label}</span>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={MANUAL_COUNT_LIMITS.min}
+                      max={MANUAL_COUNT_LIMITS.max}
+                      disabled={wagonLocked}
+                      value={manualCounts[key]}
+                      onChange={(e) =>
+                        setManualCounts((c) => ({ ...c, [key]: Number(e.target.value) }))
+                      }
+                      className="w-full min-h-[44px] bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white text-center font-mono focus:border-amber-500 focus:outline-none disabled:opacity-60"
+                    />
+                  </label>
+                ))}
+              </div>
+              {!manualCountsValid && (
+                <p className="text-[11px] text-rose-400 font-semibold">
+                  {isHi
+                    ? `प्रत्येक संख्या ${MANUAL_COUNT_LIMITS.min}–${MANUAL_COUNT_LIMITS.max} के बीच होनी चाहिए।`
+                    : `Each count must be a whole number between ${MANUAL_COUNT_LIMITS.min} and ${MANUAL_COUNT_LIMITS.max}.`}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* State plainly how many springs this configuration means, so the
               inspector knows the size of the job before starting. */}

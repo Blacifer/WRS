@@ -81,17 +81,20 @@ export const SPRING_COUNTS: Record<BogieType, SpringCountOption[]> = {
       verified: true
     }
   ],
-  CASNUB_22_RFT: [
-    {
-      axleLoad: '20.32t',
-      // Deliberately mirrors the documented NLB 20.32t configuration rather
-      // than inventing a figure. Must be confirmed against the RFT drawing
-      // before it is relied on — the UI surfaces this as unconfirmed.
-      counts: { outer: 12, inner: 8, snubber: 4 },
-      source: 'NOT IN WMM 2.0 — provisional, mirrors NLB 20.32t. Needs confirmation from the RFT drawing.',
-      verified: false
-    }
-  ]
+  // RFT is deliberately empty. Its count is not published in WMM 2.0 §601, is
+  // absent from IRIMEE's identical training table, and could not be found in
+  // any public RDSO source.
+  //
+  // An earlier version defaulted it to the NLB configuration. That was wrong
+  // to ship: G-95 gives RFT physically different springs (272 mm outer against
+  // NLB's 260, 237 inner against 262, 304 snubber against 294), and RFT is the
+  // only type whose G-95 table splits the snubber into outer and inner
+  // columns — which points to a different snubber arrangement, not the same
+  // four. Copying NLB's numbers would have produced a confident, wrong
+  // completeness check.
+  //
+  // With no source, the counts are asked for rather than guessed.
+  CASNUB_22_RFT: []
 };
 
 export function getSpringCountOptions(bogieType: BogieType): SpringCountOption[] {
@@ -100,6 +103,24 @@ export function getSpringCountOptions(bogieType: BogieType): SpringCountOption[]
 
 export function getSpringCount(bogieType: BogieType, axleLoad: AxleLoad): SpringCountOption | null {
   return getSpringCountOptions(bogieType).find((o) => o.axleLoad === axleLoad) || null;
+}
+
+/**
+ * True when this system has no sourced spring count for the bogie type, and
+ * the inspector must supply it from the bogie in front of them.
+ */
+export function requiresManualCounts(bogieType: BogieType): boolean {
+  return getSpringCountOptions(bogieType).length === 0;
+}
+
+/** Sanity bounds for a hand-entered count — no CASNUB nest falls outside these. */
+export const MANUAL_COUNT_LIMITS = { min: 1, max: 24 } as const;
+
+export function isPlausibleCount(counts: SpringCount): boolean {
+  const { min, max } = MANUAL_COUNT_LIMITS;
+  return [counts.outer, counts.inner, counts.snubber].every(
+    (n) => Number.isInteger(n) && n >= min && n <= max
+  );
 }
 
 /** Total springs on one bogie for a given configuration. */
