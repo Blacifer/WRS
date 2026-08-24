@@ -12,6 +12,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api.ts';
 import type { AdminUserRecord } from '../../../shared/types.ts';
+import type { LanguageCode } from '../i18n/index.ts';
 
 function generateStrongPassword(length = 14): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
@@ -37,7 +38,12 @@ const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Admin / DRM Officer'
 };
 
-export const UserManagementPage: React.FC = () => {
+interface UserManagementPageProps {
+  lang: LanguageCode;
+}
+
+export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) => {
+  const isHi = lang === 'hi';
   const [users, setUsers] = useState<AdminUserRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -95,11 +101,11 @@ export const UserManagementPage: React.FC = () => {
     setSubmitError(null);
 
     if (!fullName.trim() || !employeeId.trim() || !username.trim()) {
-      setSubmitError('Full name, employee ID, and username are all required.');
+      setSubmitError((isHi ? 'पूरा नाम, कर्मचारी आईडी और उपयोगकर्ता नाम — तीनों आवश्यक हैं।' : 'Full name, employee ID, and username are all required.'));
       return;
     }
     if (password.length < 8) {
-      setSubmitError('Password must be at least 8 characters.');
+      setSubmitError((isHi ? 'पासवर्ड कम से कम 8 अक्षरों का होना चाहिए।' : 'Password must be at least 8 characters.'));
       return;
     }
 
@@ -157,7 +163,7 @@ export const UserManagementPage: React.FC = () => {
             👤
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">User Accounts</h1>
+            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">{isHi ? 'उपयोगकर्ता खाते' : 'User Accounts'}</h1>
             <p className="text-xs text-slate-400 mt-0.5">
               Create and manage real login accounts for inspectors, supervisors, and admins. Accounts are never deleted, only deactivated — every inspection/audit record stays attributable.
             </p>
@@ -204,7 +210,7 @@ export const UserManagementPage: React.FC = () => {
       {/* Add User Form */}
       {isFormOpen && (
         <form onSubmit={handleSubmit} className="p-5 bg-slate-900 border border-slate-700 rounded-2xl shadow-xl space-y-4">
-          <h3 className="text-sm font-black text-white">New Account</h3>
+          <h3 className="text-sm font-black text-white">{isHi ? 'नया खाता' : 'New Account'}</h3>
 
           {submitError && (
             <div className="p-3 bg-rose-950/50 border border-rose-700/50 rounded-lg text-xs text-rose-300 font-medium">
@@ -214,7 +220,7 @@ export const UserManagementPage: React.FC = () => {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-400 mb-1">Full Name</label>
+              <label className="block text-xs font-bold text-slate-400 mb-1">{isHi ? 'पूरा नाम' : 'Full Name'}</label>
               <input
                 type="text"
                 value={fullName}
@@ -225,7 +231,7 @@ export const UserManagementPage: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-400 mb-1">Employee ID</label>
+              <label className="block text-xs font-bold text-slate-400 mb-1">{isHi ? 'कर्मचारी आईडी' : 'Employee ID'}</label>
               <input
                 type="text"
                 value={employeeId}
@@ -236,19 +242,19 @@ export const UserManagementPage: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-400 mb-1">Role</label>
+              <label className="block text-xs font-bold text-slate-400 mb-1">{isHi ? 'भूमिका' : 'Role'}</label>
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value as any)}
                 className="w-full min-h-[44px] px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-amber-500"
               >
-                <option value="INSPECTOR">Inspector</option>
-                <option value="SUPERVISOR">Supervisor</option>
+                <option value="INSPECTOR">{isHi ? 'निरीक्षक' : 'Inspector'}</option>
+                <option value="SUPERVISOR">{isHi ? 'पर्यवेक्षक' : 'Supervisor'}</option>
                 <option value="ADMIN">Admin / DRM Officer</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-400 mb-1">Username</label>
+              <label className="block text-xs font-bold text-slate-400 mb-1">{isHi ? 'उपयोगकर्ता नाम' : 'Username'}</label>
               <input
                 type="text"
                 value={username}
@@ -288,7 +294,7 @@ export const UserManagementPage: React.FC = () => {
             disabled={submitting}
             className="min-h-[44px] px-5 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold shadow-md transition-colors"
           >
-            {submitting ? 'Creating...' : 'Create Account'}
+            {submitting ? (isHi ? 'बनाया जा रहा…' : 'Creating…') : (isHi ? 'खाता बनाएँ' : 'Create Account')}
           </button>
         </form>
       )}
@@ -310,12 +316,12 @@ export const UserManagementPage: React.FC = () => {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
-                  <th className="px-4 py-3 font-bold">Name</th>
-                  <th className="px-4 py-3 font-bold">Username</th>
-                  <th className="px-4 py-3 font-bold">Role</th>
-                  <th className="px-4 py-3 font-bold">Employee ID</th>
-                  <th className="px-4 py-3 font-bold">Status</th>
-                  <th className="px-4 py-3 font-bold text-right">Action</th>
+                  <th className="px-4 py-3 font-bold">{isHi ? 'नाम' : 'Name'}</th>
+                  <th className="px-4 py-3 font-bold">{isHi ? 'उपयोगकर्ता नाम' : 'Username'}</th>
+                  <th className="px-4 py-3 font-bold">{isHi ? 'भूमिका' : 'Role'}</th>
+                  <th className="px-4 py-3 font-bold">{isHi ? 'कर्मचारी आईडी' : 'Employee ID'}</th>
+                  <th className="px-4 py-3 font-bold">{isHi ? 'स्थिति' : 'Status'}</th>
+                  <th className="px-4 py-3 font-bold text-right">{isHi ? 'क्रिया' : 'Action'}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
@@ -327,9 +333,9 @@ export const UserManagementPage: React.FC = () => {
                     <td className="px-4 py-3 text-slate-400 font-mono text-xs">{u.employee_id}</td>
                     <td className="px-4 py-3">
                       {u.is_active ? (
-                        <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-emerald-950/70 text-emerald-400 border border-emerald-800">ACTIVE</span>
+                        <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-emerald-950/70 text-emerald-400 border border-emerald-800">{isHi ? 'सक्रिय' : 'ACTIVE'}</span>
                       ) : (
-                        <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-slate-800 text-slate-500 border border-slate-700">DEACTIVATED</span>
+                        <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-slate-800 text-slate-500 border border-slate-700">{isHi ? 'निष्क्रिय' : 'DEACTIVATED'}</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -342,7 +348,7 @@ export const UserManagementPage: React.FC = () => {
                             : 'bg-emerald-950/40 border-emerald-800/60 text-emerald-400 hover:bg-emerald-900/50'
                         }`}
                       >
-                        {busyUserId === u.id ? '…' : u.is_active ? 'Deactivate' : 'Reactivate'}
+                        {busyUserId === u.id ? '…' : u.is_active ? (isHi ? 'निष्क्रिय करें' : 'Deactivate') : (isHi ? 'पुनः सक्रिय करें' : 'Reactivate')}
                       </button>
                     </td>
                   </tr>

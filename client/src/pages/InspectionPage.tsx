@@ -566,7 +566,7 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
                 <ShieldIcon size={16} className="text-purple-400" />
                 <span>Override: {overrideReason}</span>
               </div>
-              <span className="font-mono text-[10px] text-purple-300">OTP Auth Valid</span>
+              <span className="font-mono text-[10px] text-purple-300">{lang === 'hi' ? 'ओटीपी सत्यापित' : 'OTP Auth Valid'}</span>
             </div>
           )}
         </div>

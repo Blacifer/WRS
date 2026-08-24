@@ -232,7 +232,7 @@ export const App: React.FC = () => {
         {activeTab === 'inspection' && <InspectionPage lang={currentLang} user={user} />}
         {activeTab === 'history' && !isInspector && <HistoryPage lang={currentLang} />}
         {activeTab === 'analytics' && !isInspector && <AnalyticsPage lang={currentLang} user={user} />}
-        {activeTab === 'users' && user.role?.toUpperCase() === 'ADMIN' && <UserManagementPage />}
+        {activeTab === 'users' && user.role?.toUpperCase() === 'ADMIN' && <UserManagementPage lang={currentLang} />}
       </main>
 
       {/* Admin Export Dialog (Guarded from Inspector) */}

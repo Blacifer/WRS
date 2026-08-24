@@ -99,6 +99,7 @@ interface WagonDetailPageProps {
 
 export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, onBack }) => {
   const { t, lang } = useI18n();
+  const isHi = lang === 'hi';
   const [wagon, setWagon] = useState<WagonRecord | null>(null);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   // Inspect-by-exception panel state
@@ -898,12 +899,12 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                    <span>⚡</span> Inspect by Exception
+                    <span>⚡</span> {isHi ? 'अपवाद द्वारा निरीक्षण' : 'Inspect by Exception'}
                   </h4>
                   <p className="text-[11px] text-slate-400 mt-1 max-w-xl leading-relaxed">
-                    {pendingCount} item{pendingCount === 1 ? '' : 's'} still pending. Log anything
-                    defective above first, then declare the remainder serviceable in one action.
-                    Springs and any recorded FAIL or CONDEMNED verdict are never affected.
+                    {isHi
+                      ? `${pendingCount} मद अभी लंबित हैं। पहले ऊपर कोई भी दोषपूर्ण मद दर्ज करें, फिर शेष को एक ही क्रिया में सेवा-योग्य घोषित करें। स्प्रिंग तथा कोई भी दर्ज FAIL या CONDEMNED निर्णय कभी प्रभावित नहीं होते।`
+                      : `${pendingCount} item${pendingCount === 1 ? '' : 's'} still pending. Log anything defective above first, then declare the remainder serviceable in one action. Springs and any recorded FAIL or CONDEMNED verdict are never affected.`}
                   </p>
                 </div>
                 {!showBulkPanel && (
@@ -911,7 +912,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                     onClick={() => setShowBulkPanel(true)}
                     className="min-h-[44px] px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold border border-indigo-400/40 transition shrink-0"
                   >
-                    Clear {pendingCount} Remaining
+                    {isHi ? `शेष ${pendingCount} पूर्ण करें` : `Clear ${pendingCount} Remaining`}
                   </button>
                 )}
               </div>
@@ -920,19 +921,26 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                 <div className="space-y-3 pt-2 border-t border-slate-800">
                   <label className="block">
                     <span className="text-[11px] font-bold text-slate-300">
-                      Attestation — what did you physically verify? (min 10 characters)
+                      {isHi
+                        ? 'प्रमाणन — आपने भौतिक रूप से क्या सत्यापित किया? (न्यूनतम 10 अक्षर)'
+                        : 'Attestation — what did you physically verify? (min 10 characters)'}
                     </span>
                     <textarea
                       value={bulkAttestation}
                       onChange={(e) => setBulkAttestation(e.target.value)}
                       rows={2}
-                      placeholder="e.g. Walked both bogies with SSE Sharma, all remaining components visually verified serviceable"
+                      placeholder={
+                        isHi
+                          ? 'उदा. एसएसई शर्मा के साथ दोनों बोगियाँ देखीं, शेष सभी पुर्जे दृष्टिगत रूप से सेवा-योग्य पाए गए'
+                          : 'e.g. Walked both bogies with SSE Sharma, all remaining components visually verified serviceable'
+                      }
                       className="mt-1.5 w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-indigo-500 focus:outline-none"
                     />
                   </label>
                   <p className="text-[10px] text-amber-400/90 leading-relaxed">
-                    This is recorded against your name on every affected item and written to the
-                    audit log. Only declare what you actually inspected.
+                    {isHi
+                      ? 'यह प्रत्येक प्रभावित मद पर आपके नाम सहित दर्ज होता है और ऑडिट लॉग में लिखा जाता है। केवल वही घोषित करें जिसका आपने वास्तव में निरीक्षण किया है।'
+                      : 'This is recorded against your name on every affected item and written to the audit log. Only declare what you actually inspected.'}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -940,7 +948,9 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                       disabled={bulkAttestation.trim().length < 10 || isBulkClearing}
                       className="min-h-[44px] px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition"
                     >
-                      {isBulkClearing ? 'Clearing…' : 'Confirm & Clear'}
+                      {isBulkClearing
+                        ? (isHi ? 'पूर्ण किया जा रहा…' : 'Clearing…')
+                        : (isHi ? 'पुष्टि करें व पूर्ण करें' : 'Confirm & Clear')}
                     </button>
                     <button
                       onClick={() => {
@@ -949,7 +959,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                       }}
                       className="min-h-[44px] px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold border border-slate-700 transition"
                     >
-                      Cancel
+                      {isHi ? 'रद्द करें' : 'Cancel'}
                     </button>
                   </div>
                 </div>
@@ -1237,12 +1247,13 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
             <div className="bg-slate-900 border border-amber-900/60 rounded-2xl p-6 shadow-xl space-y-4">
               <div>
                 <h4 className="text-sm font-bold text-amber-400 flex items-center gap-2">
-                  <span>⚖️</span> Spring Nest Grouping ({gateStatus.advisories.length})
+                  <span>⚖️</span>{' '}
+                  {isHi ? 'स्प्रिंग नेस्ट समूहन' : 'Spring Nest Grouping'} ({gateStatus.advisories.length})
                 </h4>
                 <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
-                  Advisory only — does not block release. Springs in one nest should sit within a
-                  single 3&nbsp;mm band so they share load evenly, even when each spring passes on
-                  its own.
+                  {isHi
+                    ? 'केवल सलाहकारी — विमुक्ति नहीं रोकता। एक नेस्ट की सभी स्प्रिंग एक ही 3 मि.मी. बैंड में होनी चाहिए ताकि भार समान रूप से बँटे, भले ही प्रत्येक स्प्रिंग अलग-अलग उत्तीर्ण हो।'
+                    : 'Advisory only — does not block release. Springs in one nest should sit within a single 3 mm band so they share load evenly, even when each spring passes on its own.'}
                 </p>
               </div>
               <div className="space-y-2">
@@ -1268,7 +1279,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                       >
                         <span className="font-bold text-slate-200">{g.groupKey}</span>
                         <span className="text-slate-400 tabular-nums">
-                          {g.springCount} spring{g.springCount === 1 ? '' : 's'} ·{' '}
+                          {g.springCount} {isHi ? 'स्प्रिंग' : `spring${g.springCount === 1 ? '' : 's'}`} ·{' '}
                           {g.minHeight?.toFixed(1)}–{g.maxHeight?.toFixed(1)} mm
                         </span>
                         <span
@@ -1278,7 +1289,9 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                               : 'text-amber-300 bg-amber-950/50'
                           }`}
                         >
-                          {g.isMatched ? '✓ MATCHED' : `${g.variationMm?.toFixed(2)} mm SPREAD`}
+                          {g.isMatched
+                            ? (isHi ? '✓ मिलान' : '✓ MATCHED')
+                            : `${g.variationMm?.toFixed(2)} mm ${isHi ? 'अंतर' : 'SPREAD'}`}
                         </span>
                       </div>
                     ))}
