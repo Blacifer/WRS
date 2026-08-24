@@ -27,7 +27,10 @@ export LANG="${LANG:-en_US.UTF-8}"
 # Homebrew's bin is not always on PATH in a non-interactive shell, which made
 # the script fall back to localtunnel even with cloudflared installed.
 for brewbin in /opt/homebrew/bin /usr/local/bin; do
-  [[ -d "$brewbin" ]] && [[ ":$PATH:" != *":$brewbin:"* ]] && export PATH="$brewbin:$PATH"
+  # Appended, never prepended: Homebrew may carry an older node (node@20 here)
+  # and this addition exists only so cloudflared can be found. Putting it first
+  # silently downgraded the runtime and failed the Node 22 check.
+  [[ -d "$brewbin" ]] && [[ ":$PATH:" != *":$brewbin:"* ]] && export PATH="$PATH:$brewbin"
 done
 
 PORT="${PORT:-3000}"
@@ -65,7 +68,8 @@ trap cleanup INT TERM
 step "Checking Node"
 if [[ -s "$HOME/.nvm/nvm.sh" ]]; then
   # shellcheck disable=SC1091
-  export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"; nvm use 22 >/dev/null 2>&1 || true
+  export NVM_DIR="$HOME/.nvm"; . "$NVM_DIR/nvm.sh"
+  nvm use 22 >/dev/null 2>&1 || nvm use default >/dev/null 2>&1 || true
 fi
 NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
 [[ "$NODE_MAJOR" -ge 22 ]] || die "Node 22+ required (found $(node -v 2>/dev/null || echo none)). The server uses the built-in node:sqlite module."
@@ -140,6 +144,38 @@ else
   ok "manual indexed ($MANUAL_PAGES passages)"
 fi
 
+# -------------------------------------------------------------------------- tls
+# Camera and voice input are gated behind a secure context, and localhost is
+# the only exemption — so a phone on the LAN needs real TLS or it silently
+# loses hands-free entry. A self-signed certificate is enough: the phone warns
+# once, then every browser API works.
+step "TLS certificate"
+CERT_DIR="$ROOT/server/certs"
+TLS_KEY_PATH="$CERT_DIR/lan-key.pem"
+TLS_CERT_PATH="$CERT_DIR/lan-cert.pem"
+
+if [[ -n "$LAN_IP" ]] && { [[ ! -f "$TLS_CERT_PATH" ]] || ! openssl x509 -in "$TLS_CERT_PATH" -noout -text 2>/dev/null | grep -q "IP Address:$LAN_IP"; }; then
+  mkdir -p "$CERT_DIR"
+  if openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
+       -keyout "$TLS_KEY_PATH" -out "$TLS_CERT_PATH" \
+       -subj "/CN=$LAN_IP" \
+       -addext "subjectAltName=IP:$LAN_IP,IP:127.0.0.1,DNS:localhost" >/dev/null 2>&1; then
+    ok "generated a certificate for $LAN_IP"
+  else
+    warn "could not generate a certificate — falling back to plain HTTP"
+    warn "camera and voice input will be unavailable on the LAN address"
+  fi
+else
+  [[ -f "$TLS_CERT_PATH" ]] && ok "using the existing certificate for $LAN_IP"
+fi
+
+if [[ -f "$TLS_KEY_PATH" && -f "$TLS_CERT_PATH" ]]; then
+  export TLS_KEY_PATH TLS_CERT_PATH
+  SCHEME="https"
+else
+  SCHEME="http"
+fi
+
 # ----------------------------------------------------------------------- server
 step "Starting the server on :$PORT"
 lsof -ti:"$PORT" -sTCP:LISTEN 2>/dev/null | xargs -r kill 2>/dev/null
@@ -148,14 +184,14 @@ lsof -ti:"$PORT" -sTCP:LISTEN 2>/dev/null | xargs -r kill 2>/dev/null
 SERVER_PID=$!
 
 for _ in $(seq 1 40); do
-  curl -sf "http://localhost:$PORT/api/health" >/dev/null 2>&1 && break
+  curl -skf "$SCHEME://localhost:$PORT/api/health" >/dev/null 2>&1 && break
   sleep 1
 done
-curl -sf "http://localhost:$PORT/api/health" >/dev/null 2>&1 \
+curl -skf "$SCHEME://localhost:$PORT/api/health" >/dev/null 2>&1 \
   || die "server did not come up — see /tmp/wrs_pilot_server.log"
 ok "API healthy"
 
-curl -sf "http://localhost:$PORT/" 2>/dev/null | grep -qi '<div id="root"' \
+curl -skf "$SCHEME://localhost:$PORT/" 2>/dev/null | grep -qi '<div id="root"' \
   && ok "client is being served on the same origin" \
   || warn "the built client did not load — check that client/dist exists"
 
@@ -176,7 +212,7 @@ start_tunnel() {
 
   if [[ "$want" != "localtunnel" ]] && command -v cloudflared >/dev/null 2>&1; then
     TUNNEL_KIND="cloudflared"
-    cloudflared tunnel --url "http://localhost:$PORT" --no-autoupdate \
+    cloudflared tunnel --url "$SCHEME://localhost:$PORT" --no-autoupdate \
       >/tmp/wrs_pilot_tunnel.log 2>&1 &
     TUNNEL_PID=$!
     for _ in $(seq 1 40); do
@@ -262,12 +298,12 @@ ${BLD}  OPEN THIS ON THE PHONE OR TABLET${NC}
 
   ${BLD}1. On the same Wi-Fi — stable, recommended${NC}
 
-     ${GRN}http://${LAN_IP:-<no LAN address found>}:${PORT}${NC}
+     ${GRN}${SCHEME}://${LAN_IP:-<no LAN address found>}:${PORT}${NC}
 
-     Nothing to drop and no click-through. The live camera will not run
-     over plain HTTP, so QR scanning is unavailable and the defect photo
-     uses "Choose File" — everything else, including the whole spring
-     flow, works normally.
+     Nothing to drop, and nothing between the phone and this machine.
+     The certificate is self-signed, so the browser warns once — accept it
+     and continue. Camera, QR scanning and hands-free voice entry all work
+     after that.
 
   ${BLD}2. From anywhere — needed for Raipur, but drops often${NC}
 

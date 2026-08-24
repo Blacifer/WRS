@@ -24,6 +24,8 @@ import { CaliperCamera } from '../components/CaliperCamera.tsx';
 import { ClassificationBadge } from '../components/ClassificationBadge.tsx';
 import { DefectSelector } from '../components/DefectSelector.tsx';
 import { DefectPhotoCapture } from '../components/DefectPhotoCapture.tsx';
+import { VoiceInspectionToolbar } from '../components/VoiceInspectionToolbar.tsx';
+import type { VoiceParseResult } from '../../../shared/types.ts';
 import { classifySpringLocally, getRDSOTable } from '../services/classification.ts';
 import { getReplacementGuidance } from '../../../shared/classification/nestGrouping.ts';
 import {
@@ -267,6 +269,42 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
     if (source === 'OCR') {
       setOcrProposedHeight(height);
       setOcrProposedConfidence(confidence);
+    }
+  };
+
+  // Hands-free entry. This is the screen where forty-eight springs get
+  // recorded, and an inspector holding a gauge with greasy gloves should not
+  // have to put it down to type. Speaking the height and saying "save" keeps
+  // both hands on the work — which is the actual labour saving, since the
+  // gauging itself is physical and cannot be automated away by software.
+  const handleVoiceCommand = (result: VoiceParseResult) => {
+    const p = (result as any).springParams;
+
+    if (p?.measuredHeight) {
+      handleMeasurementChange(p.measuredHeight, 'MANUAL');
+    }
+    if (p?.condition) {
+      setCondition(p.condition);
+    }
+    if (p?.isSaveCommand) {
+      // Only advance when the reading is genuinely ready — a save spoken over
+      // an incomplete step should do nothing rather than skip a spring.
+      if (measuredHeight !== null && classification && !needsDefectPhoto) {
+        void handleConfirmAndNext();
+      }
+    }
+
+    // "condemned" / "crack" spoken aloud flags the defect without hunting for
+    // the panel.
+    const action = (result as any).actionType;
+    if (action === 'UPDATE_STATUS') {
+      const st = (result as any).status;
+      if (st === 'CONDEMNED' || st === 'FAIL') {
+        setDamageType('CRACK');
+        setShowDefectPanel(true);
+      } else if (st === 'PASS') {
+        setDamageType('NONE');
+      }
     }
   };
 
@@ -698,6 +736,16 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
             </button>
           </div>
         </div>
+      )}
+
+      {/* Hands-free entry, shown only while measuring. */}
+      {!batchDone && currentStep && (
+        <VoiceInspectionToolbar
+          wagonNumber={wagonNumber}
+          currentCategory="SPRINGS"
+          onCommandParsed={handleVoiceCommand}
+          lang={lang}
+        />
       )}
 
       {!batchDone && currentStep && (

@@ -38,3 +38,6 @@ yarn-error.log*
 .vscode/
 .idea/
 backups/
+
+# Locally generated TLS material for LAN testing — never commit
+server/certs/

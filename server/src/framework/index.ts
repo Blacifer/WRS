@@ -7,6 +7,7 @@
  */
 
 import http from 'node:http';
+import https from 'node:https';
 import { URL } from 'node:url';
 
 export type NextFunction = (err?: any) => void;
@@ -424,6 +425,27 @@ export class ExpressApp extends RouterInstance {
 
   public listen(port: number, callback?: () => void): http.Server {
     const server = http.createServer((req, res) => this.handleRequest(req, res));
+    return server.listen(port, callback);
+  }
+
+  /**
+   * Serves over TLS.
+   *
+   * Browsers gate getUserMedia and SpeechRecognition behind a secure context,
+   * and localhost is the only exception. Reaching the app from a phone on the
+   * LAN therefore silently loses both the camera and hands-free voice entry —
+   * the latter being the whole point on a shop floor, where an inspector is
+   * holding a gauge and should not have to put it down to type.
+   *
+   * A self-signed certificate is enough: the phone shows a warning once, and
+   * every browser API works afterwards.
+   */
+  public listenTls(
+    port: number,
+    tls: { key: string | Buffer; cert: string | Buffer },
+    callback?: () => void
+  ): https.Server {
+    const server = https.createServer(tls, (req, res) => this.handleRequest(req, res));
     return server.listen(port, callback);
   }
 }
