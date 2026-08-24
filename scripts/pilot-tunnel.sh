@@ -149,37 +149,50 @@ curl -sf "http://localhost:$PORT/" 2>/dev/null | grep -qi '<div id="root"' \
   || warn "the built client did not load — check that client/dist exists"
 
 # ----------------------------------------------------------------------- tunnel
-step "Opening a public HTTPS tunnel"
+# Wrapped in a function so a dropped tunnel can be re-established without
+# taking the server down with it. localtunnel in particular drops fairly
+# often, and losing an inspection session because of that would be absurd.
+TUNNEL_KIND=""
+start_tunnel() {
+  PUBLIC_URL=""
+  : > /tmp/wrs_pilot_tunnel.log
 
-PUBLIC_URL=""
-if command -v cloudflared >/dev/null 2>&1; then
-  say "using cloudflared (most reliable — no interstitial page)"
-  cloudflared tunnel --url "http://localhost:$PORT" --no-autoupdate \
-    >/tmp/wrs_pilot_tunnel.log 2>&1 &
-  TUNNEL_PID=$!
-  for _ in $(seq 1 40); do
-    PUBLIC_URL="$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/wrs_pilot_tunnel.log 2>/dev/null | head -1)"
-    [[ -n "$PUBLIC_URL" ]] && break
-    sleep 1
-  done
-else
+  if command -v cloudflared >/dev/null 2>&1; then
+    TUNNEL_KIND="cloudflared"
+    cloudflared tunnel --url "http://localhost:$PORT" --no-autoupdate \
+      >/tmp/wrs_pilot_tunnel.log 2>&1 &
+    TUNNEL_PID=$!
+    for _ in $(seq 1 40); do
+      PUBLIC_URL="$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/wrs_pilot_tunnel.log 2>/dev/null | head -1)"
+      [[ -n "$PUBLIC_URL" ]] && break
+      sleep 1
+    done
+  else
+    TUNNEL_KIND="localtunnel"
+    npx --yes localtunnel --port "$PORT" >/tmp/wrs_pilot_tunnel.log 2>&1 &
+    TUNNEL_PID=$!
+    for _ in $(seq 1 45); do
+      PUBLIC_URL="$(grep -oE 'https://[a-z0-9-]+\.loca\.lt' /tmp/wrs_pilot_tunnel.log 2>/dev/null | head -1)"
+      [[ -n "$PUBLIC_URL" ]] && break
+      sleep 1
+    done
+  fi
+}
+
+step "Opening a public HTTPS tunnel"
+if ! command -v cloudflared >/dev/null 2>&1; then
   warn "cloudflared not installed — falling back to localtunnel via npx."
-  warn "localtunnel shows a one-time click-through page and drops connections more often."
-  warn "For a smoother test:  brew install cloudflared"
-  npx --yes localtunnel --port "$PORT" >/tmp/wrs_pilot_tunnel.log 2>&1 &
-  TUNNEL_PID=$!
-  for _ in $(seq 1 45); do
-    PUBLIC_URL="$(grep -oE 'https://[a-z0-9-]+\.loca\.lt' /tmp/wrs_pilot_tunnel.log 2>/dev/null | head -1)"
-    [[ -n "$PUBLIC_URL" ]] && break
-    sleep 1
-  done
+  warn "localtunnel drops often and shows a one-time click-through page."
+  warn "Strongly recommended:  brew install cloudflared"
 fi
+
+start_tunnel
 
 if [[ -z "$PUBLIC_URL" ]]; then
   warn "Could not read a public URL from the tunnel (see /tmp/wrs_pilot_tunnel.log)."
   warn "The app is still reachable on this machine at http://localhost:$PORT"
 else
-  ok "tunnel is live"
+  ok "tunnel is live via $TUNNEL_KIND"
 fi
 
 # ------------------------------------------------------------------------- brief
@@ -215,13 +228,33 @@ ${BLD}────────────────────────�
 
 BRIEF
 
-# Keep running until interrupted; report if either process dies underneath us.
+# Watchdog. The server dying is fatal; the tunnel dying is not — reconnect it
+# and carry on, because the inspection data lives on the server, not the tunnel.
+TUNNEL_RESTARTS=0
 while true; do
   sleep 5
+
   if ! kill -0 "$SERVER_PID" 2>/dev/null; then
-    warn "the server exited — see /tmp/wrs_pilot_server.log"; cleanup
+    warn "the server exited — see /tmp/wrs_pilot_server.log"
+    cleanup
   fi
+
   if [[ -n "$TUNNEL_PID" ]] && ! kill -0 "$TUNNEL_PID" 2>/dev/null; then
-    warn "the tunnel exited — see /tmp/wrs_pilot_tunnel.log"; cleanup
+    TUNNEL_RESTARTS=$((TUNNEL_RESTARTS + 1))
+    warn "tunnel dropped (#$TUNNEL_RESTARTS) — reconnecting; the server is untouched"
+    OLD_URL="$PUBLIC_URL"
+    start_tunnel
+    if [[ -n "$PUBLIC_URL" ]]; then
+      if [[ "$PUBLIC_URL" != "$OLD_URL" ]]; then
+        printf '\n%s  THE URL CHANGED — reopen this on the device:%s\n' "${BLD}" "${NC}"
+        printf '     %s%s%s\n\n' "${GRN}" "$PUBLIC_URL" "${NC}"
+      else
+        ok "tunnel back up on the same URL"
+      fi
+    else
+      warn "could not re-establish the tunnel; retrying in 15s"
+      warn "the app is still running locally at http://localhost:$PORT"
+      sleep 15
+    fi
   fi
 done
