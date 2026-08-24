@@ -19,6 +19,11 @@
 #
 set -uo pipefail
 
+# macOS ships bash 3.2. Under a non-UTF-8 locale it parses the bytes of a
+# multi-byte character as part of an adjacent variable name, so pin UTF-8.
+export LC_ALL="${LC_ALL:-en_US.UTF-8}"
+export LANG="${LANG:-en_US.UTF-8}"
+
 PORT="${PORT:-3000}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -26,10 +31,10 @@ cd "$ROOT"
 RED=$'\033[0;31m'; GRN=$'\033[0;32m'; YEL=$'\033[1;33m'; CYA=$'\033[0;36m'; BLD=$'\033[1m'; NC=$'\033[0m'
 
 say()  { printf '%s\n' "$*"; }
-step() { printf '\n%s==>%s %s%s%s\n' "$CYA" "$NC" "$BLD" "$*" "$NC"; }
-warn() { printf '%s!%s  %s\n' "$YEL" "$NC" "$*"; }
-die()  { printf '%s✗%s  %s\n' "$RED" "$NC" "$*" >&2; exit 1; }
-ok()   { printf '%s✓%s  %s\n' "$GRN" "$NC" "$*"; }
+step() { printf '\n%s==>%s %s%s%s\n' "${CYA}" "${NC}" "${BLD}" "$*" "${NC}"; }
+warn() { printf '%s!%s  %s\n' "${YEL}" "${NC}" "$*"; }
+die()  { printf '%s✗%s  %s\n' "${RED}" "${NC}" "$*" >&2; exit 1; }
+ok()   { printf '%s✓%s  %s\n' "${GRN}" "${NC}" "$*"; }
 
 SERVER_PID=""
 TUNNEL_PID=""
@@ -89,8 +94,37 @@ try { const s = getManualStats(getDatabase()); process.stdout.write(String(s.pas
 catch { process.stdout.write('0'); }
 " 2>/dev/null || echo 0)"
 if [[ "$MANUAL_PAGES" == "0" ]]; then
-  warn "Maintenance manual is not indexed — 'Ask the Manual' will say so instead of answering."
-  warn "To enable it:  cd server && npm run index-manual -- \"/path/to/Vol-I (System Documentation).pdf\""
+  # Look for the manual where it usually is rather than making someone paste a
+  # path. Indexing is a one-off per database, so doing it automatically here
+  # removes the single most likely reason "Ask the Manual" comes up empty.
+  MANUAL_PDF=""
+  for candidate in \
+    "$HOME/Downloads/Vol-I (System Documentation)_merged.pdf" \
+    "$HOME/Downloads/Vol-I (System Documentation).pdf" \
+    "$HOME/Desktop/Vol-I (System Documentation).pdf" \
+    "$ROOT/docs/Vol-I (System Documentation).pdf"
+  do
+    [[ -f "$candidate" ]] && { MANUAL_PDF="$candidate"; break; }
+  done
+
+  if [[ -z "$MANUAL_PDF" ]]; then
+    MANUAL_PDF="$(find "$HOME/Downloads" "$HOME/Desktop" -maxdepth 1 -iname '*System Documentation*.pdf' 2>/dev/null | head -1)"
+  fi
+
+  if [[ -n "$MANUAL_PDF" ]]; then
+    step "Indexing the maintenance manual (one-off)"
+    say "found: $(basename "$MANUAL_PDF")"
+    if ( cd server && npm run index-manual -- "$MANUAL_PDF" >/tmp/wrs_pilot_manual.log 2>&1 ); then
+      ok "$(grep -oE 'Indexed [0-9,]+ passages across [0-9]+ pages' /tmp/wrs_pilot_manual.log | head -1)"
+    else
+      warn "indexing failed — see /tmp/wrs_pilot_manual.log"
+      warn "'Ask the Manual' will say it has nothing indexed rather than guessing."
+    fi
+  else
+    warn "Maintenance manual not found — 'Ask the Manual' will say so instead of answering."
+    warn "Put the PDF in ~/Downloads, or index it by hand:"
+    warn "  cd server && npm run index-manual -- <path-to-manual.pdf>"
+  fi
 else
   ok "manual indexed ($MANUAL_PAGES passages)"
 fi
@@ -151,17 +185,17 @@ fi
 # ------------------------------------------------------------------------- brief
 cat <<BRIEF
 
-$BLD────────────────────────────────────────────────────────────────$NC
-$BLD  OPEN THIS ON THE PHONE OR TABLET$NC
+${BLD}────────────────────────────────────────────────────────────────${NC}
+${BLD}  OPEN THIS ON THE PHONE OR TABLET${NC}
 
      ${GRN}${PUBLIC_URL:-<no public URL — see the log>}${NC}
 
-$BLD  Sign in$NC
+${BLD}  Sign in${NC}
      inspector1  / password123    (shop-floor view)
      supervisor1 / password123    (pipeline, gate, learning)
      admin1      / password123    (everything + user accounts)
 
-$BLD  Worth testing on the real device — these cannot be tested here$NC
+${BLD}  Worth testing on the real device — these cannot be tested here${NC}
      1. Add to Home Screen, then open it from the icon
      2. Spring Batch — is manual entry fast enough with gloves on?
      3. QR scan on a real wagon plate or component tag
@@ -171,13 +205,13 @@ $BLD  Worth testing on the real device — these cannot be tested here$NC
         on — the queue should sync on its own
      7. Ask the Manual: "brake block condemning limit"
 
-$BLD  The question that matters most$NC
+${BLD}  The question that matters most${NC}
      How is spring free height actually measured at Raipur? If it is a
      manual gauge with no digital display, the app is now built for that —
      please confirm the flow matches what an inspector really does.
 
-$YEL  Ctrl-C stops the server and closes the tunnel.$NC
-$BLD────────────────────────────────────────────────────────────────$NC
+${YEL}  Ctrl-C stops the server and closes the tunnel.${NC}
+${BLD}────────────────────────────────────────────────────────────────${NC}
 
 BRIEF
 
