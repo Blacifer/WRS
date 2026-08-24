@@ -20,6 +20,7 @@ const BANDS: BandColor[] = ['BLUE', 'GREEN', 'YELLOW', 'ORANGE', 'WHITE', 'RED']
 const BOGIE_TYPES: BogieType[] = ['CASNUB_22_NLB', 'CASNUB_22_HS', 'CASNUB_22_RFT'];
 
 export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
+  const isHi = lang === 'hi';
   const dict = getDictionary(lang);
 
   const [records, setRecords] = useState<InspectionRecord[]>([]);
@@ -295,7 +296,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
                 <div className="p-3 bg-purple-950/60 border border-purple-800 rounded-xl space-y-1 text-purple-200">
                   <div className="font-bold flex items-center gap-1.5">
                     <ShieldIcon size={14} className="text-purple-400" />
-                    <span>Supervisor Override Justification</span>
+                    <span>{isHi ? 'पर्यवेक्षक ओवरराइड कारण' : 'Supervisor Override Justification'}</span>
                   </div>
                   <p>{selectedRecord.overrideReason}</p>
                 </div>

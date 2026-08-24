@@ -27,7 +27,8 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
   onDefectLogged,
   className = ''
 }) => {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const isHi = lang === 'hi';
 
   // Engine state
   const [isActive, setIsActive] = useState<boolean>(false);
@@ -506,9 +507,8 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
       <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4 space-y-2">
         <div className="flex justify-between items-center text-xs text-slate-400 font-bold">
           <span className="flex items-center gap-1.5 text-slate-300">
-            <span>🔥</span> Waterfall Spectrogram (Live Heatmap)
-          </span>
-          <span className="font-mono text-[10px] text-slate-500">Frequency vs Time</span>
+            <span>🔥</span>{isHi ? 'वॉटरफ़ॉल स्पेक्ट्रोग्राम (लाइव हीटमैप)' : 'Waterfall Spectrogram (Live Heatmap)'}</span>
+          <span className="font-mono text-[10px] text-slate-500">{isHi ? 'आवृत्ति बनाम समय' : 'Frequency vs Time'}</span>
         </div>
         <canvas
           ref={specCanvasRef}
@@ -625,9 +625,7 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
             </div>
 
             <div>
-              <label className="block text-[11px] text-slate-400 font-semibold mb-1">
-                Component Name
-              </label>
+              <label className="block text-[11px] text-slate-400 font-semibold mb-1">{isHi ? 'घटक का नाम' : 'Component Name'}</label>
               <input
                 type="text"
                 value={targetPartName}

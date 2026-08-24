@@ -52,6 +52,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export const DashboardPage: React.FC = () => {
   const { t, lang } = useI18n();
+  const isHi = lang === 'hi';
   const [pipeline, setPipeline] = useState<any>(null);
   const [tat, setTat] = useState<any>(null);
   const [throughput, setThroughput] = useState<any>(null);
@@ -259,8 +260,7 @@ export const DashboardPage: React.FC = () => {
           🤖
         </div>
         <div className="relative z-10 flex-1 space-y-2">
-          <h3 className="text-sm font-black text-emerald-400 uppercase tracking-widest flex items-center gap-2">
-            Predictive AI Insight <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <h3 className="text-sm font-black text-emerald-400 uppercase tracking-widest flex items-center gap-2">{isHi ? 'पूर्वानुमान अंतर्दृष्टि' : 'Predictive AI Insight'}<span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           </h3>
           <p className="text-sm text-slate-300 font-medium leading-relaxed">
             <strong className="text-white">Trend Alert:</strong> CASNUB 22 HS outer springs from the SECR zone are showing a <span className="text-rose-400 font-bold bg-rose-950/50 px-1 rounded">22% higher condemnation rate</span> due to physical damage this month compared to the historical average. 
@@ -347,9 +347,7 @@ export const DashboardPage: React.FC = () => {
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-500">
-                No completed wagon turnaround trend data recorded
-              </div>
+              <div className="h-full flex items-center justify-center text-xs text-slate-500">{isHi ? 'कोई पूर्ण वैगन टर्नअराउंड प्रवृत्ति डेटा दर्ज नहीं' : 'No completed wagon turnaround trend data recorded'}</div>
             )}
           </div>
         </div>
@@ -379,9 +377,7 @@ export const DashboardPage: React.FC = () => {
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-500">
-                No daily throughput data recorded
-              </div>
+              <div className="h-full flex items-center justify-center text-xs text-slate-500">{isHi ? 'कोई दैनिक उत्पादन डेटा दर्ज नहीं' : 'No daily throughput data recorded'}</div>
             )}
           </div>
         </div>
@@ -422,9 +418,7 @@ export const DashboardPage: React.FC = () => {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-500">
-                No parts inspection data available
-              </div>
+              <div className="h-full flex items-center justify-center text-xs text-slate-500">{isHi ? 'कोई पुर्जा निरीक्षण डेटा उपलब्ध नहीं' : 'No parts inspection data available'}</div>
             )}
           </div>
         </div>
@@ -462,9 +456,7 @@ export const DashboardPage: React.FC = () => {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-500">
-                No spring band classification data recorded
-              </div>
+              <div className="h-full flex items-center justify-center text-xs text-slate-500">{isHi ? 'कोई स्प्रिंग बैंड वर्गीकरण डेटा दर्ज नहीं' : 'No spring band classification data recorded'}</div>
             )}
           </div>
         </div>
@@ -551,7 +543,7 @@ export const DashboardPage: React.FC = () => {
                 </div>
                 <div className="text-right">
                   <span className="text-sm font-black text-orange-400">{insp.itemsInspected}</span>
-                  <p className="text-[10px] text-slate-500">Components Checked</p>
+                  <p className="text-[10px] text-slate-500">{isHi ? 'जाँचे गए घटक' : 'Components Checked'}</p>
                 </div>
               </div>
             ))}

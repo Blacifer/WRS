@@ -32,6 +32,7 @@ const CATEGORY_NAMES: Record<CASNUBCategory, { en: string; hi: string }> = {
 
 export const StoresInventoryPage: React.FC = () => {
   const { t, lang } = useI18n();
+  const isHi = lang === 'hi';
 
   const [parts, setParts] = useState<StoresPart[]>([]);
   const [stats, setStats] = useState<InventoryStats | null>(null);
@@ -221,7 +222,7 @@ export const StoresInventoryPage: React.FC = () => {
             <span className="text-2xl sm:text-3xl font-black text-white font-mono">
               {stats?.totalParts ?? parts.length}
             </span>
-            <span className="text-xs text-slate-400 font-medium">Standard CASNUB SKUs</span>
+            <span className="text-xs text-slate-400 font-medium">{isHi ? 'मानक कासनब एसकेयू' : 'Standard CASNUB SKUs'}</span>
           </div>
           <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-xl pointer-events-none"></div>
         </div>
@@ -238,7 +239,7 @@ export const StoresInventoryPage: React.FC = () => {
             }`}>
               {stats?.lowStockCount ?? 0}
             </span>
-            <span className="text-xs text-slate-400 font-medium">Below reorder limit</span>
+            <span className="text-xs text-slate-400 font-medium">{isHi ? 'पुनःक्रय सीमा से नीचे' : 'Below reorder limit'}</span>
           </div>
           <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-xl pointer-events-none"></div>
         </div>
@@ -253,7 +254,7 @@ export const StoresInventoryPage: React.FC = () => {
             <span className="text-2xl sm:text-3xl font-black text-purple-400 font-mono">
               {stats?.totalReservedCount ?? reservations.filter(r => r.status === 'RESERVED').length}
             </span>
-            <span className="text-xs text-purple-300/80 font-medium">Auto-Reserved</span>
+            <span className="text-xs text-purple-300/80 font-medium">{isHi ? 'स्वतः आरक्षित' : 'Auto-Reserved'}</span>
           </div>
           <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-full blur-xl pointer-events-none"></div>
         </div>
@@ -348,7 +349,7 @@ export const StoresInventoryPage: React.FC = () => {
               onChange={(e) => setReservationStatusFilter(e.target.value)}
               className="px-3 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-xs font-bold text-slate-300 focus:outline-none focus:border-blue-500"
             >
-              <option value="ALL">All Reservation Statuses</option>
+              <option value="ALL">{isHi ? 'सभी आरक्षण स्थितियाँ' : 'All Reservation Statuses'}</option>
               <option value="RESERVED">RESERVED</option>
               <option value="ALLOCATED">ALLOCATED</option>
               <option value="ISSUED_TO_FLOOR">ISSUED_TO_FLOOR</option>
@@ -622,7 +623,7 @@ export const StoresInventoryPage: React.FC = () => {
 
             <form onSubmit={handleRestockSubmit} className="p-5 space-y-4">
               <div>
-                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">Part Description</p>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">{isHi ? 'पुर्जे का विवरण' : 'Part Description'}</p>
                 <p className="text-sm font-semibold text-white">{restockModalPart.partName}</p>
                 <p className="text-xs text-slate-400 mt-1">
                   Current Stock: <span className="font-mono font-bold text-white">{restockModalPart.stockQuantity}</span> | Reorder Threshold: <span className="font-mono font-bold text-amber-400">{restockModalPart.reorderThreshold}</span>

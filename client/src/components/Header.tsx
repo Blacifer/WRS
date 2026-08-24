@@ -283,7 +283,7 @@ export const Header: React.FC<HeaderProps> = ({
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
-                🔬 Smart Vision
+                🔬 {currentLang === 'hi' ? 'स्मार्ट विज़न' : 'Smart Vision'}
               </button>
 
               {isSupervisorOrAdmin && (

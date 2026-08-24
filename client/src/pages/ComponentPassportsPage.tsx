@@ -33,6 +33,7 @@ interface ComponentPassportsPageProps {
 
 export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ onNavigateToWagon }) => {
   const { t, lang } = useI18n();
+  const isHi = lang === 'hi';
 
   // Data state
   const [components, setComponents] = useState<SerializedComponent[]>([]);
@@ -252,28 +253,28 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
         return (
           <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-emerald-950 text-emerald-300 border border-emerald-500/50 flex items-center gap-1.5 shadow-sm">
             <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-            {score}% EXCELLENT
+            {score}% {isHi ? 'उत्कृष्ट' : 'EXCELLENT'}
           </span>
         );
       case 'GOOD':
         return (
           <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-blue-950 text-blue-300 border border-blue-500/50 flex items-center gap-1.5 shadow-sm">
             <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-            {score}% GOOD
+            {score}% {isHi ? 'अच्छा' : 'GOOD'}
           </span>
         );
       case 'FAIR':
         return (
           <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-amber-950 text-amber-300 border border-amber-500/50 flex items-center gap-1.5 shadow-sm">
             <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-            {score}% FAIR
+            {score}% {isHi ? 'ठीक' : 'FAIR'}
           </span>
         );
       case 'ATTENTION_REQUIRED':
         return (
           <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-orange-950 text-orange-300 border border-orange-500/50 flex items-center gap-1.5 shadow-sm">
             <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse"></span>
-            {score}% ATTENTION
+            {score}% {isHi ? 'ध्यान दें' : 'ATTENTION'}
           </span>
         );
       case 'CRITICAL':
@@ -281,7 +282,7 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
         return (
           <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-rose-950 text-rose-300 border border-rose-500/50 flex items-center gap-1.5 shadow-sm">
             <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping"></span>
-            {score}% CRITICAL
+            {score}% {isHi ? 'गंभीर' : 'CRITICAL'}
           </span>
         );
     }
@@ -290,15 +291,15 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
   const getStatusBadge = (status: ComponentStatus) => {
     switch (status) {
       case 'IN_SERVICE':
-        return <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-emerald-950/70 text-emerald-400 border border-emerald-800">IN SERVICE</span>;
+        return <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-emerald-950/70 text-emerald-400 border border-emerald-800">{isHi ? 'सेवा में' : 'IN SERVICE'}</span>;
       case 'AVAILABLE_IN_STORES':
-        return <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-cyan-950/70 text-cyan-400 border border-cyan-800">STORES DEPOT</span>;
+        return <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-cyan-950/70 text-cyan-400 border border-cyan-800">{isHi ? 'स्टोर्स डिपो' : 'STORES DEPOT'}</span>;
       case 'UNDER_MAINTENANCE':
-        return <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-amber-950/70 text-amber-400 border border-amber-800">MAINTENANCE</span>;
+        return <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-amber-950/70 text-amber-400 border border-amber-800">{isHi ? 'अनुरक्षण' : 'MAINTENANCE'}</span>;
       case 'RECONDITIONED':
-        return <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-purple-950/70 text-purple-400 border border-purple-800">RECONDITIONED</span>;
+        return <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-purple-950/70 text-purple-400 border border-purple-800">{isHi ? 'पुनर्निर्मित' : 'RECONDITIONED'}</span>;
       case 'CONDEMNED':
-        return <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-rose-950/70 text-rose-400 border border-rose-800">CONDEMNED</span>;
+        return <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-rose-950/70 text-rose-400 border border-rose-800">{isHi ? 'कंडम' : 'CONDEMNED'}</span>;
       default:
         return <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-slate-800 text-slate-300">{status}</span>;
     }
@@ -314,15 +315,13 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                Component Health Passports & Serialization
-              </h1>
+              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">{isHi ? 'घटक हेल्थ पासपोर्ट व क्रमांकन' : 'Component Health Passports & Serialization'}</h1>
               <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase bg-cyan-950 text-cyan-300 border border-cyan-800 rounded">
                 RDSO G-95 Rev-II
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-0.5">
-              Unique QR/RFID serialization, multi-wagon provenance tracking, and POH overhaul lifecycle ledger
+              {isHi ? 'यूनिक क्यूआर/आरएफआईडी क्रमांकन, बहु-वैगन उत्पत्ति ट्रैकिंग एवं पीओएच ओवरहॉल जीवनचक्र लेखा' : 'Unique QR/RFID serialization, multi-wagon provenance tracking, and POH overhaul lifecycle ledger'}
             </p>
           </div>
         </div>
@@ -333,7 +332,7 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
             className="flex-1 md:flex-none min-h-[44px] px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-cyan-950/50 flex items-center justify-center gap-2 transition active:scale-95 border border-cyan-400/30"
           >
             <span>📷</span>
-            <span>Scan QR Passport</span>
+            <span>{isHi ? 'क्यूआर पासपोर्ट स्कैन करें' : 'Scan QR Passport'}</span>
           </button>
 
           <button
@@ -341,7 +340,7 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
             className="flex-1 md:flex-none min-h-[44px] px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 flex items-center justify-center gap-1.5 transition active:scale-95"
           >
             <span>+</span>
-            <span>Register Component</span>
+            <span>{isHi ? 'घटक पंजीकृत करें' : 'Register Component'}</span>
           </button>
         </div>
       </div>
@@ -350,45 +349,45 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
           <div className="p-3.5 bg-slate-900/80 border border-slate-800 rounded-xl">
-            <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Total Tracked</p>
+            <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">{isHi ? 'कुल ट्रैक किए गए' : 'Total Tracked'}</p>
             <p className="text-xl font-black text-white mt-1">{stats.totalComponents}</p>
-            <p className="text-[10px] text-cyan-400 mt-0.5">Serialized Units</p>
+            <p className="text-[10px] text-cyan-400 mt-0.5">{isHi ? 'क्रमांकित इकाइयाँ' : 'Serialized Units'}</p>
           </div>
 
           <div className="p-3.5 bg-slate-900/80 border border-slate-800 rounded-xl">
-            <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">In Service</p>
+            <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">{isHi ? 'सेवा में' : 'In Service'}</p>
             <p className="text-xl font-black text-emerald-400 mt-1">{stats.inService}</p>
-            <p className="text-[10px] text-emerald-400/80 mt-0.5">Mounted on Wagons</p>
+            <p className="text-[10px] text-emerald-400/80 mt-0.5">{isHi ? 'वैगनों पर लगे' : 'Mounted on Wagons'}</p>
           </div>
 
           <div className="p-3.5 bg-slate-900/80 border border-slate-800 rounded-xl">
-            <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Stores Depot</p>
+            <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">{isHi ? 'स्टोर्स डिपो' : 'Stores Depot'}</p>
             <p className="text-xl font-black text-cyan-400 mt-1">{stats.availableInStores}</p>
-            <p className="text-[10px] text-cyan-400/80 mt-0.5">Ready for Issue</p>
+            <p className="text-[10px] text-cyan-400/80 mt-0.5">{isHi ? 'जारी करने हेतु तैयार' : 'Ready for Issue'}</p>
           </div>
 
           <div className="p-3.5 bg-slate-900/80 border border-slate-800 rounded-xl">
-            <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Maintenance</p>
+            <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">{isHi ? 'अनुरक्षण' : 'Maintenance'}</p>
             <p className="text-xl font-black text-amber-400 mt-1">{stats.underMaintenance}</p>
-            <p className="text-[10px] text-amber-400/80 mt-0.5">In Workshop Bay</p>
+            <p className="text-[10px] text-amber-400/80 mt-0.5">{isHi ? 'कारखाना बे में' : 'In Workshop Bay'}</p>
           </div>
 
           <div className="p-3.5 bg-slate-900/80 border border-slate-800 rounded-xl">
-            <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Reconditioned</p>
+            <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">{isHi ? 'पुनर्निर्मित' : 'Reconditioned'}</p>
             <p className="text-xl font-black text-purple-400 mt-1">{stats.reconditioned}</p>
-            <p className="text-[10px] text-purple-400/80 mt-0.5">POH Overhauled</p>
+            <p className="text-[10px] text-purple-400/80 mt-0.5">{isHi ? 'पीओएच ओवरहॉल किए' : 'POH Overhauled'}</p>
           </div>
 
           <div className="p-3.5 bg-slate-900/80 border border-slate-800 rounded-xl">
-            <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Avg Health</p>
+            <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">{isHi ? 'औसत स्वास्थ्य' : 'Avg Health'}</p>
             <p className="text-xl font-black text-white mt-1">{Math.round(stats.averageHealthScore)}%</p>
-            <p className="text-[10px] text-emerald-400 mt-0.5">Fleet Index</p>
+            <p className="text-[10px] text-emerald-400 mt-0.5">{isHi ? 'बेड़ा सूचकांक' : 'Fleet Index'}</p>
           </div>
 
           <div className="p-3.5 bg-slate-900/80 border border-slate-800 rounded-xl">
-            <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">Critical Alert</p>
+            <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wider">{isHi ? 'गंभीर चेतावनी' : 'Critical Alert'}</p>
             <p className="text-xl font-black text-rose-400 mt-1">{stats.criticalHealthCount}</p>
-            <p className="text-[10px] text-rose-400/80 mt-0.5">Needs Attention</p>
+            <p className="text-[10px] text-rose-400/80 mt-0.5">{isHi ? 'ध्यान आवश्यक' : 'Needs Attention'}</p>
           </div>
         </div>
       )}
@@ -402,7 +401,7 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search serial no, part name, manufacturer, RFID..."
+              placeholder={isHi ? 'क्रम संख्या, पुर्जा, निर्माता, आरएफआईडी खोजें...' : 'Search serial no, part name, manufacturer, RFID...'}
               className="w-full px-3.5 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
             />
           </div>
@@ -414,14 +413,14 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
               onChange={(e) => setTypeFilter(e.target.value)}
               className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-cyan-500"
             >
-              <option value="ALL">All Component Types</option>
-              <option value="WHEELSET">Wheelsets</option>
-              <option value="BEARING">Bearings (CTRB)</option>
-              <option value="DRAFT_GEAR">Draft Gears</option>
-              <option value="BOGIE_FRAME_BOLSTER">Bolsters & Frames</option>
-              <option value="BRAKE_VALVE">Distributor Valves</option>
-              <option value="COUPLER">Couplers (CBC)</option>
-              <option value="FRICTION_WEDGE">Friction Wedges</option>
+              <option value="ALL">{isHi ? 'सभी घटक प्रकार' : 'All Component Types'}</option>
+              <option value="WHEELSET">{isHi ? 'व्हीलसेट' : 'Wheelsets'}</option>
+              <option value="BEARING">{isHi ? 'बेयरिंग (CTRB)' : 'Bearings (CTRB)'}</option>
+              <option value="DRAFT_GEAR">{isHi ? 'ड्राफ्ट गियर' : 'Draft Gears'}</option>
+              <option value="BOGIE_FRAME_BOLSTER">{isHi ? 'बोल्स्टर व फ्रेम' : 'Bolsters & Frames'}</option>
+              <option value="BRAKE_VALVE">{isHi ? 'डिस्ट्रीब्यूटर वाल्व' : 'Distributor Valves'}</option>
+              <option value="COUPLER">{isHi ? 'कपलर (CBC)' : 'Couplers (CBC)'}</option>
+              <option value="FRICTION_WEDGE">{isHi ? 'घर्षण वेज' : 'Friction Wedges'}</option>
             </select>
           </div>
 
@@ -432,12 +431,12 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
               onChange={(e) => setStatusFilter(e.target.value)}
               className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-cyan-500"
             >
-              <option value="ALL">All Statuses</option>
-              <option value="AVAILABLE_IN_STORES">Stores Depot</option>
+              <option value="ALL">{isHi ? 'सभी स्थितियाँ' : 'All Statuses'}</option>
+              <option value="AVAILABLE_IN_STORES">{isHi ? 'स्टोर्स डिपो' : 'Stores Depot'}</option>
               <option value="IN_SERVICE">In Service (Mounted)</option>
-              <option value="UNDER_MAINTENANCE">Under Maintenance</option>
-              <option value="RECONDITIONED">Reconditioned</option>
-              <option value="CONDEMNED">Condemned</option>
+              <option value="UNDER_MAINTENANCE">{isHi ? 'अनुरक्षण में' : 'Under Maintenance'}</option>
+              <option value="RECONDITIONED">{isHi ? 'पुनर्निर्मित' : 'Reconditioned'}</option>
+              <option value="CONDEMNED">{isHi ? 'कंडम' : 'Condemned'}</option>
             </select>
           </div>
 
@@ -448,12 +447,12 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
               onChange={(e) => setHealthFilter(e.target.value)}
               className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs text-white focus:outline-none focus:border-cyan-500"
             >
-              <option value="ALL">All Health Tiers</option>
-              <option value="EXCELLENT">Excellent (≥90%)</option>
-              <option value="GOOD">Good (≥75%)</option>
-              <option value="FAIR">Fair (≥60%)</option>
-              <option value="ATTENTION_REQUIRED">Attention (≥40%)</option>
-              <option value="CRITICAL">Critical (&lt;40%)</option>
+              <option value="ALL">{isHi ? 'सभी स्वास्थ्य श्रेणियाँ' : 'All Health Tiers'}</option>
+              <option value="EXCELLENT">{isHi ? 'उत्कृष्ट (≥90%)' : 'Excellent (≥90%)'}</option>
+              <option value="GOOD">{isHi ? 'अच्छा (≥75%)' : 'Good (≥75%)'}</option>
+              <option value="FAIR">{isHi ? 'ठीक (≥60%)' : 'Fair (≥60%)'}</option>
+              <option value="ATTENTION_REQUIRED">{isHi ? 'ध्यान दें (≥40%)' : 'Attention (≥40%)'}</option>
+              <option value="CRITICAL">{isHi ? 'गंभीर (&lt;40%)' : 'Critical (&lt;40%)'}</option>
             </select>
           </div>
         </div>
@@ -474,7 +473,7 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
             </div>
           ) : components.length === 0 ? (
             <div className="p-12 text-center text-slate-400 bg-slate-900/40 rounded-xl border border-slate-800">
-              <p className="text-base font-bold text-slate-300">No Serialized Components Found</p>
+              <p className="text-base font-bold text-slate-300">{isHi ? 'कोई क्रमांकित घटक नहीं मिला' : 'No Serialized Components Found'}</p>
               <p className="text-xs text-slate-500 mt-1">Try adjusting your filters or register a new component.</p>
             </div>
           ) : (
@@ -482,12 +481,12 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-950/80 border-b border-slate-800 text-[11px] text-slate-400 uppercase tracking-wider font-semibold">
-                    <th className="p-3 sm:p-4">Serial Number & Type</th>
-                    <th className="p-3 sm:p-4">Placement / Bogie</th>
-                    <th className="p-3 sm:p-4">Health Score</th>
-                    <th className="p-3 sm:p-4">Status</th>
-                    <th className="p-3 sm:p-4">Mfg / Overhauls</th>
-                    <th className="p-3 sm:p-4 text-right">Actions</th>
+                    <th className="p-3 sm:p-4">{isHi ? 'क्रम संख्या व प्रकार' : 'Serial Number & Type'}</th>
+                    <th className="p-3 sm:p-4">{isHi ? 'स्थान / बोगी' : 'Placement / Bogie'}</th>
+                    <th className="p-3 sm:p-4">{isHi ? 'स्वास्थ्य स्कोर' : 'Health Score'}</th>
+                    <th className="p-3 sm:p-4">{isHi ? 'स्थिति' : 'Status'}</th>
+                    <th className="p-3 sm:p-4">{isHi ? 'निर्माण / ओवरहॉल' : 'Mfg / Overhauls'}</th>
+                    <th className="p-3 sm:p-4 text-right">{isHi ? 'क्रियाएँ' : 'Actions'}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 text-xs">
@@ -540,7 +539,7 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
                             </div>
                           ) : (
                             <div>
-                              <span className="text-slate-400 font-medium">Depot Stores</span>
+                              <span className="text-slate-400 font-medium">{isHi ? 'डिपो स्टोर्स' : 'Depot Stores'}</span>
                               <span className="text-[10px] text-cyan-400 block font-mono">
                                 {comp.binLocation || 'Unassigned'}
                               </span>
@@ -577,7 +576,7 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
                                 }}
                                 className="px-2.5 py-1 bg-cyan-700/80 hover:bg-cyan-600 text-white rounded text-[11px] font-bold transition shadow"
                               >
-                                Mount
+                                {isHi ? 'लगाएँ' : 'Mount'}
                               </button>
                             ) : comp.status === 'IN_SERVICE' ? (
                               <button
@@ -586,16 +585,14 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
                                   setUnassignForm({ targetStatus: 'AVAILABLE_IN_STORES', reason: 'POH Service', notes: '' });
                                 }}
                                 className="px-2.5 py-1 bg-amber-700/80 hover:bg-amber-600 text-white rounded text-[11px] font-bold transition shadow"
-                              >
-                                Unassign
-                              </button>
+                              >{isHi ? 'हटाएँ' : 'Unassign'}</button>
                             ) : null}
 
                             <button
                               onClick={() => handleSelectComponent(comp)}
                               className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[11px] font-semibold transition"
                             >
-                              Passport ↗
+                              {isHi ? 'पासपोर्ट ↗' : 'Passport ↗'}
                             </button>
                           </div>
                         </td>
@@ -616,9 +613,7 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
               <div>
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
-                  <span className="text-[11px] font-bold uppercase text-cyan-400 tracking-wider">
-                    Digital Health Passport
-                  </span>
+                  <span className="text-[11px] font-bold uppercase text-cyan-400 tracking-wider">{isHi ? 'डिजिटल हेल्थ पासपोर्ट' : 'Digital Health Passport'}</span>
                 </div>
                 <h3 className="text-lg font-black text-white font-mono mt-1">
                   {selectedComponent.serialNumber}
@@ -660,12 +655,12 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
             {/* Key Specs Card */}
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="p-2.5 bg-slate-950/60 rounded-lg border border-slate-800">
-                <span className="text-[10px] text-slate-500 font-bold uppercase block">Status</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase block">{isHi ? 'स्थिति' : 'Status'}</span>
                 {getStatusBadge(selectedComponent.status)}
               </div>
 
               <div className="p-2.5 bg-slate-950/60 rounded-lg border border-slate-800">
-                <span className="text-[10px] text-slate-500 font-bold uppercase block">Current Location</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase block">{isHi ? 'वर्तमान स्थान' : 'Current Location'}</span>
                 <span className="font-bold text-white font-mono">
                   {selectedComponent.currentWagonNumber
                     ? `${selectedComponent.currentWagonNumber} (${selectedComponent.currentBogiePosition})`
@@ -674,28 +669,28 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
               </div>
 
               <div className="p-2.5 bg-slate-950/60 rounded-lg border border-slate-800">
-                <span className="text-[10px] text-slate-500 font-bold uppercase block">Manufacturer</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase block">{isHi ? 'निर्माता' : 'Manufacturer'}</span>
                 <span className="font-medium text-slate-200 truncate block">
                   {selectedComponent.manufacturer}
                 </span>
               </div>
 
               <div className="p-2.5 bg-slate-950/60 rounded-lg border border-slate-800">
-                <span className="text-[10px] text-slate-500 font-bold uppercase block">Mfg Date</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase block">{isHi ? 'निर्माण तिथि' : 'Mfg Date'}</span>
                 <span className="font-medium text-slate-200 font-mono">
                   {selectedComponent.manufacturingDate}
                 </span>
               </div>
 
               <div className="p-2.5 bg-slate-950/60 rounded-lg border border-slate-800">
-                <span className="text-[10px] text-slate-500 font-bold uppercase block">Total Odometer</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase block">{isHi ? 'कुल ओडोमीटर' : 'Total Odometer'}</span>
                 <span className="font-bold text-cyan-300 font-mono">
                   {selectedComponent.totalKmTravelled.toLocaleString()} km
                 </span>
               </div>
 
               <div className="p-2.5 bg-slate-950/60 rounded-lg border border-slate-800">
-                <span className="text-[10px] text-slate-500 font-bold uppercase block">POH Overhauls</span>
+                <span className="text-[10px] text-slate-500 font-bold uppercase block">{isHi ? 'पीओएच ओवरहॉल' : 'POH Overhauls'}</span>
                 <span className="font-bold text-purple-300 font-mono">
                   {selectedComponent.overhaulCount} Cycles
                 </span>
@@ -737,9 +732,7 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
                     setUnassignForm({ targetStatus: 'AVAILABLE_IN_STORES', reason: 'POH Cycle', notes: '' });
                   }}
                   className="flex-1 py-2 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-lg transition shadow"
-                >
-                  Unassign
-                </button>
+                >{isHi ? 'हटाएँ' : 'Unassign'}</button>
               ) : null}
             </div>
 
@@ -747,7 +740,7 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
             <div className="space-y-2.5 pt-3 border-t border-slate-800">
               <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center justify-between">
                 <span>📜 Multi-Wagon Provenance Ledger</span>
-                <span className="text-[10px] text-slate-500">Immutable Audit Trail</span>
+                <span className="text-[10px] text-slate-500">{isHi ? 'अपरिवर्तनीय ऑडिट ट्रेल' : 'Immutable Audit Trail'}</span>
               </h4>
 
               {historyLoading ? (
@@ -800,7 +793,7 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
           <div className="bg-slate-900 border border-cyan-500/40 rounded-2xl p-6 max-w-lg w-full shadow-2xl space-y-4">
             <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-              <h3 className="text-base font-bold text-white">Register New Serialized Component</h3>
+              <h3 className="text-base font-bold text-white">{isHi ? 'नया क्रमांकित घटक पंजीकृत करें' : 'Register New Serialized Component'}</h3>
               <button
                 onClick={() => setIsRegisterModalOpen(false)}
                 className="text-slate-400 hover:text-white font-bold"
@@ -824,24 +817,24 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Component Type</label>
+                  <label className="block text-slate-300 font-semibold mb-1">{isHi ? 'घटक प्रकार' : 'Component Type'}</label>
                   <select
                     value={regForm.componentType}
                     onChange={(e) => setRegForm({ ...regForm, componentType: e.target.value as SerializedComponentType })}
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white"
                   >
-                    <option value="WHEELSET">Wheelset</option>
-                    <option value="BEARING">Bearing (CTRB)</option>
-                    <option value="DRAFT_GEAR">Draft Gear</option>
-                    <option value="BOGIE_FRAME_BOLSTER">Bogie Bolster</option>
-                    <option value="BRAKE_VALVE">Brake Valve</option>
-                    <option value="COUPLER">Coupler (CBC)</option>
-                    <option value="FRICTION_WEDGE">Friction Wedge</option>
+                    <option value="WHEELSET">{isHi ? 'व्हीलसेट' : 'Wheelset'}</option>
+                    <option value="BEARING">{isHi ? 'बेयरिंग (CTRB)' : 'Bearing (CTRB)'}</option>
+                    <option value="DRAFT_GEAR">{isHi ? 'ड्राफ्ट गियर' : 'Draft Gear'}</option>
+                    <option value="BOGIE_FRAME_BOLSTER">{isHi ? 'बोगी बोल्स्टर' : 'Bogie Bolster'}</option>
+                    <option value="BRAKE_VALVE">{isHi ? 'ब्रेक वाल्व' : 'Brake Valve'}</option>
+                    <option value="COUPLER">{isHi ? 'कपलर (CBC)' : 'Coupler (CBC)'}</option>
+                    <option value="FRICTION_WEDGE">{isHi ? 'घर्षण वेज' : 'Friction Wedge'}</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Manufacturer</label>
+                  <label className="block text-slate-300 font-semibold mb-1">{isHi ? 'निर्माता' : 'Manufacturer'}</label>
                   <input
                     type="text"
                     value={regForm.manufacturer}
@@ -854,7 +847,7 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Manufacturing Date</label>
+                  <label className="block text-slate-300 font-semibold mb-1">{isHi ? 'निर्माण तिथि' : 'Manufacturing Date'}</label>
                   <input
                     type="date"
                     value={regForm.manufacturingDate}
@@ -864,7 +857,7 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
                 </div>
 
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">Bin Location</label>
+                  <label className="block text-slate-300 font-semibold mb-1">{isHi ? 'बिन स्थान' : 'Bin Location'}</label>
                   <input
                     type="text"
                     value={regForm.binLocation}
@@ -876,7 +869,7 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">RFID Tag (Optional)</label>
+                <label className="block text-slate-300 font-semibold mb-1">{isHi ? 'आरएफआईडी टैग (वैकल्पिक)' : 'RFID Tag (Optional)'}</label>
                 <input
                   type="text"
                   value={regForm.rfidTag}
@@ -891,15 +884,11 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
                   type="button"
                   onClick={() => setIsRegisterModalOpen(false)}
                   className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-bold"
-                >
-                  Cancel
-                </button>
+                >{isHi ? 'रद्द करें' : 'Cancel'}</button>
                 <button
                   type="submit"
                   className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold shadow"
-                >
-                  Register Component
-                </button>
+                >{isHi ? 'घटक पंजीकृत करें' : 'Register Component'}</button>
               </div>
             </form>
           </div>
@@ -933,7 +922,7 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Bogie Position</label>
+                <label className="block text-slate-300 font-semibold mb-1">{isHi ? 'बोगी स्थान' : 'Bogie Position'}</label>
                 <select
                   value={assignForm.bogiePosition}
                   onChange={(e) => setAssignForm({ ...assignForm, bogiePosition: e.target.value as any })}
@@ -941,18 +930,18 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
                 >
                   <option value="BOGIE_1">Bogie 1 (Leading)</option>
                   <option value="BOGIE_2">Bogie 2 (Trailing)</option>
-                  <option value="UNDERFRAME">Underframe Assembly</option>
-                  <option value="BODY">Wagon Body</option>
-                  <option value="NONE">General Placement</option>
+                  <option value="UNDERFRAME">{isHi ? 'अंडरफ्रेम असेंबली' : 'Underframe Assembly'}</option>
+                  <option value="BODY">{isHi ? 'वैगन बॉडी' : 'Wagon Body'}</option>
+                  <option value="NONE">{isHi ? 'सामान्य स्थान' : 'General Placement'}</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Mounting Notes</label>
+                <label className="block text-slate-300 font-semibold mb-1">{isHi ? 'स्थापना टिप्पणी' : 'Mounting Notes'}</label>
                 <textarea
                   value={assignForm.notes}
                   onChange={(e) => setAssignForm({ ...assignForm, notes: e.target.value })}
-                  placeholder="Overhaul details, torque check..."
+                  placeholder={isHi ? 'ओवरहॉल विवरण, टॉर्क जाँच...' : 'Overhaul details, torque check...'}
                   rows={2}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white"
                 />
@@ -963,15 +952,11 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
                   type="button"
                   onClick={() => setAssigningComponent(null)}
                   className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-bold"
-                >
-                  Cancel
-                </button>
+                >{isHi ? 'रद्द करें' : 'Cancel'}</button>
                 <button
                   type="submit"
                   className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold shadow"
-                >
-                  Confirm Mount
-                </button>
+                >{isHi ? 'स्थापना की पुष्टि करें' : 'Confirm Mount'}</button>
               </div>
             </form>
           </div>
@@ -993,16 +978,16 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
 
             <form onSubmit={handleUnassignSubmit} className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Target Status</label>
+                <label className="block text-slate-300 font-semibold mb-1">{isHi ? 'लक्ष्य स्थिति' : 'Target Status'}</label>
                 <select
                   value={unassignForm.targetStatus}
                   onChange={(e) => setUnassignForm({ ...unassignForm, targetStatus: e.target.value as ComponentStatus })}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white"
                 >
-                  <option value="AVAILABLE_IN_STORES">Stores Depot (Available)</option>
-                  <option value="RECONDITIONED">Reconditioned</option>
-                  <option value="UNDER_MAINTENANCE">Under Maintenance</option>
-                  <option value="CONDEMNED">Condemned</option>
+                  <option value="AVAILABLE_IN_STORES">{isHi ? 'स्टोर्स डिपो (उपलब्ध)' : 'Stores Depot (Available)'}</option>
+                  <option value="RECONDITIONED">{isHi ? 'पुनर्निर्मित' : 'Reconditioned'}</option>
+                  <option value="UNDER_MAINTENANCE">{isHi ? 'अनुरक्षण में' : 'Under Maintenance'}</option>
+                  <option value="CONDEMNED">{isHi ? 'कंडम' : 'Condemned'}</option>
                 </select>
               </div>
 
@@ -1019,11 +1004,11 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Inspection Notes</label>
+                <label className="block text-slate-300 font-semibold mb-1">{isHi ? 'निरीक्षण टिप्पणी' : 'Inspection Notes'}</label>
                 <textarea
                   value={unassignForm.notes}
                   onChange={(e) => setUnassignForm({ ...unassignForm, notes: e.target.value })}
-                  placeholder="Condition notes upon unmounting..."
+                  placeholder={isHi ? 'उतारते समय स्थिति टिप्पणी...' : 'Condition notes upon unmounting...'}
                   rows={2}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white"
                 />
@@ -1034,15 +1019,11 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
                   type="button"
                   onClick={() => setUnassigningComponent(null)}
                   className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-bold"
-                >
-                  Cancel
-                </button>
+                >{isHi ? 'रद्द करें' : 'Cancel'}</button>
                 <button
                   type="submit"
                   className="px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-bold shadow"
-                >
-                  Return to Stores
-                </button>
+                >{isHi ? 'स्टोर्स में वापस' : 'Return to Stores'}</button>
               </div>
             </form>
           </div>
@@ -1078,11 +1059,11 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Evaluation Justification</label>
+                <label className="block text-slate-300 font-semibold mb-1">{isHi ? 'मूल्यांकन कारण' : 'Evaluation Justification'}</label>
                 <textarea
                   value={healthForm.notes}
                   onChange={(e) => setHealthForm({ ...healthForm, notes: e.target.value })}
-                  placeholder="Reason for score update / ultrasonic flaw check..."
+                  placeholder={isHi ? 'स्कोर अद्यतन का कारण / अल्ट्रासोनिक दोष जाँच...' : 'Reason for score update / ultrasonic flaw check...'}
                   rows={2}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white"
                 />
@@ -1093,15 +1074,11 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
                   type="button"
                   onClick={() => setHealthUpdateComponent(null)}
                   className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-bold"
-                >
-                  Cancel
-                </button>
+                >{isHi ? 'रद्द करें' : 'Cancel'}</button>
                 <button
                   type="submit"
                   className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold shadow"
-                >
-                  Save Health Score
-                </button>
+                >{isHi ? 'स्वास्थ्य स्कोर सुरक्षित करें' : 'Save Health Score'}</button>
               </div>
             </form>
           </div>

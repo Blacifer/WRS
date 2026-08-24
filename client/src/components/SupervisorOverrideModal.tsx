@@ -27,6 +27,7 @@ export const SupervisorOverrideModal: React.FC<SupervisorOverrideModalProps> = (
   originalBand,
   onApplyOverride
 }) => {
+  const isHi = lang === 'hi';
   const dict = getDictionary(lang);
   const [selectedBand, setSelectedBand] = useState<BandColor>('BLUE');
   const [reason, setReason] = useState<string>('');
@@ -217,7 +218,7 @@ export const SupervisorOverrideModal: React.FC<SupervisorOverrideModalProps> = (
             {otpToken && (
               <div className="p-2.5 bg-emerald-950/60 border border-emerald-700 rounded-lg text-emerald-300 text-xs font-bold flex items-center gap-2">
                 <CheckCircleIcon size={16} />
-                <span>OTP Verified & Authorized</span>
+                <span>{isHi ? 'ओटीपी सत्यापित व प्राधिकृत' : 'OTP Verified & Authorized'}</span>
               </div>
             )}
           </div>

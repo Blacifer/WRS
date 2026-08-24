@@ -14,7 +14,8 @@ interface PhotoGalleryProps {
 }
 
 export const PhotoGallery: React.FC<PhotoGalleryProps> = ({ photos, onAddPhotoClick, onSmartVisionClick }) => {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const isHi = lang === 'hi';
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [comparisonBefore, setComparisonBefore] = useState<WagonPhotoRecord | null>(null);
   const [comparisonAfter, setComparisonAfter] = useState<WagonPhotoRecord | null>(null);
@@ -92,16 +93,14 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({ photos, onAddPhotoCl
                 setComparisonAfter(null);
               }}
               className="text-xs text-slate-400 hover:text-white px-2 py-1 bg-slate-800 rounded"
-            >
-              Reset Comparison
-            </button>
+            >{isHi ? 'तुलना रीसेट करें' : 'Reset Comparison'}</button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Before Slot */}
             <div className="border border-slate-800 rounded-lg p-3 bg-slate-950/60 space-y-2">
               <div className="flex justify-between items-center text-xs font-semibold text-rose-400">
-                <span>BEFORE (Defect / Intake)</span>
+                <span>{isHi ? 'पहले (दोष / आगमन)' : 'BEFORE (Defect / Intake)'}</span>
                 {comparisonBefore && (
                   <button onClick={() => setComparisonBefore(null)} className="text-slate-400 hover:text-white">✕</button>
                 )}
@@ -111,16 +110,14 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({ photos, onAddPhotoCl
                   <img src={comparisonBefore.imageData || comparisonBefore.imageBase64 || (comparisonBefore as any).url} alt="Before" className="w-full h-full object-contain" />
                 </div>
               ) : (
-                <div className="aspect-video border-2 border-dashed border-slate-800 rounded flex items-center justify-center text-xs text-slate-500">
-                  Select a photo below to set as Before
-                </div>
+                <div className="aspect-video border-2 border-dashed border-slate-800 rounded flex items-center justify-center text-xs text-slate-500">{isHi ? 'नीचे से \'पहले\' हेतु फ़ोटो चुनें' : 'Select a photo below to set as Before'}</div>
               )}
             </div>
 
             {/* After Slot */}
             <div className="border border-slate-800 rounded-lg p-3 bg-slate-950/60 space-y-2">
               <div className="flex justify-between items-center text-xs font-semibold text-emerald-400">
-                <span>AFTER (Repaired / Replaced)</span>
+                <span>{isHi ? 'बाद (मरम्मत / प्रतिस्थापित)' : 'AFTER (Repaired / Replaced)'}</span>
                 {comparisonAfter && (
                   <button onClick={() => setComparisonAfter(null)} className="text-slate-400 hover:text-white">✕</button>
                 )}
@@ -130,9 +127,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({ photos, onAddPhotoCl
                   <img src={comparisonAfter.imageData || comparisonAfter.imageBase64 || (comparisonAfter as any).url} alt="After" className="w-full h-full object-contain" />
                 </div>
               ) : (
-                <div className="aspect-video border-2 border-dashed border-slate-800 rounded flex items-center justify-center text-xs text-slate-500">
-                  Select a photo below to set as After
-                </div>
+                <div className="aspect-video border-2 border-dashed border-slate-800 rounded flex items-center justify-center text-xs text-slate-500">{isHi ? 'नीचे से \'बाद\' हेतु फ़ोटो चुनें' : 'Select a photo below to set as After'}</div>
               )}
             </div>
           </div>

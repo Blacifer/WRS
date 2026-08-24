@@ -16,7 +16,8 @@ export const ReleaseCertificateModal: React.FC<ReleaseCertificateModalProps> = (
   wagonNumber,
   onClose
 }) => {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const isHi = lang === 'hi';
   const [certHtml, setCertHtml] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +86,7 @@ export const ReleaseCertificateModal: React.FC<ReleaseCertificateModalProps> = (
             </div>
           ) : error ? (
             <div className="text-center p-8 bg-rose-950/30 border border-rose-800/60 rounded-xl text-rose-300 space-y-2">
-              <p className="font-bold">Certificate Not Available</p>
+              <p className="font-bold">{isHi ? 'प्रमाणपत्र उपलब्ध नहीं' : 'Certificate Not Available'}</p>
               <p className="text-xs text-rose-400">{error}</p>
             </div>
           ) : (

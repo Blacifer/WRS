@@ -20,6 +20,7 @@ export const AdminExportModal: React.FC<AdminExportModalProps> = ({
   onClose,
   lang
 }) => {
+  const isHi = lang === 'hi';
   const dict = getDictionary(lang);
   const [format, setFormat] = useState<'csv' | 'json'>('csv');
   const [otpId, setOtpId] = useState<string | null>(null);
@@ -226,7 +227,7 @@ export const AdminExportModal: React.FC<AdminExportModalProps> = ({
             {otpToken && (
               <div className="p-2.5 bg-emerald-950/60 border border-emerald-700 rounded-lg text-emerald-300 text-xs font-bold flex items-center gap-2">
                 <CheckCircleIcon size={16} />
-                <span>Admin Authorization Verified</span>
+                <span>{isHi ? 'प्रशासक प्राधिकरण सत्यापित' : 'Admin Authorization Verified'}</span>
               </div>
             )}
           </div>

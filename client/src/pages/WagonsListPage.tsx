@@ -14,7 +14,8 @@ interface WagonsListPageProps {
 }
 
 export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon }) => {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const isHi = lang === 'hi';
   const [wagons, setWagons] = useState<WagonRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [stageFilter, setStageFilter] = useState<string>('ALL');
@@ -164,7 +165,7 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
         <div className="flex-1 relative">
           <input
             type="text"
-            placeholder="Search wagon number, railway, type..."
+            placeholder={isHi ? 'वैगन संख्या, रेलवे, प्रकार खोजें...' : 'Search wagon number, railway, type...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 min-h-[48px]"
@@ -189,7 +190,7 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
       ) : wagons.length === 0 ? (
         <div className="text-center py-20 bg-slate-900/40 rounded-2xl border border-slate-800 text-slate-400 space-y-3">
           <div className="text-4xl">📋</div>
-          <p className="text-base font-bold text-slate-300">No wagons found</p>
+          <p className="text-base font-bold text-slate-300">{isHi ? 'कोई वैगन नहीं मिला' : 'No wagons found'}</p>
           <p className="text-xs text-slate-500">
             Register a new wagon into Stage 1 (Entry Registration) to begin tracking.
           </p>
@@ -323,11 +324,11 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
                     onChange={(e) => setNewWagonType(e.target.value)}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500"
                   >
-                    <option value="BOXNHL">BOXNHL (High Axle Load)</option>
-                    <option value="BOXN">BOXN (Standard Open)</option>
-                    <option value="BCNHL">BCNHL (Covered Bogie)</option>
-                    <option value="BOBRN">BOBRN (Rapid Hopper)</option>
-                    <option value="BTPN">BTPN (Tank Wagon)</option>
+                    <option value="BOXNHL">{isHi ? 'BOXNHL (उच्च एक्सल भार)' : 'BOXNHL (High Axle Load)'}</option>
+                    <option value="BOXN">{isHi ? 'BOXN (मानक खुला)' : 'BOXN (Standard Open)'}</option>
+                    <option value="BCNHL">{isHi ? 'BCNHL (ढका हुआ)' : 'BCNHL (Covered Bogie)'}</option>
+                    <option value="BOBRN">{isHi ? 'BOBRN (त्वरित हॉपर)' : 'BOBRN (Rapid Hopper)'}</option>
+                    <option value="BTPN">{isHi ? 'BTPN (टैंक वैगन)' : 'BTPN (Tank Wagon)'}</option>
                   </select>
                 </div>
 
@@ -340,12 +341,12 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
                     onChange={(e) => setNewOwningRailway(e.target.value)}
                     className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500"
                   >
-                    <option value="SECR">SECR (South East Central)</option>
-                    <option value="ECoR">ECoR (East Coast)</option>
-                    <option value="SER">SER (South Eastern)</option>
-                    <option value="CR">CR (Central Railway)</option>
-                    <option value="WR">WR (Western Railway)</option>
-                    <option value="NR">NR (Northern Railway)</option>
+                    <option value="SECR">{isHi ? 'SECR (दक्षिण पूर्व मध्य)' : 'SECR (South East Central)'}</option>
+                    <option value="ECoR">{isHi ? 'ECoR (पूर्व तट)' : 'ECoR (East Coast)'}</option>
+                    <option value="SER">{isHi ? 'SER (दक्षिण पूर्व)' : 'SER (South Eastern)'}</option>
+                    <option value="CR">{isHi ? 'CR (मध्य रेलवे)' : 'CR (Central Railway)'}</option>
+                    <option value="WR">{isHi ? 'WR (पश्चिम रेलवे)' : 'WR (Western Railway)'}</option>
+                    <option value="NR">{isHi ? 'NR (उत्तर रेलवे)' : 'NR (Northern Railway)'}</option>
                   </select>
                 </div>
               </div>

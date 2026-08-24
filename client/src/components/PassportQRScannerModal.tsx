@@ -12,6 +12,7 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+import { useI18n } from '../i18n/index.ts';
 import jsQR from 'jsqr';
 import { api } from '../services/api.ts';
 import type { SerializedComponent } from '../../../shared/types.ts';
@@ -37,6 +38,8 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
   onComponentScanned,
   title = 'Scan Component Health Passport'
 }) => {
+  const { lang } = useI18n();
+  const isHi = lang === 'hi';
   const [manualCode, setManualCode] = useState<string>('');
   const [isScanning, setIsScanning] = useState<boolean>(true);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -362,7 +365,7 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
           {/* Manual Input Form */}
           <form onSubmit={handleManualSubmit} className="space-y-2">
             <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-              <span>Manual Serial Number / QR Payload</span>
+              <span>{isHi ? 'मैन्युअल क्रम संख्या / क्यूआर पेलोड' : 'Manual Serial Number / QR Payload'}</span>
               <span className="text-[10px] text-slate-500 font-mono">e.g. WRS-WS-2026-001</span>
             </label>
             <div className="flex gap-2">
@@ -370,7 +373,7 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
                 type="text"
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
-                placeholder="Enter serial number or paste QR URI..."
+                placeholder={isHi ? 'क्रम संख्या दर्ज करें या क्यूआर यूआरआई चिपकाएँ...' : 'Enter serial number or paste QR URI...'}
                 className="flex-1 px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
               />
               <button
@@ -412,9 +415,7 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
             type="button"
             onClick={onClose}
             className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition"
-          >
-            Cancel
-          </button>
+          >{isHi ? 'रद्द करें' : 'Cancel'}</button>
         </div>
       </div>
     </div>

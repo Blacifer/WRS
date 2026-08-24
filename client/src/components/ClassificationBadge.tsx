@@ -58,7 +58,7 @@ export const ClassificationBadge: React.FC<ClassificationBadgeProps> = ({
         )}
         {isOverridden && (
           <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 bg-purple-700 text-white rounded">
-            OVERRIDDEN
+            {lang === 'hi' ? 'ओवरराइड किया' : 'OVERRIDDEN'}
           </span>
         )}
       </div>
