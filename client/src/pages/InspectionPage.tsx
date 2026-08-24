@@ -432,12 +432,15 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
       <div className="space-y-2">
         <h2 className="text-sm font-extrabold text-slate-200 uppercase tracking-wider flex items-center gap-2">
           <span className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs">2</span>
-          <span>{lang === 'hi' ? 'डिजिटल कैलीपर माप एवं ओसीआर' : 'Digital Caliper Measurement & OCR'}</span>
+          <span>{lang === 'hi' ? 'मुक्त ऊंचाई माप' : 'Free Height Measurement'}</span>
         </h2>
         <CaliperCamera
           lang={lang}
           measuredHeight={measuredHeight}
           onMeasurementChange={handleMeasurementChange}
+          // This screen is also a spring measurement, gauged by hand at
+          // Raipur, so there is no digital display for the OCR to read.
+          hideCamera
         />
       </div>
 

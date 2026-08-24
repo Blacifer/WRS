@@ -29,6 +29,22 @@ export const MAX_NEST_HEIGHT_VARIATION_MM = 3.0;
 export const NEST_RULE_REFERENCE =
   'RDSO Wagon Maintenance Manual 2.0 — "springs having not more than 3 mm free height variation should be assembled in the same group"';
 
+/**
+ * Why a defective spring is never repaired.
+ *
+ * WMM 2.0's bogie overhaul list is explicit, and the contrast within a single
+ * numbered list settles it: item 2 reads "Replace cracked/Broken springs"
+ * while item 3, two lines below, reads "Repair cracks/welding failures of
+ * SSB/DSB". The manual distinguishes the two deliberately, and describes no
+ * spring reconditioning process anywhere.
+ *
+ * Worth stating in the interface: when a spring is condemned for a visible
+ * crack rather than lost height, "could this be welded?" is a reasonable
+ * question, and the answer needs to be traceable rather than assumed.
+ */
+export const SPRING_REPLACE_NOT_REPAIR_REFERENCE =
+  'RDSO Wagon Maintenance Manual 2.0, bogie overhaul schedule — "Replace cracked/Broken springs" (the same list specifies repair, not replacement, for SSB/DSB weld failures)';
+
 export interface NestSpringInput {
   id: string;
   springPosition: SpringPosition;
@@ -248,7 +264,8 @@ export function getReplacementGuidance(
       targetRange: null,
       targetBand: null,
       message:
-        'Replace this spring. No other spring in this nest has been measured yet, ' +
+        'Replace this spring — a defective coil spring is renewed, not repaired. ' +
+        'No other spring in this nest has been measured yet, ' +
         'so the group height is not established — measure the rest of the nest first, ' +
         'then match the replacement to it.',
       nestHeights: [],
@@ -271,7 +288,8 @@ export function getReplacementGuidance(
       targetRange: null,
       targetBand: null,
       message:
-        `Replace this spring. The rest of this nest already spans ${spread.toFixed(2)} mm ` +
+        `Replace this spring — a defective coil spring is renewed, not repaired. ` +
+        `The rest of this nest already spans ${spread.toFixed(2)} mm ` +
         `(${lo.toFixed(1)}–${hi.toFixed(1)} mm), which is wider than the ${MAX_NEST_HEIGHT_VARIATION_MM} mm limit — ` +
         `no single replacement can bring it back into one group. Re-group the whole nest.`,
       nestHeights: heights,
@@ -287,7 +305,8 @@ export function getReplacementGuidance(
     targetRange: { min: allowedMin, max: allowedMax },
     targetBand,
     message:
-      `Replace this spring. The replacement must measure between ` +
+      `Replace this spring — a defective coil spring is renewed, not repaired. ` +
+      `The replacement must measure between ` +
       `${allowedMin.toFixed(1)} and ${allowedMax.toFixed(1)} mm` +
       (targetBand ? ` (${targetBand} band)` : '') +
       ` to keep this nest within ${MAX_NEST_HEIGHT_VARIATION_MM} mm — the other ` +

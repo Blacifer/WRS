@@ -39,6 +39,14 @@ interface CaliperCameraProps {
    * camera default.
    */
   defaultMode?: 'camera' | 'manual';
+  /**
+   * Hides the camera entirely. The OCR reads digits off a measuring
+   * instrument's DIGITAL DISPLAY — it cannot tell anything from a photograph
+   * of the component itself. Springs at Raipur are gauged by hand with no
+   * display to read, so offering a camera there invites the reasonable but
+   * wrong assumption that photographing a spring will identify or measure it.
+   */
+  hideCamera?: boolean;
 }
 
 export const CaliperCamera: React.FC<CaliperCameraProps> = ({
@@ -47,14 +55,15 @@ export const CaliperCamera: React.FC<CaliperCameraProps> = ({
   onMeasurementChange,
   onClose,
   initialTarget,
-  defaultMode = 'camera'
+  defaultMode = 'camera',
+  hideCamera = false
 }) => {
   const dict = getDictionary(lang);
   const isHi = lang === 'hi';
   const measurementRange: MeasurementRange = (initialTarget && CV_COMPONENT_RANGES[initialTarget]) || DEFAULT_CALIPER_RANGE;
 
   // State
-  const [activeMode, setActiveMode] = useState<'camera' | 'manual'>(defaultMode);
+  const [activeMode, setActiveMode] = useState<'camera' | 'manual'>(hideCamera ? 'manual' : defaultMode);
   const [isProcessing, setIsProcessing] = useState(false);
   const [ocrConfidence, setOcrConfidence] = useState<number | null>(null);
   const [ocrLatencyMs, setOcrLatencyMs] = useState<number | null>(null);
@@ -88,9 +97,19 @@ export const CaliperCamera: React.FC<CaliperCameraProps> = ({
       setIsCameraActive(true);
     } catch (err) {
       console.warn('Camera not available:', err);
-      setOcrError(isHi
-        ? 'कैमरा उपलब्ध नहीं है। कृपया छवि अपलोड करें या मैनुअल इनपुट का उपयोग करें।'
-        : 'Camera not available. Please upload an image or use manual input.');
+      // Browsers refuse getUserMedia outside a secure context, so a plain-HTTP
+      // LAN address silently has no camera. Saying so beats "not available",
+      // which reads like a broken feature rather than a known limitation.
+      const insecure = typeof window !== 'undefined' && !window.isSecureContext;
+      setOcrError(
+        insecure
+          ? (isHi
+              ? 'इस पते पर कैमरा उपलब्ध नहीं है (HTTPS आवश्यक)। छवि अपलोड करें या माप स्वयं दर्ज करें।'
+              : 'The camera is blocked on this address because it is not HTTPS. Upload an image instead, or type the measurement.')
+          : (isHi
+              ? 'कैमरा उपलब्ध नहीं है। कृपया छवि अपलोड करें या मैनुअल इनपुट का उपयोग करें।'
+              : 'Camera not available. Please upload an image or use manual input.')
+      );
     }
   }, [isHi]);
 
@@ -221,9 +240,13 @@ export const CaliperCamera: React.FC<CaliperCameraProps> = ({
             {isHi ? 'माप दर्ज करें' : 'Record Measurement'}
           </h3>
           <p className="text-slate-400 text-xs mt-0.5">
-            {isHi
-              ? 'कैलिपर LCD का फोटो लें — OCR स्वचालित रूप से रीडिंग पढ़ेगा'
-              : 'Type the reading from your gauge. Camera OCR is available for instruments with a digital display.'}
+            {hideCamera
+              ? (isHi
+                  ? 'गेज से पढ़ी गई मुक्त ऊंचाई दर्ज करें।'
+                  : 'Type the free height you read from the gauge.')
+              : (isHi
+                  ? 'डिजिटल डिस्प्ले वाले उपकरण के लिए कैमरा OCR उपलब्ध है, अन्यथा माप स्वयं दर्ज करें।'
+                  : 'Type the reading from your gauge. Camera OCR is available for instruments with a digital display.')}
           </p>
         </div>
         {onClose && (
@@ -231,8 +254,9 @@ export const CaliperCamera: React.FC<CaliperCameraProps> = ({
         )}
       </div>
 
-      {/* Mode Selector: Camera OCR / Manual */}
-      <div className="flex items-center gap-1.5 p-1 bg-slate-950 rounded-lg border border-slate-800">
+      {/* Mode Selector: Camera OCR / Manual. Suppressed where the instrument
+          has no digital display — see hideCamera. */}
+      <div className={`items-center gap-1.5 p-1 bg-slate-950 rounded-lg border border-slate-800 ${hideCamera ? 'hidden' : 'flex'}`}>
         <button
           type="button"
           onClick={() => setActiveMode('camera')}

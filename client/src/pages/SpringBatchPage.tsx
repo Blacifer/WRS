@@ -730,6 +730,11 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
             // caliper LCD to photograph, so opening the camera would just
             // cost a tap and a permission prompt on every spring.
             defaultMode="manual"
+            // Springs at Raipur are gauged by hand. The OCR reads digits off a
+            // digital display, so there is nothing here for a camera to read —
+            // and offering one implies photographing the spring identifies it,
+            // which no camera can do.
+            hideCamera
           />
 
           {classification && (
