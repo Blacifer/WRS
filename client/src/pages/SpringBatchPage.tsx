@@ -25,6 +25,13 @@ import { ClassificationBadge } from '../components/ClassificationBadge.tsx';
 import { DefectSelector } from '../components/DefectSelector.tsx';
 import { DefectPhotoCapture } from '../components/DefectPhotoCapture.tsx';
 import { classifySpringLocally } from '../services/classification.ts';
+import {
+  getSpringCountOptions,
+  getSpringCount,
+  buildSpringQueue,
+  totalPerBogie
+} from '../../../shared/classification/springCounts.ts';
+import type { AxleLoad, QueuedSpring } from '../../../shared/classification/springCounts.ts';
 import { api } from '../services/api.ts';
 import { offlineDb } from '../services/offlineDb.ts';
 import { CheckCircleIcon, AlertTriangleIcon, RefreshCwIcon } from '../components/Icons.tsx';
@@ -60,10 +67,9 @@ interface SpringBatchPageProps {
   onClose: () => void;
 }
 
-interface QueueStep {
-  bogiePosition: 'BOGIE_1' | 'BOGIE_2';
-  position: SpringPosition;
-}
+// The queue is derived from the bogie's actual spring count (WMM 2.0 §601),
+// not a fixed six. See shared/classification/springCounts.ts.
+type QueueStep = QueuedSpring;
 
 interface CompletedStep extends QueueStep {
   measuredHeight: number;
@@ -74,15 +80,6 @@ interface CompletedStep extends QueueStep {
 const BOGIE_TYPES: BogieType[] = ['CASNUB_22_NLB', 'CASNUB_22_HS', 'CASNUB_22_RFT'];
 const SPRING_CONDITIONS: SpringCondition[] = ['USED', 'NEW'];
 
-const QUEUE: QueueStep[] = [
-  { bogiePosition: 'BOGIE_1', position: 'OUTER' },
-  { bogiePosition: 'BOGIE_1', position: 'INNER' },
-  { bogiePosition: 'BOGIE_1', position: 'SNUBBER' },
-  { bogiePosition: 'BOGIE_2', position: 'OUTER' },
-  { bogiePosition: 'BOGIE_2', position: 'INNER' },
-  { bogiePosition: 'BOGIE_2', position: 'SNUBBER' }
-];
-
 export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, onClose }) => {
   const dict = getDictionary(lang);
   const isHi = lang === 'hi';
@@ -90,6 +87,7 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
   const [wagonNumber, setWagonNumber] = useState<string>('');
   const [bogieType, setBogieType] = useState<BogieType>('CASNUB_22_NLB');
   const [condition, setCondition] = useState<SpringCondition>('USED');
+  const [axleLoad, setAxleLoad] = useState<AxleLoad>('20.32t');
   const [wagonLocked, setWagonLocked] = useState<boolean>(false);
 
   const [stepIndex, setStepIndex] = useState<number>(0);
@@ -111,8 +109,20 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
+  // Available axle-load configurations depend on the bogie type.
+  const countOptions = useMemo(() => getSpringCountOptions(bogieType), [bogieType]);
+  const activeCount = useMemo(
+    () => getSpringCount(bogieType, axleLoad) || countOptions[0] || null,
+    [bogieType, axleLoad, countOptions]
+  );
+
+  const QUEUE: QueueStep[] = useMemo(
+    () => (activeCount ? buildSpringQueue(activeCount.counts) : []),
+    [activeCount]
+  );
+
   const currentStep = stepIndex < QUEUE.length ? QUEUE[stepIndex] : null;
-  const batchDone = stepIndex >= QUEUE.length;
+  const batchDone = QUEUE.length > 0 && stepIndex >= QUEUE.length;
 
   const classification: ClassificationResult | null = useMemo(() => {
     if (!currentStep || measuredHeight === null || isNaN(measuredHeight)) return null;
@@ -400,30 +410,94 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
               ))}
             </div>
           </div>
+
+          {/* Axle load decides how many springs the bogie carries (WMM 2.0
+              §601), so it decides the length of this queue. */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold text-slate-300">
+              {isHi ? 'एक्सल भार' : 'Axle Load'}
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {countOptions.map((o) => (
+                <button
+                  key={o.axleLoad}
+                  type="button"
+                  disabled={wagonLocked}
+                  onClick={() => setAxleLoad(o.axleLoad)}
+                  className={`px-3 py-2 rounded-full border text-xs font-medium transition-all disabled:opacity-60 ${
+                    axleLoad === o.axleLoad
+                      ? 'bg-white text-black border-white'
+                      : 'bg-transparent border-white/10 text-neutral-400 hover:text-white hover:border-white/30'
+                  }`}
+                >
+                  {o.axleLoad}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* State plainly how many springs this configuration means, so the
+              inspector knows the size of the job before starting. */}
+          {activeCount && (
+            <div className="sm:col-span-2 rounded-xl border border-slate-800 bg-slate-950/60 px-3.5 py-3">
+              <p className="text-xs text-slate-300">
+                <span className="font-bold text-white">
+                  {activeCount.counts.outer} {isHi ? 'बाहरी' : 'outer'} ·{' '}
+                  {activeCount.counts.inner} {isHi ? 'भीतरी' : 'inner'} ·{' '}
+                  {activeCount.counts.snubber} {isHi ? 'स्नबर' : 'snubber'}
+                </span>{' '}
+                {isHi ? 'प्रति बोगी' : 'per bogie'} —{' '}
+                <span className="font-bold text-white">
+                  {totalPerBogie(activeCount.counts) * 2} {isHi ? 'स्प्रिंग कुल' : 'springs total'}
+                </span>{' '}
+                {isHi ? 'इस वैगन के लिए' : 'for this wagon'}
+              </p>
+              <p className="text-[10px] text-slate-500 mt-1">{activeCount.source}</p>
+              {!activeCount.verified && (
+                <p className="text-[11px] text-amber-400 font-semibold mt-1.5">
+                  {isHi
+                    ? '⚠ यह संख्या आरडीएसओ दस्तावेज़ से पुष्ट नहीं है — कृपया ड्राइंग से जाँचें।'
+                    : '⚠ This count is not confirmed in RDSO documentation — verify against the drawing before relying on it.'}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Progress */}
-      <div className="flex items-center gap-2">
-        {QUEUE.map((step, i) => (
+      {/* Progress. A bogie can carry 24+ springs, so one bar per spring is
+          unreadable — show overall progress plus a per-nest tally instead. */}
+      <div className="space-y-2">
+        <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
           <div
-            key={i}
-            className={`flex-1 h-1.5 rounded-full ${
-              i < stepIndex ? (completed[i]?.status === 'CONDEMNED' ? 'bg-rose-500' : 'bg-emerald-500') : i === stepIndex ? 'bg-blue-500' : 'bg-slate-800'
-            }`}
+            className="h-full bg-blue-500 transition-all"
+            style={{ width: `${QUEUE.length ? (stepIndex / QUEUE.length) * 100 : 0}%` }}
           />
-        ))}
+        </div>
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-400 tabular-nums">
+          <span>
+            {isHi ? 'पूर्ण' : 'Done'}: <span className="text-white font-bold">{stepIndex}</span> / {QUEUE.length}
+          </span>
+          <span className="text-emerald-400">
+            {isHi ? 'उत्तीर्ण' : 'Pass'}: {completed.filter((c) => c.status === 'PASS').length}
+          </span>
+          <span className="text-rose-400">
+            {isHi ? 'कंडम' : 'Condemned'}: {completed.filter((c) => c.status === 'CONDEMNED').length}
+          </span>
+        </div>
       </div>
 
       {!batchDone && currentStep && (
         <>
           <div className="text-center">
             <span className="text-xs font-mono text-blue-400 bg-blue-950/50 border border-blue-800 px-3 py-1 rounded-full">
-              {isHi ? `स्प्रिंग ${stepIndex + 1} / ${QUEUE.length}` : `Spring ${stepIndex + 1} of ${QUEUE.length}`}
-              {' — '}
               {currentStep.bogiePosition === 'BOGIE_1' ? (isHi ? 'बोगी 1' : 'Bogie 1') : (isHi ? 'बोगी 2' : 'Bogie 2')}
               {' · '}
               {getPositionText(currentStep.position, lang)}
+              {' '}
+              <span className="text-white font-bold">
+                {currentStep.indexInNest} / {currentStep.nestSize}
+              </span>
             </span>
           </div>
 

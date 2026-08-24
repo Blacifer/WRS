@@ -218,12 +218,12 @@ export const CaliperCamera: React.FC<CaliperCameraProps> = ({
         <div>
           <h3 className="text-white font-extrabold text-base sm:text-lg flex items-center gap-2">
             <span>📏</span>
-            {isHi ? 'कैलिपर मापन' : 'Caliper Measurement'}
+            {isHi ? 'माप दर्ज करें' : 'Record Measurement'}
           </h3>
           <p className="text-slate-400 text-xs mt-0.5">
             {isHi
               ? 'कैलिपर LCD का फोटो लें — OCR स्वचालित रूप से रीडिंग पढ़ेगा'
-              : 'Take a photo of the caliper LCD — OCR will read it automatically'}
+              : 'Type the reading from your gauge. Camera OCR is available for instruments with a digital display.'}
           </p>
         </div>
         {onClose && (
@@ -422,7 +422,7 @@ export const CaliperCamera: React.FC<CaliperCameraProps> = ({
           <p className="text-xs text-slate-500">
             {isHi
               ? 'कृपया अपने डिजिटल कैलिपर से वास्तविक रीडिंग दर्ज करें।'
-              : 'Enter the actual reading from your digital caliper.'}
+              : 'Enter the free height in mm as read from the gauge.'}
           </p>
         </div>
       )}
