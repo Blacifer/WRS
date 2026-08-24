@@ -25,6 +25,7 @@ export const en = {
     history: 'History & Logs',
     analytics: 'Spring Analytics',
     admin: 'Admin Console',
+    learning: 'System Learning',
     users: 'User Accounts',
     logout: 'Logout',
     sync: 'Sync Data',

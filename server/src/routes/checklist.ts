@@ -7,6 +7,7 @@ import crypto from 'node:crypto';
 import { Router } from '../framework/index.ts';
 import type { Request, Response } from '../framework/index.ts';
 import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.ts';
+import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { requireRole } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
@@ -308,3 +309,97 @@ checklistRouter.post('/voice-action', optionalAuthMiddleware, async (req: Reques
     });
   }
 });
+
+// -------------------------------------------------------------------------
+// 3. Inspect by exception — clear all remaining PENDING items in one action
+//
+// The largest single reduction in manual effort in the app. See
+// WagonRepository.bulkClearPendingItems for the safety properties that keep
+// this an inspection shortcut rather than a rubber stamp.
+// -------------------------------------------------------------------------
+checklistRouter.post(
+  '/bulk-clear',
+  authMiddleware,
+  requireRole('SUPERVISOR', 'ADMIN'),
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { wagonNumber, attestation, excludeCategories } = req.body || {};
+
+      if (!wagonNumber) {
+        res.status(400).json({
+          success: false,
+          error: 'MISSING_WAGON_NUMBER',
+          message: 'wagonNumber is required',
+          statusCode: 400,
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
+
+      const result = getRepo().bulkClearPendingItems(wagonNumber, {
+        attestation: String(attestation || ''),
+        userId: req.user!.id,
+        userRole: req.user?.role,
+        excludeCategories: Array.isArray(excludeCategories) ? excludeCategories : undefined
+      });
+
+      res.status(200).json({
+        success: true,
+        data: result,
+        message:
+          `${result.clearedCount} item(s) cleared by exception. ` +
+          `${result.skippedCategories.join(', ')} excluded — those require individual verdicts.`,
+        meta: { timestamp: new Date().toISOString() }
+      });
+    } catch (err: any) {
+      const status = err?.name === 'ValidationError' ? 400 : 500;
+      res.status(status).json({
+        success: false,
+        error: err?.name === 'ValidationError' ? 'VALIDATION_ERROR' : 'BULK_CLEAR_FAILED',
+        message: err?.message || 'Could not clear items',
+        statusCode: status,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+);
+
+// -------------------------------------------------------------------------
+// 4. Suggested statuses from this part's own inspection history
+//
+// Advisory prompts derived from data the workshop already produced. Works
+// offline, costs nothing to run, and decides nothing on its own.
+// -------------------------------------------------------------------------
+checklistRouter.get(
+  '/suggestions/:wagonNumber',
+  authMiddleware,
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const wagonNumber = req.params?.wagonNumber;
+      if (!wagonNumber) {
+        res.status(400).json({
+          success: false,
+          error: 'MISSING_WAGON_NUMBER',
+          message: 'wagonNumber is required',
+          statusCode: 400,
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
+
+      res.status(200).json({
+        success: true,
+        data: getRepo().suggestChecklistStatuses(wagonNumber),
+        meta: { timestamp: new Date().toISOString() }
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        success: false,
+        error: 'SUGGESTIONS_FAILED',
+        message: err?.message || 'Could not compute suggestions',
+        statusCode: 500,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+);

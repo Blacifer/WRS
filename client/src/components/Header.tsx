@@ -316,6 +316,20 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               )}
 
+              {isSupervisorOrAdmin && (
+                <button
+                  data-testid="nav-learning"
+                  onClick={() => onSelectTab('learning')}
+                  className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
+                    activeTab === 'learning'
+                      ? 'text-white'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  🧠 {dict.nav.learning || 'System Learning'}
+                </button>
+              )}
+
               {isAdmin && (
                 <button
                   data-testid="nav-users"

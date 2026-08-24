@@ -643,7 +643,11 @@ cvRouter.post('/measure', optionalAuthMiddleware, async (req: AuthenticatedReque
 
             if (targetItem) {
               const noteText = `CV AR: ${measuredValue.toFixed(1)}mm (Nom: ${nominalValue.toFixed(1)}mm, Δ: ${delta >= 0 ? '+' : ''}${delta.toFixed(1)}mm${band ? `, ${band}` : ''}) [${rdsoTable}]`;
-              wagonRepo.updateChecklistItem(wagonNumber, targetItem.id, {
+              // NOTE: previously called as (wagonNumber, targetItem.id, updates),
+              // but the signature is (itemId, updates). The wagon number was
+              // landing in the itemId slot, so this lookup always missed and the
+              // AR-caliper result was never written to the checklist.
+              wagonRepo.updateChecklistItem(targetItem.id, {
                 status: verdict === 'PASS' ? 'PASS' : 'CONDEMNED',
                 conditionNotes: noteText,
                 reinspectedStatus: verdict === 'PASS' ? 'PASS' : undefined

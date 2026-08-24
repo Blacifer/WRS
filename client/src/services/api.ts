@@ -175,6 +175,40 @@ export class ApiClient {
   }
 
   // =========================================================================
+  // Inspect-by-exception & history-based suggestions
+  // =========================================================================
+
+  /** Clears every remaining PENDING item on a wagon in one attested action. */
+  public async bulkClearChecklist(payload: {
+    wagonNumber: string;
+    attestation: string;
+    excludeCategories?: string[];
+  }): Promise<{ success: boolean; data: { clearedCount: number; skippedCategories: string[] }; message: string }> {
+    return this.request('/checklist/bulk-clear', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  /** Likely statuses for pending items, derived from this part's own history. */
+  public async getChecklistSuggestions(wagonNumber: string): Promise<{
+    success: boolean;
+    data: {
+      wagonNumber: string;
+      suggestions: {
+        itemId: string;
+        category: string;
+        partName: string;
+        suggestedStatus: string;
+        confidence: number;
+        basis: string;
+      }[];
+    };
+  }> {
+    return this.request(`/checklist/suggestions/${encodeURIComponent(wagonNumber)}`);
+  }
+
+  // =========================================================================
   // Machine Learning Feedback Loop
   // =========================================================================
 

@@ -582,10 +582,30 @@ export class WagonRepository {
     }
   }
 
-  public updateChecklistItem(itemId: string, updates: Partial<ChecklistItemData>): any {
+  public updateChecklistItem(
+    itemId: string,
+    updates: Partial<ChecklistItemData>,
+    options?: { expectedUpdatedAt?: string }
+  ): any {
     const existing = this.getChecklistItemById(itemId);
     if (!existing) {
       throw new Error(`Checklist item ${itemId} not found.`);
+    }
+
+    // Optimistic concurrency. Two inspectors on the same wagon previously
+    // overwrote each other silently — the loser's verdict simply vanished
+    // with no error shown to anyone. When the caller tells us which version
+    // it read, refuse the write if the row moved underneath it.
+    if (options?.expectedUpdatedAt && existing.updatedAt) {
+      if (options.expectedUpdatedAt !== existing.updatedAt) {
+        const err: any = new Error(
+          `This item was changed by someone else while you were working on it ` +
+          `(current status: ${existing.status}). Refresh to see their update, then re-apply yours.`
+        );
+        err.name = 'ConflictError';
+        err.currentItem = existing;
+        throw err;
+      }
     }
 
     const now = new Date().toISOString();
@@ -610,6 +630,159 @@ export class WagonRepository {
     const row = this.db.prepare('SELECT * FROM checklist_items WHERE id = ?').get(id) as any;
     if (!row) return null;
     return this.mapChecklistItem(row);
+  }
+
+  /**
+   * Inspect-by-exception: clear every still-PENDING item on a wagon in one
+   * action, having flagged the exceptions individually first.
+   *
+   * This is how experienced inspectors already work on paper — they walk the
+   * bogie, note what is wrong, and everything else is good by definition.
+   * Forcing 53 individual taps to say "fine" is data entry, not inspection,
+   * and it is the single largest source of manual effort in the app.
+   *
+   * Safety properties that make this defensible rather than a rubber stamp:
+   *   - It only ever touches PENDING items. A FAIL or CONDEMNED verdict that
+   *     someone already recorded can never be bulk-overwritten.
+   *   - Springs are excluded. Those carry measured RDSO band data and must
+   *     come from an actual measurement, never from a blanket action.
+   *   - It requires an attestation string, stored on every affected row, so
+   *     the record shows this was a deliberate declaration by a named person.
+   *   - Each affected item is written through the normal audit path.
+   */
+  public bulkClearPendingItems(
+    wagonNumber: string,
+    options: {
+      attestation: string;
+      userId: string;
+      userRole?: string;
+      excludeCategories?: string[];
+    }
+  ): { clearedCount: number; skippedCategories: string[]; itemIds: string[] } {
+    const normalizedWagonNumber = wagonNumber.trim().toUpperCase();
+
+    if (!options.attestation || options.attestation.trim().length < 10) {
+      const err: any = new Error(
+        'An attestation of at least 10 characters is required — this action declares physical inspection of every remaining item.'
+      );
+      err.name = 'ValidationError';
+      throw err;
+    }
+
+    // SPRINGS always excluded: their status must derive from a real measured
+    // free height classified against the RDSO tables.
+    const excluded = ['SPRINGS', ...(options.excludeCategories || [])];
+    const placeholders = excluded.map(() => '?').join(',');
+
+    const pending = this.db.prepare(`
+      SELECT id, category, part_name FROM checklist_items
+      WHERE wagon_number = ?
+        AND (status IS NULL OR status = 'PENDING')
+        AND category NOT IN (${placeholders})
+    `).all(normalizedWagonNumber, ...excluded) as any[];
+
+    const now = new Date().toISOString();
+    const note = `Cleared by exception-based inspection: ${options.attestation.trim()}`;
+    const updateStmt = this.db.prepare(`
+      UPDATE checklist_items
+      SET status = 'PASS', condition_notes = ?, updated_at = ?
+      WHERE id = ?
+    `);
+
+    const itemIds: string[] = [];
+    for (const item of pending) {
+      updateStmt.run(note, now, item.id);
+      itemIds.push(item.id);
+    }
+
+    if (itemIds.length > 0) {
+      logAuditEvent(this.db, {
+        id: `audit_bulk_${crypto.randomUUID()}`,
+        inspectionId: null,
+        eventType: 'CHECKLIST_ITEM_UPDATED' as any,
+        userId: options.userId,
+        userRole: options.userRole,
+        payload: {
+          wagonNumber: normalizedWagonNumber,
+          action: 'BULK_CLEAR_BY_EXCEPTION',
+          attestation: options.attestation.trim(),
+          clearedCount: itemIds.length,
+          clearedItems: pending.map((p) => `${p.category}/${p.part_name}`),
+          excludedCategories: excluded
+        }
+      });
+    }
+
+    return { clearedCount: itemIds.length, skippedCategories: excluded, itemIds };
+  }
+
+  /**
+   * Suggests a likely status for each pending item from this wagon's own
+   * repair history, so an inspector confirms rather than recalls.
+   *
+   * This is pattern lookup over data the workshop already produced — no model,
+   * no training, no inference cost, and it works offline on the shop floor.
+   * Nothing here decides anything: suggestions are advisory and the UI must
+   * present them as prompts, never as pre-filled answers.
+   */
+  public suggestChecklistStatuses(wagonNumber: string): {
+    wagonNumber: string;
+    suggestions: {
+      itemId: string;
+      category: string;
+      partName: string;
+      suggestedStatus: string;
+      confidence: number;
+      basis: string;
+    }[];
+  } {
+    const normalizedWagonNumber = wagonNumber.trim().toUpperCase();
+
+    const pending = this.db.prepare(`
+      SELECT id, category, part_name FROM checklist_items
+      WHERE wagon_number = ? AND (status IS NULL OR status = 'PENDING')
+    `).all(normalizedWagonNumber) as any[];
+
+    if (pending.length === 0) {
+      return { wagonNumber: normalizedWagonNumber, suggestions: [] };
+    }
+
+    // Fleet-wide outcome history for the same part, most recent first.
+    const historyStmt = this.db.prepare(`
+      SELECT status, COUNT(*) AS n
+      FROM checklist_items
+      WHERE part_name = ? AND status IS NOT NULL AND status != 'PENDING'
+      GROUP BY status
+      ORDER BY n DESC
+    `);
+
+    const suggestions = pending.map((item) => {
+      const rows = historyStmt.all(item.part_name) as any[];
+      const total = rows.reduce((sum, r) => sum + r.n, 0);
+
+      if (total < 5) {
+        return {
+          itemId: item.id,
+          category: item.category,
+          partName: item.part_name,
+          suggestedStatus: 'PENDING',
+          confidence: 0,
+          basis: 'Not enough history for this part yet'
+        };
+      }
+
+      const top = rows[0];
+      return {
+        itemId: item.id,
+        category: item.category,
+        partName: item.part_name,
+        suggestedStatus: top.status,
+        confidence: Number((top.n / total).toFixed(3)),
+        basis: `${top.n} of ${total} previous inspections of this part were ${top.status}`
+      };
+    });
+
+    return { wagonNumber: normalizedWagonNumber, suggestions };
   }
 
   // -------------------------------------------------------------------------

@@ -504,14 +504,20 @@ wagonsRouter.put('/:wagonNumber/checklist/items/:itemId', authMiddleware, async 
   }
 
   try {
-    const item = wagonRepo.updateChecklistItem(itemId, {
-      status,
-      repairAction,
-      repairNotes,
-      reinspectedStatus,
-      conditionNotes,
-      photoId
-    });
+    const item = wagonRepo.updateChecklistItem(
+      itemId,
+      {
+        status,
+        repairAction,
+        repairNotes,
+        reinspectedStatus,
+        conditionNotes,
+        photoId
+      },
+      // Optional — when the client sends the version it read, a concurrent
+      // edit by another inspector is reported instead of silently lost.
+      { expectedUpdatedAt: req.body?.expectedUpdatedAt }
+    );
 
     res.status(200).json({
       success: true,
@@ -520,6 +526,17 @@ wagonsRouter.put('/:wagonNumber/checklist/items/:itemId', authMiddleware, async 
       meta: { timestamp: new Date().toISOString() }
     });
   } catch (err: any) {
+    if (err?.name === 'ConflictError') {
+      res.status(409).json({
+        success: false,
+        error: 'CONCURRENT_MODIFICATION',
+        message: err.message,
+        data: err.currentItem,
+        statusCode: 409,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
     res.status(404).json({
       success: false,
       error: 'ITEM_NOT_FOUND',

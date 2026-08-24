@@ -101,6 +101,10 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
   const { t, lang } = useI18n();
   const [wagon, setWagon] = useState<WagonRecord | null>(null);
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  // Inspect-by-exception panel state
+  const [showBulkPanel, setShowBulkPanel] = useState<boolean>(false);
+  const [bulkAttestation, setBulkAttestation] = useState<string>('');
+  const [isBulkClearing, setIsBulkClearing] = useState<boolean>(false);
   const [categories, setCategories] = useState<Record<string, ChecklistItem[]>>({});
   const [timeline, setTimeline] = useState<WagonTransition[]>([]);
   const [photos, setPhotos] = useState<WagonPhotoRecord[]>([]);
@@ -677,6 +681,26 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
   const currentStageIndex = wagon ? stageList.indexOf(wagon.currentStage) : 0;
   const isReleased = wagon?.currentStage === 'RELEASE';
+  const pendingCount = checklist.filter((i) => !i.status || i.status === 'PENDING').length;
+
+  const handleBulkClear = async () => {
+    if (bulkAttestation.trim().length < 10) return;
+    setIsBulkClearing(true);
+    try {
+      await api.bulkClearChecklist({
+        wagonNumber,
+        attestation: bulkAttestation.trim()
+      });
+      setShowBulkPanel(false);
+      setBulkAttestation('');
+      await loadWagonData();
+    } catch (err: any) {
+      console.error('[WagonDetail] bulk clear failed:', err);
+      alert(err?.message || 'Could not clear the remaining items. Please try again.');
+    } finally {
+      setIsBulkClearing(false);
+    }
+  };
   const isQCGate = wagon?.currentStage === 'FINAL_QC_GATE';
 
   return (
@@ -865,7 +889,73 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
             onUndo={handleVoiceUndo}
           />
 
+          {/* Inspect by exception — the fast path.
+              Flag what's wrong individually, then declare the rest serviceable
+              in one attested action instead of tapping 50+ items to say "fine".
+              Springs and any already-recorded FAIL/CONDEMNED are never touched. */}
+          {pendingCount > 0 && !isReleased && (
+            <div className="bg-slate-900 border border-indigo-800/60 rounded-2xl p-5 space-y-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>⚡</span> Inspect by Exception
+                  </h4>
+                  <p className="text-[11px] text-slate-400 mt-1 max-w-xl leading-relaxed">
+                    {pendingCount} item{pendingCount === 1 ? '' : 's'} still pending. Log anything
+                    defective above first, then declare the remainder serviceable in one action.
+                    Springs and any recorded FAIL or CONDEMNED verdict are never affected.
+                  </p>
+                </div>
+                {!showBulkPanel && (
+                  <button
+                    onClick={() => setShowBulkPanel(true)}
+                    className="min-h-[44px] px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold border border-indigo-400/40 transition shrink-0"
+                  >
+                    Clear {pendingCount} Remaining
+                  </button>
+                )}
+              </div>
 
+              {showBulkPanel && (
+                <div className="space-y-3 pt-2 border-t border-slate-800">
+                  <label className="block">
+                    <span className="text-[11px] font-bold text-slate-300">
+                      Attestation — what did you physically verify? (min 10 characters)
+                    </span>
+                    <textarea
+                      value={bulkAttestation}
+                      onChange={(e) => setBulkAttestation(e.target.value)}
+                      rows={2}
+                      placeholder="e.g. Walked both bogies with SSE Sharma, all remaining components visually verified serviceable"
+                      className="mt-1.5 w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-indigo-500 focus:outline-none"
+                    />
+                  </label>
+                  <p className="text-[10px] text-amber-400/90 leading-relaxed">
+                    This is recorded against your name on every affected item and written to the
+                    audit log. Only declare what you actually inspected.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={handleBulkClear}
+                      disabled={bulkAttestation.trim().length < 10 || isBulkClearing}
+                      className="min-h-[44px] px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition"
+                    >
+                      {isBulkClearing ? 'Clearing…' : 'Confirm & Clear'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowBulkPanel(false);
+                        setBulkAttestation('');
+                      }}
+                      className="min-h-[44px] px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold border border-slate-700 transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Category Navigation Pills */}
           <div className="flex flex-wrap gap-2 border-b border-white/10 pb-4">
@@ -1137,6 +1227,63 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Spring Nest Grouping Advisories (RDSO WMM 2.0 — 3mm same-group rule).
+              These do not block release; they surface a set-level problem the
+              per-spring checks cannot see. */}
+          {gateStatus.advisories && gateStatus.advisories.length > 0 && (
+            <div className="bg-slate-900 border border-amber-900/60 rounded-2xl p-6 shadow-xl space-y-4">
+              <div>
+                <h4 className="text-sm font-bold text-amber-400 flex items-center gap-2">
+                  <span>⚖️</span> Spring Nest Grouping ({gateStatus.advisories.length})
+                </h4>
+                <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                  Advisory only — does not block release. Springs in one nest should sit within a
+                  single 3&nbsp;mm band so they share load evenly, even when each spring passes on
+                  its own.
+                </p>
+              </div>
+              <div className="space-y-2">
+                {gateStatus.advisories.map((a: string, idx: number) => (
+                  <div
+                    key={idx}
+                    className="p-3 bg-amber-950/30 border border-amber-900/60 rounded-xl text-xs text-amber-200 flex items-start gap-2.5"
+                  >
+                    <span className="text-amber-500 font-bold">•</span>
+                    <span>{a}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Per-group breakdown so the inspector can see which nest to re-group */}
+              {Array.isArray(gateStatus.summary?.springNestCheck?.groups) &&
+                gateStatus.summary.springNestCheck.groups.length > 0 && (
+                  <div className="pt-3 border-t border-slate-800 space-y-1.5">
+                    {gateStatus.summary.springNestCheck.groups.map((g: any) => (
+                      <div
+                        key={g.groupKey}
+                        className="flex items-center justify-between gap-3 text-[11px] px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-800"
+                      >
+                        <span className="font-bold text-slate-200">{g.groupKey}</span>
+                        <span className="text-slate-400 tabular-nums">
+                          {g.springCount} spring{g.springCount === 1 ? '' : 's'} ·{' '}
+                          {g.minHeight?.toFixed(1)}–{g.maxHeight?.toFixed(1)} mm
+                        </span>
+                        <span
+                          className={`font-black px-2 py-0.5 rounded ${
+                            g.isMatched
+                              ? 'text-emerald-400 bg-emerald-950/50'
+                              : 'text-amber-300 bg-amber-950/50'
+                          }`}
+                        >
+                          {g.isMatched ? '✓ MATCHED' : `${g.variationMm?.toFixed(2)} mm SPREAD`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
             </div>
           )}
 

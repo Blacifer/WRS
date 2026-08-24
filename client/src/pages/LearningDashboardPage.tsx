@@ -1,0 +1,353 @@
+/**
+ * Machine Learning Feedback Dashboard
+ * Indian Railways WRS Raipur
+ *
+ * Shows what the system has learned from inspectors correcting it, and holds
+ * the approval gate for anything it proposes to change about itself.
+ *
+ * Deliberately readable by a supervisor rather than a data scientist: how
+ * often the machine was right, whether it knows when it is unsure, where it
+ * reliably fails, and what it wants to change — with the evidence attached.
+ */
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { api } from '../services/api.ts';
+import type { LanguageCode } from '../i18n/index.ts';
+import type { User } from '../../../shared/types.ts';
+
+interface LearningDashboardPageProps {
+  lang: LanguageCode;
+  user: User | null;
+}
+
+const SUBSYSTEM_LABELS: Record<string, string> = {
+  OCR_CALIPER: 'Caliper OCR',
+  SPRING_CLASSIFICATION: 'Spring Classification',
+  VOICE_COMMAND: 'Voice Commands',
+  ACOUSTIC_DIAGNOSTIC: 'Acoustic Diagnostics',
+  DEFECT_SUGGESTION: 'Defect Suggestions'
+};
+
+export const LearningDashboardPage: React.FC<LearningDashboardPageProps> = ({ lang, user }) => {
+  const isHi = lang === 'hi';
+  const isAdmin = user?.role?.toUpperCase() === 'ADMIN';
+
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await api.getLearningDashboard();
+      setData(res.data);
+    } catch (e: any) {
+      setError(e?.message || 'Could not load learning data');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const runAnalysis = async () => {
+    setBusyKey('__analyze__');
+    try {
+      await api.runLearningAnalysis();
+      await load();
+    } catch (e: any) {
+      setError(e?.message || 'Analysis failed');
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const decide = async (paramKey: string, decision: 'APPROVE' | 'REJECT') => {
+    setBusyKey(paramKey);
+    try {
+      await api.decideLearningProposal(paramKey, decision);
+      await load();
+    } catch (e: any) {
+      setError(e?.message || 'Could not apply decision');
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-slate-400 text-sm">
+        {isHi ? 'लोड हो रहा है…' : 'Loading learning data…'}
+      </div>
+    );
+  }
+
+  const accuracy: any[] = data?.accuracy || [];
+  const insights: any[] = data?.insights || [];
+  const parameters: any[] = data?.parameters || [];
+  const calibration: any[] = data?.ocrCalibration || [];
+  const pending = parameters.filter((p) => p.approval_status === 'PENDING');
+  const totalEvents = accuracy.reduce((s, a) => s + (a.totalEvents || 0), 0);
+
+  return (
+    <div className="space-y-6 max-w-6xl mx-auto">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/40 border border-indigo-500/30 rounded-2xl shadow-xl">
+        <div>
+          <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+            {isHi ? 'सिस्टम अधिगम (Learning)' : 'What the System Has Learned'}
+          </h1>
+          <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
+            {isHi
+              ? 'हर बार जब कोई निरीक्षक मशीन के सुझाव को सुधारता है, वह एक प्रशिक्षण संकेत बनता है। सिस्टम उसी से बेहतर होता है।'
+              : 'Every time an inspector corrects the machine, that correction becomes a training signal. RDSO limits are never tuned — only operational behaviour.'}
+          </p>
+        </div>
+        <button
+          onClick={runAnalysis}
+          disabled={busyKey === '__analyze__'}
+          className="min-h-[44px] px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-sm font-bold border border-indigo-400/40 transition shrink-0"
+        >
+          {busyKey === '__analyze__'
+            ? isHi ? 'विश्लेषण…' : 'Analysing…'
+            : isHi ? 'अभी विश्लेषण करें' : 'Run Analysis'}
+        </button>
+      </div>
+
+      {error && (
+        <div className="p-4 bg-rose-950/40 border border-rose-800 rounded-xl text-sm text-rose-300">{error}</div>
+      )}
+
+      {/* Cold-start state — honest about having no data yet */}
+      {totalEvents === 0 && (
+        <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl text-center space-y-2">
+          <p className="text-sm font-bold text-white">
+            {isHi ? 'अभी तक कोई डेटा नहीं' : 'No learning data yet'}
+          </p>
+          <p className="text-xs text-slate-400 max-w-lg mx-auto leading-relaxed">
+            {isHi
+              ? 'जैसे ही निरीक्षक कैलिपर रीडिंग को सुधारना शुरू करेंगे, यहाँ सटीकता और सुझाव दिखने लगेंगे।'
+              : 'This fills in as inspectors use the app. Each accepted or corrected OCR reading is recorded, and patterns appear once there is enough evidence to trust them.'}
+          </p>
+        </div>
+      )}
+
+      {/* Accuracy per subsystem */}
+      {totalEvents > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {accuracy
+            .filter((a) => a.totalEvents > 0)
+            .map((a) => (
+              <div key={a.subsystem} className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  {SUBSYSTEM_LABELS[a.subsystem] || a.subsystem}
+                </p>
+                <p className="text-3xl font-black text-white mt-1 tabular-nums">
+                  {(a.acceptanceRate * 100).toFixed(0)}
+                  <span className="text-lg text-slate-500">%</span>
+                </p>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  {isHi ? 'स्वीकृत' : 'accepted unchanged'} · {a.totalEvents}{' '}
+                  {isHi ? 'नमूने' : 'samples'}
+                </p>
+                {a.trend !== null && a.trend !== undefined && (
+                  <p
+                    className={`text-[11px] font-bold mt-1.5 ${
+                      a.trend > 0 ? 'text-emerald-400' : a.trend < 0 ? 'text-amber-400' : 'text-slate-500'
+                    }`}
+                  >
+                    {a.trend > 0 ? '▲' : a.trend < 0 ? '▼' : '—'}{' '}
+                    {Math.abs(a.trend * 100).toFixed(1)}% {isHi ? 'रुझान' : 'trend'}
+                  </p>
+                )}
+                {!a.hasEnoughData && (
+                  <p className="text-[10px] text-slate-500 mt-1.5 italic">
+                    {isHi ? 'निष्कर्ष के लिए कम डेटा' : 'too few samples to draw conclusions'}
+                  </p>
+                )}
+              </div>
+            ))}
+        </div>
+      )}
+
+      {/* Confidence calibration */}
+      {calibration.some((b) => b.total > 0) && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+          <div>
+            <h2 className="text-sm font-bold text-white">
+              {isHi ? 'आत्मविश्वास अंशांकन' : 'Does OCR know when it is unsure?'}
+            </h2>
+            <p className="text-[11px] text-slate-400 mt-1">
+              {isHi
+                ? 'यदि निचले बैंड अधिक सुधारे जाते हैं, तो मशीन का आत्मविश्वास भरोसेमंद है।'
+                : 'A well-calibrated reader is corrected far more often in its low-confidence bands. If the bars rise left-to-right, its confidence is meaningful.'}
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            {calibration
+              .filter((b) => b.total > 0)
+              .map((b) => (
+                <div key={b.bucket} className="flex items-center gap-3 text-[11px]">
+                  <span className="font-mono text-slate-400 w-20 shrink-0 tabular-nums">{b.bucket}</span>
+                  <div className="flex-1 h-5 bg-slate-950 rounded overflow-hidden border border-slate-800">
+                    <div
+                      className={`h-full ${
+                        b.acceptanceRate >= 0.9
+                          ? 'bg-emerald-600'
+                          : b.acceptanceRate >= 0.7
+                          ? 'bg-amber-600'
+                          : 'bg-rose-700'
+                      }`}
+                      style={{ width: `${Math.max(2, b.acceptanceRate * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-slate-300 w-28 shrink-0 tabular-nums">
+                    {(b.acceptanceRate * 100).toFixed(0)}% · n={b.total}
+                  </span>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
+
+      {/* Insights */}
+      {insights.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-bold text-white">
+            {isHi ? 'सिस्टम ने क्या पाया' : 'What the system found on its own'}
+          </h2>
+          {insights.map((i, idx) => (
+            <div
+              key={idx}
+              className={`p-4 rounded-xl border ${
+                i.severity === 'ACTIONABLE'
+                  ? 'bg-indigo-950/30 border-indigo-800/60'
+                  : 'bg-slate-900 border-slate-800'
+              }`}
+            >
+              <div className="flex items-start gap-2.5">
+                <span
+                  className={`text-[9px] font-black px-2 py-0.5 rounded shrink-0 mt-0.5 ${
+                    i.severity === 'ACTIONABLE'
+                      ? 'bg-indigo-500/20 text-indigo-300'
+                      : 'bg-slate-700/50 text-slate-400'
+                  }`}
+                >
+                  {i.severity}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-white">{i.title}</p>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">{i.detail}</p>
+                  <p className="text-[10px] text-slate-500 mt-1.5 font-mono">n = {i.sampleSize}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Pending proposals — the human approval gate */}
+      {pending.length > 0 && (
+        <div className="space-y-2">
+          <div>
+            <h2 className="text-sm font-bold text-amber-400">
+              {isHi ? 'अनुमोदन प्रतीक्षित' : 'Awaiting your approval'}
+            </h2>
+            <p className="text-[11px] text-slate-400 mt-1">
+              {isHi
+                ? 'सिस्टम स्वयं कुछ नहीं बदलता। हर परिवर्तन के लिए मानव अनुमोदन आवश्यक है।'
+                : 'The system never changes itself. Each proposal waits here until a named admin accepts it.'}
+            </p>
+          </div>
+          {pending.map((p) => (
+            <div key={p.param_key} className="bg-slate-900 border border-amber-900/60 rounded-2xl p-5 space-y-3">
+              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <span className="font-mono text-xs text-amber-300">{p.param_key}</span>
+                <span className="text-lg font-black text-white tabular-nums">
+                  {p.current_value} <span className="text-slate-500">→</span> {p.proposed_value}
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 leading-relaxed">{p.description}</p>
+              {p.proposal_rationale && (
+                <p className="text-[11px] text-slate-400 leading-relaxed border-l-2 border-slate-700 pl-3">
+                  {p.proposal_rationale}
+                </p>
+              )}
+              {isAdmin ? (
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => decide(p.param_key, 'APPROVE')}
+                    disabled={busyKey === p.param_key}
+                    className="min-h-[44px] px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition"
+                  >
+                    {isHi ? 'स्वीकृत करें' : 'Approve'}
+                  </button>
+                  <button
+                    onClick={() => decide(p.param_key, 'REJECT')}
+                    disabled={busyKey === p.param_key}
+                    className="min-h-[44px] px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 rounded-xl text-xs font-bold border border-slate-700 transition"
+                  >
+                    {isHi ? 'अस्वीकार' : 'Reject'}
+                  </button>
+                </div>
+              ) : (
+                <p className="text-[11px] text-slate-500 italic">
+                  {isHi ? 'केवल प्रशासक अनुमोदन कर सकते हैं।' : 'Only an admin can approve this change.'}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Current parameters */}
+      {parameters.length > 0 && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3">
+          <h2 className="text-sm font-bold text-white">
+            {isHi ? 'वर्तमान ट्यून किए गए मान' : 'Current tuned values'}
+          </h2>
+          <div className="space-y-1.5">
+            {parameters.map((p) => (
+              <div
+                key={p.param_key}
+                className="flex flex-wrap items-center justify-between gap-2 text-[11px] px-3 py-2.5 rounded-lg bg-slate-950/60 border border-slate-800"
+              >
+                <span className="font-mono text-slate-300">{p.param_key}</span>
+                <span className="flex items-center gap-3">
+                  <span className="text-white font-bold tabular-nums">{p.current_value}</span>
+                  {p.current_value !== p.default_value && (
+                    <span className="text-slate-500 tabular-nums">
+                      (default {p.default_value})
+                    </span>
+                  )}
+                  <span
+                    className={`px-2 py-0.5 rounded font-bold ${
+                      p.approval_status === 'APPROVED'
+                        ? 'bg-emerald-950/60 text-emerald-400'
+                        : p.approval_status === 'PENDING'
+                        ? 'bg-amber-950/60 text-amber-400'
+                        : 'bg-slate-800 text-slate-400'
+                    }`}
+                  >
+                    {p.approval_status}
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[10px] text-slate-500 italic pt-1">
+            {isHi
+              ? 'RDSO बैंड सीमाएँ कभी ट्यून नहीं होतीं — वे विनियमन हैं।'
+              : 'RDSO band tables and condemning limits are never tunable — they are regulation, not parameters.'}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default LearningDashboardPage;

@@ -563,6 +563,11 @@ export const CASNUB_CATEGORIES: readonly CASNUBCategory[] = [
 ] as const;
 
 export type PartInspectionStatus =
+  // PENDING is the schema default and is checked for throughout the server
+  // (exit gate, certificate, wagon summary). It was missing here, so any
+  // client-side comparison against it failed to typecheck even though it is
+  // the most common status a checklist item ever holds.
+  | 'PENDING'
   | 'PASS'
   | 'FAIL'
   | 'CONDEMNED'
@@ -1383,7 +1388,8 @@ export type NavigationTab =
   | 'analytics'
   | 'admin'
   | 'smart_vision'
-  | 'users';
+  | 'users'
+  | 'learning';
 
 export interface AdminUserRecord {
   id: string;
@@ -1415,6 +1421,7 @@ export function canAccessTab(role: string | undefined, tab: NavigationTab, hasSe
   }
   if (roleUpper === 'SUPERVISOR') {
     if (tab === 'dashboard' || tab === 'analytics' || tab === 'users') return false;
+    // Supervisors may VIEW learning data; only admins can approve changes.
     return true;
   }
   if (roleUpper === 'ADMIN') {

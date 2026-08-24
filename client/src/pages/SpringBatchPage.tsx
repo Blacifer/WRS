@@ -29,6 +29,30 @@ import { offlineDb } from '../services/offlineDb.ts';
 import { CheckCircleIcon, AlertTriangleIcon, RefreshCwIcon } from '../components/Icons.tsx';
 import { playPassChime, playCondemnedBuzz } from '../utils/audioFeedback.ts';
 
+/**
+ * Paint colours for the physical band applied to each spring, per RDSO
+ * WMM 2.0's "coloured band should be provided for easy identification of
+ * group height". WHITE is rendered slightly off-white so it stays visible
+ * against the app's dark surface.
+ */
+const BAND_PAINT_HEX: Record<string, string> = {
+  BLUE: '#2563eb',
+  GREEN: '#16a34a',
+  YELLOW: '#eab308',
+  ORANGE: '#ea580c',
+  WHITE: '#f1f5f9',
+  RED: '#dc2626'
+};
+
+const BAND_LABEL_HI: Record<string, string> = {
+  BLUE: 'नीला',
+  GREEN: 'हरा',
+  YELLOW: 'पीला',
+  ORANGE: 'नारंगी',
+  WHITE: 'सफ़ेद',
+  RED: 'लाल'
+};
+
 interface SpringBatchPageProps {
   lang: LanguageCode;
   user: User | null;
@@ -392,6 +416,32 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
               </div>
               {classification.status === 'CONDEMNED' && classification.condemnationReason && (
                 <p className="text-xs font-semibold text-rose-300">{classification.condemnationReason}</p>
+              )}
+
+              {/* Physical paint-band instruction.
+                  RDSO WMM 2.0: "Coloured band should be provided for easy
+                  identification of group height." The band is not just a
+                  software label — it is paint applied to the spring so the
+                  fitter can match a nest by eye at assembly. The app computed
+                  the band and then said nothing about what to do with it. */}
+              {classification.status === 'PASS' && classification.band && (
+                <div className="flex items-center gap-3 pt-2.5 mt-1 border-t border-white/10">
+                  <span
+                    aria-hidden="true"
+                    className="w-9 h-9 rounded-lg shrink-0 border-2 border-white/30 shadow-inner"
+                    style={{ backgroundColor: BAND_PAINT_HEX[classification.band] || '#94a3b8' }}
+                  />
+                  <div className="leading-tight">
+                    <p className="text-xs font-black text-white tracking-wide">
+                      {isHi ? 'स्प्रिंग पर रंग पट्टी लगाएँ' : 'Paint the colour band on this spring'}
+                    </p>
+                    <p className="text-[11px] text-slate-300">
+                      {isHi
+                        ? `रंग: ${BAND_LABEL_HI[classification.band] || classification.band} — ताकि असेंबली के समय नेस्ट मिलान आँख से हो सके`
+                        : `${classification.band} — so the nest can be matched by eye at assembly`}
+                    </p>
+                  </div>
+                </div>
               )}
             </div>
           )}
