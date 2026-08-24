@@ -31,6 +31,11 @@ for brewbin in /opt/homebrew/bin /usr/local/bin; do
 done
 
 PORT="${PORT:-3000}"
+
+# This machine's address on the local network. A phone on the same Wi-Fi can
+# reach the app here directly — no tunnel, no third party, and nothing to drop.
+LAN_IP="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || \
+          ifconfig 2>/dev/null | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1)"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
@@ -255,7 +260,21 @@ cat <<BRIEF
 ${BLD}────────────────────────────────────────────────────────────────${NC}
 ${BLD}  OPEN THIS ON THE PHONE OR TABLET${NC}
 
+  ${BLD}1. On the same Wi-Fi — stable, recommended${NC}
+
+     ${GRN}http://${LAN_IP:-<no LAN address found>}:${PORT}${NC}
+
+     Nothing to drop and no click-through. The live camera will not run
+     over plain HTTP, so QR scanning is unavailable and the defect photo
+     uses "Choose File" — everything else, including the whole spring
+     flow, works normally.
+
+  ${BLD}2. From anywhere — needed for Raipur, but drops often${NC}
+
      ${GRN}${PUBLIC_URL:-<no public URL — see the log>}${NC}
+
+     Free tunnel. If it returns 503 the URL has changed — check this
+     terminal for a new one.
 
 ${BLD}  Sign in${NC}
      inspector1  / password123    (shop-floor view)
