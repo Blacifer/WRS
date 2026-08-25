@@ -17,6 +17,7 @@ import { computeComponentVerdict, resolveComponentTarget } from '../services/cla
 import { SingleWagonTestForm } from '../components/SingleWagonTestForm.tsx';
 import { playPassChime, playCondemnedBuzz } from '../utils/audioFeedback.ts';
 import { PassportQRScannerModal } from '../components/PassportQRScannerModal.tsx';
+import { ChecklistSuggestions } from '../components/ChecklistSuggestions.tsx';
 import type {
   WagonRecord,
   ChecklistItem,
@@ -922,6 +923,21 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
       {/* Tab 1: CASNUB Checklist */}
       {activeTab === 'CHECKLIST' && (
         <div className="space-y-6">
+          {/* Proposes an answer for each pending item from what this shop
+              recorded on the same part before, so an inspector confirms rather
+              than types fifty-two times. Nothing applies itself. */}
+          <ChecklistSuggestions
+            wagonNumber={wagonNumber}
+            lang={isHi ? 'hi' : 'en'}
+            onApply={async (itemId, status) => {
+              await api.updateChecklistItem(wagonNumber, itemId, {
+                status: status as any,
+                reinspectedStatus: status as any
+              });
+            }}
+            onApplied={loadWagonData}
+          />
+
           {/* Hands-Free Voice Inspection Toolbar */}
           <VoiceInspectionToolbar
             wagonNumber={wagonNumber}

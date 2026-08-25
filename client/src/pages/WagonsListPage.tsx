@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../services/api.ts';
 import { offlineDb } from '../services/offlineDb.ts';
 import { useI18n } from '../i18n/index.ts';
+import { WagonNumberCamera } from '../components/WagonNumberCamera.tsx';
 import type { WagonRecord, LifecycleStage } from '../../../shared/types.ts';
 
 interface WagonsListPageProps {
@@ -24,6 +25,8 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
 
   // Register Modal State
   const [showRegisterModal, setShowRegisterModal] = useState<boolean>(false);
+  // Reads the number painted on the wagon rather than having it typed.
+  const [showNumberCamera, setShowNumberCamera] = useState(false);
   const [newWagonNumber, setNewWagonNumber] = useState<string>('');
   const [newWagonType, setNewWagonType] = useState<string>('BOXNHL');
   const [newOwningRailway, setNewOwningRailway] = useState<string>('SECR');
@@ -278,6 +281,17 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
       )}
 
       {/* Register Wagon Modal */}
+      {showNumberCamera && (
+        <WagonNumberCamera
+          lang={isHi ? 'hi' : 'en'}
+          onRead={(num) => {
+            setNewWagonNumber(num);
+            setShowNumberCamera(false);
+          }}
+          onClose={() => setShowNumberCamera(false)}
+        />
+      )}
+
       {showRegisterModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
           <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
@@ -304,14 +318,24 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
                   {t('form.wagonNumber')} *
                 </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. NR/BOXNHL/12345 or SECR/BOXN/99021"
-                  value={newWagonNumber}
-                  onChange={(e) => setNewWagonNumber(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white font-mono uppercase focus:outline-none focus:border-orange-500"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. NR/BOXNHL/12345 or SECR/BOXN/99021"
+                    value={newWagonNumber}
+                    onChange={(e) => setNewWagonNumber(e.target.value)}
+                    className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white font-mono uppercase focus:outline-none focus:border-orange-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNumberCamera(true)}
+                    title="Read the number painted on the wagon"
+                    className="px-3 rounded-lg border border-amber-600 text-amber-300 hover:bg-amber-950/50 text-xs font-bold whitespace-nowrap"
+                  >
+                    📷 {t('actions.scan') || 'Scan'}
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
