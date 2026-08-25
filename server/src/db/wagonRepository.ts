@@ -1228,6 +1228,58 @@ export class WagonRepository {
     }
 
     // -----------------------------------------------------------------------
+    // Bearings fitted to one wagon must share an overhaul cycle.
+    //
+    // WMM 2.0 Chapter 6, clause (f): "While fitting CTRBs back into a wagon in
+    // ROH depots, it must be ensured that only CTRB with cap screws having one
+    // particular type of painting scheme (One cap screw painted / two cap
+    // screw painted / three cap screw painted) are strictly placed under a
+    // wagon undergoing ROH."
+    //
+    // The scheme is a physical record: at POH the end cap screws are replaced
+    // unpainted, and one more is painted golden yellow at each ROH. So the
+    // rule is that every bearing under a wagon must be at the same point in
+    // its overhaul cycle — a matched-set rule of exactly the same shape as the
+    // spring nest rule, currently enforced by counting paint and verified by
+    // sample check (clause (i)).
+    //
+    // "must be ensured" and "strictly" is prohibition language, so this blocks
+    // rather than advises. Wagons with no bearing passports recorded are not
+    // judged: absence of data is not evidence of a mismatch.
+    // -----------------------------------------------------------------------
+    const fittedBearings = this.db.prepare(`
+      SELECT serial_number, roh_cycles_since_poh, current_bogie_position
+      FROM components
+      WHERE current_wagon_number = ? AND component_type = 'BEARING' AND status != 'CONDEMNED'
+    `).all(normalizedWagonNumber) as any[];
+
+    if (fittedBearings.length > 1) {
+      const cycles = [...new Set(fittedBearings.map((b) => b.roh_cycles_since_poh))].sort();
+      if (cycles.length > 1) {
+        const describe = (n: number) =>
+          n === 0 ? 'no screws painted (fresh from POH)' : `${n} screw${n === 1 ? '' : 's'} painted`;
+        const summary = cycles.map(describe).join(' and ');
+
+        blockers.push(
+          `Bearings fitted to this wagon are at different points in their overhaul cycle — ${summary}. ` +
+          `WMM 2.0 Chapter 6 requires that only CTRBs with one painting scheme are fitted under a wagon.`
+        );
+        blockerDetails.push({
+          id: 'ctrb_cycle_mismatch',
+          category: 'BEARINGS',
+          partName: 'CTRB overhaul cycle',
+          issueType: 'CTRB_CYCLE_MISMATCH',
+          description:
+            `${fittedBearings.length} bearings fitted, spanning ${cycles.length} overhaul cycles (${summary}). ` +
+            `Serials: ${fittedBearings.map((b) => `${b.serial_number} (${b.roh_cycles_since_poh})`).join(', ')}.`,
+          severity: 'CRITICAL',
+          remediationAction:
+            'Refit so every bearing under this wagon carries the same painting scheme, per WMM 2.0 Chapter 6 clause (f).'
+        });
+      }
+    }
+
+    // -----------------------------------------------------------------------
     // Single Wagon Test (air brake).
     //
     // WMM 2.0 §720: "Single wagon test is also carried out after POH". For a

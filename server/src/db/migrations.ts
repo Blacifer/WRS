@@ -677,6 +677,17 @@ export function runMigrations(db: DatabaseSync): void {
     END;
   `);
 
+
+  // ROH cycle count on serialized components — see the column comment in
+  // schema.sql. This is what the yellow paint on CTRB end cap screws encodes.
+  const compCols = db.prepare("PRAGMA table_info(components)").all() as any[];
+  if (compCols.length > 0 && !compCols.some((c) => c.name === 'roh_cycles_since_poh')) {
+    db.exec(
+      'ALTER TABLE components ADD COLUMN roh_cycles_since_poh INTEGER NOT NULL DEFAULT 0 ' +
+      'CHECK(roh_cycles_since_poh >= 0 AND roh_cycles_since_poh <= 3);'
+    );
+  }
+
   // A declared principal for actions the system performs itself.
   //
   // Audit rows carry a foreign key to users, so an event with no human actor

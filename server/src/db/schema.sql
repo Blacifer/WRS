@@ -630,6 +630,18 @@ CREATE TABLE IF NOT EXISTS components (
   manufacturer TEXT NOT NULL,
   total_km_travelled REAL NOT NULL DEFAULT 0.0 CHECK(total_km_travelled >= 0.0),
   overhaul_count INTEGER NOT NULL DEFAULT 0 CHECK(overhaul_count >= 0),
+  -- ROH cycles completed since the last POH.
+  --
+  -- WMM 2.0 Chapter 6 encodes this physically, in paint: at POH the end cap
+  -- screws are a must-change item and go on unpainted; at each subsequent ROH
+  -- one more screw head is painted golden yellow. Counting yellow screws tells
+  -- a fitter how far through its overhaul cycle a bearing is.
+  --
+  -- It matters because of clause (f) of the same section: only bearings
+  -- carrying the SAME painting scheme may be fitted under one wagon. That is a
+  -- matched-set rule enforced by eye and verified by sample check, which is
+  -- exactly the kind of thing that should not depend on counting paint.
+  roh_cycles_since_poh INTEGER NOT NULL DEFAULT 0 CHECK(roh_cycles_since_poh >= 0 AND roh_cycles_since_poh <= 3),
   last_poh_date TEXT DEFAULT NULL,
   next_poh_due TEXT DEFAULT NULL,
   health_score REAL NOT NULL DEFAULT 100.0 CHECK(health_score >= 0.0 AND health_score <= 100.0),

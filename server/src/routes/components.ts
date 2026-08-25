@@ -460,6 +460,43 @@ componentsRouter.post('/:serialNumber/health', authMiddleware, async (req: Reque
 
 // -------------------------------------------------------------------------
 // 10. Record Overhaul (POH)
+
+// ---------------------------------------------------------------------------
+// Record a routine overhaul (ROH)
+//
+// WMM 2.0 Chapter 6: at each ROH one more end cap screw head is painted golden
+// yellow, so the count says how far through its cycle a bearing is. Recording
+// it here is what lets the exit gate check clause (f) — that every bearing
+// under a wagon shares one painting scheme — instead of that being counted by
+// eye and verified by sample.
+// ---------------------------------------------------------------------------
+componentsRouter.post('/:serialNumber/roh', authMiddleware, async (req: Request, res: Response) => {
+  const repo = getRepo();
+  const serialNumber = req.params?.serialNumber;
+  const user = (req as any).user;
+
+  if (!serialNumber) {
+    res.status(400).json({ success: false, error: 'MISSING_PARAM', message: 'serialNumber is required', statusCode: 400, timestamp: new Date().toISOString() });
+    return;
+  }
+  if (!user?.id) {
+    res.status(401).json({ success: false, error: 'UNAUTHORIZED', message: 'An overhaul record must name who performed it.', statusCode: 401, timestamp: new Date().toISOString() });
+    return;
+  }
+
+  try {
+    const component = repo.recordRoh(serialNumber, user.id, user.name, req.body?.notes);
+    res.status(200).json({
+      success: true,
+      message: `ROH recorded for ${component.serialNumber}. Cycles since last POH: ${(component as any).rohCyclesSincePoh}.`,
+      data: component,
+      timestamp: new Date().toISOString()
+    });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: 'ROH_FAILED', message: err.message || 'Failed to record ROH.', statusCode: 400, timestamp: new Date().toISOString() });
+  }
+});
+
 // -------------------------------------------------------------------------
 componentsRouter.post('/:serialNumber/overhaul', authMiddleware, async (req: Request, res: Response) => {
   try {

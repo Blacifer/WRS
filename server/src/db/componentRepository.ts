@@ -108,6 +108,8 @@ export class ComponentRepository {
       manufacturer: row.manufacturer as string,
       totalKmTravelled: Number(row.total_km_travelled ?? 0.0),
       overhaulCount: Number(row.overhaul_count ?? 0),
+      // What the yellow paint on the end cap screws encodes.
+      rohCyclesSincePoh: Number(row.roh_cycles_since_poh ?? 0),
       lastPohDate: (row.last_poh_date as string) || undefined,
       nextPohDue: (row.next_poh_due as string) || undefined,
       healthScore: Number(row.health_score ?? 100.0),
@@ -644,6 +646,56 @@ export class ComponentRepository {
   /**
    * Record a maintenance or overhaul event, incrementing overhaul count if applicable.
    */
+
+  /**
+   * Records a routine overhaul (ROH) on a component.
+   *
+   * WMM 2.0 Chapter 6: at each ROH one more end cap screw head is painted
+   * golden yellow, so the count of painted screws says how many ROH cycles the
+   * bearing has had since its last POH. Recording it here replaces counting
+   * paint on a shed floor.
+   *
+   * The manual describes at most three ROH schedules within a POH cycle, so a
+   * fourth is refused rather than silently recorded — a bearing that has
+   * apparently had four is a data fault worth surfacing, not a number to keep
+   * incrementing.
+   */
+  public recordRoh(
+    serialNumber: string,
+    userId: string,
+    userName: string,
+    notes?: string
+  ): SerializedComponent {
+    const component = this.getComponentBySerial(serialNumber, false);
+    if (!component) {
+      throw new Error(`COMPONENT_NOT_FOUND: Serialized component "${serialNumber}" not found.`);
+    }
+
+    const current = (component as any).rohCyclesSincePoh ?? 0;
+    if (current >= 3) {
+      throw new Error(
+        `${serialNumber} has already completed ${current} ROH cycles since its last POH. ` +
+        `WMM 2.0 describes at most three before POH is due — record a POH, or investigate the record.`
+      );
+    }
+
+    this.db.prepare(`
+      UPDATE components SET roh_cycles_since_poh = roh_cycles_since_poh + 1, updated_at = ? WHERE id = ?
+    `).run(new Date().toISOString(), component.id);
+
+    this.recordMaintenanceEvent(
+      serialNumber,
+      'MAINTENANCE_PERFORMED',
+      `Routine overhaul (ROH) recorded. Cycles since last POH: ${current + 1}.`,
+      'REPAIR_REPLACEMENT',
+      notes,
+      userId,
+      userName
+    );
+
+    return this.getComponentBySerial(serialNumber, false)!;
+  }
+
   public recordOverhaul(
     serialNumber: string,
     pohDate?: string,
@@ -667,6 +719,9 @@ export class ComponentRepository {
     this.db.prepare(`
       UPDATE components
       SET overhaul_count = overhaul_count + 1,
+          -- POH resets the ROH cycle count: the end cap screws are a
+          -- must-change item and the new ones go on unpainted.
+          roh_cycles_since_poh = 0,
           last_poh_date = ?,
           next_poh_due = ?,
           health_score = ?,

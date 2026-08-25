@@ -697,6 +697,19 @@ export class ApiClient {
     );
   }
 
+  /**
+   * Records a routine overhaul. WMM 2.0 Chapter 6 tracks this in paint — one
+   * more end cap screw painted yellow at each ROH — and it is what the exit
+   * gate checks when it requires every bearing under a wagon to share a
+   * painting scheme.
+   */
+  public async recordComponentRoh(serialNumber: string, notes?: string): Promise<{ success: boolean; data: SerializedComponent; message?: string }> {
+    return this.request<{ success: boolean; data: SerializedComponent; message?: string }>(
+      `/components/${encodeURIComponent(serialNumber)}/roh`,
+      { method: 'POST', body: JSON.stringify({ notes }) }
+    );
+  }
+
   public async recordComponentOverhaul(serialNumber: string, payload: { pohDate?: string; nextPohDue?: string; restoredHealthScore?: number; notes?: string }): Promise<{ success: boolean; data: SerializedComponent; message?: string }> {
     return this.request<{ success: boolean; data: SerializedComponent; message?: string }>(
       `/components/${encodeURIComponent(serialNumber)}/overhaul`,

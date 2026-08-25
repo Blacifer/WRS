@@ -563,11 +563,43 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
                           <p className="text-[10px] text-slate-500">
                             POH: {comp.overhaulCount} | {comp.totalKmTravelled.toLocaleString()} km
                           </p>
+                          {/*
+                            For a bearing, how many end cap screws are painted
+                            yellow. WMM 2.0 Chapter 6 requires every bearing
+                            under one wagon to carry the same scheme, so this
+                            is the number a fitter has to match — shown here
+                            rather than counted off the screws at the wagon.
+                          */}
+                          {comp.componentType === 'BEARING' && (
+                            <p className="text-[10px] text-amber-400/90 font-semibold">
+                              {isHi ? 'ROH चक्र' : 'ROH cycles'}: {(comp as any).rohCyclesSincePoh ?? 0}
+                              {' '}
+                              <span className="text-amber-500/70">
+                                ({(comp as any).rohCyclesSincePoh ? `${(comp as any).rohCyclesSincePoh} ${isHi ? 'पेंटेड स्क्रू' : 'painted'}` : (isHi ? 'बिना पेंट' : 'unpainted')})
+                              </span>
+                            </p>
+                          )}
                         </td>
 
                         {/* Actions */}
                         <td className="p-3 sm:p-4 text-right">
                           <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            {comp.componentType === 'BEARING' && ((comp as any).rohCyclesSincePoh ?? 0) < 3 && (
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await api.recordComponentRoh(comp.serialNumber, 'ROH recorded at depot');
+                                    await loadData();
+                                  } catch (e: any) {
+                                    setError(e?.message || 'Could not record ROH');
+                                  }
+                                }}
+                                title={isHi ? 'नियमित ओवरहॉल दर्ज करें' : 'Record a routine overhaul (one more painted screw)'}
+                                className="px-2.5 py-1 bg-amber-700/80 hover:bg-amber-600 text-white rounded text-[11px] font-bold transition shadow"
+                              >
+                                {isHi ? 'ROH' : 'ROH'}
+                              </button>
+                            )}
                             {comp.status === 'AVAILABLE_IN_STORES' || comp.status === 'RECONDITIONED' ? (
                               <button
                                 onClick={() => {
