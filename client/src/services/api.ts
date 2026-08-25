@@ -435,9 +435,10 @@ export class ApiClient {
   }
 
   public async signoffExitGate(wagonNumber: string, payload: {
-    digitalSignature?: string;
     otpToken?: string;
     notes?: string;
+    /** Advisory ids the supervisor accepted; the server refuses without them. */
+    acknowledgedAdvisoryIds?: string[];
   }): Promise<{ success: boolean; data: GateSignoffRecord }> {
     return this.request<{ success: boolean; data: GateSignoffRecord }>(`/wagons/${wagonNumber}/gate/signoff`, {
       method: 'POST',

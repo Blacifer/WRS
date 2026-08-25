@@ -380,3 +380,51 @@ describe('Nest Grouping for Band-Recorded Springs', () => {
     assert.ok(!r.violations.some((v) => v.type === 'BAND_MIXED'), 'the condemned spring is excluded');
   });
 });
+
+describe('Nest Violation Severity', () => {
+  // Severity follows the manual's own wording rather than our own judgement of
+  // how serious each fault is. Getting this backwards in either direction has
+  // a cost: detaining wagons on a recommendation teaches people to distrust
+  // the gate, and passing a prohibition silently defeats it.
+  const mk = (over: Record<string, unknown>) => ({
+    id: String(Math.random()),
+    springPosition: 'OUTER' as const,
+    bogiePosition: 'BOGIE_1',
+    condition: 'USED' as const,
+    measuredFreeHeight: 258.5,
+    classifiedBand: 'GREEN',
+    status: 'PASS',
+    ...over
+  });
+
+  it('TC-SEV-01: mixing new and used springs is a prohibition — "must be avoided"', () => {
+    const r = validateSpringNests([
+      mk({ condition: 'USED' }),
+      mk({ condition: 'NEW' })
+    ]);
+    assert.ok(r.violations.some((v) => v.type === 'NEW_OLD_MIXED'));
+  });
+
+  it('TC-SEV-02: a measured 3 mm overrun is a recommendation — "it is recommended"', () => {
+    const r = validateSpringNests([
+      mk({ measuredFreeHeight: 251 }),
+      mk({ measuredFreeHeight: 260 })
+    ]);
+    const v = r.violations.find((x) => x.type === 'HEIGHT_VARIATION_EXCEEDED')!;
+    assert.ok(v, 'a 9 mm spread must still be reported');
+    assert.ok(/3 mm/.test(v.message));
+  });
+
+  it('TC-SEV-03: band mixing is reported without claiming a certain breach', () => {
+    // Two springs either side of a band boundary can be a fraction of a
+    // millimetre apart. What is certain is that the real spread is unknown —
+    // the wording must not overstate that.
+    const r = validateSpringNests([
+      mk({ classifiedBand: 'GREEN', heightIsApproximate: true }),
+      mk({ classifiedBand: 'BLUE', measuredFreeHeight: 261.5, heightIsApproximate: true })
+    ]);
+    const v = r.violations.find((x) => x.type === 'BAND_MIXED')!;
+    assert.ok(v);
+    assert.ok(/can be up to/.test(v.message), 'must describe the risk, not assert a measured breach');
+  });
+});

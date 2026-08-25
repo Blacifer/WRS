@@ -111,6 +111,19 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
   const [signoffOtp, setSignoffOtp] = useState<string>('');
   const [signoffNotes, setSignoffNotes] = useState<string>('Zero-defect quality clearance certified per RDSO specifications.');
   const [signoffError, setSignoffError] = useState<string | null>(null);
+  // Advisory findings the supervisor has explicitly accepted. The server
+  // refuses sign-off until every current advisory appears here, so a wagon can
+  // leave with a mismatched nest only as a recorded decision.
+  const [acknowledgedAdvisories, setAcknowledgedAdvisories] = useState<string[]>([]);
+  // Real two-step OTP, mirroring SupervisorOverrideModal. The sign-off modal
+  // previously had a bare "6-digit OTP" box whose value went straight to the
+  // API as an action token — which no real code could ever satisfy. The only
+  // path that actually worked was leaving it blank, which sent the test-suite
+  // bypass token. Requesting and verifying properly is the whole point of
+  // gating release behind an OTP.
+  const [signoffOtpId, setSignoffOtpId] = useState<string | null>(null);
+  const [signoffOtpToken, setSignoffOtpToken] = useState<string | null>(null);
+  const [signoffOtpBusy, setSignoffOtpBusy] = useState<boolean>(false);
   const [signoffSubmitting, setSignoffSubmitting] = useState<boolean>(false);
 
   const user = api.getUser();
@@ -421,18 +434,63 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
     }
   };
 
+  const handleRequestSignoffOtp = async () => {
+    setSignoffError(null);
+    setSignoffOtpBusy(true);
+    try {
+      const res = await api.requestOtp('OVERRIDE');
+      setSignoffOtpId(res.otpId);
+      // Autofilled on a workshop kiosk in development, exactly as the override
+      // modal does; in production the supervisor reads it from their device.
+      if (res.devOtpCode) setSignoffOtp(res.devOtpCode);
+    } catch (err: any) {
+      setSignoffError(err.message || 'Could not request an OTP');
+    } finally {
+      setSignoffOtpBusy(false);
+    }
+  };
+
+  const handleVerifySignoffOtp = async () => {
+    if (!signoffOtpId || !signoffOtp.trim()) {
+      setSignoffError('Enter the OTP code sent to you');
+      return;
+    }
+    setSignoffError(null);
+    setSignoffOtpBusy(true);
+    try {
+      const res = await api.verifyOtp(signoffOtpId, signoffOtp.trim());
+      if (res.otpToken) setSignoffOtpToken(res.otpToken);
+      else setSignoffError('That OTP code was not accepted');
+    } catch (err: any) {
+      setSignoffError(err.message || 'Could not verify the OTP');
+    } finally {
+      setSignoffOtpBusy(false);
+    }
+  };
+
   const handleGateSignoff = async (e: React.FormEvent) => {
     e.preventDefault();
     setSignoffSubmitting(true);
     setSignoffError(null);
 
     try {
+      // The signature is computed and keyed by the server. Sending one from
+      // here was theatre: `HMAC-SHA256-<timestamp>` signed nothing, and the
+      // server no longer accepts a caller-supplied signature at all.
+      //
+      // The OTP is sent as typed. It used to fall back to 'test_token_override'
+      // when the field was blank, which quietly cleared the supervisor gate
+      // with a bypass token meant for the test suite.
       await api.signoffExitGate(wagonNumber, {
-        otpToken: signoffOtp || 'test_token_override',
+        otpToken: signoffOtpToken || '',
         notes: signoffNotes,
-        digitalSignature: `HMAC-SHA256-${Date.now()}`
+        acknowledgedAdvisoryIds: acknowledgedAdvisories
       });
       setShowSignoffModal(false);
+      setAcknowledgedAdvisories([]);
+      setSignoffOtp('');
+      setSignoffOtpId(null);
+      setSignoffOtpToken(null);
       loadWagonData();
       setShowCertificateModal(true);
     } catch (err: any) {
@@ -2005,14 +2063,75 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">{isHi ? 'पर्यवेक्षक क्रिया ओटीपी टोकन' : 'Supervisor Action OTP Token'}</label>
-                <input
-                  type="text"
-                  placeholder={isHi ? '6-अंकीय ओटीपी दर्ज करें' : 'Enter 6-digit OTP'}
-                  value={signoffOtp}
-                  onChange={(e) => setSignoffOtp(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
-                />
+                {!signoffOtpToken ? (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder={isHi ? '6-अंकीय ओटीपी दर्ज करें' : 'Enter 6-digit OTP'}
+                      value={signoffOtp}
+                      onChange={(e) => setSignoffOtp(e.target.value)}
+                      disabled={!signoffOtpId}
+                      className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white disabled:opacity-50 focus:outline-none focus:border-emerald-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={signoffOtpId ? handleVerifySignoffOtp : handleRequestSignoffOtp}
+                      disabled={signoffOtpBusy}
+                      className="px-4 py-2 rounded-lg border border-emerald-600 text-emerald-300 hover:bg-emerald-950 disabled:opacity-40 text-xs font-bold whitespace-nowrap"
+                    >
+                      {signoffOtpBusy
+                        ? '…'
+                        : signoffOtpId
+                          ? (isHi ? 'ओटीपी सत्यापित करें' : 'Verify OTP')
+                          : (isHi ? 'ओटीपी भेजें' : 'Send OTP')}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-xs font-bold text-emerald-400">
+                    {isHi ? '✓ ओटीपी सत्यापित' : '✓ OTP verified'}
+                  </p>
+                )}
               </div>
+
+              {/*
+                Advisory findings do not block release — the manual words the
+                nest grouping rule as a recommendation. They do have to be
+                accepted by name, so releasing a wagon with a mismatched nest
+                is a decision on the record rather than something nobody read.
+              */}
+              {(gateStatus?.advisoryDetails || []).length > 0 && (
+                <div className="rounded-lg border border-amber-700/60 bg-amber-950/30 p-3 space-y-2">
+                  <p className="text-xs font-bold text-amber-300 uppercase tracking-wide">
+                    {isHi ? 'सलाहकार निष्कर्ष — स्वीकृति आवश्यक' : 'Advisory findings — your acceptance required'}
+                  </p>
+                  <p className="text-[11px] text-amber-200/80">
+                    {isHi
+                      ? 'ये विमुक्ति को नहीं रोकते, पर प्रमाणपत्र पर आपके नाम से दर्ज होंगे।'
+                      : 'These do not block release, but accepting them is recorded on the certificate in your name.'}
+                  </p>
+                  {(gateStatus?.advisoryDetails || []).map((a: any) => {
+                    const checked = acknowledgedAdvisories.includes(a.id);
+                    return (
+                      <label key={a.id} className="flex gap-2 items-start text-xs text-amber-100 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() =>
+                            setAcknowledgedAdvisories((prev) =>
+                              checked ? prev.filter((x) => x !== a.id) : [...prev, a.id]
+                            )
+                          }
+                          className="mt-0.5 shrink-0"
+                        />
+                        <span>
+                          <span className="font-semibold">{a.partName}</span> — {a.description}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
 
               <div className="pt-3 border-t border-slate-800 flex justify-end gap-3">
                 <button
@@ -2022,8 +2141,12 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                 >{isHi ? 'रद्द करें' : 'Cancel'}</button>
                 <button
                   type="submit"
-                  disabled={signoffSubmitting}
-                  className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-lg"
+                  disabled={
+                    signoffSubmitting ||
+                    !signoffOtpToken ||
+                    (gateStatus?.advisoryDetails || []).some((a: any) => !acknowledgedAdvisories.includes(a.id))
+                  }
+                  className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-bold shadow-lg"
                 >
                   {signoffSubmitting ? 'Signing...' : 'Authorize & Issue Certificate'}
                 </button>

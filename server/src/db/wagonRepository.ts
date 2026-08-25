@@ -1171,20 +1171,45 @@ export class WagonRepository {
       }))
     );
 
+    // Severity follows the manual's own wording, rather than a judgement of
+    // our own about how serious each fault is:
+    //
+    //   NEW_OLD_MIXED — "Mixing of new and old springs must be avoided."
+    //     A prohibition, so it blocks.
+    //
+    //   HEIGHT_VARIATION_EXCEEDED / BAND_MIXED — "it is recommended that
+    //     springs having not more than 3 mm free height variation should be
+    //     assembled in the same group." A recommendation, so it does not block.
+    //
+    // Band mixing in particular is not a certain breach: two springs either
+    // side of a band boundary can be a fraction of a millimetre apart. What is
+    // certain is that the real spread is unknown, which is a matter for
+    // supervisor judgement — not grounds to detain a wagon automatically.
+    //
+    // A recommendation is not permission to ignore it silently, though. Every
+    // advisory raised here has to be acknowledged by name at sign-off (see
+    // recordGateSignoff), so a wagon can leave with a mismatched nest only as
+    // a recorded decision, never by nobody noticing.
     for (const v of nestResult.violations) {
-      advisories.push(v.message);
-      advisoryDetails.push({
+      const detail = {
         id: `nest_${v.type}_${v.groupKey}`,
-        category: 'SPRINGS',
+        category: 'SPRINGS' as const,
         partName: `${v.groupKey} spring nest`,
         issueType: v.type,
         description: v.message,
-        severity: 'ADVISORY',
         remediationAction:
           v.type === 'NEW_OLD_MIXED'
             ? 'Re-group so each nest contains either all-new or all-used springs.'
             : `Re-group so every spring in this nest falls within one 3 mm band. ${nestResult.ruleReference}.`
-      });
+      };
+
+      if (v.type === 'NEW_OLD_MIXED') {
+        blockers.push(v.message);
+        blockerDetails.push({ ...detail, severity: 'CRITICAL' });
+      } else {
+        advisories.push(v.message);
+        advisoryDetails.push({ ...detail, severity: 'ADVISORY' });
+      }
     }
 
     const springCount = latestSprings.length;
@@ -1283,6 +1308,11 @@ export class WagonRepository {
     supervisorName: string;
     supervisorEmployeeId: string;
     otpTokenRef: string;
+    /**
+     * Advisory ids the supervisor has explicitly accepted. Every advisory the
+     * gate currently raises must appear here, or sign-off is refused.
+     */
+    acknowledgedAdvisoryIds?: string[];
     signoffNotes?: string;
     checksSummary: Record<string, unknown>;
   }): any {
@@ -1298,6 +1328,28 @@ export class WagonRepository {
       throw new Error(`Cannot sign off release. Blocker evaluation failed: ${evaluation.blockers.join('; ')}`);
     }
 
+    // -----------------------------------------------------------------------
+    // Advisories must be acknowledged, not merely displayed.
+    //
+    // The nest grouping rule is worded as a recommendation, so it does not
+    // block. That is not the same as being ignorable: a wagon leaving with a
+    // mismatched nest should be a decision somebody made and put their name
+    // to, not something nobody happened to read. Requiring each advisory to be
+    // named at sign-off is what turns a notice into a decision — and the
+    // acknowledgement travels inside the signed certificate contents below, so
+    // it cannot be quietly detached from the release afterwards.
+    // -----------------------------------------------------------------------
+    const acknowledged = new Set(data.acknowledgedAdvisoryIds || []);
+    const unacknowledged = (evaluation.advisoryDetails || []).filter((a: any) => !acknowledged.has(a.id));
+
+    if (unacknowledged.length > 0) {
+      throw new Error(
+        `Cannot sign off release. ${unacknowledged.length} advisory finding(s) have not been ` +
+        `acknowledged: ${unacknowledged.map((a: any) => a.description).join('; ')} ` +
+        `Acknowledge each finding to release the wagon on your authority, or resolve it first.`
+      );
+    }
+
     const id = `signoff_${crypto.randomUUID()}`;
     const year = new Date().getFullYear();
     const month = String(new Date().getMonth() + 1).padStart(2, '0');
@@ -1311,13 +1363,22 @@ export class WagonRepository {
     // certificate. A hash that cannot be re-derived attests to nothing.
     const signedAt = new Date().toISOString();
 
+    // The acknowledgement is folded into the checks summary rather than kept
+    // as a signature-only field, because the summary is what gets stored.
+    // Anything the signature covers has to be recoverable from the record, or
+    // the certificate can never be re-verified by whoever receives it.
+    const checksSummary = {
+      ...(data.checksSummary as Record<string, unknown>),
+      acknowledgedAdvisoryIds: [...acknowledged].sort()
+    };
+
     const canonicalSummary = JSON.stringify({
       wagonNumber: normalizedWagonNumber,
       certificateNumber,
       supervisorId: data.supervisorId,
       supervisorEmployeeId: data.supervisorEmployeeId,
       signedAt,
-      summary: data.checksSummary
+      summary: checksSummary
     });
     const certificateHash = crypto.createHash('sha256').update(canonicalSummary).digest('hex');
 
@@ -1367,7 +1428,7 @@ export class WagonRepository {
     `).run(
       id, wagon.id, normalizedWagonNumber, data.supervisorId, data.supervisorName,
       data.supervisorEmployeeId, digitalSignature, data.otpTokenRef,
-      data.signoffNotes || null, JSON.stringify(data.checksSummary),
+      data.signoffNotes || null, JSON.stringify(checksSummary),
       certificateNumber, certificateHash, signedAt
     );
 
@@ -1394,7 +1455,7 @@ export class WagonRepository {
       digitalSignature,
       otpTokenRef: data.otpTokenRef,
       signoffNotes: data.signoffNotes || null,
-      checksSummary: data.checksSummary,
+      checksSummary,
       certificateNumber,
       certificateHash,
       signedAt

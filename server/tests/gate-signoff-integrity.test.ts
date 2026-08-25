@@ -325,4 +325,122 @@ describe('Release Sign-off Integrity', () => {
       'no certificate may be issued for a deactivated signatory'
     );
   });
+
+  // -------------------------------------------------------------------------
+  // Advisories are decisions, not notices
+  // -------------------------------------------------------------------------
+
+  /** Adds two unindexed outer springs 9 mm apart — a mismatched nest. */
+  async function addMismatchedNest(wagonNumber: string) {
+    for (const h of [251.0, 260.0]) {
+      await app.dispatch({
+        method: 'POST',
+        url: '/api/inspections',
+        headers: auth(inspectorToken),
+        body: {
+          wagonNumber,
+          bogieType: 'CASNUB_22_NLB',
+          condition: 'USED',
+          springPosition: 'OUTER',
+          measuredFreeHeight: h
+        }
+      });
+    }
+  }
+
+  test('TC-ACK-01: a wagon with an unacknowledged advisory cannot be released', async () => {
+    // The nest rule is worded as a recommendation, so it does not block. It is
+    // still not something a wagon may pass by nobody reading it.
+    const wagonNumber = 'SECR/BOXNHL/ACK001';
+    await driveToReleasable(wagonNumber);
+    await addMismatchedNest(wagonNumber);
+
+    const gate = await app.dispatch({
+      method: 'GET',
+      url: `/api/wagons/${wagonNumber}/gate/status`,
+      headers: auth(inspectorToken)
+    });
+    assert.ok(gate.body.data.advisories.length > 0, 'the mismatched nest must raise an advisory');
+    assert.equal(gate.body.data.canRelease, true, 'a recommendation must not block by itself');
+
+    const res = await signoff(wagonNumber, supervisorToken, { otpToken: 'test_token_override' });
+
+    assert.ok(res.status >= 400, `expected refusal without acknowledgement, got ${res.status}`);
+    assert.match(res.body.message, /not been acknowledged/i);
+    assert.equal(
+      getDatabase().prepare('SELECT COUNT(*) c FROM gate_signoffs WHERE wagon_number = ?').get(wagonNumber).c,
+      0
+    );
+  });
+
+  test('TC-ACK-02: acknowledging the advisory releases the wagon and records the decision', async () => {
+    const wagonNumber = 'SECR/BOXNHL/ACK001';
+    const gate = await app.dispatch({
+      method: 'GET',
+      url: `/api/wagons/${wagonNumber}/gate/status`,
+      headers: auth(inspectorToken)
+    });
+    const ids = gate.body.data.advisoryDetails.map((a: any) => a.id);
+
+    const res = await signoff(wagonNumber, supervisorToken, {
+      otpToken: 'test_token_override',
+      acknowledgedAdvisoryIds: ids
+    });
+
+    assert.equal(res.status, 200);
+
+    // The acknowledgement has to survive in the record, inside the signed
+    // contents — otherwise it could be detached from the release afterwards.
+    const row = getDatabase()
+      .prepare('SELECT checks_summary_json FROM gate_signoffs WHERE wagon_number = ?')
+      .get(wagonNumber) as any;
+    const summary = JSON.parse(row.checks_summary_json);
+    assert.deepEqual(summary.acknowledgedAdvisoryIds, [...ids].sort());
+  });
+
+  test('TC-ACK-03: a released certificate with an acknowledgement still verifies', async () => {
+    const row = getDatabase().prepare(`
+      SELECT wagon_number, certificate_number, supervisor_id, supervisor_employee_id,
+             signed_at, checks_summary_json, digital_signature
+      FROM gate_signoffs WHERE wagon_number = ?
+    `).get('SECR/BOXNHL/ACK001') as any;
+
+    const canonical = JSON.stringify({
+      wagonNumber: row.wagon_number,
+      certificateNumber: row.certificate_number,
+      supervisorId: row.supervisor_id,
+      supervisorEmployeeId: row.supervisor_employee_id,
+      signedAt: row.signed_at,
+      summary: JSON.parse(row.checks_summary_json)
+    });
+
+    assert.equal(
+      row.digital_signature,
+      'HMAC-SHA256:' + crypto.createHmac('sha256', config.jwtSecret).update(canonical).digest('hex'),
+      'everything the signature covers must be recoverable from the stored record'
+    );
+  });
+
+  test('TC-ACK-04: acknowledging an unrelated id does not count as acknowledgement', async () => {
+    const wagonNumber = 'SECR/BOXNHL/ACK002';
+    await driveToReleasable(wagonNumber);
+    await addMismatchedNest(wagonNumber);
+
+    const res = await signoff(wagonNumber, supervisorToken, {
+      otpToken: 'test_token_override',
+      acknowledgedAdvisoryIds: ['nest_SOMETHING_ELSE']
+    });
+
+    assert.ok(res.status >= 400, 'a wrong id must not clear a real advisory');
+    assert.match(res.body.message, /not been acknowledged/i);
+  });
+
+  test('TC-ACK-05: a clean wagon needs no acknowledgement', async () => {
+    // The gate must not become a nuisance where there is nothing to accept.
+    const wagonNumber = 'SECR/BOXNHL/ACK003';
+    await driveToReleasable(wagonNumber);
+
+    const res = await signoff(wagonNumber, supervisorToken, { otpToken: 'test_token_override' });
+    assert.equal(res.status, 200);
+  });
 });

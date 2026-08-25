@@ -612,7 +612,7 @@ wagonsRouter.post('/:wagonNumber/gate/signoff', authMiddleware, requireRole('SUP
   // Identity comes from the authenticated token; the signature is computed
   // server-side. Accepting either from the caller would let them choose whose
   // name goes on the certificate.
-  const { otp, otpToken, notes, signoffNotes } = req.body;
+  const { otp, otpToken, notes, signoffNotes, acknowledgedAdvisoryIds } = req.body;
 
   if (!wagonNumber) {
     res.status(400).json({
@@ -722,6 +722,7 @@ wagonsRouter.post('/:wagonNumber/gate/signoff', authMiddleware, requireRole('SUP
       // signature over the certificate's canonical contents.
       otpTokenRef: tokenToVerify || `otp_auto_${crypto.randomBytes(6).toString('hex')}`,
       signoffNotes: notes || signoffNotes || 'Quality audit cleared with zero defects.',
+      acknowledgedAdvisoryIds: Array.isArray(acknowledgedAdvisoryIds) ? acknowledgedAdvisoryIds : [],
       checksSummary: gateEvaluation.summary
     });
 
