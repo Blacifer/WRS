@@ -652,7 +652,7 @@ export class WagonRepository {
   public updateChecklistItem(
     itemId: string,
     updates: Partial<ChecklistItemData>,
-    options?: { expectedUpdatedAt?: string }
+    options?: { expectedUpdatedAt?: string; userId?: string; userRole?: string }
   ): any {
     const existing = this.getChecklistItemById(itemId);
     if (!existing) {
@@ -689,6 +689,30 @@ export class WagonRepository {
           condition_notes = ?, photo_id = ?, updated_at = ?
       WHERE id = ?
     `).run(status, repairAction, repairNotes, reinspectedStatus, conditionNotes, photoId, now, itemId);
+
+    // Every verdict on every part goes into the chain.
+    //
+    // Only the bulk "clear by exception" path was audited before, so the
+    // ordinary route — an inspector marking one component PASS, FAIL or
+    // CONDEMNED, which is the great majority of what happens to a wagon —
+    // left no trace at all. The system's claim is that nothing is skipped
+    // silently; that has to include the record of the inspection itself.
+    logAuditEvent(this.db, {
+      eventType: 'CHECKLIST_ITEM_INSPECTED' as any,
+      userId: options?.userId || 'usr_system',
+      userRole: options?.userRole || 'SYSTEM',
+      payload: {
+        wagonNumber: existing.wagon_number,
+        itemId,
+        category: existing.category,
+        partName: existing.part_name,
+        previousStatus: existing.status,
+        newStatus: status,
+        repairAction,
+        reinspectedStatus,
+        conditionNotes: conditionNotes || null
+      }
+    });
 
     return this.getChecklistItemById(itemId);
   }
@@ -1431,6 +1455,29 @@ export class WagonRepository {
       data.signoffNotes || null, JSON.stringify(checksSummary),
       certificateNumber, certificateHash, signedAt
     );
+
+    // The release itself, as its own event.
+    //
+    // This produced only a stage transition before — a side effect of the
+    // release rather than a record of it — so the audit log could not answer
+    // "who released this wagon, under which certificate, accepting what".
+    // That is the single most consequential act in the system and the one a
+    // DRM would look for first.
+    logAuditEvent(this.db, {
+      eventType: 'GATE_SIGNOFF_COMPLETED' as any,
+      userId: data.supervisorId,
+      userRole: 'SUPERVISOR',
+      payload: {
+        wagonNumber: normalizedWagonNumber,
+        certificateNumber,
+        certificateHash,
+        supervisorName: data.supervisorName,
+        supervisorEmployeeId: data.supervisorEmployeeId,
+        otpTokenRef: data.otpTokenRef,
+        acknowledgedAdvisoryIds: [...acknowledged].sort(),
+        signedAt
+      }
+    });
 
     // Record transition to RELEASE (Stage 7)
     this.recordTransition({

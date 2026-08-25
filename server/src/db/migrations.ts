@@ -592,4 +592,18 @@ export function runMigrations(db: DatabaseSync): void {
       "CHECK(bogie_position IS NULL OR bogie_position IN ('BOGIE_1', 'BOGIE_2'));"
     );
   }
+
+  // A declared principal for actions the system performs itself.
+  //
+  // Audit rows carry a foreign key to users, so an event with no human actor
+  // had nowhere valid to point — which is why checklist verdicts written by a
+  // direct repository call were silently not logged at all. This is a real,
+  // deliberate row rather than a ghost conjured on demand, and it cannot be
+  // signed into: is_active is 0, and its stored hash is not a valid PBKDF2
+  // record, so with the unsalted-SHA-256 fallback removed nothing can ever
+  // verify against it.
+  db.exec(
+    "INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, employee_id, is_active) " +
+    "VALUES ('usr_system', 'system', 'NO_LOGIN', 'ADMIN', 'System (automated actions)', 'WRS-SYSTEM', 0);"
+  );
 }

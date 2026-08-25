@@ -129,6 +129,19 @@ CREATE TABLE IF NOT EXISTS sequence_tracker (
 );
 INSERT OR IGNORE INTO sequence_tracker (name, last_val) VALUES ('inspection_seq', 0);
 
+-- A declared principal for actions the system performs itself.
+--
+-- Audit rows carry a foreign key to users, so an event with no human actor has
+-- nowhere valid to point and simply does not get written. It is defined here,
+-- alongside the schema it is a constraint of, so a database built straight from
+-- this file behaves the same as one built by the migrations.
+--
+-- It cannot be signed into: is_active is 0, and 'NO_LOGIN' is not a valid
+-- PBKDF2 record, so with the unsalted-SHA-256 fallback removed nothing can
+-- verify against it.
+INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, employee_id, is_active)
+VALUES ('usr_system', 'system', 'NO_LOGIN', 'ADMIN', 'System (automated actions)', 'WRS-SYSTEM', 0);
+
 -- =========================================================================
 -- Phase 2 Tables: Wagons, Lifecycle, Checklist, Gate & Photos
 -- =========================================================================

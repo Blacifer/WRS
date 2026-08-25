@@ -516,7 +516,11 @@ wagonsRouter.put('/:wagonNumber/checklist/items/:itemId', authMiddleware, async 
       },
       // Optional — when the client sends the version it read, a concurrent
       // edit by another inspector is reported instead of silently lost.
-      { expectedUpdatedAt: req.body?.expectedUpdatedAt }
+      {
+        expectedUpdatedAt: req.body?.expectedUpdatedAt,
+        userId: (req as any).user?.id,
+        userRole: (req as any).user?.role
+      }
     );
 
     res.status(200).json({

@@ -276,3 +276,74 @@ describe('Audit Chain Verification', () => {
     }
   });
 });
+
+describe('Audit Coverage — what actually reaches the chain', () => {
+  // The system's claim to the DRM is that everything is logged. Auditing which
+  // event types were ever written found two holes at the centre of it: an
+  // inspector's verdict on a component was recorded nowhere, and the release
+  // sign-off produced only a stage transition — a side effect of the release
+  // rather than a record of it. The log could not answer "who released this
+  // wagon, under which certificate, accepting what".
+  it('TC-AUD-15: a full wagon lifecycle is auditable end to end', async () => {
+    const { createApp } = await import('../src/app.ts');
+    const { generateToken } = await import('../src/auth/jwt.ts');
+    const { getDatabase } = await import('../src/db/connection.ts');
+    const { verifyAuditChain } = await import('../src/db/auditLog.ts');
+
+    const app = createApp(':memory:');
+    const H = (t: string) => ({ authorization: `Bearer ${t}`, 'content-type': 'application/json' });
+    const ins = generateToken({ id: 'usr_insp_001', username: 'inspector1', role: 'INSPECTOR', name: 'R' } as any);
+    const sup = generateToken({ id: 'usr_sup_001', username: 'supervisor1', role: 'SUPERVISOR', name: 'S' } as any);
+    const W = 'SECR/AUDCOV/1';
+
+    await app.dispatch({ method: 'POST', url: '/api/wagons/register', headers: H(ins), body: { wagonNumber: W, wagonType: 'BOXNHL', owningRailway: 'SECR' } });
+    for (const st of ['DISMANTLING', 'COMPONENT_INSPECTION', 'REPAIR_REPLACEMENT', 'REASSEMBLY', 'FINAL_QC_GATE'])
+      await app.dispatch({ method: 'POST', url: `/api/wagons/${W}/transition`, headers: H(ins), body: { targetStage: st } });
+
+    const chk: any = await app.dispatch({ method: 'GET', url: `/api/wagons/${W}/checklist`, headers: H(ins) });
+    for (const it of chk.body.data.allItems)
+      await app.dispatch({ method: 'PUT', url: `/api/wagons/${W}/checklist/items/${it.id}`, headers: H(ins), body: { status: 'PASS', reinspectedStatus: 'PASS' } });
+
+    await app.dispatch({ method: 'POST', url: '/api/inspections', headers: H(ins), body: { wagonNumber: W, bogieType: 'CASNUB_22_NLB', condition: 'USED', springPosition: 'OUTER', measuredFreeHeight: 258 } });
+
+    const sign: any = await app.dispatch({ method: 'POST', url: `/api/wagons/${W}/gate/signoff`, headers: H(sup), body: { otpToken: 'test_token_override' } });
+    assert.strictEqual(sign.status, 200);
+
+    const db = getDatabase();
+    const types = new Set(
+      (db.prepare('SELECT DISTINCT event_type t FROM inspection_audit_log').all() as any[]).map((r) => r.t)
+    );
+
+    for (const required of [
+      'WAGON_REGISTERED',
+      'WAGON_STAGE_TRANSITION',
+      'CHECKLIST_ITEM_INSPECTED',
+      'INSPECTION_CREATED',
+      'GATE_SIGNOFF_COMPLETED'
+    ]) {
+      assert.ok(types.has(required), `${required} never reaches the audit log`);
+    }
+
+    // Each component's verdict, not one row for the batch.
+    const itemEvents = db
+      .prepare("SELECT COUNT(*) c FROM inspection_audit_log WHERE event_type='CHECKLIST_ITEM_INSPECTED'")
+      .get() as any;
+    assert.strictEqual(
+      itemEvents.c,
+      chk.body.data.allItems.length,
+      'every checklist verdict must be individually recorded'
+    );
+
+    // The release must be answerable from the log alone.
+    const signoffRow = db
+      .prepare("SELECT payload_json, user_id FROM inspection_audit_log WHERE event_type='GATE_SIGNOFF_COMPLETED'")
+      .get() as any;
+    const payload = JSON.parse(signoffRow.payload_json);
+    assert.strictEqual(signoffRow.user_id, 'usr_sup_001', 'who signed');
+    assert.ok(payload.certificateNumber, 'under which certificate');
+    assert.ok('acknowledgedAdvisoryIds' in payload, 'accepting what');
+
+    // And all of it still chains.
+    assert.strictEqual(verifyAuditChain(db).verified, true, 'the enlarged log must still verify');
+  });
+});
