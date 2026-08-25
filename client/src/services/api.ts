@@ -722,6 +722,41 @@ export class ApiClient {
 
 
 
+
+  // =========================================================================
+  // Authenticator (TOTP) — a real second factor
+  // =========================================================================
+
+  public async getTotpStatus(): Promise<{ success: boolean; data: { enrolled: boolean; username: string } }> {
+    return this.request('/auth/totp/status');
+  }
+
+  public async beginTotpEnrolment(): Promise<{ success: boolean; data: { secret: string; uri: string } }> {
+    return this.request('/auth/totp/enrol', { method: 'POST', body: JSON.stringify({}) });
+  }
+
+  public async confirmTotpEnrolment(code: string): Promise<{ success: boolean; message?: string }> {
+    return this.request('/auth/totp/confirm', { method: 'POST', body: JSON.stringify({ code }) });
+  }
+
+  /**
+   * Exchanges an authenticator code for a single-use, action-scoped token.
+   * The token is what the protected endpoint actually accepts.
+   */
+  public async verifyTotpForAction(
+    action: 'OVERRIDE' | 'EXPORT' | 'USER_MGMT',
+    code: string
+  ): Promise<{ success: boolean; data: { otpToken: string; action: string } }> {
+    return this.request('/auth/totp/verify', { method: 'POST', body: JSON.stringify({ action, code }) });
+  }
+
+  public async resetUserTotp(userId: string): Promise<{ success: boolean; message?: string }> {
+    return this.request(`/auth/users/${encodeURIComponent(userId)}/totp/reset`, {
+      method: 'POST',
+      body: JSON.stringify({})
+    });
+  }
+
   // =========================================================================
   // Single Wagon Test (air brake) — WMM 2.0 §720
   // =========================================================================

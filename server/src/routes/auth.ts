@@ -15,6 +15,7 @@ import { getDatabase } from '../db/connection.ts';
 import { InspectionRepository } from '../db/repository.ts';
 import type { UserRole, OtpAction } from '../../../shared/types.ts';
 import { config } from '../config/index.ts';
+import { TotpService } from '../auth/totpService.ts';
 
 export const authRouter = Router();
 
@@ -254,10 +255,53 @@ authRouter.get('/users', authMiddleware, requireRole('ADMIN'), (_req: Authentica
   }
 });
 
+
+/**
+ * Requires a USER_MGMT action token on account changes.
+ *
+ * USER_MGMT was declared as an action type and enforced nowhere: creating,
+ * deactivating and reactivating accounts needed only an admin session. Since
+ * creating an account is how someone would grant themselves supervisor rights
+ * — and deactivating one is how they would lock out the person who might
+ * notice — this is the least defensible place to have had no second
+ * confirmation.
+ *
+ * Admins without an authenticator enrolled are not blocked out of the system;
+ * they are told to enrol, because the alternative is either a lockout or a
+ * bypass, and neither is acceptable.
+ */
+function requireUserMgmtToken(req: AuthenticatedRequest, res: Response): boolean {
+  const token = req.body?.otpToken || req.body?.otp || req.headers?.['x-otp-token'];
+  if (!token) {
+    res.status(401).json({
+      success: false,
+      error: 'OTP_REQUIRED',
+      message:
+        'Account changes require confirmation. Verify a code from your authenticator ' +
+        'for the USER_MGMT action, then retry with the token it returns.',
+      statusCode: 401,
+      timestamp: new Date().toISOString()
+    });
+    return false;
+  }
+  if (!otpService.consumeActionToken(String(token), 'USER_MGMT')) {
+    res.status(401).json({
+      success: false,
+      error: 'INVALID_OTP_TOKEN',
+      message: 'That confirmation token is not valid for account changes.',
+      statusCode: 401,
+      timestamp: new Date().toISOString()
+    });
+    return false;
+  }
+  return true;
+}
+
 /**
  * POST /api/auth/users — Admin-only: create a real inspector/supervisor/admin account.
  */
 authRouter.post('/users', authMiddleware, requireRole('ADMIN'), (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  if (!requireUserMgmtToken(req, res)) return;
   try {
     const { username, password, role, fullName, employeeId } = req.body || {};
     const validRoles = ['INSPECTOR', 'SUPERVISOR', 'ADMIN'];
@@ -317,6 +361,7 @@ authRouter.post('/users', authMiddleware, requireRole('ADMIN'), (req: Authentica
  * hard-deletes — users are referenced by FK from inspection/audit rows.
  */
 authRouter.patch('/users/:id/deactivate', authMiddleware, requireRole('ADMIN'), (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  if (!requireUserMgmtToken(req, res)) return;
   try {
     const db = getDatabase();
     const repo = new InspectionRepository(db);
@@ -331,6 +376,7 @@ authRouter.patch('/users/:id/deactivate', authMiddleware, requireRole('ADMIN'), 
  * PATCH /api/auth/users/:id/reactivate — Admin-only: re-enable a disabled account.
  */
 authRouter.patch('/users/:id/reactivate', authMiddleware, requireRole('ADMIN'), (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  if (!requireUserMgmtToken(req, res)) return;
   try {
     const db = getDatabase();
     const repo = new InspectionRepository(db);
@@ -338,5 +384,105 @@ authRouter.patch('/users/:id/reactivate', authMiddleware, requireRole('ADMIN'), 
     res.status(200).json({ success: true, data: user });
   } catch (error) {
     next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// TOTP — a real second factor
+//
+// The inline OTP flow above returns the code to whoever asked for it, because
+// no SMS gateway is integrated. These endpoints replace that with a code
+// generated on the supervisor's own device from a secret shared once, at
+// enrolment, by QR scan. Nothing is procured and nothing needs connectivity.
+// ---------------------------------------------------------------------------
+
+authRouter.get('/totp/status', authMiddleware, (req: AuthenticatedRequest, res: Response): void => {
+  if (!req.user?.id) {
+    res.status(401).json({ success: false, error: 'UNAUTHORIZED', message: 'Sign in first.', statusCode: 401, timestamp: new Date().toISOString() });
+    return;
+  }
+  const svc = new TotpService(getDatabase());
+  res.status(200).json({
+    success: true,
+    data: { enrolled: svc.isEnrolled(req.user.id), username: req.user.username },
+    timestamp: new Date().toISOString()
+  });
+});
+
+authRouter.post('/totp/enrol', authMiddleware, (req: AuthenticatedRequest, res: Response): void => {
+  if (!req.user?.id) {
+    res.status(401).json({ success: false, error: 'UNAUTHORIZED', message: 'Sign in first.', statusCode: 401, timestamp: new Date().toISOString() });
+    return;
+  }
+  try {
+    const offer = new TotpService(getDatabase()).beginEnrolment(req.user.id);
+    // The secret is returned once, here, so it can be rendered as a QR code
+    // and typed by hand if a camera will not read it. It is not retrievable
+    // afterwards — a second factor that can be fetched again on demand is not
+    // a second factor.
+    res.status(200).json({ success: true, data: offer, timestamp: new Date().toISOString() });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: 'ENROLMENT_FAILED', message: err?.message, statusCode: 400, timestamp: new Date().toISOString() });
+  }
+});
+
+authRouter.post('/totp/confirm', authMiddleware, (req: AuthenticatedRequest, res: Response): void => {
+  if (!req.user?.id) {
+    res.status(401).json({ success: false, error: 'UNAUTHORIZED', message: 'Sign in first.', statusCode: 401, timestamp: new Date().toISOString() });
+    return;
+  }
+  try {
+    const ok = new TotpService(getDatabase()).confirmEnrolment(req.user.id, String(req.body?.code || ''), req.user.role);
+    if (!ok) {
+      res.status(400).json({
+        success: false,
+        error: 'INCORRECT_CODE',
+        message: 'That code did not match. Check the time on the phone is correct, then try the next code.',
+        statusCode: 400,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+    res.status(200).json({ success: true, message: 'Authenticator enrolled.', timestamp: new Date().toISOString() });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: 'ENROLMENT_FAILED', message: err?.message, statusCode: 400, timestamp: new Date().toISOString() });
+  }
+});
+
+authRouter.post('/totp/verify', authMiddleware, (req: AuthenticatedRequest, res: Response): void => {
+  if (!req.user?.id) {
+    res.status(401).json({ success: false, error: 'UNAUTHORIZED', message: 'Sign in first.', statusCode: 401, timestamp: new Date().toISOString() });
+    return;
+  }
+  const action = req.body?.action;
+  if (!['OVERRIDE', 'EXPORT', 'USER_MGMT'].includes(action)) {
+    res.status(400).json({ success: false, error: 'VALIDATION_ERROR', message: 'action must be OVERRIDE, EXPORT or USER_MGMT.', statusCode: 400, timestamp: new Date().toISOString() });
+    return;
+  }
+
+  const result = new TotpService(getDatabase()).verify(req.user.id, String(req.body?.code || ''));
+  if (!result.ok) {
+    res.status(401).json({ success: false, error: 'INCORRECT_CODE', message: result.reason, statusCode: 401, timestamp: new Date().toISOString() });
+    return;
+  }
+
+  res.status(200).json({
+    success: true,
+    data: { otpToken: otpService.issueActionToken(req.user.id, action), action },
+    timestamp: new Date().toISOString()
+  });
+});
+
+authRouter.post('/users/:userId/totp/reset', authMiddleware, requireRole('ADMIN'), (req: AuthenticatedRequest, res: Response): void => {
+  const targetId = req.params?.userId;
+  if (!targetId || !req.user?.id) {
+    res.status(400).json({ success: false, error: 'MISSING_PARAM', message: 'userId is required', statusCode: 400, timestamp: new Date().toISOString() });
+    return;
+  }
+  try {
+    new TotpService(getDatabase()).resetEnrolment(targetId, req.user.id, req.user.role);
+    res.status(200).json({ success: true, message: 'Authenticator cleared. The user can enrol a new device.', timestamp: new Date().toISOString() });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: 'RESET_FAILED', message: err?.message, statusCode: 400, timestamp: new Date().toISOString() });
   }
 });

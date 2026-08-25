@@ -688,6 +688,19 @@ export function runMigrations(db: DatabaseSync): void {
     );
   }
 
+
+  // TOTP enrolment columns — see the comments in schema.sql.
+  const userCols = db.prepare("PRAGMA table_info(users)").all() as any[];
+  for (const [name, ddl] of [
+    ['totp_secret_sealed', 'TEXT DEFAULT NULL'],
+    ['totp_enrolled_at', 'TEXT DEFAULT NULL'],
+    ['totp_last_counter', 'INTEGER DEFAULT NULL']
+  ] as [string, string][]) {
+    if (userCols.length > 0 && !userCols.some((c) => c.name === name)) {
+      db.exec(`ALTER TABLE users ADD COLUMN ${name} ${ddl};`);
+    }
+  }
+
   // A declared principal for actions the system performs itself.
   //
   // Audit rows carry a foreign key to users, so an event with no human actor

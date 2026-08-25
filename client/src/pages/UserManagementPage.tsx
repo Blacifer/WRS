@@ -13,6 +13,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api.ts';
 import type { AdminUserRecord } from '../../../shared/types.ts';
 import type { LanguageCode } from '../i18n/index.ts';
+import { AppAccessQr } from '../components/AppAccessQr.tsx';
+import { TotpEnrolment } from '../components/TotpEnrolment.tsx';
 
 function generateStrongPassword(length = 14): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
@@ -156,6 +158,17 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
 
   return (
     <div className="space-y-6">
+      {/* Shop-floor access and second-factor setup.
+          Both belong on the admin screen: one is a poster to print, the other
+          is a credential the admin also has to be able to reset for a
+          supervisor who has lost their phone. */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <AppAccessQr lang={lang} />
+        <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5">
+          <TotpEnrolment lang={lang} onClose={() => { /* inline panel, nothing to close to */ }} />
+        </div>
+      </div>
+
       {/* Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-5 bg-gradient-to-r from-slate-900 via-slate-900 to-amber-950/30 border border-amber-500/30 rounded-2xl shadow-xl">
         <div className="flex items-center gap-3.5">

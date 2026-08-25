@@ -8,6 +8,14 @@ CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   username TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
+  -- TOTP enrolment. The secret is a credential rather than a record, so it is
+  -- sealed with AES-256-GCM before it is stored — a copied backup must not
+  -- hand over every supervisor's second factor. See auth/secretBox.ts.
+  totp_secret_sealed TEXT DEFAULT NULL,
+  totp_enrolled_at TEXT DEFAULT NULL,
+  -- Highest TOTP counter already accepted, so a code cannot be replayed
+  -- inside its ~90 second validity window.
+  totp_last_counter INTEGER DEFAULT NULL,
   role TEXT NOT NULL CHECK(role IN ('INSPECTOR', 'SUPERVISOR', 'ADMIN', 'Inspector', 'Supervisor', 'Admin')),
   full_name TEXT NOT NULL,
   employee_id TEXT NOT NULL UNIQUE,

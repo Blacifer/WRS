@@ -150,6 +150,27 @@ export class OtpService {
   /**
    * Consumes and validates an action token for an authorized operation
    */
+
+  /**
+   * Issues an action token directly, for a factor verified elsewhere.
+   *
+   * TOTP replaces the code-generation half of this service but not the token
+   * half: an action token is action-scoped, single-use and short-lived, and
+   * that design is worth keeping whichever factor proved the supervisor's
+   * identity. This is the seam between the two.
+   */
+  public issueActionToken(userId: string, action: OtpAction): string {
+    const otpToken = `otp_tok_${crypto.randomBytes(16).toString('hex')}`;
+    this.actionTokens.set(otpToken, {
+      token: otpToken,
+      userId,
+      action,
+      expiresAt: Date.now() + 600 * 1000,
+      isUsed: false
+    });
+    return otpToken;
+  }
+
   public consumeActionToken(otpToken: string, requiredAction: OtpAction): boolean {
     if (!otpToken) return false;
 

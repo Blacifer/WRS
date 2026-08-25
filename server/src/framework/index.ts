@@ -474,7 +474,17 @@ function parseByteLimit(limit: string | undefined, fallbackBytes: number): numbe
 
 express.json = (options?: { limit?: string }) => {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    if (req.body !== undefined && Object.keys(req.body).length > 0) {
+    // A body that is already present has nothing to parse.
+    //
+    // This used to additionally require the body to be non-empty, which made
+    // any request carrying `{}` fall through to the stream reader below. On a
+    // real request that is harmless, but dispatch() builds a synthetic request
+    // whose `on` is a no-op, so the 'end' event never fires and the request
+    // hangs forever — silently, with no response and no error. Any route
+    // exercised with an empty body was untestable, which is most of the PATCH
+    // routes. Real requests are IncomingMessage and have no `body`, so they
+    // still parse.
+    if (req.body !== undefined) {
       return next();
     }
 
