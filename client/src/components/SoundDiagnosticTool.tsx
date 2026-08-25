@@ -278,7 +278,8 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
     setMode('SIM_LEAK');
     setIsActive(true);
     await acousticEngine.simulateAirLeakHiss(isAudible);
-    acousticEngine.startMicrophone(handleFrame);
+    // Not startMicrophone — that would clear the simulation it was just given.
+    acousticEngine.startSyntheticAnalysis(handleFrame);
   };
 
   const handleSimulateBearingKnock = async () => {
@@ -287,7 +288,8 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
     setMode('SIM_BEARING');
     setIsActive(true);
     await acousticEngine.simulateBearingKnock(isAudible);
-    acousticEngine.startMicrophone(handleFrame);
+    // Not startMicrophone — that would clear the simulation it was just given.
+    acousticEngine.startSyntheticAnalysis(handleFrame);
   };
 
   const handleSimulateNormal = async () => {
@@ -296,7 +298,8 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
     setMode('SIM_NORMAL');
     setIsActive(true);
     await acousticEngine.simulateNormalSound(isAudible);
-    acousticEngine.startMicrophone(handleFrame);
+    // Not startMicrophone — that would clear the simulation it was just given.
+    acousticEngine.startSyntheticAnalysis(handleFrame);
   };
 
   const handleStop = () => {

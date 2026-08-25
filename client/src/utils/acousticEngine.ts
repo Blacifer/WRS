@@ -124,6 +124,26 @@ export class AcousticDiagnosticEngine {
   }
 
   /**
+   * Start the analysis loop over a synthetic signal already set up by one of
+   * the simulate* presets.
+   *
+   * The presets used to be followed by startMicrophone(), which begins by
+   * calling stopSyntheticGenerator() and clearing simulatedAnomaly — so the
+   * simulation was torn down the instant it started and the buttons did
+   * nothing at all. This path starts the loop without touching either, so a
+   * demonstration actually demonstrates something.
+   *
+   * micAvailable stays false, which tags every frame SYNTHETIC and keeps the
+   * result from being filed as a real defect.
+   */
+  public startSyntheticAnalysis(onFrame?: AcousticFrameCallback): void {
+    if (onFrame) this.onFrameCallback = onFrame;
+    this.micAvailable = false;
+    this.isRunning = true;
+    this.startAnalysisLoop();
+  }
+
+  /**
    * Start microphone capture and live real-time analysis
    */
   public async startMicrophone(onFrame?: AcousticFrameCallback): Promise<void> {
