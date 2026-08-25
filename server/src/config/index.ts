@@ -5,9 +5,31 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import dotenv from 'dotenv';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+/**
+ * Load the .env file before anything below reads process.env.
+ *
+ * Without this, a .env file is read by Docker Compose (which interpolates it
+ * itself) and ignored by every other way of starting the server — including
+ * `npm start`, which the deployment README documents. The visible symptom
+ * would be a production start refusing to boot with a correct JWT_SECRET
+ * sitting in the file beside it; the invisible one is worse, since a
+ * development start would quietly run on the built-in fallback secret while
+ * the operator believed the file was in effect.
+ *
+ * Two locations are tried because the server can be launched from either the
+ * repository root or from server/. dotenv does not overwrite variables that
+ * are already set, so a real environment variable — how Docker and any
+ * managed host inject secrets — always wins over a file on disk, and the
+ * more specific server/.env wins over the repository root.
+ */
+const REPO_ROOT = path.resolve(__dirname, '..', '..', '..');
+dotenv.config({ path: path.join(REPO_ROOT, 'server', '.env'), quiet: true });
+dotenv.config({ path: path.join(REPO_ROOT, '.env'), quiet: true });
 
 export interface AppConfig {
   port: number;

@@ -27,6 +27,7 @@ services:
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set in .env}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-24h}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      OTP_DELIVERY: ${OTP_DELIVERY:-INLINE}
     volumes:
       - wrs_data:/app/server/data
 
