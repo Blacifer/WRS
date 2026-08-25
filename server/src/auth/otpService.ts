@@ -8,6 +8,7 @@
 
 import crypto from 'node:crypto';
 import type { OtpAction } from '../../../shared/types.ts';
+import { config } from '../config/index.ts';
 
 export interface StoredOtpRecord {
   id: string;
@@ -113,9 +114,16 @@ export class OtpService {
   public consumeActionToken(otpToken: string, requiredAction: OtpAction): boolean {
     if (!otpToken) return false;
 
-    // Test bypass tokens for development / automated tests
-    if (otpToken.startsWith('test_token_') || otpToken === 'otp_tok_test_override' || otpToken === 'valid_otp_token') {
-      return true;
+    // Fixed bypass tokens for development and the automated suites.
+    //
+    // These are hardcoded strings in a public repository, and they used to be
+    // honoured in every environment — anyone who had read the source could
+    // clear a supervisor OTP gate on a live deployment by sending
+    // 'valid_otp_token'. They are now refused outside development.
+    if (config.nodeEnv !== 'production') {
+      if (otpToken.startsWith('test_token_') || otpToken === 'otp_tok_test_override' || otpToken === 'valid_otp_token') {
+        return true;
+      }
     }
 
     const tokenRecord = this.actionTokens.get(otpToken);

@@ -6,6 +6,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import crypto from 'node:crypto';
 import { logAuditEvent } from './auditLog.ts';
+import { config } from '../config/index.ts';
 import { CASNUB_CHECKLIST_TEMPLATE } from './checklistTemplate.ts';
 import { validateSpringNests } from '../../../shared/classification/nestGrouping.ts';
 import { getSpringCountOptions, buildSpringQueue } from '../../../shared/classification/springCounts.ts';
@@ -1263,12 +1264,24 @@ export class WagonRepository {
     };
   }
 
+  /**
+   * Employee ID of a registered, active user — the identifier printed on a
+   * release certificate. Returns null when the user is unknown or inactive,
+   * so callers must decide explicitly rather than falling back to a constant.
+   */
+  public getUserEmployeeId(userId: string): string | null {
+    const row = this.db
+      .prepare('SELECT employee_id, is_active FROM users WHERE id = ?')
+      .get(userId) as { employee_id: string | null; is_active: number } | undefined;
+    if (!row || !row.is_active) return null;
+    return row.employee_id || null;
+  }
+
   public recordGateSignoff(data: {
     wagonNumber: string;
     supervisorId: string;
     supervisorName: string;
     supervisorEmployeeId: string;
-    digitalSignature: string;
     otpTokenRef: string;
     signoffNotes?: string;
     checksSummary: Record<string, unknown>;
@@ -1291,25 +1304,58 @@ export class WagonRepository {
     const randomSuffix = crypto.randomBytes(2).toString('hex').toUpperCase();
     const certificateNumber = `WRS/QC-REL/${year}/${month}/${randomSuffix}`;
 
+    // One timestamp, used both inside the signed content and as the stored
+    // signed_at. It used to be a fresh `new Date()` inside the canonical
+    // summary and a separate one for the row, so the hash covered a moment
+    // that was never recorded — nobody could ever recompute it to check the
+    // certificate. A hash that cannot be re-derived attests to nothing.
+    const signedAt = new Date().toISOString();
+
     const canonicalSummary = JSON.stringify({
       wagonNumber: normalizedWagonNumber,
       certificateNumber,
       supervisorId: data.supervisorId,
-      timestamp: new Date().toISOString(),
+      supervisorEmployeeId: data.supervisorEmployeeId,
+      signedAt,
       summary: data.checksSummary
     });
     const certificateHash = crypto.createHash('sha256').update(canonicalSummary).digest('hex');
 
-    // Ensure supervisor user exists
-    const userCheck = this.db.prepare('SELECT id FROM users WHERE id = ?').get(data.supervisorId);
-    if (!userCheck) {
-      this.db.prepare(`
-        INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, employee_id, is_active)
-        VALUES (?, ?, 'none', 'SUPERVISOR', ?, ?, 1)
-      `).run(data.supervisorId, `sup_${data.supervisorId}`, data.supervisorName, data.supervisorEmployeeId);
-    }
+    // A real signature over the certificate's contents.
+    //
+    // What was stored before was `HMAC-` followed by 16 random bytes — a label
+    // claiming to be a MAC over a document it had never seen. It could not be
+    // checked, and would verify nothing if anyone tried. This is a keyed
+    // HMAC-SHA256 over the same canonical content the hash covers, so an
+    // altered certificate fails verification and only this server can produce
+    // a valid one.
+    const digitalSignature =
+      'HMAC-SHA256:' +
+      crypto.createHmac('sha256', config.jwtSecret).update(canonicalSummary).digest('hex');
 
-    const now = new Date().toISOString();
+    // The signing supervisor must already exist and be active.
+    //
+    // This previously created the user if it was missing — an INSERT giving
+    // the unknown id a SUPERVISOR role and a password of 'none'. On the one
+    // route whose entire purpose is accountable sign-off, an unrecognised
+    // signatory conjured an account rather than being refused. Ghost-user
+    // creation was removed from the inspection path for exactly this reason;
+    // it survived here, where it mattered most.
+    const signer = this.db
+      .prepare('SELECT id, is_active FROM users WHERE id = ?')
+      .get(data.supervisorId) as { id: string; is_active: number } | undefined;
+
+    if (!signer) {
+      throw new Error(
+        `Supervisor ${data.supervisorId} is not a registered user. A release certificate ` +
+        `cannot be signed by an unknown signatory.`
+      );
+    }
+    if (!signer.is_active) {
+      throw new Error(
+        `Supervisor ${data.supervisorId} is deactivated and cannot sign a release certificate.`
+      );
+    }
 
     // Insert signoff
     this.db.prepare(`
@@ -1320,9 +1366,9 @@ export class WagonRepository {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, wagon.id, normalizedWagonNumber, data.supervisorId, data.supervisorName,
-      data.supervisorEmployeeId, data.digitalSignature, data.otpTokenRef,
+      data.supervisorEmployeeId, digitalSignature, data.otpTokenRef,
       data.signoffNotes || null, JSON.stringify(data.checksSummary),
-      certificateNumber, certificateHash, now
+      certificateNumber, certificateHash, signedAt
     );
 
     // Record transition to RELEASE (Stage 7)
@@ -1345,13 +1391,13 @@ export class WagonRepository {
       supervisorId: data.supervisorId,
       supervisorName: data.supervisorName,
       supervisorEmployeeId: data.supervisorEmployeeId,
-      digitalSignature: data.digitalSignature,
+      digitalSignature,
       otpTokenRef: data.otpTokenRef,
       signoffNotes: data.signoffNotes || null,
       checksSummary: data.checksSummary,
       certificateNumber,
       certificateHash,
-      signedAt: now
+      signedAt
     };
   }
 

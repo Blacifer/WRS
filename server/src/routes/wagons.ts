@@ -608,7 +608,11 @@ wagonsRouter.post('/:wagonNumber/checklist/items', authMiddleware, async (req: R
 wagonsRouter.post('/:wagonNumber/gate/signoff', authMiddleware, requireRole('SUPERVISOR'), async (req: Request, res: Response) => {
   const { wagonRepo } = getRepos();
   const wagonNumber = req.params?.wagonNumber;
-  const { supervisorId, digitalSignature, otp, otpToken, notes, signoffNotes } = req.body;
+  // supervisorId and digitalSignature are deliberately NOT read from the body.
+  // Identity comes from the authenticated token; the signature is computed
+  // server-side. Accepting either from the caller would let them choose whose
+  // name goes on the certificate.
+  const { otp, otpToken, notes, signoffNotes } = req.body;
 
   if (!wagonNumber) {
     res.status(400).json({
@@ -637,26 +641,76 @@ wagonsRouter.post('/:wagonNumber/gate/signoff', authMiddleware, requireRole('SUP
     return;
   }
 
-  // Verify OTP token
+  // -----------------------------------------------------------------------
+  // OTP is required, not optional.
+  //
+  // This block used to run only `if (tokenToVerify)`, so omitting the field
+  // skipped verification entirely — the OTP gate could be walked past by
+  // simply not mentioning it. A release certificate is the most consequential
+  // record the system produces; it does not get a silent path.
+  // -----------------------------------------------------------------------
   const tokenToVerify = otpToken || otp;
-  if (tokenToVerify) {
-    const valid = otpService.consumeActionToken(tokenToVerify, 'OVERRIDE');
-    if (!valid && !tokenToVerify.startsWith('test_')) {
-      res.status(401).json({
-        success: false,
-        error: 'INVALID_OTP_TOKEN',
-        message: 'Release sign-off requires a valid supervisor OTP action token.',
-        statusCode: 401,
-        timestamp: new Date().toISOString()
-      });
-      return;
-    }
+  if (!tokenToVerify) {
+    res.status(401).json({
+      success: false,
+      error: 'OTP_REQUIRED',
+      message: 'Release sign-off requires a supervisor OTP action token.',
+      statusCode: 401,
+      timestamp: new Date().toISOString()
+    });
+    return;
   }
 
-  const effectiveSupervisorId = req.user?.id || supervisorId || 'usr_sup_001';
-  const effectiveSupervisorName = req.user?.name || 'S. K. Verma';
-  const employeeId = req.user?.employeeId || 'WRS-SUP-2019';
-  const signature = digitalSignature || `HMAC-${crypto.randomBytes(16).toString('hex')}`;
+  if (!otpService.consumeActionToken(tokenToVerify, 'OVERRIDE')) {
+    res.status(401).json({
+      success: false,
+      error: 'INVALID_OTP_TOKEN',
+      message: 'Release sign-off requires a valid supervisor OTP action token.',
+      statusCode: 401,
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
+
+  // -----------------------------------------------------------------------
+  // Who signed is taken from the authenticated token and nowhere else.
+  //
+  // This previously read `req.user?.id || supervisorId || 'usr_sup_001'`,
+  // falling back first to a client-supplied body field and then to a
+  // hardcoded demo supervisor — so a certificate could be attributed to
+  // someone who did not sign it. The name and employee ID fell back to
+  // 'S. K. Verma' / 'WRS-SUP-2019' the same way, and since the JWT carries no
+  // employeeId at all, *every* certificate issued to date bore the demo ID
+  // regardless of who signed. A signature naming the wrong person is worse
+  // than no signature.
+  // -----------------------------------------------------------------------
+  if (!req.user?.id) {
+    res.status(401).json({
+      success: false,
+      error: 'UNAUTHORIZED',
+      message: 'Release sign-off requires an authenticated supervisor.',
+      statusCode: 401,
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
+
+  const effectiveSupervisorId = req.user.id;
+  const effectiveSupervisorName = req.user.name;
+  const employeeId = wagonRepo.getUserEmployeeId(effectiveSupervisorId);
+
+  if (!employeeId) {
+    res.status(403).json({
+      success: false,
+      error: 'SUPERVISOR_NOT_REGISTERED',
+      message:
+        'The signing supervisor has no employee record. A release certificate cannot be ' +
+        'issued without an identifiable signatory.',
+      statusCode: 403,
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
 
   try {
     const signoff = wagonRepo.recordGateSignoff({
@@ -664,7 +718,8 @@ wagonsRouter.post('/:wagonNumber/gate/signoff', authMiddleware, requireRole('SUP
       supervisorId: effectiveSupervisorId,
       supervisorName: effectiveSupervisorName,
       supervisorEmployeeId: employeeId,
-      digitalSignature: signature,
+      // Deliberately not client-supplied: the repository computes a keyed
+      // signature over the certificate's canonical contents.
       otpTokenRef: tokenToVerify || `otp_auto_${crypto.randomBytes(6).toString('hex')}`,
       signoffNotes: notes || signoffNotes || 'Quality audit cleared with zero defects.',
       checksSummary: gateEvaluation.summary
