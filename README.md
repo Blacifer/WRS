@@ -36,7 +36,7 @@ The **WRS Raipur Quality Control Platform** is an enterprise-grade web applicati
 
 7. **Tamper-evident record**
    - SHA-256 hash chain across every event, with database-level append-only triggers.
-   - `GET /api/audit/verify` re-derives the whole chain and names the first altered entry. A changed *role* breaks it, not just changed data.
+   - The **Audit Chain** screen (supervisor and above), or `GET /api/audit/verify`, re-derives the whole chain and names the first altered entry. A changed *role* breaks it, not just changed data. The screen also states what a pass does *not* prove: that no record was altered after it was written is not the same as every measurement having been correct.
    - Release certificates carry a keyed HMAC over their own contents and can be re-verified from the stored record.
 
 8. **Built for the shop floor**

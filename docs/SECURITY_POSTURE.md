@@ -16,7 +16,7 @@ nothing to stop someone who obtains the database file from reading it.
 |---|---|---|
 | Password storage | PBKDF2-HMAC-SHA512, 16-byte random salt per password, 210,000 iterations, constant-time comparison | Sound. Matches OWASP guidance. |
 | Session tokens | JWT, HS256 over the server secret | Sound for a single server. |
-| Record integrity | SHA-256 hash chain over every audit event, covering actor and role | Strong, and verifiable at `GET /api/audit/verify`. |
+| Record integrity | SHA-256 hash chain over every audit event, covering actor and role | Strong, and verifiable in the app — the Audit Chain screen (supervisor and above) recomputes every hash, or `GET /api/audit/verify` from a shell. |
 | Record immutability | 16 database-level `RAISE(ABORT)` triggers | Strong. Enforced by the storage engine, not the application. |
 | Release certificates | Keyed HMAC-SHA256 over canonical contents, re-derivable from the stored record | Strong as an integrity proof. **Not** a legal digital signature — see below. |
 | One-time codes | `crypto.randomInt`, stored as a keyed HMAC, constant-time comparison, 5-minute expiry, single use | Sound as a confirmation step. Not a second factor — see below. |

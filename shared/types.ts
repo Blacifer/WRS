@@ -1401,6 +1401,7 @@ export type NavigationTab =
   | 'smart_vision'
   | 'users'
   | 'learning'
+  | 'audit'
   | 'manual';
 
 export interface AdminUserRecord {
@@ -1437,6 +1438,11 @@ export function canAccessTab(role: string | undefined, tab: NavigationTab, hasSe
   }
   if (roleUpper === 'SUPERVISOR') {
     if (tab === 'dashboard' || tab === 'analytics' || tab === 'users') return false;
+    // Audit verification is deliberately supervisor-visible, matching the
+    // endpoint's own RBAC. The supervisor is the one who signs releases, so
+    // the supervisor is the one who needs to be able to ask whether the
+    // record behind those signatures is still intact.
+    if (tab === 'audit') return true;
     // Supervisors may VIEW learning data; only admins can approve changes.
     return true;
   }

@@ -27,6 +27,7 @@ export const en = {
     admin: 'Admin Console',
     manual: 'Ask the Manual',
     learning: 'System Learning',
+    audit: 'Audit Chain',
     users: 'User Accounts',
     logout: 'Logout',
     sync: 'Sync Data',

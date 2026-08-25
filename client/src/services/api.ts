@@ -540,6 +540,38 @@ export class ApiClient {
     );
   }
 
+  /**
+   * Re-derives every hash in the audit log and reports whether the chain
+   * still adds up. Supervisor and above.
+   *
+   * The whole system's claim is that nothing can be quietly changed after the
+   * fact. Append-only triggers enforce that through the application; the
+   * hash chain is what catches a change that went around it — someone editing
+   * the database file directly. This is the only way to ask whether that has
+   * happened, so it needs to be answerable by the supervisor who signs
+   * releases, not only by someone with a terminal and a hand-minted token.
+   */
+  public async verifyAuditChain(): Promise<{
+    success: boolean;
+    data: {
+      verified: boolean;
+      entriesChecked: number;
+      breaksFound: number;
+      firstBrokenAt: {
+        rowid: number;
+        id: string;
+        eventType: string;
+        createdAt: string;
+        reason: 'CONTENT_ALTERED' | 'BROKEN_LINK' | 'GENESIS_MISMATCH' | 'UNCHAINED';
+        detail: string;
+      } | null;
+      checkedAt: string;
+      summary: string;
+    };
+  }> {
+    return this.request('/audit/verify');
+  }
+
   // =========================================================================
   // Phase 3 (M1): Stores Depot Inventory & Pre-Arrival OMRS AI Triage APIs
   // =========================================================================
