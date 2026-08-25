@@ -966,14 +966,26 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
                     className="w-9 h-9 rounded-lg shrink-0 border-2 border-white/30 shadow-inner"
                     style={{ backgroundColor: BAND_PAINT_HEX[classification.band] || '#94a3b8' }}
                   />
+                  {/*
+                    States the group, and does not instruct anyone to paint it.
+
+                    This previously read "Paint the colour band on this spring".
+                    Whether WRS Raipur marks springs individually or sorts them
+                    into marked bins is not settled — the site photographs show
+                    bare springs with no visible band — and an app that tells
+                    inspectors to do work they do not do loses their trust on
+                    the first shift. Naming the group is true either way.
+                  */}
                   <div className="leading-tight">
                     <p className="text-xs font-black text-white tracking-wide">
-                      {isHi ? 'स्प्रिंग पर रंग पट्टी लगाएँ' : 'Paint the colour band on this spring'}
+                      {isHi
+                        ? `समूह: ${BAND_LABEL_HI[classification.band] || classification.band}`
+                        : `Group: ${classification.band}`}
                     </p>
                     <p className="text-[11px] text-slate-300">
                       {isHi
-                        ? `रंग: ${BAND_LABEL_HI[classification.band] || classification.band} — ताकि असेंबली के समय नेस्ट मिलान आँख से हो सके`
-                        : `${classification.band} — so the nest can be matched by eye at assembly`}
+                        ? 'इसी समूह के स्प्रिंग एक साथ लगाए जाएँ'
+                        : 'Keep with springs of this group — a nest must come from one group'}
                     </p>
                   </div>
                 </div>
