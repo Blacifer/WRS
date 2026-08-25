@@ -181,6 +181,21 @@ describe('Phase 2 R3: Zero-Defect Exit Gate & Release Certification', () => {
       }
     });
 
+    // 4b. Single Wagon Test — WMM 2.0 §720 requires one after POH, so the
+    // exit gate now demands a passing test before release.
+    await app.dispatch({
+      method: 'POST',
+      url: `/api/wagons/${wagonNumber}/swt`,
+      headers: { authorization: `Bearer ${inspectorToken}`, 'content-type': 'application/json' },
+      body: { wagonType: 'BOXN', pipeType: 'SINGLE', loadCondition: 'EMPTY', readings: [
+          { ref: '1', value: 5.0 }, { ref: '2', value: 5.0 }, { ref: '3', value: 0.05 },
+          { ref: '4.1', value: 24 }, { ref: '4.2', value: 3.8 }, { ref: '4.3', value: 1.45 },
+          { ref: '5.1', value: 52 }, { ref: '6', value: 4 }, { ref: '7', observed: true },
+          { ref: '8.1', value: 25 }, { ref: '8.2', value: 3.8 }, { ref: '9', value: 85 },
+          { ref: '10', value: 0.05 }, { ref: '12', observed: true }
+        ] }
+    });
+
     // 5. Evaluate Exit Gate -> should be CLEARED (canRelease = true)
     const gateRes = await app.dispatch({
       method: 'GET',

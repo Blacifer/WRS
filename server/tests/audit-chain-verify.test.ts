@@ -306,6 +306,19 @@ describe('Audit Coverage — what actually reaches the chain', () => {
 
     await app.dispatch({ method: 'POST', url: '/api/inspections', headers: H(ins), body: { wagonNumber: W, bogieType: 'CASNUB_22_NLB', condition: 'USED', springPosition: 'OUTER', measuredFreeHeight: 258 } });
 
+    await app.dispatch({
+      method: 'POST',
+      url: `/api/wagons/${W}/swt`,
+      headers: H(ins),
+      body: { wagonType: 'BOXN', pipeType: 'SINGLE', loadCondition: 'EMPTY', readings: [
+          { ref: '1', value: 5.0 }, { ref: '2', value: 5.0 }, { ref: '3', value: 0.05 },
+          { ref: '4.1', value: 24 }, { ref: '4.2', value: 3.8 }, { ref: '4.3', value: 1.45 },
+          { ref: '5.1', value: 52 }, { ref: '6', value: 4 }, { ref: '7', observed: true },
+          { ref: '8.1', value: 25 }, { ref: '8.2', value: 3.8 }, { ref: '9', value: 85 },
+          { ref: '10', value: 0.05 }, { ref: '12', observed: true }
+        ] }
+    });
+
     const sign: any = await app.dispatch({ method: 'POST', url: `/api/wagons/${W}/gate/signoff`, headers: H(sup), body: { otpToken: 'test_token_override' } });
     assert.strictEqual(sign.status, 200);
 

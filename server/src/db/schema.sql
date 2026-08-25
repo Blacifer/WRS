@@ -358,6 +358,51 @@ BEGIN
   SELECT RAISE(ABORT, 'Audit log is strictly append-only. Spring sorting records are immutable and cannot be deleted.');
 END;
 
+
+-- ---------------------------------------------------------------------------
+-- SINGLE WAGON TEST (air brake)
+--
+-- WMM 2.0 §720: "Single wagon test is also carried out after POH". It is a
+-- proforma of measured values, each with a published limit in §720-C, and it
+-- is currently filled in on paper and signed.
+--
+-- Stored whole rather than as checklist line items: the readings only mean
+-- something together, and the verdict depends on the pipe configuration and
+-- the load condition the test was run in.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS swt_tests (
+  id TEXT PRIMARY KEY,
+  wagon_number TEXT NOT NULL,
+  wagon_type TEXT NOT NULL,
+  pipe_type TEXT NOT NULL CHECK(pipe_type IN ('SINGLE', 'TWIN')),
+  load_condition TEXT NOT NULL CHECK(load_condition IN ('EMPTY', 'LOADED')),
+  readings_json TEXT NOT NULL,
+  results_json TEXT NOT NULL,
+  passed INTEGER NOT NULL CHECK(passed IN (0, 1)),
+  failed_refs TEXT DEFAULT NULL,
+  missing_refs TEXT DEFAULT NULL,
+  unjudged_refs TEXT DEFAULT NULL,
+  tested_by TEXT NOT NULL,
+  tester_name TEXT DEFAULT NULL,
+  notes TEXT DEFAULT NULL,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  FOREIGN KEY (tested_by) REFERENCES users(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_swt_wagon ON swt_tests(wagon_number, created_at);
+
+CREATE TRIGGER IF NOT EXISTS trg_prevent_swt_update
+BEFORE UPDATE ON swt_tests
+BEGIN
+  SELECT RAISE(ABORT, 'Audit log is strictly append-only. Single wagon test records are immutable and cannot be updated.');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_prevent_swt_delete
+BEFORE DELETE ON swt_tests
+BEGIN
+  SELECT RAISE(ABORT, 'Audit log is strictly append-only. Single wagon test records are immutable and cannot be deleted.');
+END;
+
 CREATE TRIGGER IF NOT EXISTS trg_prevent_inspections_update
 BEFORE UPDATE ON inspections
 BEGIN

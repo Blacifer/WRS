@@ -617,6 +617,62 @@ wagonsRouter.post('/:wagonNumber/checklist/items', authMiddleware, async (req: R
   }
 });
 
+
+// -------------------------------------------------------------------------
+// Single Wagon Test (air brake) — WMM 2.0 §720
+// -------------------------------------------------------------------------
+
+wagonsRouter.post('/:wagonNumber/swt', authMiddleware, async (req: Request, res: Response) => {
+  const { wagonRepo } = getRepos();
+  const wagonNumber = req.params?.wagonNumber;
+  const b = req.body || {};
+  const user = (req as any).user;
+
+  if (!wagonNumber) {
+    res.status(400).json({ success: false, error: 'MISSING_PARAM', message: 'wagonNumber is required', statusCode: 400, timestamp: new Date().toISOString() });
+    return;
+  }
+  if (!user?.id) {
+    res.status(401).json({ success: false, error: 'UNAUTHORIZED', message: 'A single wagon test must name the person who carried it out.', statusCode: 401, timestamp: new Date().toISOString() });
+    return;
+  }
+  if (!Array.isArray(b.readings)) {
+    res.status(400).json({ success: false, error: 'VALIDATION_ERROR', message: 'readings[] is required — every proforma row must be answered.', statusCode: 400, timestamp: new Date().toISOString() });
+    return;
+  }
+
+  try {
+    const wagon = wagonRepo.getWagonByNumber(wagonNumber);
+    const result = wagonRepo.recordSwt({
+      wagonNumber,
+      wagonType: b.wagonType || wagon?.wagonType || 'UNKNOWN',
+      pipeType: b.pipeType === 'TWIN' ? 'TWIN' : 'SINGLE',
+      loadCondition: b.loadCondition === 'LOADED' ? 'LOADED' : 'EMPTY',
+      readings: b.readings,
+      testedBy: user.id,
+      testerName: user.name ?? null,
+      notes: b.notes ?? null
+    });
+    res.status(201).json({ success: true, data: result, timestamp: new Date().toISOString() });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: 'SWT_FAILED', message: err?.message || 'Could not record the single wagon test', statusCode: 400, timestamp: new Date().toISOString() });
+  }
+});
+
+wagonsRouter.get('/:wagonNumber/swt', authMiddleware, async (req: Request, res: Response) => {
+  const { wagonRepo } = getRepos();
+  const wagonNumber = req.params?.wagonNumber;
+  if (!wagonNumber) {
+    res.status(400).json({ success: false, error: 'MISSING_PARAM', message: 'wagonNumber is required', statusCode: 400, timestamp: new Date().toISOString() });
+    return;
+  }
+  res.status(200).json({
+    success: true,
+    data: { latest: wagonRepo.getLatestSwt(wagonNumber), history: wagonRepo.getSwtHistory(wagonNumber) },
+    timestamp: new Date().toISOString()
+  });
+});
+
 // -------------------------------------------------------------------------
 // 11. Supervisor Digital Sign-off & Release Certification
 // -------------------------------------------------------------------------

@@ -10,6 +10,8 @@ import { config } from '../config/index.ts';
 import { CASNUB_CHECKLIST_TEMPLATE } from './checklistTemplate.ts';
 import { validateSpringNests } from '../../../shared/classification/nestGrouping.ts';
 import { getSpringCountOptions, buildSpringQueue } from '../../../shared/classification/springCounts.ts';
+import { evaluateSwt } from '../../../shared/classification/swtSpec.ts';
+import type { PipeType, LoadCondition, SwtReading } from '../../../shared/classification/swtSpec.ts';
 import type {
   LifecycleStage,
   CASNUBCategory,
@@ -1225,6 +1227,53 @@ export class WagonRepository {
       }
     }
 
+    // -----------------------------------------------------------------------
+    // Single Wagon Test (air brake).
+    //
+    // WMM 2.0 §720: "Single wagon test is also carried out after POH". For a
+    // workshop doing periodic overhaul that makes it mandatory, not advisory,
+    // so a wagon without a passing test does not leave. The brake system is
+    // the one component whose failure is not recoverable by the next
+    // inspection down the line.
+    //
+    // A test that was run and failed, and a test that was never run, are
+    // reported differently: they need different things done about them.
+    // -----------------------------------------------------------------------
+    const latestSwt = this.getLatestSwt(normalizedWagonNumber);
+    if (!latestSwt) {
+      blockers.push(
+        'Single Wagon Test (air brake) has not been carried out. WMM 2.0 §720 requires it after POH.'
+      );
+      blockerDetails.push({
+        id: 'swt_not_performed',
+        category: 'BRAKE_SYSTEM',
+        partName: 'Single Wagon Test',
+        issueType: 'SWT_NOT_PERFORMED',
+        description:
+          'No Single Wagon Test on record for this wagon. WMM 2.0 §720 requires one after POH ' +
+          'and after any change of distributor valve.',
+        severity: 'CRITICAL',
+        remediationAction: 'Carry out the Single Wagon Test and record the proforma readings.'
+      });
+    } else if (!latestSwt.passed) {
+      const failed = (latestSwt.failed_refs || '').split(',').filter(Boolean);
+      const missing = (latestSwt.missing_refs || '').split(',').filter(Boolean);
+      const parts: string[] = [];
+      if (failed.length) parts.push(`${failed.length} reading(s) outside limit (rows ${failed.join(', ')})`);
+      if (missing.length) parts.push(`${missing.length} row(s) not recorded (rows ${missing.join(', ')})`);
+
+      blockers.push(`Single Wagon Test did not pass — ${parts.join('; ')}.`);
+      blockerDetails.push({
+        id: 'swt_failed',
+        category: 'BRAKE_SYSTEM',
+        partName: 'Single Wagon Test',
+        issueType: 'SWT_FAILED',
+        description: `Single Wagon Test did not pass — ${parts.join('; ')}.`,
+        severity: 'CRITICAL',
+        remediationAction: 'Rectify the air brake faults and repeat the Single Wagon Test.'
+      });
+    }
+
     const springCount = latestSprings.length;
     let springsPassed = 0;
     let springsCondemned = 0;
@@ -1585,6 +1634,96 @@ export class WagonRepository {
       throw new Error(`${context}: user ${userId} is deactivated.`);
     }
     return row.id;
+  }
+
+  /**
+   * Records a Single Wagon Test.
+   *
+   * The verdict is computed here from the readings, never accepted from the
+   * caller — a test whose result the tester can assert is not a test.
+   */
+  public recordSwt(data: {
+    wagonNumber: string;
+    wagonType: string;
+    pipeType: PipeType;
+    loadCondition: LoadCondition;
+    readings: SwtReading[];
+    testedBy: string;
+    testerName?: string | null;
+    notes?: string | null;
+  }): any {
+    const wagonNumber = data.wagonNumber.trim().toUpperCase();
+    this.requireActor(data.testedBy, 'Single wagon test');
+
+    const evaluation = evaluateSwt({
+      pipeType: data.pipeType,
+      loadCondition: data.loadCondition,
+      wagonType: data.wagonType,
+      readings: data.readings
+    });
+
+    const id = `swt_${crypto.randomUUID()}`;
+    this.db.prepare(`
+      INSERT INTO swt_tests (
+        id, wagon_number, wagon_type, pipe_type, load_condition,
+        readings_json, results_json, passed, failed_refs, missing_refs,
+        unjudged_refs, tested_by, tester_name, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id, wagonNumber, data.wagonType, data.pipeType, data.loadCondition,
+      JSON.stringify(data.readings), JSON.stringify(evaluation.results),
+      evaluation.passed ? 1 : 0,
+      evaluation.failedRefs.join(',') || null,
+      evaluation.missingRefs.join(',') || null,
+      evaluation.unjudgedRefs.join(',') || null,
+      data.testedBy, data.testerName ?? null, data.notes ?? null
+    );
+
+    // Logged as INSPECTION_CREATED with an explicit action, not as
+    // CHECKLIST_ITEM_INSPECTED. A single wagon test is not a checklist verdict,
+    // and counting it as one made the log overstate how many components had
+    // been individually inspected. The event_type column carries a CHECK
+    // constraint listing the permitted values, and SQLite cannot extend that
+    // on an existing table without rebuilding it — which is not something to
+    // do casually to the append-only audit log — so the precise meaning lives
+    // in the payload's action field.
+    logAuditEvent(this.db, {
+      eventType: 'INSPECTION_CREATED' as any,
+      userId: data.testedBy,
+      userRole: 'INSPECTOR',
+      payload: {
+        action: 'SINGLE_WAGON_TEST',
+        wagonNumber,
+        pipeType: data.pipeType,
+        loadCondition: data.loadCondition,
+        passed: evaluation.passed,
+        failedRefs: evaluation.failedRefs,
+        missingRefs: evaluation.missingRefs
+      }
+    });
+
+    return { id, ...evaluation };
+  }
+
+  /** Most recent Single Wagon Test for a wagon, or null. */
+  public getLatestSwt(wagonNumber: string): any | null {
+    const row = this.db.prepare(`
+      SELECT * FROM swt_tests WHERE wagon_number = ? ORDER BY created_at DESC, rowid DESC LIMIT 1
+    `).get(wagonNumber.trim().toUpperCase()) as any;
+    if (!row) return null;
+    return {
+      ...row,
+      passed: row.passed === 1,
+      readings: JSON.parse(row.readings_json),
+      results: JSON.parse(row.results_json)
+    };
+  }
+
+  public getSwtHistory(wagonNumber: string): any[] {
+    return (this.db.prepare(`
+      SELECT id, pipe_type, load_condition, passed, failed_refs, tester_name, created_at
+      FROM swt_tests WHERE wagon_number = ? ORDER BY created_at DESC
+    `).all(wagonNumber.trim().toUpperCase()) as any[]).map((r) => ({ ...r, passed: r.passed === 1 }));
   }
 
   public insertPhoto(data: {

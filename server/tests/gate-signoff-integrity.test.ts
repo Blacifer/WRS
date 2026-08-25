@@ -83,6 +83,26 @@ describe('Release Sign-off Integrity', () => {
       }
     });
 
+
+    // WMM 2.0 §720 requires a Single Wagon Test after POH, so the gate now
+    // demands one. A wagon is not releasable without it.
+    await app.dispatch({
+      method: 'POST',
+      url: `/api/wagons/${wagonNumber}/swt`,
+      headers: auth(inspectorToken),
+      body: {
+        wagonType: 'BOXN',
+        pipeType: 'SINGLE',
+        loadCondition: 'EMPTY',
+        readings: [
+          { ref: '1', value: 5.0 }, { ref: '2', value: 5.0 }, { ref: '3', value: 0.05 },
+          { ref: '4.1', value: 24 }, { ref: '4.2', value: 3.8 }, { ref: '4.3', value: 1.45 },
+          { ref: '5.1', value: 52 }, { ref: '6', value: 4 }, { ref: '7', observed: true },
+          { ref: '8.1', value: 25 }, { ref: '8.2', value: 3.8 }, { ref: '9', value: 85 },
+          { ref: '10', value: 0.05 }, { ref: '12', observed: true }
+        ]
+      }
+    });
     const gate = await app.dispatch({
       method: 'GET',
       url: `/api/wagons/${wagonNumber}/gate/status`,

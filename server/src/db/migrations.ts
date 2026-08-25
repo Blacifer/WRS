@@ -643,6 +643,40 @@ export function runMigrations(db: DatabaseSync): void {
     );
   }
 
+
+  // Single Wagon Test — see the table comment in schema.sql.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS swt_tests (
+      id TEXT PRIMARY KEY,
+      wagon_number TEXT NOT NULL,
+      wagon_type TEXT NOT NULL,
+      pipe_type TEXT NOT NULL CHECK(pipe_type IN ('SINGLE', 'TWIN')),
+      load_condition TEXT NOT NULL CHECK(load_condition IN ('EMPTY', 'LOADED')),
+      readings_json TEXT NOT NULL,
+      results_json TEXT NOT NULL,
+      passed INTEGER NOT NULL CHECK(passed IN (0, 1)),
+      failed_refs TEXT DEFAULT NULL,
+      missing_refs TEXT DEFAULT NULL,
+      unjudged_refs TEXT DEFAULT NULL,
+      tested_by TEXT NOT NULL,
+      tester_name TEXT DEFAULT NULL,
+      notes TEXT DEFAULT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      FOREIGN KEY (tested_by) REFERENCES users(id) ON DELETE RESTRICT
+    );
+    CREATE INDEX IF NOT EXISTS idx_swt_wagon ON swt_tests(wagon_number, created_at);
+    CREATE TRIGGER IF NOT EXISTS trg_prevent_swt_update
+    BEFORE UPDATE ON swt_tests
+    BEGIN
+      SELECT RAISE(ABORT, 'Audit log is strictly append-only. Single wagon test records are immutable and cannot be updated.');
+    END;
+    CREATE TRIGGER IF NOT EXISTS trg_prevent_swt_delete
+    BEFORE DELETE ON swt_tests
+    BEGIN
+      SELECT RAISE(ABORT, 'Audit log is strictly append-only. Single wagon test records are immutable and cannot be deleted.');
+    END;
+  `);
+
   // A declared principal for actions the system performs itself.
   //
   // Audit rows carry a foreign key to users, so an event with no human actor
