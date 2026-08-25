@@ -21,6 +21,55 @@ export const authRouter = Router();
 /**
  * POST /api/auth/login
  */
+
+/**
+ * Login throttling.
+ *
+ * There was none: an unlimited number of password guesses could be made
+ * against any account, at whatever rate the network allowed. On a workshop
+ * LAN with known usernames (inspector1, supervisor1) and a shared initial
+ * password policy, that is the easiest way into the system by a wide margin.
+ *
+ * Kept in memory deliberately — the lockout should reset if the server
+ * restarts, and persisting failures would let an attacker fill the database.
+ */
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_LOCKOUT_MS = 15 * 60 * 1000;
+const loginAttempts = new Map<string, { count: number; firstAt: number; lockedUntil: number }>();
+
+function loginKey(username: string, req: any): string {
+  const ip = req.socket?.remoteAddress || req.headers?.['x-forwarded-for'] || 'unknown';
+  // Keyed on both, so one account being attacked cannot lock out a whole
+  // shop floor sharing an IP, and one machine cannot spray every account.
+  return `${String(username).toLowerCase()}|${ip}`;
+}
+
+function isLockedOut(key: string): number {
+  const rec = loginAttempts.get(key);
+  if (!rec) return 0;
+  if (rec.lockedUntil > Date.now()) return Math.ceil((rec.lockedUntil - Date.now()) / 1000);
+  if (rec.lockedUntil && rec.lockedUntil <= Date.now()) loginAttempts.delete(key);
+  return 0;
+}
+
+function recordFailure(key: string): void {
+  const now = Date.now();
+  const rec = loginAttempts.get(key) || { count: 0, firstAt: now, lockedUntil: 0 };
+  // Attempts age out, so occasional typos across a shift never accumulate
+  // into a lockout.
+  if (now - rec.firstAt > LOGIN_LOCKOUT_MS) {
+    rec.count = 0;
+    rec.firstAt = now;
+  }
+  rec.count += 1;
+  if (rec.count >= LOGIN_MAX_ATTEMPTS) rec.lockedUntil = now + LOGIN_LOCKOUT_MS;
+  loginAttempts.set(key, rec);
+}
+
+function clearFailures(key: string): void {
+  loginAttempts.delete(key);
+}
+
 authRouter.post('/login', (req: Request, res: Response, next: NextFunction): void => {
   try {
     const { username, password } = req.body || {};
@@ -36,20 +85,39 @@ authRouter.post('/login', (req: Request, res: Response, next: NextFunction): voi
       return;
     }
 
+    const attemptKey = loginKey(username, req);
+    const lockedFor = isLockedOut(attemptKey);
+    if (lockedFor > 0) {
+      res.status(429).json({
+        success: false,
+        error: 'TOO_MANY_ATTEMPTS',
+        message: `Too many failed sign-in attempts. Try again in ${Math.ceil(lockedFor / 60)} minute(s).`,
+        retryAfterSeconds: lockedFor,
+        statusCode: 429,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
     const db = getDatabase();
     const repo = new InspectionRepository(db);
     const userRow = repo.getUserByUsername(username);
 
     if (!userRow || !verifyPassword(password, userRow.password_hash)) {
+      recordFailure(attemptKey);
       res.status(401).json({
         success: false,
         error: 'INVALID_CREDENTIALS',
+        // Deliberately identical whether the user exists or not, so the
+        // response cannot be used to enumerate valid usernames.
         message: 'Invalid username or password',
         statusCode: 401,
         timestamp: new Date().toISOString()
       });
       return;
     }
+
+    clearFailures(attemptKey);
 
     const user = {
       id: userRow.id,

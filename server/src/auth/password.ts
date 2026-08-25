@@ -36,11 +36,12 @@ export function verifyPassword(password: string, storedHash: string): boolean {
     return crypto.timingSafeEqual(Buffer.from(derivedKey, 'hex'), Buffer.from(originalHash, 'hex'));
   }
 
-  // Handle plain SHA-256 fallback or legacy hash
-  const shaHash = crypto.createHash('sha256').update(password).digest('hex');
-  if (storedHash === shaHash) {
-    return true;
-  }
-
+  // Anything that is not PBKDF2 is refused.
+  //
+  // There used to be a fallback here that accepted an unsalted SHA-256 of the
+  // password — a fast, rainbow-tableable hash — and it accepted it silently,
+  // so a weakly-stored credential would authenticate with no indication that
+  // it had taken the weaker path. Nothing writes that format any more, and a
+  // login that cannot be verified properly should fail rather than fall back.
   return false;
 }

@@ -32,6 +32,16 @@ if (nodeEnv === 'production' && !process.env.JWT_SECRET) {
   );
 }
 
+// A wildcard CORS origin in production means any website a logged-in user
+// visits can call this API with their browser. Fine on a closed LAN during
+// the pilot, not something to reach production unnoticed.
+if (nodeEnv === 'production' && (!process.env.CORS_ORIGIN || process.env.CORS_ORIGIN === '*')) {
+  console.warn(
+    '[config] WARNING: CORS_ORIGIN is "*" in production. Set it to the exact origin ' +
+    'the workshop tablets load the app from.'
+  );
+}
+
 if (process.env.OTP_DELIVERY === 'SMS') {
   throw new Error(
     'OTP_DELIVERY=SMS is not implemented — no SMS gateway is integrated. ' +

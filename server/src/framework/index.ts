@@ -454,6 +454,24 @@ export function express(): ExpressApp {
   return new ExpressApp();
 }
 
+/**
+ * Parses a body-size limit like '10mb' into bytes.
+ *
+ * The limit option was previously accepted and then ignored — express.json()
+ * took `{ limit: '10mb' }` and never checked anything, so the server would
+ * buffer a body of any size into memory. With defect photos arriving as
+ * base64 that is both a stability risk and an easy way to exhaust the host.
+ */
+function parseByteLimit(limit: string | undefined, fallbackBytes: number): number {
+  if (!limit) return fallbackBytes;
+  const m = /^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb)?$/i.exec(limit.trim());
+  if (!m) return fallbackBytes;
+  const value = parseFloat(m[1]);
+  const unit = (m[2] || 'b').toLowerCase();
+  const mult = unit === 'gb' ? 1024 ** 3 : unit === 'mb' ? 1024 ** 2 : unit === 'kb' ? 1024 : 1;
+  return Math.floor(value * mult);
+}
+
 express.json = (options?: { limit?: string }) => {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     if (req.body !== undefined && Object.keys(req.body).length > 0) {
@@ -471,12 +489,31 @@ express.json = (options?: { limit?: string }) => {
       return next();
     }
 
+    const maxBytes = parseByteLimit(options?.limit, 10 * 1024 * 1024);
     const chunks: Buffer[] = [];
+    let received = 0;
+    let aborted = false;
+
     req.on('data', chunk => {
+      if (aborted) return;
+      received += chunk.length;
+      if (received > maxBytes) {
+        aborted = true;
+        res.status(413).json({
+          success: false,
+          error: 'PAYLOAD_TOO_LARGE',
+          message: `Request body exceeds the ${options?.limit || '10mb'} limit.`,
+          statusCode: 413,
+          timestamp: new Date().toISOString()
+        });
+        req.destroy();
+        return;
+      }
       chunks.push(chunk);
     });
 
     req.on('end', () => {
+      if (aborted) return;
       if (chunks.length === 0) {
         req.body = {};
         return next();
