@@ -15,6 +15,7 @@ export interface AppConfig {
   jwtExpiresIn: string;
   dbPath: string;
   corsOrigin: string;
+  otpDelivery: 'INLINE' | 'SMS';
   nodeEnv: string;
 }
 
@@ -31,11 +32,32 @@ if (nodeEnv === 'production' && !process.env.JWT_SECRET) {
   );
 }
 
+if (process.env.OTP_DELIVERY === 'SMS') {
+  throw new Error(
+    'OTP_DELIVERY=SMS is not implemented — no SMS gateway is integrated. ' +
+    'Use OTP_DELIVERY=INLINE (the code is returned in the API response, which is ' +
+    'an audited confirmation step but not a second factor), or add a delivery ' +
+    'integration before selecting SMS.'
+  );
+}
+
 export const config: AppConfig = {
   port: parseInt(process.env.PORT || '3000', 10),
   jwtSecret: process.env.JWT_SECRET || 'wrs-raipur-rdso-g95-secret-key-2026-DEV-ONLY',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
   dbPath: process.env.DB_PATH || path.resolve(__dirname, '..', '..', 'data', 'wrs_inspections.db'),
   corsOrigin: process.env.CORS_ORIGIN || '*',
+  // How a supervisor receives their one-time code.
+  //
+  // 'INLINE' returns the code in the API response to whoever asked for it.
+  // That is workable for a LAN pilot where the tablet is the supervisor's own
+  // and the point of the step is a deliberate, audited confirmation — but it
+  // is NOT a second factor, because possession of nothing extra is proven.
+  // It is a setting rather than a silent default so the posture is a choice
+  // somebody made, not an accident nobody noticed.
+  //
+  // 'SMS' requires a delivery integration and is not implemented; selecting it
+  // makes the server refuse to start rather than pretend.
+  otpDelivery: (process.env.OTP_DELIVERY || 'INLINE') as 'INLINE' | 'SMS',
   nodeEnv
 };

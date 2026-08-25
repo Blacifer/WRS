@@ -14,6 +14,7 @@ import { requireRole } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { InspectionRepository } from '../db/repository.ts';
 import type { UserRole, OtpAction } from '../../../shared/types.ts';
+import { config } from '../config/index.ts';
 
 export const authRouter = Router();
 
@@ -92,7 +93,11 @@ authRouter.post('/request-otp', authMiddleware, (req: AuthenticatedRequest, res:
       action,
       expiresInSeconds: otpResult.expiresInSeconds,
       message: 'OTP has been generated and sent to supervisor channel',
+      // Returned because OTP_DELIVERY is INLINE — see config/index.ts. This is
+      // an audited two-step confirmation, not a second factor: the code goes
+      // back to whoever asked for it.
       devOtpCode: otpResult.otpCode,
+      otpDelivery: config.otpDelivery,
       data: {
         otpId: otpResult.otpId,
         action,
