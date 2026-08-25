@@ -411,6 +411,52 @@ BEGIN
   SELECT RAISE(ABORT, 'Audit log is strictly append-only. Single wagon test records are immutable and cannot be deleted.');
 END;
 
+
+-- ---------------------------------------------------------------------------
+-- LEARNED PARAMETER HISTORY
+--
+-- learned_parameters holds only the current state, so approving a second
+-- proposal overwrote any record of the first. That made the one question worth
+-- asking of a self-improving system — "what has it actually learned, and on
+-- what evidence?" — unanswerable after the second change.
+--
+-- This is that record: every decision, accepted or rejected, with the value
+-- before and after, the reasoning, how many observations it rested on, and who
+-- decided. Rejections are kept too: knowing which suggestions a supervisor
+-- turned down says as much about the system's judgement as the ones they took.
+--
+-- Append-only, like every other record here.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS learned_parameter_history (
+  id TEXT PRIMARY KEY,
+  param_key TEXT NOT NULL,
+  subsystem TEXT NOT NULL,
+  previous_value REAL NOT NULL,
+  proposed_value REAL NOT NULL,
+  applied_value REAL DEFAULT NULL,
+  decision TEXT NOT NULL CHECK(decision IN ('APPROVED', 'REJECTED')),
+  rationale TEXT DEFAULT NULL,
+  sample_size INTEGER DEFAULT NULL,
+  decided_by TEXT NOT NULL,
+  decided_by_name TEXT DEFAULT NULL,
+  decided_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  FOREIGN KEY (decided_by) REFERENCES users(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_param_history ON learned_parameter_history(param_key, decided_at);
+
+CREATE TRIGGER IF NOT EXISTS trg_prevent_param_history_update
+BEFORE UPDATE ON learned_parameter_history
+BEGIN
+  SELECT RAISE(ABORT, 'Audit log is strictly append-only. Learned parameter history is immutable and cannot be updated.');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_prevent_param_history_delete
+BEFORE DELETE ON learned_parameter_history
+BEGIN
+  SELECT RAISE(ABORT, 'Audit log is strictly append-only. Learned parameter history is immutable and cannot be deleted.');
+END;
+
 CREATE TRIGGER IF NOT EXISTS trg_prevent_inspections_update
 BEFORE UPDATE ON inspections
 BEGIN

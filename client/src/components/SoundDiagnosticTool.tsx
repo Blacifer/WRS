@@ -15,6 +15,7 @@ import { useI18n } from '../i18n/index.ts';
 import { acousticEngine, AcousticAnalysisFrame, EqualizerBand } from '../utils/acousticEngine.ts';
 import { api } from '../services/api.ts';
 import type { AcousticAnomalyType, CASNUBCategory } from '../../../shared/types.ts';
+import { tunable, loadTunables } from '../services/tunables.ts';
 
 interface SoundDiagnosticToolProps {
   wagonNumber: string;
@@ -42,6 +43,8 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
   // Where the current reading's audio came from. A synthetic training signal
   // or a dead microphone must never be filed against a real wagon.
   const [signalSource, setSignalSource] = useState<AcousticAnalysisFrame['signalSource']>('NO_SIGNAL');
+  // True when something was detected but was too marginal to raise.
+  const [belowThreshold, setBelowThreshold] = useState<boolean>(false);
   const [confidence, setConfidence] = useState<number>(0.95);
   const [crestFactor, setCrestFactor] = useState<number>(1.5);
   const [highFreqRatio, setHighFreqRatio] = useState<number>(0.05);
@@ -81,7 +84,15 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
   const handleFrame = useCallback((frame: AcousticAnalysisFrame) => {
     setDominantFreq(frame.dominantFrequencyHz);
     setPeakDb(frame.peakDb);
-    setAnomalyType(frame.anomalyType);
+    // An anomaly below the approved confidence threshold is not surfaced as a
+    // finding. There was no gate here at all: every detection was presented
+    // with equal weight regardless of how marginal it was, and the tunable
+    // meant to control it tuned nothing. Below the threshold the reading is
+    // still shown live — the inspector can see the spectrum — it simply does
+    // not become a defect they are invited to file.
+    const meetsThreshold = frame.confidence >= tunable('acoustic.alert_threshold');
+    setAnomalyType(meetsThreshold ? frame.anomalyType : 'NONE');
+    setBelowThreshold(!meetsThreshold && frame.anomalyType !== 'NONE');
     setSignalSource(frame.signalSource);
     setConfidence(frame.confidence);
     setCrestFactor(Math.round(frame.crestFactor * 10) / 10);
@@ -318,7 +329,17 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
     };
   }, []);
 
+  useEffect(() => {
+    loadTunables();
+  }, []);
+
   // Log Defect to Exit Gate Blockers
+  /*
+    Shown when something was heard but was too marginal to raise. Silently
+    discarding a detection would be worse than not having the gate: the
+    inspector would have no way to tell "nothing there" from "something there,
+    below the bar".
+  */
   const handleLogDefect = async () => {
     if (anomalyType === 'NONE') return;
 
@@ -576,6 +597,13 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
           <div className="flex items-center gap-2 self-end sm:self-auto">
             <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-900/80 text-slate-300 border border-slate-700">
               Confidence: {(confidence * 100).toFixed(0)}%
+              {belowThreshold && (
+                <span className="block text-[11px] text-amber-400 font-semibold mt-1">
+                  {isHi
+                    ? `संकेत मिला पर सीमा (${(tunable('acoustic.alert_threshold') * 100).toFixed(0)}%) से नीचे — दोष के रूप में दर्ज नहीं`
+                    : `Something was detected but sits below the ${(tunable('acoustic.alert_threshold') * 100).toFixed(0)}% alert threshold, so it is not raised as a defect.`}
+                </span>
+              )}
             </span>
           </div>
         </div>

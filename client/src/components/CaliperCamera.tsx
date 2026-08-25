@@ -18,6 +18,7 @@ import type { MeasurementRange } from '../services/ocr.ts';
 import { CameraIcon, AlertTriangleIcon, CheckCircleIcon, RefreshCwIcon } from './Icons.tsx';
 import { playActionTap, playPassChime, playCondemnedBuzz } from '../utils/audioFeedback.ts';
 import type { BogieType, SpringCondition, CVComponentTarget } from '../../../shared/types.ts';
+import { tunable, loadTunables } from '../services/tunables.ts';
 
 interface CaliperCameraProps {
   lang: LanguageCode;
@@ -123,6 +124,11 @@ export const CaliperCamera: React.FC<CaliperCameraProps> = ({
   }, []);
 
   // Start camera when entering camera mode
+  // Approved thresholds are fetched once when the camera opens.
+  useEffect(() => {
+    loadTunables();
+  }, []);
+
   useEffect(() => {
     if (activeMode === 'camera') {
       startCamera();
@@ -184,7 +190,11 @@ export const CaliperCamera: React.FC<CaliperCameraProps> = ({
       setOcrLatencyMs(result.processingTimeMs);
       setOcrRawText(result.rawText || null);
 
-      if (result.measuredHeight > 0 && result.confidence >= 0.5) {
+      // The threshold is the approved, tuned value rather than a constant.
+      // This was hardcoded to 0.5 — the same number as the parameter's shipped
+      // default — so the learning loop could propose a change, a supervisor
+      // could approve it, and this line would carry on ignoring it.
+      if (result.measuredHeight > 0 && result.confidence >= tunable('ocr.manual_confirm_threshold')) {
         // OCR succeeded — auto-fill the measurement
         setManualInputStr(result.measuredHeight.toFixed(2));
         onMeasurementChange(result.measuredHeight, 'OCR', result.confidence);

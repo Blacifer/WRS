@@ -701,6 +701,37 @@ export function runMigrations(db: DatabaseSync): void {
     }
   }
 
+
+  // Learned parameter history — see the table comment in schema.sql.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS learned_parameter_history (
+      id TEXT PRIMARY KEY,
+      param_key TEXT NOT NULL,
+      subsystem TEXT NOT NULL,
+      previous_value REAL NOT NULL,
+      proposed_value REAL NOT NULL,
+      applied_value REAL DEFAULT NULL,
+      decision TEXT NOT NULL CHECK(decision IN ('APPROVED', 'REJECTED')),
+      rationale TEXT DEFAULT NULL,
+      sample_size INTEGER DEFAULT NULL,
+      decided_by TEXT NOT NULL,
+      decided_by_name TEXT DEFAULT NULL,
+      decided_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      FOREIGN KEY (decided_by) REFERENCES users(id) ON DELETE RESTRICT
+    );
+    CREATE INDEX IF NOT EXISTS idx_param_history ON learned_parameter_history(param_key, decided_at);
+    CREATE TRIGGER IF NOT EXISTS trg_prevent_param_history_update
+    BEFORE UPDATE ON learned_parameter_history
+    BEGIN
+      SELECT RAISE(ABORT, 'Audit log is strictly append-only. Learned parameter history is immutable and cannot be updated.');
+    END;
+    CREATE TRIGGER IF NOT EXISTS trg_prevent_param_history_delete
+    BEFORE DELETE ON learned_parameter_history
+    BEGIN
+      SELECT RAISE(ABORT, 'Audit log is strictly append-only. Learned parameter history is immutable and cannot be deleted.');
+    END;
+  `);
+
   // A declared principal for actions the system performs itself.
   //
   // Audit rows carry a foreign key to users, so an event with no human actor

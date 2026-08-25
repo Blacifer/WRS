@@ -723,6 +723,23 @@ export class ApiClient {
 
 
 
+
+  /**
+   * Threshold values the running app should use, as tuned and approved.
+   * Cached by tunables.ts — this is the raw fetch.
+   */
+  public async getEffectiveParameters(): Promise<{ success: boolean; data: Record<string, number> }> {
+    return this.request('/learning/parameters/effective');
+  }
+
+  public async getLearningMemory(): Promise<{ success: boolean; data: any }> {
+    return this.request('/learning/memory');
+  }
+
+  public async getParameterHistory(paramKey: string): Promise<{ success: boolean; data: any[] }> {
+    return this.request(`/learning/parameters/${encodeURIComponent(paramKey)}/history`);
+  }
+
   // =========================================================================
   // Authenticator (TOTP) — a real second factor
   // =========================================================================

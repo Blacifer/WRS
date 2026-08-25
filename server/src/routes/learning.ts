@@ -33,6 +33,42 @@ const VALID_SUBSYSTEMS: LearningSubsystem[] = [
 // POST /api/learning/outcome
 // Records one machine judgement and what the human did with it. Called by the
 // client whenever an OCR read, classification or voice command is committed.
+
+// ---------------------------------------------------------------------------
+// GET /api/learning/parameters/effective
+//
+// The values the running system should actually use.
+//
+// Without this the loop did not close: outcomes were recorded, accuracy was
+// computed, proposals were raised and approved — and the approved value was
+// written to a table nothing read. Approving a change altered no behaviour
+// whatsoever, which makes a dial that is connected to nothing, and someone
+// will eventually turn it and believe they have done something.
+// ---------------------------------------------------------------------------
+learningRouter.get('/parameters/effective', authMiddleware, (_req: AuthenticatedRequest, res: Response) => {
+  const values: Record<string, number> = {};
+  for (const row of service().listParameters()) {
+    values[row.param_key] = row.current_value;
+  }
+  res.status(200).json({ success: true, data: values, timestamp: new Date().toISOString() });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/learning/memory — "how much has it seen, what has it learned"
+// ---------------------------------------------------------------------------
+learningRouter.get('/memory', authMiddleware, (_req: AuthenticatedRequest, res: Response) => {
+  res.status(200).json({ success: true, data: service().getMemory(), timestamp: new Date().toISOString() });
+});
+
+learningRouter.get('/parameters/:paramKey/history', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+  const paramKey = req.params?.paramKey;
+  if (!paramKey) {
+    res.status(400).json({ success: false, error: 'MISSING_PARAM', message: 'paramKey is required', statusCode: 400, timestamp: new Date().toISOString() });
+    return;
+  }
+  res.status(200).json({ success: true, data: service().getParameterHistory(paramKey), timestamp: new Date().toISOString() });
+});
+
 // ---------------------------------------------------------------------------
 learningRouter.post('/outcome', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
   try {

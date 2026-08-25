@@ -483,8 +483,45 @@ export class LearningService {
 
     const now = new Date().toISOString();
 
+    // Record the decision before applying it.
+    //
+    // learned_parameters holds only current state, so approving a second
+    // proposal used to overwrite any trace of the first — which made "what has
+    // this system actually learned, and on what evidence?" unanswerable after
+    // the second change. Rejections are recorded too: which suggestions a
+    // supervisor turned down says as much about the system's judgement as the
+    // ones they accepted.
+    const applied =
+      decision === 'APPROVE'
+        ? Math.min(row.max_allowed, Math.max(row.min_allowed, row.proposed_value))
+        : null;
+
+    const decider = this.db
+      .prepare('SELECT full_name FROM users WHERE id = ?')
+      .get(userId) as { full_name: string } | undefined;
+
+    this.db.prepare(`
+      INSERT INTO learned_parameter_history (
+        id, param_key, subsystem, previous_value, proposed_value, applied_value,
+        decision, rationale, sample_size, decided_by, decided_by_name, decided_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      `lph_${crypto.randomUUID()}`,
+      paramKey,
+      row.subsystem,
+      row.current_value,
+      row.proposed_value,
+      applied,
+      decision === 'APPROVE' ? 'APPROVED' : 'REJECTED',
+      row.proposal_rationale ?? null,
+      row.proposal_sample_size ?? null,
+      userId,
+      decider?.full_name ?? null,
+      now
+    );
+
     if (decision === 'APPROVE') {
-      const clamped = Math.min(row.max_allowed, Math.max(row.min_allowed, row.proposed_value));
+      const clamped = applied as number;
       this.db.prepare(`
         UPDATE learned_parameters
         SET current_value = ?, approval_status = 'APPROVED', approved_by = ?, approved_at = ?,
@@ -503,6 +540,112 @@ export class LearningService {
     return this.db.prepare('SELECT * FROM learned_parameters WHERE param_key = ?').get(paramKey);
   }
 
+
+  /**
+   * The answer to "how much has it seen, and what has it learned?"
+   *
+   * Written to be shown to someone who will reasonably be sceptical. Two rules
+   * govern it:
+   *
+   * 1. Nothing is inferred. Every number is a count of something recorded.
+   * 2. Having learned nothing is reported as having learned nothing. On day
+   *    one that is the truthful answer, and a system that dresses it up as
+   *    something more is one nobody should trust with a safety decision.
+   */
+  public getMemory(): {
+    observations: {
+      subsystem: string;
+      total: number;
+      corrected: number;
+      accuracyPct: number | null;
+      enoughToLearnFrom: boolean;
+      firstSeen: string | null;
+      lastSeen: string | null;
+    }[];
+    totalObservations: number;
+    changesApplied: any[];
+    changesRejected: any[];
+    pendingProposals: any[];
+    summary: string;
+  } {
+    const subsystems: LearningSubsystem[] = [
+      'OCR_CALIPER',
+      'SPRING_CLASSIFICATION',
+      'VOICE_COMMAND',
+      'ACOUSTIC_DIAGNOSTIC',
+      'DEFECT_SUGGESTION'
+    ];
+
+    const observations = subsystems.map((subsystem) => {
+      const row = this.db.prepare(`
+        SELECT COUNT(*) AS total,
+               SUM(CASE WHEN was_corrected = 1 THEN 1 ELSE 0 END) AS corrected,
+               MIN(created_at) AS firstSeen,
+               MAX(created_at) AS lastSeen
+        FROM machine_learning_events WHERE subsystem = ?
+      `).get(subsystem) as any;
+
+      const total = row?.total || 0;
+      const corrected = row?.corrected || 0;
+      return {
+        subsystem,
+        total,
+        corrected,
+        // Reported as null rather than 100% when nothing has been seen. A
+        // subsystem with no observations has no accuracy, and showing one
+        // would be the single most misleading number on the screen.
+        accuracyPct: total > 0 ? Number((((total - corrected) / total) * 100).toFixed(1)) : null,
+        enoughToLearnFrom: total >= MIN_SAMPLE_FOR_INSIGHT,
+        firstSeen: row?.firstSeen ?? null,
+        lastSeen: row?.lastSeen ?? null
+      };
+    });
+
+    const history = this.db
+      .prepare('SELECT * FROM learned_parameter_history ORDER BY decided_at DESC')
+      .all() as any[];
+
+    const pending = this.db
+      .prepare("SELECT * FROM learned_parameters WHERE approval_status = 'PENDING' AND proposed_value IS NOT NULL")
+      .all() as any[];
+
+    const totalObservations = observations.reduce((n, o) => n + o.total, 0);
+    const applied = history.filter((h) => h.decision === 'APPROVED');
+
+    let summary: string;
+    if (totalObservations === 0) {
+      summary =
+        'Nothing has been recorded yet, so the system has learned nothing. It will begin ' +
+        'accumulating observations as inspectors use it.';
+    } else if (applied.length === 0) {
+      summary =
+        `${totalObservations.toLocaleString()} observations recorded. No settings have been ` +
+        `changed yet — either the evidence has not reached the threshold of ` +
+        `${MIN_SAMPLE_FOR_INSIGHT} observations, or no proposal has been accepted.`;
+    } else {
+      summary =
+        `${totalObservations.toLocaleString()} observations recorded, and ` +
+        `${applied.length} setting${applied.length === 1 ? '' : 's'} changed as a result, ` +
+        `each approved by a named supervisor.`;
+    }
+
+    return {
+      observations,
+      totalObservations,
+      changesApplied: applied,
+      changesRejected: history.filter((h) => h.decision === 'REJECTED'),
+      pendingProposals: pending,
+      summary
+    };
+  }
+
+  /** Every decision ever taken on one parameter, oldest first. */
+  public getParameterHistory(paramKey: string): any[] {
+    return this.db
+      .prepare('SELECT * FROM learned_parameter_history WHERE param_key = ? ORDER BY decided_at ASC')
+      .all(paramKey) as any[];
+  }
+
   /** Everything the "what has the system learned" view needs, in one call. */
   public getDashboard(): Record<string, unknown> {
     const subsystems: LearningSubsystem[] = [
@@ -519,6 +662,7 @@ export class LearningService {
       ocrCalibration: this.getConfidenceCalibration('OCR_CALIPER'),
       insights: this.deriveInsights(),
       parameters: this.listParameters(),
+      memory: this.getMemory(),
       minSampleForInsight: MIN_SAMPLE_FOR_INSIGHT
     };
   }
