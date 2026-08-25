@@ -108,16 +108,9 @@ export class WagonRepository {
     const entryDate = data.entryDate || new Date().toISOString();
     const entryNotes = data.entryNotes || data.conditionNotes || null;
     const conditionNotes = data.conditionNotes || data.entryNotes || null;
-    const createdBy = data.createdBy || 'usr_insp_001';
-
-    // Ensure createdBy user exists
-    const userCheck = this.db.prepare('SELECT id FROM users WHERE id = ?').get(createdBy);
-    if (!userCheck) {
-      this.db.prepare(`
-        INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, employee_id, is_active)
-        VALUES (?, ?, 'none', 'INSPECTOR', 'Inspector', ?, 1)
-      `).run(createdBy, `user_${createdBy}`, `EMP-${createdBy}`);
-    }
+    // No fallback to a demo user: a wagon registered by nobody in particular
+    // is a record that cannot be questioned or defended later.
+    const createdBy = this.requireActor(data.createdBy, 'Wagon registration');
 
     const stmt = this.db.prepare(`
       INSERT INTO wagons (
@@ -266,14 +259,10 @@ export class WagonRepository {
     const now = data.createdAt || new Date().toISOString();
     const isOverride = data.isOverride ? 1 : 0;
 
-    // Ensure performer exists
-    const userCheck = this.db.prepare('SELECT id FROM users WHERE id = ?').get(data.performedBy);
-    if (!userCheck) {
-      this.db.prepare(`
-        INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, employee_id, is_active)
-        VALUES (?, ?, 'none', ?, ?, ?, 1)
-      `).run(data.performedBy, `user_${data.performedBy}`, data.performerRole || 'INSPECTOR', data.performerName || 'User', `EMP-${data.performedBy}`);
-    }
+    // The performer must already exist. This previously created the account if
+    // the id was unknown, using the role the caller supplied — so an unknown
+    // id could materialise as an active SUPERVISOR.
+    this.requireActor(data.performedBy, 'Stage transition');
 
     // Insert transition
     this.db.prepare(`
@@ -1536,6 +1525,68 @@ export class WagonRepository {
   // Photo Evidence Management
   // -------------------------------------------------------------------------
 
+  /**
+   * Resolves an actor to a registered, active user, or refuses.
+   *
+   * Three call sites used to conjure a user row when the id was unknown —
+   * wagon registration, stage transitions and photo evidence — each inserting
+   * an account with a password of 'none'. The transition one took the role
+   * from the caller, so an unknown id could materialise as a SUPERVISOR.
+   *
+   * Ghost-user creation was removed from the inspection path during the Tier 1
+   * cleanup with a note never to reintroduce it. It had survived in four other
+   * places. Everything this system records is an assertion that a named person
+   * did something; an actor who cannot be identified is a reason to refuse, not
+   * to invent one.
+   */
+  /**
+   * Evidence held for one checklist item, split by what it shows.
+   *
+   * The question this answers is "can this repair be demonstrated?" — which
+   * needs a before and an after, not merely a count of photographs.
+   */
+  public getEvidenceForItem(checklistItemId: string): {
+    before: any[];
+    after: any[];
+    defect: any[];
+    other: any[];
+    hasBeforeAndAfter: boolean;
+  } {
+    const rows = this.db.prepare(`
+      SELECT id, evidence_stage, file_name, part_name, inspector_name, created_at
+      FROM wagon_photos WHERE checklist_item_id = ? ORDER BY created_at ASC
+    `).all(checklistItemId) as any[];
+
+    const of = (stage: string) => rows.filter((r) => r.evidence_stage === stage);
+    const before = of('BEFORE');
+    const after = of('AFTER');
+
+    return {
+      before,
+      after,
+      defect: of('DEFECT'),
+      other: rows.filter((r) => !['BEFORE', 'AFTER', 'DEFECT'].includes(r.evidence_stage)),
+      hasBeforeAndAfter: before.length > 0 && after.length > 0
+    };
+  }
+
+  private requireActor(userId: string, context: string): string {
+    if (!userId) {
+      throw new Error(`${context}: no user was supplied. Every record must name who made it.`);
+    }
+    const row = this.db
+      .prepare('SELECT id, is_active FROM users WHERE id = ?')
+      .get(userId) as { id: string; is_active: number } | undefined;
+
+    if (!row) {
+      throw new Error(`${context}: user ${userId} is not registered. Records must name a real person.`);
+    }
+    if (!row.is_active) {
+      throw new Error(`${context}: user ${userId} is deactivated.`);
+    }
+    return row.id;
+  }
+
   public insertPhoto(data: {
     id?: string;
     wagonNumber: string;
@@ -1550,6 +1601,8 @@ export class WagonRepository {
     inspectorId: string;
     inspectorName: string;
     tags?: string[];
+    /** BEFORE / AFTER for a repair, DEFECT for a condemnation, else GENERAL. */
+    evidenceStage?: 'BEFORE' | 'AFTER' | 'DEFECT' | 'GENERAL' | null;
   }): any {
     const id = data.id || `photo_${crypto.randomUUID()}`;
     const wagonNumber = data.wagonNumber.trim().toUpperCase();
@@ -1559,25 +1612,20 @@ export class WagonRepository {
     const tagsJson = JSON.stringify(data.tags || []);
     const now = new Date().toISOString();
 
-    // Ensure inspector user exists
-    const userCheck = this.db.prepare('SELECT id FROM users WHERE id = ?').get(data.inspectorId);
-    if (!userCheck) {
-      this.db.prepare(`
-        INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, employee_id, is_active)
-        VALUES (?, ?, 'none', 'INSPECTOR', ?, ?, 1)
-      `).run(data.inspectorId, `user_${data.inspectorId}`, data.inspectorName, `EMP-${data.inspectorId}`);
-    }
+    // Photo evidence is only evidence if it is attributable.
+    this.requireActor(data.inspectorId, 'Photo evidence');
 
     this.db.prepare(`
       INSERT INTO wagon_photos (
         id, wagon_number, checklist_item_id, category, part_name, stage,
         file_name, mime_type, file_size, image_data, inspector_id,
-        inspector_name, tags_json, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        inspector_name, tags_json, evidence_stage, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, wagonNumber, data.checklistItemId || null, data.category || null,
       data.partName || null, data.stage || null, fileName, mimeType, fileSize,
-      data.imageData, data.inspectorId, data.inspectorName, tagsJson, now
+      data.imageData, data.inspectorId, data.inspectorName, tagsJson,
+      data.evidenceStage || null, now
     );
 
     return this.getPhotoById(id);

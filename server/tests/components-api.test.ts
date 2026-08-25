@@ -45,13 +45,15 @@ describe('Phase 3 M1: /api/components REST API Integration Tests (R4 Serializati
     wagonRepo.registerWagon({
       wagonNumber: 'SECR/BOXNHL/10492',
       wagonType: 'BOXNHL',
-      owningRailway: 'SECR'
+      owningRailway: 'SECR',
+      createdBy: 'usr_insp_001'
     });
 
     wagonRepo.registerWagon({
       wagonNumber: 'ECOR/BOXNHL/20831',
       wagonType: 'BOXNHL',
-      owningRailway: 'ECOR'
+      owningRailway: 'ECOR',
+      createdBy: 'usr_insp_001'
     });
   });
 

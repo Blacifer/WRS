@@ -54,7 +54,9 @@ describe('Spring to Checklist Auto-Link', () => {
     seedUsers(db);
     wagonRepo = new WagonRepository(db);
     inspectionRepo = new InspectionRepository(db);
-    wagonRepo.registerWagon({ wagonNumber: wagon, wagonType: 'BOXNHL', owningRailway: 'SECR' });
+    wagonRepo.registerWagon({ wagonNumber: wagon, wagonType: 'BOXNHL', owningRailway: 'SECR',
+      createdBy: 'usr_insp_001'
+    });
   });
 
   it('TC-LINK-01: measuring Bogie 1 does NOT mark Bogie 2 as verified', () => {

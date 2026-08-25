@@ -144,7 +144,8 @@ describe('Challenger 2 Phase 2 Empirical Stress Test Suite', () => {
         wagonNumber,
         wagonType: 'BOXNHL',
         owningRailway: 'ER',
-        entryNotes: 'First intake'
+        entryNotes: 'First intake',
+        createdBy: 'usr_insp_001'
       });
       assert.strictEqual(w1.wagonNumber, wagonNumber);
 
@@ -155,7 +156,8 @@ describe('Challenger 2 Phase 2 Empirical Stress Test Suite', () => {
           wagonNumber,
           wagonType: 'BOXNHL',
           owningRailway: 'ER',
-          entryNotes: 'Duplicate intake'
+          entryNotes: 'Duplicate intake',
+          createdBy: 'usr_insp_001'
         });
       } catch (err: any) {
         if (err.message.includes('UNIQUE constraint failed')) {
@@ -257,7 +259,9 @@ describe('Challenger 2 Phase 2 Empirical Stress Test Suite', () => {
       const wagonRepo = new WagonRepository(db);
 
       const wagonNumber = 'SCR/BOXNHL/33445';
-      wagonRepo.registerWagon({ wagonNumber, wagonType: 'BOXNHL', owningRailway: 'SCR' });
+      wagonRepo.registerWagon({ wagonNumber, wagonType: 'BOXNHL', owningRailway: 'SCR',
+      createdBy: 'usr_insp_001'
+    });
 
       // Step 1: Initial inspection PASS
       const item1 = wagonRepo.upsertChecklistItem({
@@ -644,7 +648,8 @@ describe('Challenger 2 Phase 2 Empirical Stress Test Suite', () => {
       wagonRepo.registerWagon({
         wagonNumber,
         wagonType: 'BOXNHL',
-        owningRailway: 'WR'
+        owningRailway: 'WR',
+        createdBy: 'usr_insp_001'
       });
 
       const photo1 = wagonRepo.insertPhoto({

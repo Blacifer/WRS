@@ -36,7 +36,8 @@ photosRouter.post('/upload', authMiddleware, async (req: Request, res: Response)
     fileSize,
     imageBase64,
     imageData,
-    tags
+    tags,
+    evidenceStage
   } = req.body;
 
   const effectiveImageData = imageBase64 || imageData;
@@ -53,8 +54,22 @@ photosRouter.post('/upload', authMiddleware, async (req: Request, res: Response)
     return;
   }
 
-  const inspectorId = req.user?.id || 'usr_insp_001';
-  const inspectorName = req.user?.name || 'Inspector';
+  // Identity comes from the token. This fell back to a hardcoded demo
+  // inspector, so evidence uploaded by anyone whose token lacked an id was
+  // filed under someone else's name — the same fault the release certificate
+  // had, on the records meant to prove what was actually done.
+  if (!req.user?.id) {
+    res.status(401).json({
+      success: false,
+      error: 'UNAUTHORIZED',
+      message: 'Photo evidence must be attributable to an authenticated inspector.',
+      statusCode: 401,
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
+  const inspectorId = req.user.id;
+  const inspectorName = req.user.name;
 
   try {
     const photo = repo.insertPhoto({
@@ -69,7 +84,8 @@ photosRouter.post('/upload', authMiddleware, async (req: Request, res: Response)
       imageData: effectiveImageData,
       inspectorId,
       inspectorName,
-      tags: Array.isArray(tags) ? tags : [wagonNumber, effectiveCategory, partName].filter(Boolean)
+      tags: Array.isArray(tags) ? tags : [wagonNumber, effectiveCategory, partName].filter(Boolean),
+      evidenceStage: ['BEFORE', 'AFTER', 'DEFECT', 'GENERAL'].includes(evidenceStage) ? evidenceStage : null
     });
 
     // If checklistItemId is provided, link photo to checklist item

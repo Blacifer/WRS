@@ -9,6 +9,7 @@ import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { runMigrations } from '../src/db/migrations.ts';
+import { seedUsers } from '../src/db/seed.ts';
 import { ComponentRepository, calculateHealthStatus } from '../src/db/componentRepository.ts';
 import { WagonRepository } from '../src/db/wagonRepository.ts';
 import { AuditDatabase } from '../../tests/harness/audit_db.ts';
@@ -23,6 +24,7 @@ describe('M1 Adversarial Challenger: Deep Stress & Invariant Verification', () =
     db = new DatabaseSync(':memory:');
     db.exec('PRAGMA foreign_keys = ON;');
     runMigrations(db);
+    seedUsers(db);
     componentRepo = new ComponentRepository(db);
     wagonRepo = new WagonRepository(db);
     auditDb = new AuditDatabase(':memory:');
@@ -31,38 +33,44 @@ describe('M1 Adversarial Challenger: Deep Stress & Invariant Verification', () =
     wagonRepo.registerWagon({
       wagonNumber: 'SECR/BOXNHL/2026/001',
       wagonType: 'BOXNHL',
-      owningRailway: 'SECR'
+      owningRailway: 'SECR',
+      createdBy: 'usr_insp_001'
     });
 
     wagonRepo.registerWagon({
       wagonNumber: 'WR/BCN/2026/002',
       wagonType: 'BCN',
-      owningRailway: 'WR'
+      owningRailway: 'WR',
+      createdBy: 'usr_insp_001'
     });
 
     wagonRepo.registerWagon({
       wagonNumber: 'NR/BOXN/2026/003',
       wagonType: 'BOXN',
-      owningRailway: 'NR'
+      owningRailway: 'NR',
+      createdBy: 'usr_insp_001'
     });
 
     // Also register wagons in auditDb for harness filter verification
     auditDb.registerWagon({
       wagonNumber: 'SECR/BOXNHL/2026/001',
       wagonType: 'BOXNHL',
-      owningRailway: 'SECR'
+      owningRailway: 'SECR',
+      createdBy: 'usr_insp_001'
     });
 
     auditDb.registerWagon({
       wagonNumber: 'WR/BCN/2026/002',
       wagonType: 'BCN',
-      owningRailway: 'WR'
+      owningRailway: 'WR',
+      createdBy: 'usr_insp_001'
     });
 
     auditDb.registerWagon({
       wagonNumber: 'NR/BOXN/2026/003',
       wagonType: 'BOXN',
-      owningRailway: 'NR'
+      owningRailway: 'NR',
+      createdBy: 'usr_insp_001'
     });
   });
 

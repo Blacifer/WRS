@@ -61,7 +61,19 @@ wagonsRouter.post('/register', authMiddleware, async (req: Request, res: Respons
   }
 
   try {
-    const createdBy = req.user?.id || 'usr_insp_001';
+    // No demo-user fallback: a wagon registered by nobody in particular is a
+    // record that cannot be defended later.
+    if (!req.user?.id) {
+      res.status(401).json({
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'Wagon registration must be attributable to an authenticated user.',
+        statusCode: 401,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+    const createdBy = req.user.id;
     const wagon = wagonRepo.registerWagon({
       wagonNumber,
       wagonType: wagonType || 'BOXNHL',

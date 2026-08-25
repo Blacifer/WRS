@@ -357,8 +357,17 @@ describe('Tier 5 Adversarial — Phase 2 Lifecycle State Machine, Exit Gate & DB
     const rawDb = new DatabaseSync(':memory:');
     const schemaSql = fs.readFileSync(path.join(PROJECT_ROOT, 'server/src/db/schema.sql'), 'utf-8');
     rawDb.exec(schemaSql);
+    // Records must name a real person, so the fixture needs one. The schema
+    // seeds only the inactive system principal, which cannot author records.
+    rawDb.exec(
+      "INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, employee_id, is_active) " +
+      "VALUES ('usr_insp_001', 'inspector1', 'x', 'INSPECTOR', 'Ramesh Kumar', 'WRS-INSP-1042', 1), " +
+      "       ('usr_sup_001', 'supervisor1', 'x', 'SUPERVISOR', 'S. K. Verma', 'WRS-SUP-2019', 1);"
+    );
     const wagonRepo = new WagonRepository(rawDb);
-    wagonRepo.registerWagon({ wagonNumber: 'CR/BOXNHL/STAGE-CHK-01', wagonType: 'BOXNHL', owningRailway: 'CR' });
+    wagonRepo.registerWagon({ wagonNumber: 'CR/BOXNHL/STAGE-CHK-01', wagonType: 'BOXNHL', owningRailway: 'CR',
+      createdBy: 'usr_insp_001'
+    });
 
     const serverGateEval = ExitGateValidator.evaluate('CR/BOXNHL/STAGE-CHK-01', wagonRepo);
     assert.strictEqual(serverGateEval.canRelease, false);
@@ -465,9 +474,18 @@ describe('Tier 5 Adversarial — Phase 2 Lifecycle State Machine, Exit Gate & DB
     const rawDb = new DatabaseSync(':memory:');
     const schemaSql = fs.readFileSync(path.join(PROJECT_ROOT, 'server/src/db/schema.sql'), 'utf-8');
     rawDb.exec(schemaSql);
+    // Records must name a real person, so the fixture needs one. The schema
+    // seeds only the inactive system principal, which cannot author records.
+    rawDb.exec(
+      "INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, employee_id, is_active) " +
+      "VALUES ('usr_insp_001', 'inspector1', 'x', 'INSPECTOR', 'Ramesh Kumar', 'WRS-INSP-1042', 1), " +
+      "       ('usr_sup_001', 'supervisor1', 'x', 'SUPERVISOR', 'S. K. Verma', 'WRS-SUP-2019', 1);"
+    );
     const wagonRepo = new WagonRepository(rawDb);
 
-    const wagon = wagonRepo.registerWagon({ wagonNumber: 'SECR/BOXNHL/REPAIR-01', wagonType: 'BOXNHL', owningRailway: 'SECR' });
+    const wagon = wagonRepo.registerWagon({ wagonNumber: 'SECR/BOXNHL/REPAIR-01', wagonType: 'BOXNHL', owningRailway: 'SECR',
+      createdBy: 'usr_insp_001'
+    });
     wagonRepo.recordTransition({
       wagonNumber: 'SECR/BOXNHL/REPAIR-01',
       fromStage: 'ENTRY_REGISTRATION',
@@ -551,9 +569,18 @@ describe('Tier 5 Adversarial — Phase 2 Lifecycle State Machine, Exit Gate & DB
     const rawDb = new DatabaseSync(':memory:');
     const schemaSql = fs.readFileSync(path.join(PROJECT_ROOT, 'server/src/db/schema.sql'), 'utf-8');
     rawDb.exec(schemaSql);
+    // Records must name a real person, so the fixture needs one. The schema
+    // seeds only the inactive system principal, which cannot author records.
+    rawDb.exec(
+      "INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, employee_id, is_active) " +
+      "VALUES ('usr_insp_001', 'inspector1', 'x', 'INSPECTOR', 'Ramesh Kumar', 'WRS-INSP-1042', 1), " +
+      "       ('usr_sup_001', 'supervisor1', 'x', 'SUPERVISOR', 'S. K. Verma', 'WRS-SUP-2019', 1);"
+    );
     const wagonRepo = new WagonRepository(rawDb);
 
-    wagonRepo.registerWagon({ wagonNumber: 'SECR/BOXNHL/RAW-SPRING-01', wagonType: 'BOXNHL', owningRailway: 'SECR' });
+    wagonRepo.registerWagon({ wagonNumber: 'SECR/BOXNHL/RAW-SPRING-01', wagonType: 'BOXNHL', owningRailway: 'SECR',
+      createdBy: 'usr_insp_001'
+    });
     wagonRepo.recordTransition({
       wagonNumber: 'SECR/BOXNHL/RAW-SPRING-01',
       fromStage: 'ENTRY_REGISTRATION',
@@ -734,6 +761,13 @@ describe('Tier 5 Adversarial — Phase 2 Lifecycle State Machine, Exit Gate & DB
     const rawDb = new DatabaseSync(':memory:');
     const schemaSql = fs.readFileSync(path.join(PROJECT_ROOT, 'server/src/db/schema.sql'), 'utf-8');
     rawDb.exec(schemaSql);
+    // Records must name a real person, so the fixture needs one. The schema
+    // seeds only the inactive system principal, which cannot author records.
+    rawDb.exec(
+      "INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, employee_id, is_active) " +
+      "VALUES ('usr_insp_001', 'inspector1', 'x', 'INSPECTOR', 'Ramesh Kumar', 'WRS-INSP-1042', 1), " +
+      "       ('usr_sup_001', 'supervisor1', 'x', 'SUPERVISOR', 'S. K. Verma', 'WRS-SUP-2019', 1);"
+    );
 
     // 1. Seed test user
     rawDb.prepare(`

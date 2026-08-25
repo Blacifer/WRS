@@ -7,6 +7,7 @@ import { describe, it, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { runMigrations } from '../src/db/migrations.ts';
+import { seedUsers } from '../src/db/seed.ts';
 import { ComponentRepository, calculateHealthStatus, deriveCategoryAndPartName } from '../src/db/componentRepository.ts';
 import { WagonRepository } from '../src/db/wagonRepository.ts';
 
@@ -18,6 +19,7 @@ describe('Phase 3 M1: Component Repository Unit Tests (R4 Serialization)', () =>
   before(() => {
     db = new DatabaseSync(':memory:');
     runMigrations(db);
+    seedUsers(db);
     componentRepo = new ComponentRepository(db);
     wagonRepo = new WagonRepository(db);
 
@@ -25,13 +27,15 @@ describe('Phase 3 M1: Component Repository Unit Tests (R4 Serialization)', () =>
     wagonRepo.registerWagon({
       wagonNumber: 'SECR/BOXNHL/99101',
       wagonType: 'BOXNHL',
-      owningRailway: 'SECR'
+      owningRailway: 'SECR',
+      createdBy: 'usr_insp_001'
     });
 
     wagonRepo.registerWagon({
       wagonNumber: 'ECOR/BOXNHL/99102',
       wagonType: 'BOXNHL',
-      owningRailway: 'ECOR'
+      owningRailway: 'ECOR',
+      createdBy: 'usr_insp_001'
     });
   });
 

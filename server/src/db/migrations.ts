@@ -633,6 +633,16 @@ export function runMigrations(db: DatabaseSync): void {
     END;
   `);
 
+
+  // Photo evidence stage — see the column comment in schema.sql.
+  const photoCols = db.prepare("PRAGMA table_info(wagon_photos)").all() as any[];
+  if (photoCols.length > 0 && !photoCols.some((c) => c.name === 'evidence_stage')) {
+    db.exec(
+      "ALTER TABLE wagon_photos ADD COLUMN evidence_stage TEXT DEFAULT NULL " +
+      "CHECK(evidence_stage IS NULL OR evidence_stage IN ('BEFORE', 'AFTER', 'DEFECT', 'GENERAL'));"
+    );
+  }
+
   // A declared principal for actions the system performs itself.
   //
   // Audit rows carry a foreign key to users, so an event with no human actor

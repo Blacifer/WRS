@@ -283,6 +283,13 @@ CREATE TABLE IF NOT EXISTS wagon_photos (
   inspector_id TEXT NOT NULL,
   inspector_name TEXT NOT NULL,
   tags_json TEXT DEFAULT NULL,
+  -- What this photograph is evidence OF.
+  --
+  -- A repair is only demonstrable as a pair: the condition that justified the
+  -- work, and the condition after it. Photos previously attached to a part with
+  -- no way to say which they were, so a gallery of images could not answer
+  -- "show me this component before you touched it".
+  evidence_stage TEXT DEFAULT NULL CHECK(evidence_stage IS NULL OR evidence_stage IN ('BEFORE', 'AFTER', 'DEFECT', 'GENERAL')),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   FOREIGN KEY (inspector_id) REFERENCES users(id) ON DELETE RESTRICT
 );

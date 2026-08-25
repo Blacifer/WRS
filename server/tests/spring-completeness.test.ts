@@ -63,7 +63,9 @@ describe('Spring Completeness at the Exit Gate', () => {
     seedUsers(db);
     wagonRepo = new WagonRepository(db);
     inspectionRepo = new InspectionRepository(db);
-    wagonRepo.registerWagon({ wagonNumber: wagon, wagonType: 'BOXNHL', owningRailway: 'SECR' });
+    wagonRepo.registerWagon({ wagonNumber: wagon, wagonType: 'BOXNHL', owningRailway: 'SECR',
+      createdBy: 'usr_insp_001'
+    });
   });
 
   // -------------------------------------------------------------------------

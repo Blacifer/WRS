@@ -62,13 +62,15 @@ describe('CHALLENGER 2: Milestone 1 Concurrency, Integrity & API Stress Harness'
     wagonRepo.registerWagon({
       wagonNumber: 'SECR/BOXNHL/STRESS01',
       wagonType: 'BOXNHL',
-      owningRailway: 'SECR'
+      owningRailway: 'SECR',
+      createdBy: 'usr_insp_001'
     });
 
     wagonRepo.registerWagon({
       wagonNumber: 'ECOR/BOXNHL/STRESS02',
       wagonType: 'BOXNHL',
-      owningRailway: 'ECOR'
+      owningRailway: 'ECOR',
+      createdBy: 'usr_insp_001'
     });
   });
 
@@ -406,7 +408,8 @@ describe('CHALLENGER 2: Milestone 1 Concurrency, Integrity & API Stress Harness'
       wagonRepo.registerWagon({
         wagonNumber: certWagon,
         wagonType: 'BOXNHL',
-        owningRailway: 'SECR'
+        owningRailway: 'SECR',
+        createdBy: 'usr_insp_001'
       });
 
       // Mount 4 serialized components to certWagon
@@ -478,7 +481,8 @@ describe('CHALLENGER 2: Milestone 1 Concurrency, Integrity & API Stress Harness'
       wagonRepo.registerWagon({
         wagonNumber: emptyWagon,
         wagonType: 'BOXNHL',
-        owningRailway: 'SECR'
+        owningRailway: 'SECR',
+        createdBy: 'usr_insp_001'
       });
 
       // This wagon is deliberately unreleased — the case under test is the

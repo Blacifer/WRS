@@ -44,7 +44,8 @@ describe('Phase 3 M1: Release Certificate Serialized Component Manifest (R4)', (
     const w1 = wagonRepo.registerWagon({
       wagonNumber: testWagon,
       wagonType: 'BOXNHL',
-      owningRailway: 'SECR'
+      owningRailway: 'SECR',
+      createdBy: 'usr_insp_001'
     });
 
     // Create supervisor and signoff row
@@ -151,7 +152,8 @@ describe('Phase 3 M1: Release Certificate Serialized Component Manifest (R4)', (
     const w2 = wagonRepo.registerWagon({
       wagonNumber: emptyWagon,
       wagonType: 'BOXNHL',
-      owningRailway: 'ECOR'
+      owningRailway: 'ECOR',
+      createdBy: 'usr_insp_001'
     });
     const db = getDatabase();
     db.prepare(`
@@ -220,7 +222,8 @@ describe('Phase 3 M1: Release Certificate Serialized Component Manifest (R4)', (
     wagonRepo.registerWagon({
       wagonNumber: unsignedWagon,
       wagonType: 'BOXNHL',
-      owningRailway: 'SECR'
+      owningRailway: 'SECR',
+      createdBy: 'usr_insp_001'
     });
 
     const res = await app.dispatch({

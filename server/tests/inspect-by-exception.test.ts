@@ -23,7 +23,9 @@ describe('Inspect by Exception & Concurrency', () => {
     runMigrations(db);
     seedUsers(db);
     repo = new WagonRepository(db);
-    repo.registerWagon({ wagonNumber: wagon, wagonType: 'BOXNHL', owningRailway: 'SECR' });
+    repo.registerWagon({ wagonNumber: wagon, wagonType: 'BOXNHL', owningRailway: 'SECR',
+      createdBy: 'usr_insp_001'
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -159,7 +161,9 @@ describe('Inspect by Exception & Concurrency', () => {
     // Build history for one part across several other wagons.
     for (let i = 0; i < 6; i++) {
       const w = `TEST/HIST/${i}`;
-      repo.registerWagon({ wagonNumber: w, wagonType: 'BOXNHL', owningRailway: 'SECR' });
+      repo.registerWagon({ wagonNumber: w, wagonType: 'BOXNHL', owningRailway: 'SECR',
+      createdBy: 'usr_insp_001'
+    });
       const item = repo
         .getChecklistItems(w)
         .allItems.find((x: any) => x.partName === 'Brake Beams & Truss Assembly');
