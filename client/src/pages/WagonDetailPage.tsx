@@ -14,6 +14,7 @@ import { SoundDiagnosticTool } from '../components/SoundDiagnosticTool.tsx';
 import { VoiceInspectionToolbar } from '../components/VoiceInspectionToolbar.tsx';
 import { CaliperCamera } from '../components/CaliperCamera.tsx';
 import { computeComponentVerdict, resolveComponentTarget } from '../services/classification.ts';
+import { SingleWagonTestForm } from '../components/SingleWagonTestForm.tsx';
 import { playPassChime, playCondemnedBuzz } from '../utils/audioFeedback.ts';
 import { PassportQRScannerModal } from '../components/PassportQRScannerModal.tsx';
 import type {
@@ -54,7 +55,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
   const [photos, setPhotos] = useState<WagonPhotoRecord[]>([]);
   const [gateStatus, setGateStatus] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<'CHECKLIST' | 'GATE' | 'PHOTOS' | 'TIMELINE' | 'ACOUSTIC' | 'COMPONENTS'>('CHECKLIST');
+  const [activeTab, setActiveTab] = useState<'CHECKLIST' | 'GATE' | 'PHOTOS' | 'TIMELINE' | 'ACOUSTIC' | 'COMPONENTS' | 'SWT'>('CHECKLIST');
 
   // Selected Checklist Category
   const [selectedCategory, setSelectedCategory] = useState<string>('SPRINGS');
@@ -855,6 +856,17 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
 
         <button
+          onClick={() => setActiveTab('SWT')}
+          className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
+            activeTab === 'SWT'
+              ? 'border-cyan-500 text-cyan-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          <span>🌬️</span>{isHi ? 'एकल वैगन परीक्षण (वायु ब्रेक)' : 'Single Wagon Test (Air Brake)'}
+        </button>
+
+        <button
           onClick={() => setActiveTab('ACOUSTIC')}
           className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
             activeTab === 'ACOUSTIC'
@@ -1379,6 +1391,19 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
       )}
 
 
+
+      {/* Single Wagon Test — the WMM 2.0 §720-C air brake proforma */}
+      {activeTab === 'SWT' && wagon && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <SingleWagonTestForm
+            wagonNumber={wagonNumber}
+            wagonType={wagon.wagonType}
+            lang={isHi ? 'hi' : 'en'}
+            onRecorded={loadWagonData}
+            onClose={() => setActiveTab('GATE')}
+          />
+        </div>
+      )}
 
       {/* Tab 6: Smart Acoustic Bearing & Pneumatic Leak Detection */}
       {activeTab === 'ACOUSTIC' && (

@@ -708,6 +708,28 @@ export class ApiClient {
   }
 
 
+
+  // =========================================================================
+  // Single Wagon Test (air brake) — WMM 2.0 §720
+  // =========================================================================
+
+  public async recordSwt(wagonNumber: string, payload: {
+    wagonType: string;
+    pipeType: 'SINGLE' | 'TWIN';
+    loadCondition: 'EMPTY' | 'LOADED';
+    readings: Array<{ ref: string; value?: number | null; observed?: boolean }>;
+    notes?: string;
+  }): Promise<{ success: boolean; data: any }> {
+    return this.request(`/wagons/${encodeURIComponent(wagonNumber)}/swt`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  public async getSwt(wagonNumber: string): Promise<{ success: boolean; data: { latest: any; history: any[] } }> {
+    return this.request(`/wagons/${encodeURIComponent(wagonNumber)}/swt`);
+  }
+
   // =========================================================================
   // Spring Sorting — bulk grouping of dismantled springs, no wagon involved
   // =========================================================================
