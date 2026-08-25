@@ -1390,6 +1390,7 @@ export interface VoiceSimulationChip {
 export type NavigationTab =
   | 'inspector_home'
   | 'inspection'
+  | 'spring_sorting'
   | 'wagons'
   | 'dashboard'
   | 'inventory'
@@ -1425,7 +1426,9 @@ export function isUserSupervisorOrAdmin(role?: string | null): boolean {
 export function canAccessTab(role: string | undefined, tab: NavigationTab, hasSelectedWagon: boolean = false): boolean {
   const roleUpper = role?.toUpperCase();
   if (roleUpper === 'INSPECTOR') {
+    // Sorting loose springs is core inspector work — it is the ~900/day job.
     if (tab === 'inspector_home' || tab === 'inspection' || tab === 'smart_vision') return true;
+    if (tab === 'spring_sorting') return true;
     // The manual is for the person holding the component — inspectors included.
     if (tab === 'manual') return true;
     // An inspector can access 'wagons' ONLY when a specific wagon is active/selected (WagonDetailPage)

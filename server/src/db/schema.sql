@@ -292,6 +292,65 @@ CREATE TABLE IF NOT EXISTS wagon_photos (
 -- =========================================================================
 
 -- Block any UPDATE on inspections
+
+-- ---------------------------------------------------------------------------
+-- SPRING SORTING
+--
+-- Springs arrive at WRS Raipur already dismantled, in bulk, and are sorted
+-- against the strip into band groups — roughly 900 a day. At that moment the
+-- wagon they came off is often not known, and the shop confirmed it varies by
+-- day.
+--
+-- These are not wagon inspections and must not be stored as them. Every
+-- completeness check, nest check and exit-gate query in this system is keyed
+-- on a wagon; a sorted spring has no wagon yet, and forcing one in with a null
+-- or a placeholder would corrupt all of them. A sorted spring is stock: it is
+-- measured, grouped, and later drawn on for an assembly.
+--
+-- assigned_wagon_number is left for the day a sorted spring is claimed by an
+-- assembly, so the two halves of the workflow can be joined without a
+-- migration.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS spring_sorting_records (
+  id TEXT PRIMARY KEY,
+  batch_id TEXT NOT NULL,
+  bogie_type TEXT NOT NULL,
+  spring_condition TEXT NOT NULL CHECK(spring_condition IN ('NEW', 'USED')),
+  spring_position TEXT NOT NULL CHECK(spring_position IN ('OUTER', 'INNER', 'SNUBBER', 'SNUBBER_OUTER', 'SNUBBER_INNER')),
+  measured_height REAL NOT NULL,
+  height_is_approximate INTEGER NOT NULL DEFAULT 0 CHECK(height_is_approximate IN (0, 1)),
+  classified_band TEXT DEFAULT NULL,
+  band_roman TEXT DEFAULT NULL,
+  status TEXT NOT NULL CHECK(status IN ('PASS', 'CONDEMNED')),
+  damage_type TEXT DEFAULT NULL,
+  condemnation_reason TEXT DEFAULT NULL,
+  table_reference TEXT DEFAULT NULL,
+  inspector_id TEXT NOT NULL,
+  inspector_name TEXT DEFAULT NULL,
+  assigned_wagon_number TEXT DEFAULT NULL,
+  sync_id TEXT DEFAULT NULL UNIQUE,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+  FOREIGN KEY (inspector_id) REFERENCES users(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX IF NOT EXISTS idx_sorting_batch ON spring_sorting_records(batch_id);
+CREATE INDEX IF NOT EXISTS idx_sorting_group ON spring_sorting_records(bogie_type, spring_condition, spring_position, classified_band);
+CREATE INDEX IF NOT EXISTS idx_sorting_created ON spring_sorting_records(created_at);
+
+-- Sorted springs are measurements, and are append-only like every other
+-- measurement in this system.
+CREATE TRIGGER IF NOT EXISTS trg_prevent_sorting_update
+BEFORE UPDATE ON spring_sorting_records
+BEGIN
+  SELECT RAISE(ABORT, 'Audit log is strictly append-only. Spring sorting records are immutable and cannot be updated.');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_prevent_sorting_delete
+BEFORE DELETE ON spring_sorting_records
+BEGIN
+  SELECT RAISE(ABORT, 'Audit log is strictly append-only. Spring sorting records are immutable and cannot be deleted.');
+END;
+
 CREATE TRIGGER IF NOT EXISTS trg_prevent_inspections_update
 BEFORE UPDATE ON inspections
 BEGIN

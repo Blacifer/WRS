@@ -707,6 +707,43 @@ export class ApiClient {
     );
   }
 
+
+  // =========================================================================
+  // Spring Sorting — bulk grouping of dismantled springs, no wagon involved
+  // =========================================================================
+
+  public async recordSortedSpring(payload: {
+    batchId: string;
+    bogieType: string;
+    condition: string;
+    springPosition: string;
+    measuredFreeHeight: number;
+    heightIsApproximate?: boolean;
+    damageType?: string;
+    syncId?: string;
+  }): Promise<{ success: boolean; data: { id: string; band: string | null; bandRoman: string | null; status: string; tableReference: string | null; condemnationReason: string | null } }> {
+    return this.request('/sorting/record', { method: 'POST', body: JSON.stringify(payload) });
+  }
+
+  public async getSortingBatch(batchId: string): Promise<{ success: boolean; data: { batchId: string; total: number; passed: number; condemned: number; byBand: any[] } }> {
+    return this.request(`/sorting/batches/${encodeURIComponent(batchId)}`);
+  }
+
+  public async closeSortingBatch(batchId: string): Promise<{ success: boolean; data: any }> {
+    return this.request(`/sorting/batches/${encodeURIComponent(batchId)}/close`, { method: 'POST', body: JSON.stringify({}) });
+  }
+
+  public async getSortingStock(bogieType: string, condition: string, forWagon?: string): Promise<{ success: boolean; data: { stock: any[]; capacity: any[] | null; wagon: any } }> {
+    const params = new URLSearchParams({ bogieType, condition });
+    if (forWagon) params.set('forWagon', forWagon);
+    return this.request(`/sorting/stock?${params.toString()}`);
+  }
+
+  public async getSortingThroughput(date?: string): Promise<{ success: boolean; data: { date: string; total: number; passed: number; condemned: number } }> {
+    const params = date ? `?date=${encodeURIComponent(date)}` : '';
+    return this.request(`/sorting/throughput${params}`);
+  }
+
   // =========================================================================
   // Phase 3 (M5): Smart Acoustic Bearing & Leak Detection APIs (R3)
   // =========================================================================

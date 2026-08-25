@@ -25,6 +25,7 @@ export interface InspectorLandingViewProps {
   onSelectWagon: (wagonNumber: string) => void;
   onOpenVoiceInspection: () => void;
   onOpenSmartVision: () => void;
+  onOpenSpringSorting: () => void;
   onOpenSpringQC: () => void;
   onOpenQRScanner: () => void;
   onContinueChecklist: (wagonNumber: string) => void;
@@ -39,6 +40,7 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
   onSelectWagon,
   onOpenVoiceInspection,
   onOpenSmartVision,
+  onOpenSpringSorting,
   onOpenSpringQC,
   onOpenQRScanner,
   onContinueChecklist,
@@ -305,6 +307,35 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
             {/* Card 3: Spring Batch Inspection (Emerald Green) */}
+          <button
+            onClick={onOpenSpringSorting}
+            className="min-h-[120px] p-6 rounded-3xl border-2 border-sky-500/40 bg-gradient-to-br from-sky-950/40 via-slate-900 to-slate-950 hover:border-sky-400 hover:bg-sky-950/60 active:scale-[0.98] transition-all text-left shadow-xl flex items-center justify-between group cursor-pointer"
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-sky-500/20 border border-sky-500/50 flex items-center justify-center text-3xl shadow-inner shrink-0 group-hover:scale-105 transition-transform">
+                ⚖️
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-extrabold uppercase px-2 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-800">
+                    {isHi ? 'खुले स्प्रिंग · वैगन नहीं' : 'Loose springs · no wagon'}
+                  </span>
+                </div>
+                <h3 className="text-xl font-extrabold text-white group-hover:text-sky-300 transition-colors">
+                  {isHi ? 'स्प्रिंग छँटाई' : 'Spring Sorting'}
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-300 font-medium line-clamp-2">
+                  {isHi
+                    ? 'ढेर से छँटाई — बैंड टैप करें, समूह और पूर्ण नेस्ट की गिनती चलती रहेगी'
+                    : 'Sort the pile — tap the band, and see how the groups and complete nests add up'}
+                </p>
+              </div>
+            </div>
+            <div className="hidden sm:flex items-center justify-center w-10 h-10 rounded-xl bg-slate-800 text-sky-400 text-lg group-hover:bg-sky-500 group-hover:text-slate-950 transition-colors shrink-0 ml-2">
+              ➔
+            </div>
+          </button>
+
           <button
             data-testid="cta-smart-vision"
             onClick={onOpenSmartVision}

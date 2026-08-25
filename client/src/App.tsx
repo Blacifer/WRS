@@ -11,6 +11,7 @@ import { api } from './services/api.ts';
 import { Header } from './components/Header.tsx';
 import { InspectionPage } from './pages/InspectionPage.tsx';
 import { SpringBatchPage } from './pages/SpringBatchPage.tsx';
+import { SpringSortingPage } from './pages/SpringSortingPage.tsx';
 import { HistoryPage } from './pages/HistoryPage.tsx';
 import { AnalyticsPage } from './pages/AnalyticsPage.tsx';
 import { LoginPage } from './pages/LoginPage.tsx';
@@ -141,6 +142,9 @@ export const App: React.FC = () => {
             onOpenSmartVision={() => {
               setActiveTab('smart_vision');
             }}
+            onOpenSpringSorting={() => {
+              setActiveTab('spring_sorting');
+            }}
             onOpenSpringQC={() => {
               setActiveTab('inspection');
             }}
@@ -166,6 +170,7 @@ export const App: React.FC = () => {
               onSelectWagon={(wNum) => setSelectedWagonNumber(wNum)}
               onOpenVoiceInspection={() => setActiveTab('wagons')}
               onOpenSmartVision={() => setActiveTab('smart_vision')}
+              onOpenSpringSorting={() => setActiveTab('spring_sorting')}
               onOpenSpringQC={() => setActiveTab('inspection')}
               onOpenQRScanner={() => setIsQRScannerModalOpen(true)}
               onContinueChecklist={(wNum) => {
@@ -207,6 +212,25 @@ export const App: React.FC = () => {
             <SpringBatchPage
               lang={currentLang}
               user={user}
+              onClose={() => setActiveTab(isInspector ? 'inspector_home' : 'wagons')}
+            />
+          </div>
+        )}
+
+        {/* 4b. SPRING SORTING — loose springs, no wagon */}
+        {activeTab === 'spring_sorting' && (
+          <div className="max-w-4xl mx-auto space-y-4">
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setActiveTab(isInspector ? 'inspector_home' : 'wagons')}
+                className="min-h-[44px] px-4 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-200 rounded-xl text-sm font-bold flex items-center gap-2 border border-slate-700 transition-all"
+              >
+                <span>←</span>
+                <span>{currentLang === 'hi' ? 'मुख्य पृष्ठ पर लौटें' : 'Back to Home'}</span>
+              </button>
+            </div>
+            <SpringSortingPage
+              lang={currentLang}
               onClose={() => setActiveTab(isInspector ? 'inspector_home' : 'wagons')}
             />
           </div>

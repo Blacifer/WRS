@@ -593,6 +593,46 @@ export function runMigrations(db: DatabaseSync): void {
     );
   }
 
+
+  // Spring sorting — see the table comment in schema.sql. Created here too so
+  // an existing database picks it up on boot rather than only a fresh one.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS spring_sorting_records (
+      id TEXT PRIMARY KEY,
+      batch_id TEXT NOT NULL,
+      bogie_type TEXT NOT NULL,
+      spring_condition TEXT NOT NULL CHECK(spring_condition IN ('NEW', 'USED')),
+      spring_position TEXT NOT NULL CHECK(spring_position IN ('OUTER', 'INNER', 'SNUBBER', 'SNUBBER_OUTER', 'SNUBBER_INNER')),
+      measured_height REAL NOT NULL,
+      height_is_approximate INTEGER NOT NULL DEFAULT 0 CHECK(height_is_approximate IN (0, 1)),
+      classified_band TEXT DEFAULT NULL,
+      band_roman TEXT DEFAULT NULL,
+      status TEXT NOT NULL CHECK(status IN ('PASS', 'CONDEMNED')),
+      damage_type TEXT DEFAULT NULL,
+      condemnation_reason TEXT DEFAULT NULL,
+      table_reference TEXT DEFAULT NULL,
+      inspector_id TEXT NOT NULL,
+      inspector_name TEXT DEFAULT NULL,
+      assigned_wagon_number TEXT DEFAULT NULL,
+      sync_id TEXT DEFAULT NULL UNIQUE,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      FOREIGN KEY (inspector_id) REFERENCES users(id) ON DELETE RESTRICT
+    );
+    CREATE INDEX IF NOT EXISTS idx_sorting_batch ON spring_sorting_records(batch_id);
+    CREATE INDEX IF NOT EXISTS idx_sorting_group ON spring_sorting_records(bogie_type, spring_condition, spring_position, classified_band);
+    CREATE INDEX IF NOT EXISTS idx_sorting_created ON spring_sorting_records(created_at);
+    CREATE TRIGGER IF NOT EXISTS trg_prevent_sorting_update
+    BEFORE UPDATE ON spring_sorting_records
+    BEGIN
+      SELECT RAISE(ABORT, 'Audit log is strictly append-only. Spring sorting records are immutable and cannot be updated.');
+    END;
+    CREATE TRIGGER IF NOT EXISTS trg_prevent_sorting_delete
+    BEFORE DELETE ON spring_sorting_records
+    BEGIN
+      SELECT RAISE(ABORT, 'Audit log is strictly append-only. Spring sorting records are immutable and cannot be deleted.');
+    END;
+  `);
+
   // A declared principal for actions the system performs itself.
   //
   // Audit rows carry a foreign key to users, so an event with no human actor
