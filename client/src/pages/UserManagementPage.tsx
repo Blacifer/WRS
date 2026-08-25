@@ -15,6 +15,7 @@ import type { AdminUserRecord } from '../../../shared/types.ts';
 import type { LanguageCode } from '../i18n/index.ts';
 import { AppAccessQr } from '../components/AppAccessQr.tsx';
 import { TotpEnrolment } from '../components/TotpEnrolment.tsx';
+import { ActionConfirm } from '../components/ActionConfirm.tsx';
 
 function generateStrongPassword(length = 14): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
@@ -61,6 +62,17 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [justCreated, setJustCreated] = useState<{ username: string; password: string; fullName: string } | null>(null);
   const [copied, setCopied] = useState<boolean>(false);
+
+  /**
+   * An account change waiting on confirmation.
+   *
+   * Server-side enforcement of USER_MGMT was added without the interface ever
+   * obtaining a token, which broke account creation entirely — the tests
+   * passed because they minted tokens directly. This is the interface half.
+   */
+  const [pendingAction, setPendingAction] = useState<
+    { kind: 'CREATE' } | { kind: 'TOGGLE'; user: AdminUserRecord } | null
+  >(null);
 
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
 
@@ -111,14 +123,21 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
       return;
     }
 
+    // Confirmation first; the account is created once a token comes back.
+    setPendingAction({ kind: 'CREATE' });
+  };
+
+  const createWithToken = async (otpToken: string) => {
     setSubmitting(true);
+    setSubmitError(null);
     try {
       await api.createUser({
         username: username.trim(),
         password,
         role,
         fullName: fullName.trim(),
-        employeeId: employeeId.trim()
+        employeeId: employeeId.trim(),
+        otpToken
       });
       setJustCreated({ username: username.trim(), password, fullName: fullName.trim() });
       resetForm();
@@ -128,21 +147,48 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
       setSubmitError(err?.message || 'Failed to create account.');
     } finally {
       setSubmitting(false);
+      setPendingAction(null);
+    }
+  };
+
+  /**
+   * Clears a user's authenticator so they can enrol a new device.
+   *
+   * A lost or replaced phone is the ordinary case, not an edge case. Without
+   * this the only remedy would be editing the database by hand, and the
+   * clearance is written to the audit chain because removing someone's second
+   * factor is exactly what an attacker would want.
+   */
+  const handleResetTotp = async (u: AdminUserRecord) => {
+    setBusyUserId(u.id);
+    setLoadError(null);
+    try {
+      await api.resetUserTotp(u.id);
+      await loadUsers();
+    } catch (err: any) {
+      setLoadError(err?.message || 'Failed to clear the authenticator.');
+    } finally {
+      setBusyUserId(null);
     }
   };
 
   const handleToggleActive = async (u: AdminUserRecord) => {
+    setPendingAction({ kind: 'TOGGLE', user: u });
+  };
+
+  const toggleWithToken = async (u: AdminUserRecord, otpToken: string) => {
     setBusyUserId(u.id);
     try {
       if (u.is_active) {
-        await api.deactivateUser(u.id);
+        await api.deactivateUser(u.id, otpToken);
       } else {
-        await api.reactivateUser(u.id);
+        await api.reactivateUser(u.id, otpToken);
       }
       await loadUsers();
     } catch (err: any) {
       setLoadError(err?.message || 'Failed to update account status.');
     } finally {
+      setPendingAction(null);
       setBusyUserId(null);
     }
   };
@@ -158,6 +204,34 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
 
   return (
     <div className="space-y-6">
+      {pendingAction && (
+        <ActionConfirm
+          action="USER_MGMT"
+          lang={lang}
+          title={
+            pendingAction.kind === 'CREATE'
+              ? (isHi ? 'नया खाता बनाने की पुष्टि' : 'Confirm creating an account')
+              : pendingAction.user.is_active
+                ? (isHi ? 'खाता निष्क्रिय करने की पुष्टि' : 'Confirm deactivating this account')
+                : (isHi ? 'खाता पुनः सक्रिय करने की पुष्टि' : 'Confirm reactivating this account')
+          }
+          description={
+            pendingAction.kind === 'CREATE'
+              ? (isHi
+                  ? 'नया खाता बनाना अधिकार देने के बराबर है, इसलिए इसकी पुष्टि आवश्यक है।'
+                  : 'Creating an account grants access, so it needs the same confirmation a release does.')
+              : (isHi
+                  ? `${pendingAction.user.full_name} — यह निर्णय दर्ज किया जाएगा।`
+                  : `${pendingAction.user.full_name} — this decision is recorded against your name.`)
+          }
+          onCancel={() => setPendingAction(null)}
+          onConfirmed={async (token) => {
+            if (pendingAction.kind === 'CREATE') await createWithToken(token);
+            else await toggleWithToken(pendingAction.user, token);
+          }}
+        />
+      )}
+
       {/* Shop-floor access and second-factor setup.
           Both belong on the admin screen: one is a poster to print, the other
           is a credential the admin also has to be able to reset for a
@@ -352,6 +426,16 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
+                      {/* A lost phone is routine; without this the only remedy
+                          would be editing the database by hand. */}
+                      <button
+                        onClick={() => handleResetTotp(u)}
+                        disabled={busyUserId === u.id}
+                        title={isHi ? 'प्रमाणक हटाएँ ताकि नया फ़ोन सेट हो सके' : 'Clear the authenticator so a new phone can be enrolled'}
+                        className="min-h-[36px] px-3 py-1.5 mr-1.5 rounded-lg text-xs font-bold border border-amber-800/60 bg-amber-950/40 text-amber-400 hover:bg-amber-900/50 transition-colors disabled:opacity-50"
+                      >
+                        {isHi ? 'प्रमाणक रीसेट' : 'Reset authenticator'}
+                      </button>
                       <button
                         onClick={() => handleToggleActive(u)}
                         disabled={busyUserId === u.id}

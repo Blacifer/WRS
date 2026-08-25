@@ -167,6 +167,7 @@ export class ApiClient {
     role: 'INSPECTOR' | 'SUPERVISOR' | 'ADMIN';
     fullName: string;
     employeeId: string;
+      otpToken: string;
   }): Promise<{ success: boolean; data: AdminUserRecord }> {
     return this.request('/auth/users', {
       method: 'POST',
@@ -264,12 +265,15 @@ export class ApiClient {
     });
   }
 
-  public async deactivateUser(id: string): Promise<{ success: boolean; data: AdminUserRecord }> {
-    return this.request(`/auth/users/${id}/deactivate`, { method: 'PATCH' });
+  // Account changes carry an action token: creating an account is how someone
+  // would grant themselves supervisor rights, and deactivating one is how they
+  // would lock out whoever might notice.
+  public async deactivateUser(id: string, otpToken: string): Promise<{ success: boolean; data: AdminUserRecord }> {
+    return this.request(`/auth/users/${id}/deactivate`, { method: 'PATCH', body: JSON.stringify({ otpToken }) });
   }
 
-  public async reactivateUser(id: string): Promise<{ success: boolean; data: AdminUserRecord }> {
-    return this.request(`/auth/users/${id}/reactivate`, { method: 'PATCH' });
+  public async reactivateUser(id: string, otpToken: string): Promise<{ success: boolean; data: AdminUserRecord }> {
+    return this.request(`/auth/users/${id}/reactivate`, { method: 'PATCH', body: JSON.stringify({ otpToken }) });
   }
 
   // =========================================================================

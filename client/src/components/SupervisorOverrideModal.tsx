@@ -3,7 +3,7 @@
  * Indian Railways WRS Raipur
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { BandColor } from '../../../shared/types.ts';
 import { getDictionary, getBandText } from '../i18n/index.ts';
 import type { LanguageCode } from '../i18n/index.ts';
@@ -38,6 +38,17 @@ export const SupervisorOverrideModal: React.FC<SupervisorOverrideModalProps> = (
   const [isVerifyingOtp, setIsVerifyingOtp] = useState<boolean>(false);
   const [otpToken, setOtpToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Whether this supervisor has an authenticator. When they do, the code comes
+  // from their phone and the server never issues one — a code the server hands
+  // you confirms intent but proves possession of nothing.
+  const [totpEnrolled, setTotpEnrolled] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    api.getTotpStatus()
+      .then((r) => setTotpEnrolled(r.data.enrolled))
+      .catch(() => setTotpEnrolled(false));
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -59,6 +70,26 @@ export const SupervisorOverrideModal: React.FC<SupervisorOverrideModalProps> = (
   };
 
   const handleVerifyOtp = async () => {
+    // Enrolled supervisors never request a server code, so there is no otpId —
+    // the code is verified straight against their authenticator.
+    if (totpEnrolled) {
+      if (!otpCode) {
+        setError('Enter the code from your authenticator app');
+        return;
+      }
+      setError(null);
+      setIsVerifyingOtp(true);
+      try {
+        const res = await api.verifyTotpForAction('OVERRIDE', otpCode.trim());
+        setOtpToken(res.data.otpToken);
+      } catch (err: any) {
+        setError(err.message || 'That code was not accepted');
+      } finally {
+        setIsVerifyingOtp(false);
+      }
+      return;
+    }
+
     if (!otpId || !otpCode) {
       setError('Please enter OTP code');
       return;
@@ -165,10 +196,20 @@ export const SupervisorOverrideModal: React.FC<SupervisorOverrideModalProps> = (
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
                 <KeyIcon size={14} className="text-amber-400" />
-                <span>{lang === 'hi' ? 'पर्यवेक्षक ओटीपी सत्यापन' : 'Supervisor OTP Verification'}</span>
+                <span>
+                  {totpEnrolled
+                    ? (lang === 'hi' ? 'प्रमाणक कोड' : 'Authenticator code')
+                    : (lang === 'hi' ? 'पर्यवेक्षक ओटीपी सत्यापन' : 'Supervisor OTP Verification')}
+                </span>
               </span>
 
-              {!otpId ? (
+              {/* An enrolled supervisor already has a code on their phone;
+                  there is nothing to request. */}
+              {totpEnrolled ? (
+                <span className="text-[11px] text-emerald-400/80 font-semibold">
+                  {lang === 'hi' ? 'ऐप से — नेटवर्क आवश्यक नहीं' : 'From your app — no network needed'}
+                </span>
+              ) : !otpId ? (
                 <button
                   type="button"
                   onClick={handleRequestOtp}
@@ -186,9 +227,9 @@ export const SupervisorOverrideModal: React.FC<SupervisorOverrideModalProps> = (
               )}
             </div>
 
-            {otpId && !otpToken && (
+            {(totpEnrolled || otpId) && !otpToken && (
               <div className="space-y-2 pt-1">
-                {devOtpCode && (
+                {!totpEnrolled && devOtpCode && (
                   <p className="text-[11px] text-amber-300/80 bg-amber-950/40 p-2 rounded border border-amber-900">
                     Workshop Demo OTP Code: <strong className="font-mono text-amber-200">{devOtpCode}</strong>
                   </p>

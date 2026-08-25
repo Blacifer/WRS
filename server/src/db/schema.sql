@@ -25,18 +25,6 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- 2. OTP Verifications Table
-CREATE TABLE IF NOT EXISTS otp_verifications (
-  id TEXT PRIMARY KEY,
-  user_id TEXT NOT NULL,
-  action_type TEXT NOT NULL CHECK(action_type IN ('OVERRIDE', 'EXPORT', 'USER_MGMT')),
-  otp_code_hash TEXT NOT NULL,
-  token_ref TEXT NOT NULL UNIQUE,
-  is_used INTEGER NOT NULL DEFAULT 0 CHECK(is_used IN (0, 1)),
-  expires_at TEXT NOT NULL,
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  used_at TEXT DEFAULT NULL,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
-);
 
 -- 3. Core Inspections Table (Strictly Append-Only)
 CREATE TABLE IF NOT EXISTS inspections (
@@ -530,7 +518,6 @@ CREATE INDEX IF NOT EXISTS idx_inspections_bogie_cond_pos ON inspections(bogie_t
 CREATE INDEX IF NOT EXISTS idx_inspections_sync_id ON inspections(sync_id);
 CREATE INDEX IF NOT EXISTS idx_audit_log_inspection_id ON inspection_audit_log(inspection_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_log_event_user ON inspection_audit_log(event_type, user_id, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_otp_token_ref ON otp_verifications(token_ref);
 
 CREATE INDEX IF NOT EXISTS idx_wagons_stage_status ON wagons(current_stage, status);
 CREATE INDEX IF NOT EXISTS idx_wagons_entry_date ON wagons(entry_date DESC);

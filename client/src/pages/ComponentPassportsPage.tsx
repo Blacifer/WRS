@@ -584,6 +584,24 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
                         {/* Actions */}
                         <td className="p-3 sm:p-4 text-right">
                           <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            {/* POH resets the ROH cycle count, because the end
+                                cap screws are physically replaced. ROH was
+                                reachable and this was not, which left the
+                                counter able to climb but never reset. */}
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await api.recordComponentOverhaul(comp.serialNumber, {});
+                                  await loadData();
+                                } catch (e: any) {
+                                  setError(e?.message || 'Could not record POH');
+                                }
+                              }}
+                              title={isHi ? 'आवधिक ओवरहॉल दर्ज करें' : 'Record a periodic overhaul (resets the ROH cycle count)'}
+                              className="px-2.5 py-1 bg-purple-800/80 hover:bg-purple-700 text-white rounded text-[11px] font-bold transition shadow"
+                            >
+                              POH
+                            </button>
                             {comp.componentType === 'BEARING' && ((comp as any).rohCyclesSincePoh ?? 0) < 3 && (
                               <button
                                 onClick={async () => {

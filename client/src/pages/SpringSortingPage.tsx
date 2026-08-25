@@ -68,6 +68,9 @@ export function SpringSortingPage({ lang, onClose }: Props) {
   const [tallies, setTallies] = useState<Tally[]>([]);
   const [capacity, setCapacity] = useState<Capacity[]>([]);
   const [totals, setTotals] = useState({ total: 0, passed: 0, condemned: 0 });
+  // Today's total across every session, which is the figure the DRM quoted as
+  // ~900 and the one worth watching against it.
+  const [today, setToday] = useState<{ total: number; passed: number; condemned: number } | null>(null);
   const [lastRecorded, setLastRecorded] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,10 +85,12 @@ export function SpringSortingPage({ lang, onClose }: Props) {
 
   const refresh = useCallback(async () => {
     try {
-      const [batch, stock] = await Promise.all([
+      const [batch, stock, throughput] = await Promise.all([
         api.getSortingBatch(batchId),
-        api.getSortingStock(bogieType, condition, forWagon)
+        api.getSortingStock(bogieType, condition, forWagon),
+        api.getSortingThroughput()
       ]);
+      setToday(throughput.data);
       setTotals({
         total: batch.data.total,
         passed: batch.data.passed,
@@ -227,6 +232,15 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           {lastRecorded && (
             <span className="text-slate-300">
               {isHi ? 'अंतिम' : 'Last'}: <b>{lastRecorded}</b>
+            </span>
+          )}
+          {today && (
+            <span className="text-slate-400 border-l border-slate-700 pl-6">
+              {isHi ? 'आज कुल' : 'Today, all sessions'}:{' '}
+              <b className="text-white tabular-nums">{today.total.toLocaleString()}</b>
+              {today.condemned > 0 && (
+                <span className="text-red-400"> ({today.condemned} {isHi ? 'कंडम' : 'condemned'})</span>
+              )}
             </span>
           )}
         </div>

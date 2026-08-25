@@ -32,19 +32,6 @@ export function runMigrations(db: DatabaseSync): void {
         updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
       );
 
-      CREATE TABLE IF NOT EXISTS otp_verifications (
-        id TEXT PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        action_type TEXT NOT NULL CHECK(action_type IN ('OVERRIDE', 'EXPORT', 'USER_MGMT')),
-        otp_code_hash TEXT NOT NULL,
-        token_ref TEXT NOT NULL UNIQUE,
-        is_used INTEGER NOT NULL DEFAULT 0 CHECK(is_used IN (0, 1)),
-        expires_at TEXT NOT NULL,
-        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-        used_at TEXT DEFAULT NULL,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT
-      );
-
       CREATE TABLE IF NOT EXISTS inspections (
         id TEXT PRIMARY KEY,
         sequence_number INTEGER UNIQUE,
