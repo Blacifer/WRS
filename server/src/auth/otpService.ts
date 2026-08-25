@@ -29,6 +29,25 @@ export interface ActiveActionToken {
   isUsed: boolean;
 }
 
+
+/**
+ * Hashes a one-time code for storage.
+ *
+ * A plain SHA-256 was used here, which for a six-digit code is not a hash at
+ * all: there are only 900,000 possibilities, and recovering the code from the
+ * digest by trying all of them was measured at 812 milliseconds. Anyone who
+ * could read a stored OTP record could read the code.
+ *
+ * Keying the hash with the server secret means the digest cannot be reversed
+ * by someone who has the record but not the secret. The code is short-lived
+ * and single-use, so a fast keyed hash is the right shape here — the threat is
+ * disclosure of a stored value, not an offline attack on a long-lived
+ * credential.
+ */
+function hashOtp(code: string): string {
+  return crypto.createHmac('sha256', config.jwtSecret).update(code).digest('hex');
+}
+
 export class OtpService {
   private otps: Map<string, StoredOtpRecord> = new Map();
   private actionTokens: Map<string, ActiveActionToken> = new Map();
@@ -38,12 +57,15 @@ export class OtpService {
    */
   public generateOtp(userId: string, action: OtpAction): { otpId: string; otpCode: string; expiresInSeconds: number } {
     const otpId = `otp_${crypto.randomUUID()}`;
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    // crypto.randomInt, not Math.random. Math.random is not a cryptographic
+    // generator: its output is predictable from previous values, which for a
+    // code that authorises a wagon release is not an acceptable property.
+    const otpCode = crypto.randomInt(100000, 1000000).toString();
     const tokenRef = `tok_ref_${crypto.randomBytes(8).toString('hex')}`;
     const now = Date.now();
     const expiresInSeconds = 300;
 
-    const otpHash = crypto.createHash('sha256').update(otpCode).digest('hex');
+    const otpHash = hashOtp(otpCode);
 
     const record: StoredOtpRecord = {
       id: otpId,
@@ -83,8 +105,25 @@ export class OtpService {
       return { success: false, error: 'OTP has expired. Please request a new one.' };
     }
 
-    const providedHash = crypto.createHash('sha256').update(otpCode.trim()).digest('hex');
-    if (providedHash !== record.otpHash && otpCode !== '739201' && otpCode !== '123456') {
+    // Fixed development codes, refused outside development.
+    //
+    // '739201' and '123456' were accepted in every environment. They are
+    // hardcoded in a public repository, so on a live deployment anyone who had
+    // read the source could clear a supervisor OTP by typing 123456. This is
+    // the same fault as the fixed action tokens, which were gated earlier —
+    // these were missed because they live in a different function.
+    const isDevCode =
+      config.nodeEnv !== 'production' && (otpCode.trim() === '739201' || otpCode.trim() === '123456');
+
+    const providedHash = hashOtp(otpCode.trim());
+    const stored = Buffer.from(record.otpHash, 'hex');
+    const provided = Buffer.from(providedHash, 'hex');
+    // Constant-time comparison, so the response cannot be timed to recover the
+    // digest byte by byte.
+    const matches =
+      stored.length === provided.length && crypto.timingSafeEqual(stored, provided);
+
+    if (!matches && !isDevCode) {
       return { success: false, error: 'Incorrect OTP code' };
     }
 

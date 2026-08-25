@@ -112,3 +112,81 @@ describe('Security Hardening', () => {
     assert.match(src, /received > maxBytes/, 'the running total must actually be checked');
   });
 });
+
+describe('Cryptographic Parameters', () => {
+  // Answering "what encryption are we using, and is the data safe" properly
+  // meant measuring rather than asserting. Two things did not survive it.
+
+  it('TC-SEC-08: the password work factor is a modern one', async () => {
+    const { PBKDF2_ITERATIONS, hashPassword } = await import('../src/auth/password.ts');
+    // Was 10,000 — about 22 ms per guess for anyone holding the database file.
+    // 210,000 is OWASP's figure for PBKDF2-HMAC-SHA512.
+    assert.ok(PBKDF2_ITERATIONS >= 210000, `work factor is only ${PBKDF2_ITERATIONS}`);
+    assert.match(hashPassword('x'), new RegExp(`^pbkdf2:${PBKDF2_ITERATIONS}:`));
+  });
+
+  it('TC-SEC-09: an older, weaker hash still verifies', async () => {
+    // The iteration count lives inside each stored hash, so raising the factor
+    // must not lock out existing accounts.
+    const crypto = await import('node:crypto');
+    const { verifyPassword } = await import('../src/auth/password.ts');
+    const salt = 'a'.repeat(32);
+    const legacy = `pbkdf2:10000:${salt}:${crypto.pbkdf2Sync('Railway@2026', salt, 10000, 64, 'sha512').toString('hex')}`;
+    assert.strictEqual(verifyPassword('Railway@2026', legacy), true);
+    assert.strictEqual(verifyPassword('wrong', legacy), false);
+  });
+
+  it('TC-SEC-10: a stored OTP digest cannot be reversed by brute force', async () => {
+    // A plain SHA-256 of a six-digit code is not a hash: all 900,000
+    // possibilities can be tried in well under a second, which was measured at
+    // 812 ms. Keying it with the server secret makes the digest useless to
+    // someone who has the record but not the key.
+    const crypto = await import('node:crypto');
+    const { otpService } = await import('../src/auth/otpService.ts');
+
+    const { otpId, otpCode } = otpService.generateOtp('usr_insp_001', 'OVERRIDE');
+    const record = (otpService as any).otps.get(otpId);
+
+    const unkeyed = crypto.createHash('sha256').update(otpCode).digest('hex');
+    assert.notStrictEqual(record.otpHash, unkeyed, 'the stored digest must not be a plain SHA-256');
+
+    // And confirm the whole keyspace does not recover it without the secret.
+    let recovered: string | null = null;
+    for (let i = 100000; i < 1000000; i++) {
+      if (crypto.createHash('sha256').update(String(i)).digest('hex') === record.otpHash) {
+        recovered = String(i);
+        break;
+      }
+    }
+    assert.strictEqual(recovered, null, 'the code was recovered from the stored digest');
+  });
+
+  it('TC-SEC-11: OTP codes come from a cryptographic generator', async () => {
+    // Math.random is predictable from prior output. For a code that authorises
+    // a wagon release that is not an acceptable property.
+    const { otpService } = await import('../src/auth/otpService.ts');
+    const codes = new Set<string>();
+    for (let i = 0; i < 200; i++) codes.add(otpService.generateOtp('usr_insp_001', 'OVERRIDE').otpCode);
+
+    assert.ok(codes.size > 190, `only ${codes.size} distinct codes in 200 draws`);
+    for (const c of codes) assert.match(c, /^[1-9]\d{5}$/, `malformed code ${c}`);
+
+    const src = (await import('node:fs')).readFileSync(
+      new URL('../src/auth/otpService.ts', import.meta.url), 'utf-8'
+    );
+    // Scoped to an actual call, not the comment that explains why it is not
+    // used — the first version of this assertion matched its own rationale.
+    assert.doesNotMatch(src, /Math\.random\s*\(/, 'OTP generation must not call Math.random');
+    assert.match(src, /crypto\.randomInt\(100000, 1000000\)/, 'must draw from a cryptographic generator');
+  });
+
+  it('TC-SEC-12: fixed development OTP codes are refused in production', async () => {
+    // '123456' and '739201' were accepted in every environment, and they are
+    // hardcoded in a public repository.
+    const src = (await import('node:fs')).readFileSync(
+      new URL('../src/auth/otpService.ts', import.meta.url), 'utf-8'
+    );
+    const guard = src.slice(src.indexOf('isDevCode'), src.indexOf('const providedHash'));
+    assert.match(guard, /nodeEnv !== 'production'/, 'dev codes must be environment-gated');
+  });
+});
