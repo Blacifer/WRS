@@ -124,11 +124,47 @@ You mentioned wanting the app to work offline and sync once connected — this i
 
 ## Backups
 
-`server/scripts/backup-db.sh` takes a safe, integrity-checked backup of the live database (works correctly even while the app is running — it doesn't need to be stopped) and prunes anything older than 30 days. Schedule it:
+`server/scripts/backup-db.sh` takes a safe, integrity-checked, **encrypted** backup of the live database (works correctly even while the app is running — it doesn't need to be stopped) and prunes anything older than 30 days.
+
+### Create the backup key first, once
+
+The database holds the audit log, the release certificates and every inspector's record. The script refuses to run without a key rather than quietly producing a plaintext copy of all that.
+
+```bash
+umask 077
+openssl rand -hex 32 > /etc/wrs/backup.key
+chmod 400 /etc/wrs/backup.key
+```
+
+Two rules about that file:
+
+- **Keep it off the backup volume.** A key stored beside the thing it encrypts protects against nothing.
+- **Back it up separately, and do not lose it.** There is no recovery path around a lost backup key — every backup becomes unreadable.
+
+It is deliberately *not* the same value as `JWT_SECRET`: whoever restores backups should not thereby be able to forge tokens or release certificates.
+
+### Schedule it
 
 ```bash
 # crontab -e (on the host, or inside the container via a sidecar/cron job)
-0 2 * * * /path/to/server/scripts/backup-db.sh >> /var/log/wrs-backup.log 2>&1
+0 2 * * * WRS_BACKUP_KEY_FILE=/etc/wrs/backup.key /path/to/server/scripts/backup-db.sh >> /var/log/wrs-backup.log 2>&1
+```
+
+Each run writes `wrs_inspections_<timestamp>.db.enc` and a detached `.hmac` beside it — AES-256-CBC with PBKDF2 (210,000 iterations), then HMAC-SHA256 over the ciphertext. The script decrypts what it just wrote and runs an integrity check on the result before reporting success, so a backup that cannot be restored fails loudly on the night it is taken rather than on the day it is needed.
+
+### Restoring
+
+```bash
+WRS_BACKUP_KEY_FILE=/etc/wrs/backup.key \
+  server/scripts/restore-db.sh /path/to/wrs_inspections_20260825_020000.db.enc
+```
+
+It verifies the HMAC before decrypting, and refuses to overwrite an existing database — restoring over a live one would destroy every inspection recorded since the backup, which on this system exist nowhere else.
+
+**Do one restore onto a throwaway path now, before go-live.** An untested restore is a belief, not a backup. Afterwards, check the chain survived:
+
+```bash
+curl -s -H "Authorization: Bearer <supervisor-token>" http://localhost:3000/api/audit/verify
 ```
 
 If running via Docker, either run this from the host against the named volume's mount point, or add a small cron sidecar container that shares the `wrs_data` volume — happy to wire that up once you've picked a host and volume layout.

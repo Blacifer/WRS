@@ -52,8 +52,14 @@ does nothing to stop someone **reading** it.
 operating-system concern rather than an application one:
 
 - Full-disk encryption on the host (LUKS on Linux, BitLocker on Windows).
-- Encrypted backups — `backup-db.sh` currently produces plaintext copies, and
-  those copies are as sensitive as the original.
+- Encrypted backups — **done**. `backup-db.sh` writes AES-256-CBC (PBKDF2,
+  210,000 iterations) with a detached HMAC-SHA256 over the ciphertext, and
+  refuses to run without a key rather than degrading to a plaintext copy. It
+  decrypts and integrity-checks each backup immediately after writing it, so
+  an unrestorable backup fails on the night it is taken. `restore-db.sh`
+  verifies the HMAC before decrypting and will not overwrite a live database.
+  The backup key is separate from `JWT_SECRET` by design: restoring backups
+  should not confer the ability to forge tokens or certificates.
 - File permissions restricting the database to the service account.
 
 None of that is difficult. It just has to be decided and done.
