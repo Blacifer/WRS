@@ -125,6 +125,11 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
   const [signoffOtpId, setSignoffOtpId] = useState<string | null>(null);
   const [signoffOtpToken, setSignoffOtpToken] = useState<string | null>(null);
   const [signoffOtpBusy, setSignoffOtpBusy] = useState<boolean>(false);
+  // Whether this supervisor has an authenticator enrolled. When they do, the
+  // code comes from their phone and the server-generated inline code — which
+  // is returned to whoever asks for it, and so proves possession of nothing —
+  // is not used at all.
+  const [totpEnrolled, setTotpEnrolled] = useState<boolean | null>(null);
   const [signoffSubmitting, setSignoffSubmitting] = useState<boolean>(false);
 
   const user = api.getUser();
@@ -432,6 +437,31 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
       }, 3000);
     } catch (err: any) {
       console.warn('[Voice Undo Error]', err);
+    }
+  };
+
+  useEffect(() => {
+    if (!showSignoffModal) return;
+    api.getTotpStatus()
+      .then((r) => setTotpEnrolled(r.data.enrolled))
+      .catch(() => setTotpEnrolled(false));
+  }, [showSignoffModal]);
+
+  /** Exchanges an authenticator code for the action token the gate requires. */
+  const handleVerifyAuthenticator = async () => {
+    if (!signoffOtp.trim()) {
+      setSignoffError('Enter the code from your authenticator app');
+      return;
+    }
+    setSignoffError(null);
+    setSignoffOtpBusy(true);
+    try {
+      const res = await api.verifyTotpForAction('OVERRIDE', signoffOtp.trim());
+      setSignoffOtpToken(res.data.otpToken);
+    } catch (err: any) {
+      setSignoffError(err.message || 'That code was not accepted');
+    } finally {
+      setSignoffOtpBusy(false);
     }
   };
 
@@ -2088,33 +2118,74 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">{isHi ? 'पर्यवेक्षक क्रिया ओटीपी टोकन' : 'Supervisor Action OTP Token'}</label>
+                {/*
+                  An enrolled supervisor uses the code on their own phone. The
+                  inline flow below is the fallback for anyone not yet enrolled,
+                  and it is worth being honest on screen about the difference:
+                  a code the server hands you is a confirmation step, not a
+                  second factor.
+                */}
                 {!signoffOtpToken ? (
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      placeholder={isHi ? '6-अंकीय ओटीपी दर्ज करें' : 'Enter 6-digit OTP'}
-                      value={signoffOtp}
-                      onChange={(e) => setSignoffOtp(e.target.value)}
-                      disabled={!signoffOtpId}
-                      className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white disabled:opacity-50 focus:outline-none focus:border-emerald-500"
-                    />
-                    <button
-                      type="button"
-                      onClick={signoffOtpId ? handleVerifySignoffOtp : handleRequestSignoffOtp}
-                      disabled={signoffOtpBusy}
-                      className="px-4 py-2 rounded-lg border border-emerald-600 text-emerald-300 hover:bg-emerald-950 disabled:opacity-40 text-xs font-bold whitespace-nowrap"
-                    >
-                      {signoffOtpBusy
-                        ? '…'
-                        : signoffOtpId
-                          ? (isHi ? 'ओटीपी सत्यापित करें' : 'Verify OTP')
-                          : (isHi ? 'ओटीपी भेजें' : 'Send OTP')}
-                    </button>
-                  </div>
+                  totpEnrolled ? (
+                    <div className="space-y-1.5">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          maxLength={6}
+                          placeholder={isHi ? 'ऐप का 6-अंकीय कोड' : '6-digit code from your app'}
+                          value={signoffOtp}
+                          onChange={(e) => setSignoffOtp(e.target.value.replace(/\D/g, ''))}
+                          className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono tracking-widest focus:outline-none focus:border-emerald-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleVerifyAuthenticator}
+                          disabled={signoffOtpBusy || signoffOtp.trim().length !== 6}
+                          className="px-4 py-2 rounded-lg border border-emerald-600 text-emerald-300 hover:bg-emerald-950 disabled:opacity-40 text-xs font-bold whitespace-nowrap"
+                        >
+                          {signoffOtpBusy ? '…' : (isHi ? 'सत्यापित करें' : 'Verify')}
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-emerald-400/80">
+                        {isHi ? 'प्रमाणक ऐप से — इंटरनेट की आवश्यकता नहीं' : 'From your authenticator app — no network needed'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          placeholder={isHi ? '6-अंकीय ओटीपी दर्ज करें' : 'Enter 6-digit OTP'}
+                          value={signoffOtp}
+                          onChange={(e) => setSignoffOtp(e.target.value)}
+                          disabled={!signoffOtpId}
+                          className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white disabled:opacity-50 focus:outline-none focus:border-emerald-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={signoffOtpId ? handleVerifySignoffOtp : handleRequestSignoffOtp}
+                          disabled={signoffOtpBusy}
+                          className="px-4 py-2 rounded-lg border border-emerald-600 text-emerald-300 hover:bg-emerald-950 disabled:opacity-40 text-xs font-bold whitespace-nowrap"
+                        >
+                          {signoffOtpBusy
+                            ? '…'
+                            : signoffOtpId
+                              ? (isHi ? 'ओटीपी सत्यापित करें' : 'Verify OTP')
+                              : (isHi ? 'ओटीपी भेजें' : 'Send OTP')}
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-amber-400/90">
+                        {isHi
+                          ? 'कोई प्रमाणक सेट नहीं — यह कोड सर्वर देता है, इसलिए यह दूसरा प्रमाण नहीं है। खाता स्क्रीन से सेटअप करें।'
+                          : 'No authenticator set up. This code is issued by the server, so it confirms intent but is not a second factor. Set one up from the User Accounts screen.'}
+                      </p>
+                    </div>
+                  )
                 ) : (
                   <p className="text-xs font-bold text-emerald-400">
-                    {isHi ? '✓ ओटीपी सत्यापित' : '✓ OTP verified'}
+                    {isHi ? '✓ सत्यापित' : '✓ Verified'}
                   </p>
                 )}
               </div>

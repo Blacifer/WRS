@@ -14,6 +14,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api.ts';
 import type { LanguageCode } from '../i18n/index.ts';
 import type { User } from '../../../shared/types.ts';
+import { LearningMemory } from '../components/LearningMemory.tsx';
 
 interface LearningDashboardPageProps {
   lang: LanguageCode;
@@ -116,6 +117,13 @@ export const LearningDashboardPage: React.FC<LearningDashboardPageProps> = ({ la
             ? isHi ? 'विश्लेषण…' : 'Analysing…'
             : isHi ? 'अभी विश्लेषण करें' : 'Run Analysis'}
         </button>
+      </div>
+
+      {/* The direct answer to the question in the title, placed first because
+          it is what somebody senior actually asks: how much has it seen, and
+          what changed as a result. */}
+      <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5">
+        <LearningMemory lang={lang} />
       </div>
 
       {error && (
