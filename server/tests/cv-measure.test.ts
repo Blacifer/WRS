@@ -217,38 +217,48 @@ describe('Milestone 4: CV Measurement Telemetry & RDSO Tolerance Verification AP
   // -------------------------------------------------------------------------
   // 3. CTRB End Cap Evaluation (RDSO G-81)
   // -------------------------------------------------------------------------
-  it('TC-CV-15: CTRB End Cap gap within [0.5, 3.0mm] evaluates to PASS', async () => {
+  it('TC-CV-15: a component with no approved limit returns a measurement, not a verdict', async () => {
+    // CTRB_END_CAP has no sourced gap figure — WMM 2.0 gives a torque and a
+    // must-change-screw procedure and no measurable limit, and none is in
+    // G-81 either. The spec exists with placeholder numbers, and those numbers
+    // must never reach a pass/fail. These three cases previously asserted
+    // PASS/CONDEMNED against them, pinning invented limits as if they were
+    // RDSO's.
     const res = await mockFetch(app, 'POST', '/api/cv/measure', {
       componentType: 'CTRB_END_CAP',
-      measuredValue: 1.8 // 1.8mm gap
+      measuredValue: 1.8
     });
 
     assert.strictEqual(res.status, 200);
-    assert.strictEqual(res.body.verdict, 'PASS');
-    assert.strictEqual(res.body.nominalValue, 1.5);
-    assert.strictEqual(res.body.delta, 0.3);
+    assert.strictEqual(res.body.verdict, null, 'no verdict may be given without an approved limit');
+    assert.strictEqual(res.body.verdictAvailable, false);
+    assert.strictEqual(res.body.measuredValue, 1.8, 'the reading is still recorded');
+    assert.strictEqual(res.body.verificationStatus, 'PENDING_SIGNOFF');
   });
 
-  it('TC-CV-16: CTRB End Cap gap outside [0.5, 3.0mm] evaluates to CONDEMNED', async () => {
+  it('TC-CV-16: the same applies to a reading well outside the placeholder range', async () => {
+    // Guards the subtler half: not judging must not mean quietly passing
+    // everything, nor quietly condemning it.
     const res = await mockFetch(app, 'POST', '/api/cv/measure', {
       componentType: 'CTRB_END_CAP',
-      measuredValue: 3.8 // 3.8mm gap
+      measuredValue: 3.8
     });
 
     assert.strictEqual(res.status, 200);
-    assert.strictEqual(res.body.verdict, 'CONDEMNED');
-    assert.ok(res.body.condemnationReason.includes('permissible range [0.5, 3.0]'));
+    assert.strictEqual(res.body.verdict, null);
+    assert.strictEqual(res.body.verdictAvailable, false);
   });
 
-  it('TC-CV-17: CTRB End Cap diameter in [176.0, 180.0mm] evaluates to PASS', async () => {
+  it('TC-CV-17: the reason there is no verdict is stated, not left blank', async () => {
+    // Whoever reads this needs to know it is a missing figure, not a fault in
+    // the tool — and what would make the check work.
     const res = await mockFetch(app, 'POST', '/api/cv/measure', {
       componentType: 'CTRB_END_CAP',
-      measuredValue: 178.2
+      measuredValue: 1.5
     });
 
-    assert.strictEqual(res.status, 200);
-    assert.strictEqual(res.body.verdict, 'PASS');
-    assert.strictEqual(res.body.nominalValue, 178.0);
+    assert.match(res.body.message, /no approved limit/i);
+    assert.match(res.body.verificationNote, /sign-off/i);
   });
 
   // -------------------------------------------------------------------------

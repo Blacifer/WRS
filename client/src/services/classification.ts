@@ -26,6 +26,8 @@ export interface ComponentToleranceSpec {
   minPermissible: number;
   maxPermissible: number;
   tableRef: string;
+  /** 'PENDING_SIGNOFF' means no approved limit exists; never judge against it. */
+  verificationStatus?: 'VERIFIED' | 'PENDING_SIGNOFF';
 }
 
 export const COMPONENT_TOLERANCE_SPECS: Record<Exclude<CVComponentTarget, 'OUTER_SPRING' | 'INNER_SPRING' | 'SNUBBER_SPRING'>, ComponentToleranceSpec> = {
@@ -35,8 +37,13 @@ export const COMPONENT_TOLERANCE_SPECS: Record<Exclude<CVComponentTarget, 'OUTER
   // §309D wear limit (min=0 makes this a max-only wear check).
   FRICTION_WEDGE_VERTICAL: { nominalValue: 0.0, minPermissible: 0.0, maxPermissible: 7.0, tableRef: 'WMM 2.0 §309D (Vertical Surface)' },
   FRICTION_WEDGE_SLOPE: { nominalValue: 0.0, minPermissible: 0.0, maxPermissible: 3.0, tableRef: 'WMM 2.0 §309D (Slope Surface)' },
-  CTRB_END_CAP: { nominalValue: 1.5, minPermissible: 0.5, maxPermissible: 3.0, tableRef: 'RDSO G-81 Wheelset' },
-  CTRB_BEARING_END_CAP: { nominalValue: 1.5, minPermissible: 0.5, maxPermissible: 3.0, tableRef: 'RDSO G-81 Wheelset' },
+  // No numeric end-cap gap limit exists in WMM 2.0 or G-81 — only a torque and
+  // must-change-screw procedure. These numbers are placeholders, and
+  // PENDING_SIGNOFF is what keeps them from being shown as a verdict or
+  // offered as a caliper reading. When a real figure is signed off, flipping
+  // this one field turns the check on everywhere.
+  CTRB_END_CAP: { nominalValue: 1.5, minPermissible: 0.5, maxPermissible: 3.0, tableRef: 'RDSO G-81 Wheelset', verificationStatus: 'PENDING_SIGNOFF' },
+  CTRB_BEARING_END_CAP: { nominalValue: 1.5, minPermissible: 0.5, maxPermissible: 3.0, tableRef: 'RDSO G-81 Wheelset', verificationStatus: 'PENDING_SIGNOFF' },
   WHEEL_FLANGE: { nominalValue: 28.5, minPermissible: 16.0, maxPermissible: 31.0, tableRef: 'RDSO G-95 Para 5.2 / WMM 2.0 §607(a), §7' },
   BRAKE_BLOCK: { nominalValue: 45.0, minPermissible: 10.0, maxPermissible: 55.0, tableRef: 'RDSO G-97 Para 6.1' },
   // Mark-50 Draft Gear gauges — mirrors RDSO_TOLERANCE_SPECS in
@@ -230,6 +237,19 @@ export function classifySpringLocally(request: ClassificationRequest): Classific
   };
 }
 
+/**
+ * A target is only offered to the caliper when its spec has an approved
+ * limit. Keeping this in one place means "we have no sourced figure for this"
+ * is enforced by the registry rather than remembered as a special case in the
+ * UI — which is how the bearings items ended up showing a confidently precise
+ * button backed by numbers nobody could cite.
+ */
+function withApprovedLimit(target: CVComponentTarget): CVComponentTarget | null {
+  const spec = (COMPONENT_TOLERANCE_SPECS as any)[target];
+  if (spec && spec.verificationStatus === 'PENDING_SIGNOFF') return null;
+  return target;
+}
+
 export function resolveComponentTarget(partName: string, category: string): CVComponentTarget | null {
   const name = partName.toLowerCase();
 
@@ -238,13 +258,13 @@ export function resolveComponentTarget(partName: string, category: string): CVCo
   // Gap Gauge" can't fall through into the generic spring-branch default
   // below just because it contains the word "spring".
   if (category === 'COUPLERS_DRAFT_GEAR' || name.includes('draft gear')) {
-    if (name.includes('wall thickness')) return 'DG_HOUSING_WALL_THICKNESS';
-    if (name.includes('centre wedge location')) return 'DG_CENTRE_WEDGE_LOCATION';
-    if (name.includes('movable plate location')) return 'DG_MOVABLE_PLATE_LOCATION';
-    if (name.includes('outer coil spring')) return 'DG_OUTER_COIL_SPRING';
-    if (name.includes('inner coil spring')) return 'DG_INNER_COIL_SPRING';
-    if (name.includes('corner coil spring')) return 'DG_CORNER_COIL_SPRING';
-    if (name.includes('release spring')) return 'DG_RELEASE_SPRING';
+    if (name.includes('wall thickness')) return withApprovedLimit('DG_HOUSING_WALL_THICKNESS');
+    if (name.includes('centre wedge location')) return withApprovedLimit('DG_CENTRE_WEDGE_LOCATION');
+    if (name.includes('movable plate location')) return withApprovedLimit('DG_MOVABLE_PLATE_LOCATION');
+    if (name.includes('outer coil spring')) return withApprovedLimit('DG_OUTER_COIL_SPRING');
+    if (name.includes('inner coil spring')) return withApprovedLimit('DG_INNER_COIL_SPRING');
+    if (name.includes('corner coil spring')) return withApprovedLimit('DG_CORNER_COIL_SPRING');
+    if (name.includes('release spring')) return withApprovedLimit('DG_RELEASE_SPRING');
     // Housing box profile gauge, the gap/contact gauges (wedge shoe, centre
     // wedge, outer stationary plate, taper stationary plate, spring seat),
     // the movable-plate 180° rotation check, and the pre-existing
@@ -254,36 +274,35 @@ export function resolveComponentTarget(partName: string, category: string): CVCo
   }
 
   if (category === 'SPRINGS' || name.includes('spring') || name.includes('स्प्रिंग')) {
-    if (name.includes('snubber') || name.includes('स्नबर')) return 'SNUBBER_SPRING';
-    if (name.includes('inner') || name.includes('भीतरी') || name.includes('इनर')) return 'INNER_SPRING';
-    return 'OUTER_SPRING';
+    if (name.includes('snubber') || name.includes('स्नबर')) return withApprovedLimit('SNUBBER_SPRING');
+    if (name.includes('inner') || name.includes('भीतरी') || name.includes('इनर')) return withApprovedLimit('INNER_SPRING');
+    return withApprovedLimit('OUTER_SPRING');
   }
   if (category === 'FRICTION_WEDGES' || name.includes('wedge') || name.includes('घर्षण') || name.includes('वेज')) {
     // WMM 2.0 §309D gives distinct per-surface wear limits and the
     // checklist already names the two surfaces separately — route each to
     // its own spec instead of the shared legacy FRICTION_WEDGE target.
-    if (name.includes('slope')) return 'FRICTION_WEDGE_SLOPE';
-    if (name.includes('vertical')) return 'FRICTION_WEDGE_VERTICAL';
-    return 'FRICTION_WEDGE';
+    if (name.includes('slope')) return withApprovedLimit('FRICTION_WEDGE_SLOPE');
+    if (name.includes('vertical')) return withApprovedLimit('FRICTION_WEDGE_VERTICAL');
+    return withApprovedLimit('FRICTION_WEDGE');
   }
   if (category === 'BEARINGS' || name.includes('end cap') || name.includes('ctrb') || name.includes('bearing') || name.includes('कैप')) {
-    // None of the current BEARINGS checklist items are actually a caliper-
-    // measurable CTRB end-cap gap: "CTRB Cartridge Bearing Rotation" is a
-    // spin/rotation test, "Axle Box Adapter Crown Wear" has no verified
-    // numeric limit sourced anywhere, and Locking Plate/Grease Seal/End Cap
-    // Screws are 100%-replace items, not measurements. CTRB_END_CAP's own
-    // tolerance spec (server/src/routes/cv.ts) is itself flagged UNVERIFIED
-    // — no gap/clearance figure exists in WMM 2.0, only a must-change-screw
-    // procedure — so routing any of these to it would show a confidently
-    // precise but fabricated verdict. No AR Caliper button until a real
-    // number exists; these stay manual PASS/FAIL/REPLACED like the rest.
-    return null;
+    // Routed normally. Whether a caliper button appears is decided at the end
+    // of this function by the spec's own verificationStatus, not by a special
+    // case here — CTRB_END_CAP is PENDING_SIGNOFF, so it resolves to null
+    // today and starts working the day a real figure is signed off, with no
+    // code change in this file.
+    //
+    // The other BEARINGS items are not caliper measurements in any case:
+    // "CTRB Cartridge Bearing Rotation" is a spin test, and Locking Plate /
+    // Grease Seal / End Cap Screws are 100%-replace items.
+    return withApprovedLimit('CTRB_END_CAP');
   }
   if (category === 'WHEELS_AXLES' || name.includes('flange') || name.includes('wheel') || name.includes('पहिया')) {
-    return 'WHEEL_FLANGE';
+    return withApprovedLimit('WHEEL_FLANGE');
   }
   if (category === 'BRAKE_SYSTEM' || name.includes('brake') || name.includes('ब्रेक')) {
-    return 'BRAKE_BLOCK';
+    return withApprovedLimit('BRAKE_BLOCK');
   }
-  return 'OUTER_SPRING';
+  return withApprovedLimit('OUTER_SPRING');
 }

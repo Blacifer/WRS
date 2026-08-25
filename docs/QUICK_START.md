@@ -6,17 +6,24 @@ One page per role. The app has an English/Hindi toggle (top of screen) — use w
 
 ## Inspector — Springs
 
-1. **Log in** with your username/password. Tap **Spring Batch Inspection** (or "Smart Vision" on the home screen).
-2. Enter the **wagon number**, pick **bogie type** and **condition** (Used/New) — you only do this once per wagon.
-3. For each of the 6 springs (Outer/Inner/Snubber × Bogie 1/2, shown one at a time):
-   - Tap **Take Photo** and frame the caliper's digital display in the box. The app reads the number automatically.
-   - If the photo doesn't read cleanly (bad lighting, glare), a **manual entry box** appears — type the reading straight from the caliper.
-   - The PASS/CONDEMNED result and color band show instantly, with a sound cue (chime = pass, buzz = condemned).
-   - If you see a visible crack, corrosion, or deformation, tap **+ Flag a visible defect** and pick the type — this overrides the measurement and condemns the spring regardless of height.
+1. **Log in** with your username and password. Tap **Spring Batch**.
+2. Enter the **wagon number** once, then pick the **bogie type**, whether the springs are **used or new**, and the **axle load**. The app tells you how many springs that configuration has — for a 20.32t NLB bogie it is 12 outer, 8 inner and 4 snubber, so 48 for the wagon.
+3. The app then walks you through them one at a time, showing which spring you are on (e.g. *Bogie 1 · Outer Spring 5 / 12*). For each one:
+   - Check the spring against the **strip**, exactly as you do now.
+   - **Tap the band the strip shows** — the six colours are on screen with their height ranges. That is the whole entry: one tap, no typing.
+   - The result and the band appear straight away, with a sound cue (chime = pass, buzz = condemned), and it tells you which colour to paint.
+   - If the spring is **off the strip** — below the lowest band or above the highest — tap **Off the strip — condemn**.
+   - If you need to record an exact measurement instead (a borderline spring, or a disputed reading), switch to the **Exact height** tab and type it. Both routes reach the same verdict.
+   - If you can see a crack, corrosion or deformation, tap **+ Flag a visible defect**. That condemns the spring whatever its height.
    - Tap **Save & Next Spring**.
-4. After all 6, you get a pass/condemn summary for that bogie. Tap **Start Next Wagon** to continue, or **Done** to exit.
+4. A condemned spring asks for a **photo** before you can move on — that photograph is the evidence behind the condemnation. It also tells you what the replacement must be: not just "a good spring", but the band and millimetre range that keeps the nest matched.
+5. When the wagon is done you get a summary — how many passed, how many were condemned — and **Start Next Wagon**.
 
-**No signal / offline:** the app keeps working — readings are queued on the device and sync automatically once you're back online. You don't need to do anything differently.
+**If you are interrupted:** close the app, lock the tablet, or lose the page — it comes back on the same spring with your counts intact.
+
+**No signal:** keep working normally. Readings are held on the device and sync by themselves once you are back in range. Nothing is lost and nothing is recorded twice.
+
+**Note on the camera:** there is no photographing of springs or calipers. The strip already tells you the band, so the app just asks you to tap it. The camera is only for photographing a defect.
 
 ## Inspector — Wagon Checklist
 
@@ -30,11 +37,12 @@ One page per role. The app has an English/Hindi toggle (top of screen) — use w
 
 - Everything an inspector can do, plus:
 - **Override a spring's band**: opens an OTP-verification step — you'll need a one-time code before the override is recorded. Every override is logged with your name and reason.
-- **Gate & Release** tab on a wagon: shows exactly what's still blocking release (in plain language, e.g. *"Mandatory component X has not been inspected"*). Once the list is empty, you can digitally sign off and generate the release certificate.
+- **Gate & Release** tab on a wagon: shows exactly what's still blocking release (in plain language, e.g. *"Mandatory component X has not been inspected"*). Once the list is empty you can sign off, which needs a **one-time code**: tap **Send OTP**, enter the code, tap **Verify OTP**, then authorise. The certificate is issued in your name and carries a signature that can be checked later.
+- Some findings are **advisories** rather than blockers — most often a spring nest whose springs each pass but which are not matched as a set. These do not stop a release, but you have to **tick each one to accept it**, and your acceptance is recorded on the certificate. A wagon can leave with a mismatched nest only because a named person decided it should.
 - **Scan a component QR code** (wheelset, bearing, draft gear, etc.) to pull up its full service history across every wagon it's been fitted to.
 
 ## Everyone
 
-- **Everything you do is logged permanently** — who, what, when — and cannot be edited or deleted afterward, including by an administrator. This is by design: it's what makes the record trustworthy.
+- **Everything you do is logged permanently** — who, what, when — and cannot be edited or deleted afterward, including by an administrator. This is by design: it's what makes the record trustworthy. A supervisor can check the log is intact at any time from the audit verification view; it will say so if a single entry has been altered.
 - If something looks wrong (a reading, a checklist state), don't try to "fix" it by re-entering — flag it to your supervisor. The record should show what actually happened, corrections included, not be silently overwritten.
 - The app works offline. If you lose signal mid-shift, keep working normally — it'll catch up once you're connected again.

@@ -48,7 +48,8 @@ export const RDSO_TOLERANCE_SPECS = {
     minWireDiameter: 30.0,
     unit: 'mm',
     bandsCount: 6,
-    bandStepMm: 3.0
+    bandStepMm: 3.0,
+    verificationStatus: 'VERIFIED'
   },
   INNER_SPRING: {
     componentType: 'INNER_SPRING',
@@ -64,7 +65,8 @@ export const RDSO_TOLERANCE_SPECS = {
     minWireDiameter: 15.0,
     unit: 'mm',
     bandsCount: 6,
-    bandStepMm: 3.0
+    bandStepMm: 3.0,
+    verificationStatus: 'VERIFIED'
   },
   SNUBBER_SPRING: {
     componentType: 'SNUBBER_SPRING',
@@ -80,7 +82,8 @@ export const RDSO_TOLERANCE_SPECS = {
     minWireDiameter: 13.5,
     unit: 'mm',
     bandsCount: 6,
-    bandStepMm: 3.0
+    bandStepMm: 3.0,
+    verificationStatus: 'VERIFIED'
   },
   // LEGACY generic target — kept only so existing callers/tests that pass
   // componentType: 'FRICTION_WEDGE' keep working unchanged. New code should
@@ -97,7 +100,8 @@ export const RDSO_TOLERANCE_SPECS = {
     minPermissible: 129.0,
     maxPermissible: 138.0,
     maxPermissibleWear: 7.0,
-    unit: 'mm'
+    unit: 'mm',
+    verificationStatus: 'VERIFIED'
   },
   // WMM 2.0 §309D "Wear Limit for Friction Wedge Block" — vertical surface.
   FRICTION_WEDGE_VERTICAL: {
@@ -108,7 +112,8 @@ export const RDSO_TOLERANCE_SPECS = {
     nominalValue: 0.0,
     minPermissible: 0.0,
     maxPermissible: 7.0,
-    unit: 'mm'
+    unit: 'mm',
+    verificationStatus: 'VERIFIED'
   },
   // WMM 2.0 §309D "Wear Limit for Friction Wedge Block" — slope surface.
   FRICTION_WEDGE_SLOPE: {
@@ -119,11 +124,15 @@ export const RDSO_TOLERANCE_SPECS = {
     nominalValue: 0.0,
     minPermissible: 0.0,
     maxPermissible: 3.0,
-    unit: 'mm'
+    unit: 'mm',
+    verificationStatus: 'VERIFIED'
   },
-  // UNVERIFIED: no numeric gap/clearance figure for this found in WMM 2.0 —
-  // only torque/must-change-screw procedure, not a measurable mm limit.
-  // Needs DRM technical sign-off before live use.
+  // The only spec in the registry with no sourced limit. WMM 2.0 gives a
+  // torque and a must-change-screw procedure for the end cap and no gap
+  // figure at all; none was found in G-81 either. The numbers below exist
+  // only so the shape is complete — PENDING_SIGNOFF is what stops them being
+  // used to judge anything, and it is a field rather than this comment
+  // precisely so the rule is enforced instead of remembered.
   CTRB_END_CAP: {
     componentType: 'CTRB_END_CAP',
     nameEn: 'CTRB End Cap (Gap & Bolt Deflection)',
@@ -133,7 +142,12 @@ export const RDSO_TOLERANCE_SPECS = {
     minPermissible: 0.5,
     maxPermissible: 3.0,
     diameterNominal: 178.0,
-    unit: 'mm'
+    unit: 'mm',
+    verificationStatus: 'PENDING_SIGNOFF',
+    verificationNote:
+      'No numeric end-cap gap limit exists in WMM 2.0 or RDSO G-81 — only a torque and ' +
+      'must-change-screw procedure. Awaiting DRM technical sign-off; until then this ' +
+      'component can be measured but not judged.'
   },
   // VERIFIED against WMM 2.0 §607(a) "Thin and Sharp Flange": minimum
   // thickness 16mm matches exactly. Max 31mm verified against §7 Wheel
@@ -147,7 +161,8 @@ export const RDSO_TOLERANCE_SPECS = {
     nominalValue: 28.5,
     minPermissible: 16.0,
     maxPermissible: 31.0,
-    unit: 'mm'
+    unit: 'mm',
+    verificationStatus: 'VERIFIED'
   },
   // VERIFIED against WMM 2.0 §308A "Brake Gear Limit and Clearances":
   // "Brake block condemning limits — 10mm" matches exactly.
@@ -159,7 +174,8 @@ export const RDSO_TOLERANCE_SPECS = {
     nominalValue: 45.0,
     minPermissible: 10.0,
     maxPermissible: 55.0,
-    unit: 'mm'
+    unit: 'mm',
+    verificationStatus: 'VERIFIED'
   },
   // ---------------------------------------------------------------------
   // Mark-50 Draft Gear recondition gauges — sourced directly from the WRS
@@ -188,7 +204,8 @@ export const RDSO_TOLERANCE_SPECS = {
     nominalValue: 15.88,
     minPermissible: 15.88,
     maxPermissible: 60.0,
-    unit: 'mm'
+    unit: 'mm',
+    verificationStatus: 'VERIFIED'
   },
   DG_CENTRE_WEDGE_LOCATION: {
     componentType: 'DG_CENTRE_WEDGE_LOCATION',
@@ -198,7 +215,8 @@ export const RDSO_TOLERANCE_SPECS = {
     nominalValue: 60.325,
     minPermissible: 59.54,
     maxPermissible: 61.11,
-    unit: 'mm'
+    unit: 'mm',
+    verificationStatus: 'VERIFIED'
   },
   DG_MOVABLE_PLATE_LOCATION: {
     componentType: 'DG_MOVABLE_PLATE_LOCATION',
@@ -208,7 +226,8 @@ export const RDSO_TOLERANCE_SPECS = {
     nominalValue: 142.875,
     minPermissible: 141.27,
     maxPermissible: 144.48,
-    unit: 'mm'
+    unit: 'mm',
+    verificationStatus: 'VERIFIED'
   },
   DG_OUTER_COIL_SPRING: {
     componentType: 'DG_OUTER_COIL_SPRING',
@@ -218,7 +237,8 @@ export const RDSO_TOLERANCE_SPECS = {
     nominalValue: 342.0,
     minPermissible: 342.0,
     maxPermissible: 400.0,
-    unit: 'mm'
+    unit: 'mm',
+    verificationStatus: 'VERIFIED'
   },
   DG_INNER_COIL_SPRING: {
     componentType: 'DG_INNER_COIL_SPRING',
@@ -228,7 +248,8 @@ export const RDSO_TOLERANCE_SPECS = {
     nominalValue: 342.0,
     minPermissible: 342.0,
     maxPermissible: 400.0,
-    unit: 'mm'
+    unit: 'mm',
+    verificationStatus: 'VERIFIED'
   },
   DG_CORNER_COIL_SPRING: {
     componentType: 'DG_CORNER_COIL_SPRING',
@@ -238,7 +259,8 @@ export const RDSO_TOLERANCE_SPECS = {
     nominalValue: 286.0,
     minPermissible: 286.0,
     maxPermissible: 340.0,
-    unit: 'mm'
+    unit: 'mm',
+    verificationStatus: 'VERIFIED'
   },
   DG_RELEASE_SPRING: {
     componentType: 'DG_RELEASE_SPRING',
@@ -248,7 +270,8 @@ export const RDSO_TOLERANCE_SPECS = {
     nominalValue: 123.0,
     minPermissible: 123.0,
     maxPermissible: 160.0,
-    unit: 'mm'
+    unit: 'mm',
+    verificationStatus: 'VERIFIED'
   }
 };
 
@@ -347,6 +370,39 @@ cvRouter.post('/measure', optionalAuthMiddleware, async (req: AuthenticatedReque
     let rdsoTable = 'RDSO Technical Specification';
     let condemnationReason: string | null = null;
     let wireDiameterCheck: CVMeasureResponse['wireDiameterCheck'] | undefined;
+
+    // -----------------------------------------------------------------------
+    // 1b. A spec with no approved limit does not get to produce a verdict.
+    //
+    // CTRB_END_CAP carries placeholder numbers because no gap figure exists in
+    // the manual. Returning PASS or CONDEMNED from those would be a confidently
+    // precise answer with nothing behind it — the exact failure mode this
+    // project has been removing. The measurement is still recorded and
+    // returned, labelled as unjudged, so the reading is not lost and the
+    // component becomes judgeable the day a real limit is signed off.
+    // -----------------------------------------------------------------------
+    const targetSpec = RDSO_TOLERANCE_SPECS[normalizedTarget as keyof typeof RDSO_TOLERANCE_SPECS] as any;
+    if (targetSpec?.verificationStatus === 'PENDING_SIGNOFF') {
+      res.status(200).json({
+        success: true,
+        // Shape matches the normal measurement response (fields at the top
+        // level), so an existing caller reading `verdict` gets null rather
+        // than reaching into a differently-shaped object and finding nothing.
+        verdict: null,
+        verdictAvailable: false,
+        componentType: normalizedTarget,
+        measuredValue,
+        unit: targetSpec.unit || 'mm',
+        rdsoTable: targetSpec.rdsoStandard,
+        verificationStatus: 'PENDING_SIGNOFF',
+        message:
+          `Measurement recorded. No approved limit exists for ` +
+          `${targetSpec.nameEn}, so no pass or fail can be given.`,
+        verificationNote: targetSpec.verificationNote || null,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
 
     // 2. Tolerance Evaluation
     if (['OUTER_SPRING', 'INNER_SPRING', 'SNUBBER_SPRING'].includes(normalizedTarget)) {
