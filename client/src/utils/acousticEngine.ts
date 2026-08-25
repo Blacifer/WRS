@@ -31,6 +31,13 @@ export interface AcousticAnalysisFrame {
   bands: EqualizerBand[];
   timeDomainWaveform: Float32Array;
   frequencySpectrum: Float32Array;
+  /**
+   * Where this frame's audio came from. A diagnosis derived from a synthetic
+   * oscillator must never be recordable against a real wagon, and one derived
+   * from no signal at all must not be reported as "nominal" — so the frame
+   * carries its own provenance rather than leaving callers to assume.
+   */
+  signalSource: 'MICROPHONE' | 'SYNTHETIC' | 'NO_SIGNAL';
 }
 
 export type AcousticFrameCallback = (frame: AcousticAnalysisFrame) => void;
@@ -71,6 +78,9 @@ export class AcousticDiagnosticEngine {
   // Active simulation mode
   private simulatedAnomaly: AcousticAnomalyType | null = null;
   private simulatedDominantFreq: number = 0;
+
+  /** False when getUserMedia failed — there is no audio to analyse. */
+  private micAvailable: boolean = false;
 
   constructor() {
     // Expose test harness hook to window
@@ -138,8 +148,14 @@ export class AcousticDiagnosticEngine {
           this.micSource.connect(this.analyser);
         }
       }
+      this.micAvailable = !!this.micSource;
     } catch (err) {
-      console.warn('Microphone stream access unavailable, switching to internal oscillator simulation:', err);
+      // Previously this warned and carried on analysing nothing, which produced
+      // "spectrum nominal, subsystems clear" at 0.95 confidence from an absent
+      // microphone — a confident all-clear for a bearing nobody listened to.
+      // Failing loudly is the only safe direction here.
+      this.micAvailable = false;
+      console.warn('Microphone unavailable — acoustic diagnosis cannot run:', err);
     }
 
     this.isRunning = true;
@@ -229,13 +245,25 @@ export class AcousticDiagnosticEngine {
     const peakDb = Math.min(115, Math.max(30, Math.round(this.smoothedPeakDb * 10) / 10));
 
     // 3. Anomaly Decision Logic (Dual-Path DSP)
+    const signalSource: AcousticAnalysisFrame['signalSource'] = this.simulatedAnomaly
+      ? 'SYNTHETIC'
+      : this.micAvailable
+        ? 'MICROPHONE'
+        : 'NO_SIGNAL';
+
     let detectedAnomaly: AcousticAnomalyType = 'NONE';
     let confidence = 0.95;
     let details = 'Acoustic frequency spectrum nominal. Workshop background sound levels within RDSO limits.';
     let recommendedAction = 'No action required. Subsystems clear.';
 
-    if (this.simulatedAnomaly) {
-      // Overridden by manual or automated simulation preset
+    if (signalSource === 'NO_SIGNAL') {
+      // Say nothing about the bearing, because nothing was heard.
+      confidence = 0;
+      details = 'No microphone signal — nothing was recorded, so no acoustic assessment can be made.';
+      recommendedAction = 'Grant microphone access and run the check again.';
+    } else if (this.simulatedAnomaly) {
+      // A synthetic training signal, not the wagon. The frame is tagged
+      // SYNTHETIC so this can never be filed as a real defect.
       detectedAnomaly = this.simulatedAnomaly;
       dominantFrequencyHz = this.simulatedDominantFreq || dominantFrequencyHz;
       if (detectedAnomaly === 'AIR_LEAK') {
@@ -296,7 +324,8 @@ export class AcousticDiagnosticEngine {
       recommendedAction,
       bands,
       timeDomainWaveform: this.floatTimeData,
-      frequencySpectrum: this.floatFreqData
+      frequencySpectrum: this.floatFreqData,
+      signalSource
     };
   }
 

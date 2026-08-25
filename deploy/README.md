@@ -10,6 +10,52 @@ You said cloud makes sense, but that the data should stay under your control and
 
 Whichever you pick, the deployment artifacts below (Docker image + nginx config) work identically — nothing in the app is tied to a specific provider.
 
+## Backup and restore drill
+
+Last drilled: **25 August 2026** — backup taken from a live WAL database with
+the server running, database then deleted, restored from the backup, and the
+server brought back up.
+
+Result: all recorded inspections survived, the server returned healthy in WAL
+mode, and — the part that matters — `GET /api/audit/verify` reported the hash
+chain **unbroken across the restore**. A restored database is not merely
+readable; it is still able to prove it has not been altered.
+
+```bash
+# take a backup (safe against a live server — uses SQLite .backup, not cp)
+server/scripts/backup-db.sh /path/to/wrs_inspections.db /path/to/backups
+
+# restore
+cp /path/to/backups/wrs_inspections_YYYYMMDD_HHMMSS.db /path/to/wrs_inspections.db
+
+# then verify, in this order
+curl .../api/health                 # healthy, WAL
+curl .../api/audit/verify           # must say "unbroken"
+```
+
+Re-run this drill whenever the schema changes or the host moves. A backup
+nobody has restored from is not a backup.
+
+
+## Index the maintenance manual (one-off, per deployment)
+
+"Ask the Manual" searches the full RDSO Wagon Maintenance Manual 2.0. The
+index is built on the server from the manual itself:
+
+```bash
+npm run index-manual -- "/path/to/Vol-I (System Documentation)_merged.pdf"
+```
+
+It extracts the text (via `pdftotext`, from poppler), splits it into passages
+and builds the FTS5 index — roughly 2,300 passages across 659 pages. Until
+this is run, manual search returns a clear "not indexed on this server yet"
+error rather than silently finding nothing.
+
+**The manual text is deliberately not committed to this repository.** It is
+copyrighted RDSO material and this repository is public. Keep the PDF with the
+deployment, not in git.
+
+
 ## What's already offline-first (no extra work needed)
 
 You mentioned wanting the app to work offline and sync once connected — this is already built and doesn't depend on the hosting choice: inspection/checklist data is queued in the browser's IndexedDB when offline (`client/src/services/offlineDb.ts`) and syncs automatically once connectivity returns. A patchy workshop wifi doesn't block an inspector from working.

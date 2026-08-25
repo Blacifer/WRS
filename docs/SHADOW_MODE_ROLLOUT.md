@@ -39,3 +39,11 @@ This is not a statement of distrust in the software — it's the standard way to
 
 - OCR misreads that the inspector caught and corrected via manual entry (expected — this is what the manual fallback is for; frequency worth tracking to judge lighting/caliper conditions).
 - Minor UI confusion or workflow friction — feed this into the quick-start doc and inspector training, not a go/no-go blocker.
+
+---
+
+## The forms
+
+The discrepancy log and daily summary this document asks for are in
+[SHADOW_MODE_FORMS.md](SHADOW_MODE_FORMS.md), along with how to read them at
+the end of the first week.

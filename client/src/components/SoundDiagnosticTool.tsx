@@ -39,6 +39,9 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
   const [dominantFreq, setDominantFreq] = useState<number>(0);
   const [peakDb, setPeakDb] = useState<number>(30);
   const [anomalyType, setAnomalyType] = useState<AcousticAnomalyType>('NONE');
+  // Where the current reading's audio came from. A synthetic training signal
+  // or a dead microphone must never be filed against a real wagon.
+  const [signalSource, setSignalSource] = useState<AcousticAnalysisFrame['signalSource']>('NO_SIGNAL');
   const [confidence, setConfidence] = useState<number>(0.95);
   const [crestFactor, setCrestFactor] = useState<number>(1.5);
   const [highFreqRatio, setHighFreqRatio] = useState<number>(0.05);
@@ -79,6 +82,7 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
     setDominantFreq(frame.dominantFrequencyHz);
     setPeakDb(frame.peakDb);
     setAnomalyType(frame.anomalyType);
+    setSignalSource(frame.signalSource);
     setConfidence(frame.confidence);
     setCrestFactor(Math.round(frame.crestFactor * 10) / 10);
     setHighFreqRatio(Math.round(frame.highFreqPowerRatio * 100) / 100);
@@ -314,6 +318,19 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
   // Log Defect to Exit Gate Blockers
   const handleLogDefect = async () => {
     if (anomalyType === 'NONE') return;
+
+    // A simulated bearing knock used to be loggable as a real defect against a
+    // real wagon — it raised a genuine exit-gate blocker and was stored
+    // indistinguishably from a microphone reading. The simulation presets are
+    // for training and demonstration; they are not evidence about this wagon.
+    if (signalSource !== 'MICROPHONE') {
+      setLogErrorMessage(
+        signalSource === 'SYNTHETIC'
+          ? 'This is a simulated training signal, not a recording of this wagon. Run the microphone check to log a real defect.'
+          : 'No microphone signal was captured, so there is nothing to log. Grant microphone access and run the check again.'
+      );
+      return;
+    }
 
     setIsLogging(true);
     setLogSuccessMessage(null);
