@@ -10,34 +10,49 @@ The **WRS Raipur Quality Control Platform** is an enterprise-grade web applicati
 
 ### Key Capabilities
 
-1. **Spring Classification Engine (RDSO G-95 Rev-II)**:
-   - Automated group band classification (Bands I to IV, Condemnation thresholds) for CASNUB 22 NLB, 22 HS, and 22 RFT bogie springs.
-   - Live AR caliper HUD & computer vision measurement simulations.
+1. **Spring classification — RDSO G-95 Rev-II**
+   - Deterministic band classification for CASNUB 22 NLB / HS / RFT springs, verified value-by-value against the printed tables.
+   - **Band-first entry**: inspectors check the spring against the strip and tap the band, as RDSO's "Grouping of Springs (By strip method)" describes. One tap, no typing.
+   - **Bulk sorting** of dismantled springs with no wagon number, which is the ~900/day work — with per-band tallies and, more usefully, how many *complete matched nests* the stock can supply.
+   - **Set-level checks** a person cannot perform by eye: nest free-height variation, band mixing, and new/old mixing.
 
-2. **Full Lifecycle Stage Progression (7 Stages)**:
-   - Stage 1: Inward Yard Entry
-   - Stage 2: Stripping & Dismantling
-   - Stage 3: Bogie & Component Inspection
-   - Stage 4: Body & Structural Repair
-   - Stage 5: Wheelset & Reassembly
-   - Stage 6: Final QC Gate & Air Brake Testing
-   - Stage 7: Ready for Departure / Exit Gate Certification
+2. **Wagon type registry (WMM 2.0 Tables 1.1–1.3)**
+   - 33 wagon designations — BOXN, BOSTHS M1/M2, BOXNLW, BRN, BCNA and others — each carrying its bogie, axle load and spring configuration from the manual.
+   - Pick the wagon and the spring count follows. BOSTHS M1 is 64 springs a wagon; M2 is 56.
 
-3. **Component Health Passports & RFID/QR Tracking**:
-   - Traceability for critical wagon assets (wheelsets, side frames, bolster, draft gears, CTRB bearings, CBC couplers).
-   - Tamper-proof lifecycle history and QR certificate generation.
+3. **Full lifecycle stage progression (7 stages)**, from inward yard entry to exit gate certification, with every transition timestamped and dwell time tracked.
 
-4. **Smart Diagnostics & AI Triage**:
-   - **Voice UI ("Greasy Gloves")**: Hands-free bilingual (English / Hindi) voice checklist inspection.
-   - **Acoustic Bearing & Leak Diagnostics**: Web Audio DSP with real-time 32-band FFT frequency analyzer.
-   - **Pre-Arrival OMRS Telemetry**: Automated trackside sensor ingestion and stores reservation.
+4. **Zero-defect exit gate**
+   - Server-enforced. A wagon does not leave with a mandatory component unaddressed, a condemned spring, an incomplete spring sweep, a failed air brake test, or bearings at mismatched overhaul cycles.
+   - Advisory findings do not block, but must be **acknowledged by name** at sign-off and are recorded inside the signed certificate.
 
-5. **Industrial Integrity & Audit Security**:
-   - SQLite append-only audit tables with cryptographic SHA-256 hash chains.
-   - Strict database-level immutability triggers preventing retrospective tampering.
-   - Multi-role RBAC: Inspector, Supervisor, DRM, and Admin with supervisor overrides and OTP validation.
+5. **Single Wagon Test — air brake (WMM 2.0 §720-C)**
+   - The full sixteen-row proforma with published limits, including piston stroke keyed per wagon type from §308B and separate single/twin pipe limits.
+   - A blank row is not a pass; neither is a row with no published limit.
 
----
+6. **Component passports & CTRB overhaul-cycle matching**
+   - QR/RFID traceability for wheelsets, bearings, draft gear and couplers.
+   - Enforces WMM 2.0 Chapter 6 clause (f): every bearing under one wagon must share its overhaul cycle — the rule currently kept in yellow paint on end cap screws and verified by sample check.
+
+7. **Tamper-evident record**
+   - SHA-256 hash chain across every event, with database-level append-only triggers.
+   - `GET /api/audit/verify` re-derives the whole chain and names the first altered entry. A changed *role* breaks it, not just changed data.
+   - Release certificates carry a keyed HMAC over their own contents and can be re-verified from the stored record.
+
+8. **Built for the shop floor**
+   - Offline-first PWA with an IndexedDB queue; work continues without a network and syncs without duplicating.
+   - Bilingual throughout (English / Hindi).
+   - Hands-free voice checklist entry, and acoustic bearing/leak diagnostics using real Web Audio FFT.
+   - Full-text search over the RDSO manual (2,341 passages, 659 pages) with real citations.
+
+### What it deliberately does not do
+
+Stated plainly, because a system used for safety decisions should be clear about its own limits:
+
+- **It does not identify a spring, or a wagon, from a photograph.** Free height cannot be recovered from an image without a scale. The spring queue and the wagon number are entered, not detected.
+- **It does not detect cracks or corrosion automatically.** Visible defects are recorded by the inspector, with a mandatory photograph as evidence.
+- **It does not invent limits.** Where the manual publishes no figure — the CTRB end-cap gap, the RFT spring count — the app measures and records but returns no verdict, and says why.
+- **The supervisor OTP is not a second factor.** With no SMS gateway integrated, the code is returned in the API response. It is an audited two-step confirmation; `OTP_DELIVERY` makes that posture explicit rather than implied.
 
 ## 🛠️ Architecture & Tech Stack
 
@@ -108,8 +123,17 @@ Access the application at `http://localhost:3000`.
 
 Execute the end-to-end verification suite across all tiers:
 
+The suite that exercises the real server is `server/tests` — **503 cases**. Run it with:
+
 ```bash
-# Run all 41 test suites (260 test cases)
+node --experimental-strip-types --test server/tests/*.test.ts
+```
+
+The root harness is a separate, largely hand-written parallel suite — 38 suites and
+239 cases, of which 7 files import the real server and the rest test a mock harness.
+It is useful, but a green run there is not on its own evidence that the product works:
+
+```bash
 npm test
 
 # Run specific tiers
@@ -126,11 +150,13 @@ npm run test:tier5    # Adversarial stress & immutability trigger validation
 
 | Role | Username | Password | Full Name |
 |------|----------|----------|-----------|
-| **Inspector** | `inspector_ramesh` | `Railway@2026` | Ramesh Kumar |
-| **Inspector** | `inspector_suresh` | `Railway@2026` | Suresh Verma |
-| **Supervisor** | `supervisor_sharma` | `Railway@2026` | Alok Sharma (SSE) |
-| **DRM (Divisional Railway Manager)** | `drm_raipur` | `Railway@2026` | Rajesh Agrawal (DRM) |
-| **Admin** | `admin` | `Railway@2026` | System Administrator |
+| **Inspector** | `inspector1` … `inspector4` | `password123` | Ramesh Kumar, and others |
+| **Supervisor** | `supervisor1` | `password123` | S. K. Verma |
+| **Admin** | `admin1` | `password123` | A. K. Mishra |
+
+> These are demo logins created by `npm run seed`. Replace them with the real
+> roster and deactivate these before any real wagon is recorded — an admin can
+> do both from the **User Accounts** screen.
 
 ---
 

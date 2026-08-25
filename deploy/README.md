@@ -10,6 +10,58 @@ You said cloud makes sense, but that the data should stay under your control and
 
 Whichever you pick, the deployment artifacts below (Docker image + nginx config) work identically — nothing in the app is tied to a specific provider.
 
+## Deploying inside Indian Railways — what is decided elsewhere
+
+This is a Government of India context, so several things are procurement and
+approval decisions rather than engineering ones. Recording them here so they
+are not discovered late.
+
+### Hosting: CRIS and RailTel, more likely than NIC
+
+NIC (National Informatics Centre) provides IT services to most GoI ministries,
+and its MeghRaj / GI Cloud is the usual empanelled destination. **Indian
+Railways is the exception**: it has its own IT arm, **CRIS** (Centre for
+Railway Information Systems), which builds and runs the Railways' major
+applications, and its own telecom PSU, **RailTel**, which operates data centres
+and connectivity.
+
+So the institutional path for this system is most likely CRIS-owned and
+RailTel-hosted rather than NIC. Confirm with CRIS before assuming a cloud
+region — a commercial India-region account may not be acceptable for a system
+holding safety records, whatever its technical merits.
+
+### Three compliance gates worth knowing about early
+
+These typically apply to a government-hosted web application and none of them
+is quick, so they are worth starting before the code is finished:
+
+1. **CERT-In security audit.** Government applications generally require a
+   security audit by a CERT-In empanelled auditor, with a clearance certificate,
+   before being hosted. Budget weeks, not days. The hardening already done —
+   login throttling, PBKDF2 with per-password salts, bound parameters
+   throughout, enforced body limits, no ghost accounts — is the sort of thing
+   such an audit looks for, but the audit is still a separate exercise.
+
+2. **GIGW compliance** (Guidelines for Indian Government Websites). Covers
+   accessibility (WCAG), language, and content standards. The app is already
+   bilingual; accessibility has not been formally assessed.
+
+3. **Digital signature.** The release certificate carries a keyed HMAC, which
+   proves the document has not been altered and that this server produced it.
+   That is **not** the same as a digital signature under the IT Act 2000, which
+   requires a Digital Signature Certificate from a CCA-licensed Certifying
+   Authority (a Class 3 DSC, or eSign). If a release certificate is ever to
+   carry legal weight rather than internal weight, that is the gap to close —
+   and it is an integration, not a rewrite: the canonical content that is
+   currently HMAC'd is exactly what a DSC would sign.
+
+### Data localisation
+
+All data stays in one SQLite file on the host, so localisation follows the
+hosting decision automatically. Nothing is sent to any external service — the
+application makes no outbound network calls at all.
+
+
 ## Backup and restore drill
 
 Last drilled: **25 August 2026** — backup taken from a live WAL database with
