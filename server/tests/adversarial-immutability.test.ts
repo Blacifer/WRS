@@ -8,12 +8,24 @@ import assert from 'node:assert';
 import crypto from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 import { createApp } from '../src/app.ts';
+import { generateToken } from '../src/auth/jwt.ts';
 import { getDatabase, setDatabaseInstance } from '../src/db/connection.ts';
 import { runMigrations } from '../src/db/migrations.ts';
 import { seedUsers } from '../src/db/seed.ts';
 import { InspectionRepository } from '../src/db/repository.ts';
 import type { ExpressApp } from '../src/framework/index.ts';
 import type { BogieType, SpringCondition, SpringPosition } from '../../shared/types.ts';
+
+/*
+ * POST /api/inspections now requires authentication. These tests used to
+ * rely on it not doing so — the route accepted an unauthenticated write and
+ * attributed it to a hardcoded inspector, which is the fault being fixed.
+ */
+const INSPECTOR_AUTH = {
+  authorization: `Bearer ${generateToken({
+    id: 'usr_insp_001', username: 'inspector1', role: 'INSPECTOR', name: 'Ramesh Kumar'
+  } as any)}`
+};
 
 async function mockFetch(app: ExpressApp, method: string, path: string, body: any = { _dummy: true }, headers: Record<string, string> = {}) {
   return app.dispatch({ method, url: path, body, headers });
@@ -169,7 +181,7 @@ describe('Adversarial Verification: Database Immutability & API Integrity', () =
             position: positions[i % positions.length],
             measuredHeight: 245.0 + (i % 20) * 1.0,
             inspectorId: `usr_insp_${String((i % 4) + 1).padStart(3, '0')}`
-          })
+          }, INSPECTOR_AUTH)
         );
       }
 
@@ -206,7 +218,7 @@ describe('Adversarial Verification: Database Immutability & API Integrity', () =
           position: 'OUTER',
           measuredHeight: 260.0,
           inspectorId: 'usr_insp_001'
-        });
+        }, INSPECTOR_AUTH);
       }
 
       const queryRes = await mockFetch(app, 'GET', `/api/inspections?limit=${recordsCount}`);

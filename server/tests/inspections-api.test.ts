@@ -6,7 +6,19 @@
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import { createApp } from '../src/app.ts';
+import { generateToken } from '../src/auth/jwt.ts';
 import type { ExpressApp } from '../src/framework/index.ts';
+
+/*
+ * POST /api/inspections now requires authentication. These tests used to
+ * rely on it not doing so — the route accepted an unauthenticated write and
+ * attributed it to a hardcoded inspector, which is the fault being fixed.
+ */
+const INSPECTOR_AUTH = {
+  authorization: `Bearer ${generateToken({
+    id: 'usr_insp_001', username: 'inspector1', role: 'INSPECTOR', name: 'Ramesh Kumar'
+  } as any)}`
+};
 
 // Helper for sending simulated HTTP requests to the Express app
 async function mockFetch(app: ExpressApp, method: string, path: string, body?: any, headers: Record<string, string> = {}) {
@@ -53,7 +65,7 @@ describe('Inspection & Classification REST API Endpoints', () => {
       condition: 'USED',
       position: 'OUTER',
       measuredHeight: 260.0
-    });
+    }, INSPECTOR_AUTH);
 
     if (res.status !== 201) {
       console.error('DEBUG TC-API-02 ERROR:', res.body);
@@ -88,7 +100,7 @@ describe('Inspection & Classification REST API Endpoints', () => {
       condition: 'USED',
       position: 'OUTER',
       measuredHeight: 260.0
-    });
+    }, INSPECTOR_AUTH);
 
     await mockFetch(app, 'POST', '/api/inspections', {
       wagonNumber: 'BOXN-SPECIAL-2',
@@ -96,7 +108,7 @@ describe('Inspection & Classification REST API Endpoints', () => {
       condition: 'USED',
       position: 'OUTER',
       measuredHeight: 240.0 // CONDEMNED
-    });
+    }, INSPECTOR_AUTH);
 
     const res = await mockFetch(app, 'GET', '/api/inspections?wagonNumber=SPECIAL&status=PASS');
     assert.strictEqual(res.status, 200);
@@ -113,7 +125,7 @@ describe('Inspection & Classification REST API Endpoints', () => {
       condition: 'USED',
       position: 'OUTER',
       measuredHeight: 260.0
-    });
+    }, INSPECTOR_AUTH);
 
     const res = await mockFetch(app, 'GET', '/api/inspections/stats');
     assert.strictEqual(res.status, 200);

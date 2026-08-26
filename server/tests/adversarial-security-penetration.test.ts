@@ -296,6 +296,72 @@ describe('M5 Adversarial Security & Penetration Testing Suite', () => {
       assert.strictEqual(exportRes.status, 403, 'Supervisor attempting regulatory export must receive 403 Forbidden');
     });
 
+    it('PEN-02H: creating an inspection requires authentication and ignores claimed identity', async () => {
+      /*
+       * Verified exploitable before the fix: an unauthenticated POST to
+       * /api/inspections returned 201 and wrote a spring inspection attributed
+       * to Ramesh Kumar — a real, active inspector — which then entered the
+       * audit chain as if he had made it.
+       *
+       * The route read `req.user?.id || body.inspectorId || 'usr_insp_001'`,
+       * and the supervisor override path had the same shape ending in
+       * 'usr_sup_001', so an unauthenticated caller could also record an
+       * override against a named supervisor.
+       *
+       * A false record about a real person, hash-chained so it reads as
+       * authentic for ever, is the worst thing this system can produce. The
+       * chain protects whatever it is given; it cannot tell that the actor was
+       * invented.
+       */
+      const payload = {
+        wagonNumber: 'PEN/BOXNHL/77013',
+        bogieType: 'CASNUB_22_NLB',
+        condition: 'USED',
+        position: 'OUTER',
+        measuredHeight: 260
+      };
+
+      const anonymous = await mockFetch(expressApp, 'POST', '/api/inspections', payload);
+      assert.strictEqual(anonymous.status, 401, 'an unauthenticated inspection must be refused');
+
+      const anonymousOverride = await mockFetch(expressApp, 'POST', '/api/inspections', {
+        ...payload, measuredHeight: 200, supervisorOverride: true, supervisorId: 'usr_sup_001'
+      });
+      assert.strictEqual(anonymousOverride.status, 401, 'an unauthenticated override must be refused');
+
+      // Authenticated, but claiming to be somebody else.
+      const res = await mockFetch(expressApp, 'POST', '/api/inspections',
+        { ...payload, inspectorId: 'usr_sup_001', inspectorName: 'Not Me' },
+        { Authorization: `Bearer ${inspectorToken}` });
+      assert.strictEqual(res.status, 201, 'a legitimate authenticated inspection must still work');
+
+      const row = db.prepare(
+        'SELECT inspector_id, inspector_name FROM inspections ORDER BY rowid DESC LIMIT 1'
+      ).get() as any;
+      assert.notStrictEqual(row.inspector_id, 'usr_sup_001', 'the payload must not choose the inspector');
+      assert.notStrictEqual(row.inspector_name, 'Not Me');
+    });
+
+    it('PEN-02I: a spoken verdict requires authentication', async () => {
+      /*
+       * The third unauthenticated write path found in this sweep. Verified
+       * exploitable: an anonymous POST created a checklist item with status
+       * PASS attributed to usr_insp_001 as "Voice Inspector", and logged
+       * CHECKLIST_ITEM_INSPECTED against that real inspector's id and role.
+       *
+       * Spoken input is the least deliberate way to record a verdict, which
+       * makes it the last place that should have accepted an unnamed one.
+       */
+      const anonymous = await mockFetch(expressApp, 'POST', '/api/checklist/voice-action', {
+        wagonNumber: 'PEN/BOXNHL/77014',
+        partName: 'Brake Beam',
+        action: 'PASS',
+        status: 'PASS',
+        transcript: 'brake beam passes'
+      });
+      assert.strictEqual(anonymous.status, 401, 'an unauthenticated voice verdict must be refused');
+    });
+
     it('PEN-02F: the offline sync endpoint requires authentication', async () => {
       /*
        * This was open. Verified exploitable before the fix, twice over:

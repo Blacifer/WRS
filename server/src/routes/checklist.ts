@@ -96,7 +96,20 @@ checklistRouter.post('/config', authMiddleware, requireRole('SUPERVISOR'), async
 // 3. Record Voice-Dictated Inspection Action (Milestone 3 Hands-Free UI)
 // -------------------------------------------------------------------------
 
-checklistRouter.post('/voice-action', optionalAuthMiddleware, async (req: Request, res: Response) => {
+/*
+ * Authentication required. A voice action writes a PASS or CONDEMNED verdict
+ * against a component and an entry into the audit chain.
+ *
+ * Verified exploitable before this change: an unauthenticated POST created a
+ * checklist item with status PASS attributed to usr_insp_001 as "Voice
+ * Inspector", and logged CHECKLIST_ITEM_INSPECTED against that real
+ * inspector's id and role. The audit chain then protected the fabrication
+ * faithfully.
+ *
+ * Spoken input is the least deliberate way to record a verdict, which makes
+ * it the last place that should have accepted an unnamed one.
+ */
+checklistRouter.post('/voice-action', authMiddleware, async (req: Request, res: Response) => {
   const repo = getRepo();
   const {
     wagonNumber,
@@ -164,9 +177,14 @@ checklistRouter.post('/voice-action', optionalAuthMiddleware, async (req: Reques
   }
 
   const normalizedWagonNumber = wagonNumber.trim().toUpperCase();
-  const inspectorId = req.user?.id || 'usr_insp_001';
-  const inspectorName = req.user?.name || 'Voice Inspector';
-  const userRole = req.user?.role || 'INSPECTOR';
+  // From the token only. There is no such person as "Voice Inspector", and a
+  // verdict recorded against a name nobody holds is unattributable.
+  const inspectorId = (req as AuthenticatedRequest).user!.id;
+  const inspectorName =
+    (req as AuthenticatedRequest).user?.name ||
+    (req as AuthenticatedRequest).user?.username ||
+    'Inspector';
+  const userRole = (req as AuthenticatedRequest).user?.role || 'INSPECTOR';
 
   try {
     // 2. Locate or resolve checklist item

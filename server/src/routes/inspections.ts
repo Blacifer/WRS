@@ -8,7 +8,7 @@ import type { Request, Response, NextFunction } from '../framework/index.ts';
 import { getDatabase } from '../db/connection.ts';
 import { InspectionRepository } from '../db/repository.ts';
 import { classifySpring } from '../../../shared/classification/engine.ts';
-import { optionalAuthMiddleware } from '../middleware/auth.ts';
+import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { otpService } from '../auth/otpService.ts';
 import type {
@@ -22,7 +22,21 @@ export const inspectionsRouter = Router();
 /**
  * POST /api/inspections (Append-Only Logging)
  */
-inspectionsRouter.post('/', optionalAuthMiddleware, (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+/*
+ * Authentication required, and the inspector taken from the token alone.
+ *
+ * This route used optionalAuthMiddleware with
+ *   inspectorId = req.user?.id || body.inspectorId || 'usr_insp_001'
+ * and the supervisor override path had the same shape ending in
+ * 'usr_sup_001'. Verified against a running server: an unauthenticated POST
+ * created a spring inspection attributed to Ramesh Kumar — a real, active
+ * inspector — and it entered the audit chain as if he had made it.
+ *
+ * A false record about a named person, hash-chained so it looks authentic for
+ * ever, is the worst output this system can produce. The chain faithfully
+ * protects whatever it is given.
+ */
+inspectionsRouter.post('/', authMiddleware, (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   try {
     const body = req.body as any;
 
@@ -88,12 +102,14 @@ inspectionsRouter.post('/', optionalAuthMiddleware, (req: AuthenticatedRequest, 
         return;
       }
 
-      supervisorId = req.user?.id || body.supervisorId || 'usr_sup_001';
-      supervisorName = req.user?.name || body.supervisorName || 'Supervisor';
+      // Never body.supervisorId: an override is attributed to whoever was
+      // authenticated, or it is not an override.
+      supervisorId = req.user!.id;
+      supervisorName = req.user?.name || req.user?.username || 'Supervisor';
     }
 
-    const inspectorId = req.user?.id || body.inspectorId || 'usr_insp_001';
-    const inspectorName = req.user?.name || body.inspectorName || 'Ramesh Kumar';
+    const inspectorId = req.user!.id;
+    const inspectorName = req.user?.name || req.user?.username || 'Inspector';
 
     const db = getDatabase();
     const repo = new InspectionRepository(db);
@@ -200,8 +216,10 @@ const handleBatchSync = (req: AuthenticatedRequest, res: Response, next: NextFun
   }
 };
 
-inspectionsRouter.post('/sync-batch', optionalAuthMiddleware, handleBatchSync);
-inspectionsRouter.post('/batch', optionalAuthMiddleware, handleBatchSync);
+// Offline sync writes real inspections; it gets the same treatment as the
+// live route rather than a weaker one because it arrives late.
+inspectionsRouter.post('/sync-batch', authMiddleware, handleBatchSync);
+inspectionsRouter.post('/batch', authMiddleware, handleBatchSync);
 
 /**
  * GET /api/inspections/stats (Analytics & Throughput)
