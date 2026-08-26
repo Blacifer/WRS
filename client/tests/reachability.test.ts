@@ -166,3 +166,39 @@ describe('Every screen is reachable from navigation', () => {
     expect(blocked.length).toBeLessThanOrEqual(tabs.length);
   });
 });
+
+describe('The navigation row stays physically reachable', () => {
+  /*
+   * Adding one nav item pushed "Wagons Pipeline" to x = -121 on a 1400px
+   * viewport: off the left edge, unclickable, and with nothing on screen to
+   * suggest the row could scroll.
+   *
+   * The row was a centred `overflow-x-auto` with the scrollbar hidden by
+   * `no-scrollbar`. Once the items stop fitting, centred overflow spills off
+   * BOTH ends, and the left end is not reliably scrollable back into view.
+   * The failure is silent and depends on viewport width, so it does not show
+   * up until someone opens the app on a narrower screen — a shop tablet, or a
+   * projector at a demo.
+   *
+   * This cannot be hit-tested here: happy-dom has no layout engine, so every
+   * element reports a zero-sized box and nothing is ever off-screen. What is
+   * checkable is the mechanism, so this pins that the row wraps instead of
+   * relying on hidden horizontal scroll. It is a proxy, and it would have
+   * caught the actual regression.
+   */
+  const header = readFileSync(join(SRC, 'components/Header.tsx'), 'utf-8');
+  const navRow = header.slice(header.indexOf('<nav'), header.indexOf('<nav') + 900);
+
+  it('wraps rather than scrolling horizontally', () => {
+    expect(navRow, 'the nav row must wrap so every item stays on screen').toContain('flex-wrap');
+  });
+
+  it('does not hide a horizontal scrollbar on the nav row', () => {
+    const hiddenScroll = navRow.includes('overflow-x-auto') && navRow.includes('no-scrollbar');
+    expect(
+      hiddenScroll,
+      'a hidden horizontal scrollbar gives no affordance that items are off-screen, ' +
+        'and is the wrong interaction for a gloved hand on a tablet'
+    ).toBe(false);
+  });
+});

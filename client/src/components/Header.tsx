@@ -149,7 +149,15 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Navigation Tabs Bar (Touch Targets >= 48px) */}
       <nav className="bg-transparent px-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-start sm:justify-center overflow-x-auto no-scrollbar gap-3 sm:gap-6 py-2">
+        {/* Wraps rather than scrolling horizontally. This row used to be a
+            centred overflow-x-auto with the scrollbar hidden, which meant that
+            once the items no longer fitted, the ends spilled off BOTH sides with
+            nothing on screen suggesting it could scroll — and centred overflow is
+            not reliably scrollable back to the left in any case. Adding one more
+            nav item was enough to push "Wagons Pipeline" off the left edge at
+            1400px, and a shop tablet is narrower than that. Hidden horizontal
+            scroll is also the wrong affordance for a gloved hand. */}
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-start sm:justify-center gap-x-3 sm:gap-x-6 gap-y-1 py-2">
           {/* 1. INSPECTOR ROLE: Ultra-Simple Shop-Floor Essentials ONLY */}
           {isInspector ? (
             <>
