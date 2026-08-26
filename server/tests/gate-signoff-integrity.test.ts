@@ -231,12 +231,26 @@ describe('Release Sign-off Integrity', () => {
       summary: JSON.parse(row.checks_summary_json)
     });
 
-    const expectedSig =
-      'HMAC-SHA256:' + crypto.createHmac('sha256', config.jwtSecret).update(canonical).digest('hex');
+    const { verifyCertificate, certificatePublicKeyPem } = await import('../src/reports/certificateSigning.ts');
     const expectedHash = crypto.createHash('sha256').update(canonical).digest('hex');
 
-    assert.equal(row.digital_signature, expectedSig, 'signature must verify over the canonical contents');
+    /*
+     * Verified with the PUBLIC key only, which is the point of the scheme.
+     * The previous version of this test recomputed an HMAC from the server
+     * secret — which proved the signature was genuine, but also demonstrated
+     * that anyone able to check a certificate could equally well produce one.
+     */
+    assert.ok(
+      verifyCertificate(canonical, row.digital_signature, certificatePublicKeyPem()),
+      'the signature must verify over the canonical contents using only the public key'
+    );
     assert.equal(row.certificate_hash, expectedHash, 'certificate hash must be re-derivable from stored fields');
+
+    // Altered content must fail, or the signature is decorative.
+    assert.ok(
+      !verifyCertificate(canonical + ' ', row.digital_signature, certificatePublicKeyPem()),
+      'a single altered byte must fail verification'
+    );
   });
 
   test('TC-SGN-07: altering a released certificate breaks its signature', async () => {
@@ -262,7 +276,7 @@ describe('Release Sign-off Integrity', () => {
     assert.notEqual(tamperedSig, row.digital_signature, 'a changed certificate must not keep its signature');
   });
 
-  test('TC-SGN-08: the signature is keyed, so it cannot be forged without the server secret', async () => {
+  test('TC-SGN-08: the certificate can be verified by someone who cannot issue one', async () => {
     const row = getDatabase().prepare(`
       SELECT wagon_number, certificate_number, supervisor_id, supervisor_employee_id,
              signed_at, checks_summary_json, digital_signature
@@ -278,11 +292,44 @@ describe('Release Sign-off Integrity', () => {
       summary: JSON.parse(row.checks_summary_json)
     });
 
-    const wrongKey =
-      'HMAC-SHA256:' + crypto.createHmac('sha256', 'not-the-server-secret').update(canonical).digest('hex');
+    const { verifyCertificate, certificatePublicKeyPem } = await import('../src/reports/certificateSigning.ts');
 
-    assert.notEqual(wrongKey, row.digital_signature, 'the same contents under another key must not match');
-    assert.match(row.digital_signature, /^HMAC-SHA256:[0-9a-f]{64}$/);
+    /*
+     * The property that matters for this document.
+     *
+     * A release certificate is checked by the people who must not be able to
+     * issue one: a reviewer, an auditor, a railway receiving the wagon. Under
+     * the previous HMAC scheme those two abilities were the same key, so in
+     * practice nobody outside this server could verify anything.
+     *
+     * This asserts both halves. A holder of only the public key can confirm a
+     * genuine certificate, and cannot produce a signature that passes.
+     */
+    const publicKey = certificatePublicKeyPem();
+    assert.match(row.digital_signature, /^Ed25519:/);
+
+    assert.ok(
+      verifyCertificate(canonical, row.digital_signature, publicKey),
+      'a holder of the public key alone must be able to verify a genuine certificate'
+    );
+
+    // Forgery attempt: sign the same content with a different key entirely.
+    const attacker = crypto.generateKeyPairSync('ed25519');
+    const forged =
+      'Ed25519:' +
+      crypto.sign(null, Buffer.from(canonical, 'utf8'), attacker.privateKey).toString('base64');
+
+    assert.ok(
+      !verifyCertificate(canonical, forged, publicKey),
+      'a signature from any other key must not verify'
+    );
+
+    // And an HMAC-labelled signature from the old scheme must read as
+    // unverifiable rather than being waved through.
+    assert.ok(
+      !verifyCertificate(canonical, 'HMAC-SHA256:' + 'a'.repeat(64), publicKey),
+      'a legacy HMAC signature must not verify under the new scheme'
+    );
   });
 
   test('TC-SGN-09: two certificates do not share a signature', async () => {
@@ -435,9 +482,9 @@ describe('Release Sign-off Integrity', () => {
       summary: JSON.parse(row.checks_summary_json)
     });
 
-    assert.equal(
-      row.digital_signature,
-      'HMAC-SHA256:' + crypto.createHmac('sha256', config.jwtSecret).update(canonical).digest('hex'),
+    const { verifyCertificate, certificatePublicKeyPem } = await import('../src/reports/certificateSigning.ts');
+    assert.ok(
+      verifyCertificate(canonical, row.digital_signature, certificatePublicKeyPem()),
       'everything the signature covers must be recoverable from the stored record'
     );
   });

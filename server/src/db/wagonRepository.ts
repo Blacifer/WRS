@@ -7,6 +7,7 @@ import { DatabaseSync } from 'node:sqlite';
 import crypto from 'node:crypto';
 import { logAuditEvent } from './auditLog.ts';
 import { config } from '../config/index.ts';
+import { signCertificate } from '../reports/certificateSigning.ts';
 import { CASNUB_CHECKLIST_TEMPLATE } from './checklistTemplate.ts';
 import { validateSpringNests } from '../../../shared/classification/nestGrouping.ts';
 import { getSpringCountOptions, buildSpringQueue } from '../../../shared/classification/springCounts.ts';
@@ -1496,17 +1497,27 @@ export class WagonRepository {
     });
     const certificateHash = crypto.createHash('sha256').update(canonicalSummary).digest('hex');
 
-    // A real signature over the certificate's contents.
-    //
-    // What was stored before was `HMAC-` followed by 16 random bytes — a label
-    // claiming to be a MAC over a document it had never seen. It could not be
-    // checked, and would verify nothing if anyone tried. This is a keyed
-    // HMAC-SHA256 over the same canonical content the hash covers, so an
-    // altered certificate fails verification and only this server can produce
-    // a valid one.
-    const digitalSignature =
-      'HMAC-SHA256:' +
-      crypto.createHmac('sha256', config.jwtSecret).update(canonicalSummary).digest('hex');
+    /*
+     * An Ed25519 signature over the certificate's contents.
+     *
+     * Two earlier versions of this line are worth remembering. The first
+     * stored `HMAC-` followed by 16 random bytes — a label claiming to be a
+     * MAC over a document it had never seen. The second was a genuine keyed
+     * HMAC-SHA256, which detected alteration but could only be verified by
+     * whoever held the signing key.
+     *
+     * That second property is the problem for this particular document. The
+     * people who will want to check a release certificate — a CRIS reviewer,
+     * an auditor, a railway receiving the wagon — are precisely the people who
+     * must not be able to issue one. A shared key cannot give them the first
+     * without the second, so nobody outside this server could ever really
+     * check anything.
+     *
+     * Ed25519 separates signing from verifying. The public key is printed on
+     * the certificate by fingerprint and served from /api/audit/certificate-key,
+     * so verification is something a third party does for themselves.
+     */
+    const digitalSignature = signCertificate(canonicalSummary);
 
     // The signing supervisor must already exist and be active.
     //

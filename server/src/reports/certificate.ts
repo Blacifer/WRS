@@ -12,6 +12,7 @@ import { InspectionRepository } from '../db/repository.ts';
 import { ComponentRepository } from '../db/componentRepository.ts';
 import { getDatabase } from '../db/connection.ts';
 import qrcode from 'qrcode-generator';
+import { SIGNATURE_ALGORITHM, certificateKeyFingerprint } from './certificateSigning.ts';
 
 /**
  * Renders the certificate's verification payload as a real, scannable QR code.
@@ -226,6 +227,40 @@ export class CertificateGenerator {
         digitalSignature,
         signedAt
       },
+
+      /*
+       * Everything needed to check the signature without this server.
+       *
+       * signedContent is the exact byte sequence that was signed. Without it a
+       * verifier would have to reconstruct the canonical JSON — same fields,
+       * same order, same formatting — by reading the source, and would get a
+       * verification failure indistinguishable from tampering if they got any
+       * of it subtly wrong. Publishing the signed bytes turns third-party
+       * verification into three lines of Ed25519 rather than an exercise in
+       * guessing a serialisation.
+       *
+       * The fields inside signedContent are also visible on the certificate
+       * itself, so a reader can confirm the signed content says the same thing
+       * the printed document does.
+       */
+      verification: isSigned
+        ? {
+            algorithm: SIGNATURE_ALGORITHM,
+            signature: digitalSignature,
+            signedContent: signoff
+              ? JSON.stringify({
+                  wagonNumber: normalizedWagonNumber,
+                  certificateNumber: signoff.certificateNumber,
+                  supervisorId: signoff.supervisorId,
+                  supervisorEmployeeId: signoff.supervisorEmployeeId,
+                  signedAt: signoff.signedAt,
+                  summary: signoff.checksSummary
+                })
+              : null,
+            publicKeyFingerprint: certificateKeyFingerprint(),
+            publicKeyUrl: '/api/audit/certificate-key'
+          }
+        : null,
       qrData
     };
 
@@ -577,8 +612,14 @@ export class CertificateGenerator {
         <div style="font-weight: 800; color: #1e3a8a; margin-bottom: 4px;">SUPERVISOR DIGITAL SIGN-OFF & CERTIFICATION</div>
         <div><strong>Certifying Supervisor:</strong> ${supervisorName} (${supervisorEmpId})</div>
         <div><strong>Certification Timestamp:</strong> ${signedAt}</div>
-        <div><strong>Verification Algorithm:</strong> HMAC-SHA256 Multi-Factor Digital Signature</div>
-        <div class="sig-hash"><strong>Signature Digest:</strong> ${digitalSignature}</div>
+        <div><strong>Verification Algorithm:</strong> ${SIGNATURE_ALGORITHM} public-key signature</div>
+        <div class="sig-hash"><strong>Signature:</strong> ${digitalSignature}</div>
+        <!-- The fingerprint lets whoever holds this on paper confirm which key
+             to check it against, without transcribing the whole key. The key
+             itself is published and needs no account to fetch, because a
+             signature only the issuer can verify is not much of a signature. -->
+        <div class="sig-hash"><strong>Signing key:</strong> ${certificateKeyFingerprint()}
+          &nbsp;·&nbsp; verify at /api/audit/certificate-key</div>
         <div class="sig-hash"><strong>Certificate SHA-256:</strong> ${certHash}</div>
       </div>
       <div class="qr-box">

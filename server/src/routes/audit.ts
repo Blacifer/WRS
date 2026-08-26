@@ -13,6 +13,11 @@ import { Router } from '../framework/index.ts';
 import type { Response } from '../framework/index.ts';
 import { getDatabase } from '../db/connection.ts';
 import { verifyAuditChain } from '../db/auditLog.ts';
+import {
+  certificatePublicKeyPem,
+  certificateKeyFingerprint,
+  SIGNATURE_ALGORITHM
+} from '../reports/certificateSigning.ts';
 import { authMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { requireRole } from '../middleware/rbac.ts';
@@ -59,3 +64,42 @@ auditRouter.get(
     }
   }
 );
+
+// ---------------------------------------------------------------------------
+// GET /api/audit/certificate-key
+//
+// The public half of the certificate signing key.
+//
+// Deliberately unauthenticated. A signature nobody outside this server can
+// check is not much of a signature, and the whole reason for signing release
+// certificates with an asymmetric scheme is so that a reviewer, an auditor or
+// a railway receiving a wagon can verify one without being given the ability
+// to issue one. Requiring a login to fetch a public key would put the gate
+// back exactly where it does no good.
+//
+// Publishing this key allows verification and nothing else. It cannot sign.
+// ---------------------------------------------------------------------------
+auditRouter.get('/certificate-key', (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    res.status(200).json({
+      success: true,
+      data: {
+        algorithm: SIGNATURE_ALGORITHM,
+        publicKeyPem: certificatePublicKeyPem(),
+        fingerprint: certificateKeyFingerprint(),
+        howToVerify:
+          'Signatures are over the certificate\'s canonical summary JSON, base64-encoded ' +
+          'after the algorithm prefix. Verify with any Ed25519 implementation using the key above.'
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: 'CERT_KEY_UNAVAILABLE',
+      message: error?.message || 'The certificate signing key could not be read',
+      statusCode: 500,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
