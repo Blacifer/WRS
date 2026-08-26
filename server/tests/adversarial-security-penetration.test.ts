@@ -295,6 +295,101 @@ describe('M5 Adversarial Security & Penetration Testing Suite', () => {
       });
       assert.strictEqual(exportRes.status, 403, 'Supervisor attempting regulatory export must receive 403 Forbidden');
     });
+
+    it('PEN-02E: a fabricated "test_" token cannot authorise a supervisor override', async () => {
+      /*
+       * The override path used to accept any token beginning with "test_":
+       *
+       *   if (!consumed && !tokenToVerify.startsWith('test_'))
+       *
+       * It was not gated on NODE_ENV, so it was live in production. Verified
+       * exploitable against a running server before removal: a backward stage
+       * transition carrying otpToken "test_fabricated_no_otp_was_issued"
+       * succeeded, while the identical request without the prefix was refused.
+       *
+       * The OTP on an override exists so that rewriting a wagon's lifecycle is
+       * deliberate and confirmed by a second factor. Worse than the bypass
+       * itself, the fabricated string was then written to the audit log as the
+       * OTP reference, so the override would read as properly authorised for
+       * ever afterwards.
+       *
+       * This runs against expressApp — the real createApp instance the server
+       * boots — rather than the TestApp harness. That matters: an earlier
+       * version of this test used the harness, where a deeper guard rejects
+       * the token before the route-level check is reached, and it therefore
+       * passed happily with the bypass reintroduced. A regression test that
+       * cannot see the regression is worse than none, because it reports
+       * safety it never checked.
+       */
+      const auth = { Authorization: `Bearer ${supervisorToken}` };
+      const wagonNumber = 'PEN/BOXNHL/77012';
+
+      await mockFetch(expressApp, 'POST', '/api/wagons/register',
+        { wagonNumber, wagonType: 'BOXNHL', owningRailway: 'SECR' }, auth);
+      const enc = encodeURIComponent(wagonNumber);
+
+      // Move it forward legitimately so there is somewhere to move back from.
+      await mockFetch(expressApp, 'POST', `/api/wagons/${enc}/transition`,
+        { targetStage: 'DISMANTLING', notes: 'normal progression' }, auth);
+
+      const justification = 'Rework required on bogie frame after inspection';
+
+      const forged = await mockFetch(expressApp, 'POST', `/api/wagons/${enc}/transition`, {
+        targetStage: 'ENTRY_REGISTRATION',
+        supervisorOverride: true,
+        overrideJustification: justification,
+        otpToken: 'test_fabricated_no_otp_was_issued'
+      }, auth);
+
+      assert.ok(
+        forged.status >= 400,
+        `a fabricated test_ token must not authorise an override (got ${forged.status})`
+      );
+
+      /*
+       * Assert the reason, not merely the status: a 401 is equally correct for
+       * "you are not logged in", and an earlier draft of this test sent the
+       * wrong header case and passed on exactly that, proving nothing.
+       */
+      const reason = JSON.stringify(forged.body ?? {});
+      assert.ok(
+        !/Authentication required/i.test(reason),
+        'the request must actually have been authenticated, or this proves nothing'
+      );
+
+      // The assertion that matters most: the wagon did not move.
+      const after = await mockFetch(expressApp, 'GET', `/api/wagons/${enc}`, undefined, auth);
+      const stageAfter =
+        (after.body as any)?.wagon?.currentStage ?? (after.body as any)?.data?.currentStage;
+      assert.strictEqual(
+        stageAfter,
+        'DISMANTLING',
+        'the forged override must not have moved the wagon'
+      );
+
+      // And a genuine token must still work, or this would be a fix that
+      // simply broke the feature.
+      const otpReq = await mockFetch(expressApp, 'POST', '/api/auth/request-otp',
+        { action: 'OVERRIDE' }, auth);
+      const otpId = (otpReq.body as any).otpId;
+      const code = (otpReq.body as any).devOtpCode ?? (otpReq.body as any).codeForTest;
+      const verify = await mockFetch(expressApp, 'POST', '/api/auth/verify-otp',
+        { otpId, otpCode: code }, auth);
+      const realToken = (verify.body as any).otpToken;
+      assert.ok(realToken, 'the test must obtain a genuine action token');
+
+      const allowed = await mockFetch(expressApp, 'POST', `/api/wagons/${enc}/transition`, {
+        targetStage: 'ENTRY_REGISTRATION',
+        supervisorOverride: true,
+        overrideJustification: justification,
+        otpToken: realToken
+      }, auth);
+      assert.strictEqual(
+        allowed.status,
+        200,
+        'a genuine action token must still authorise the override'
+      );
+    });
   });
 
   // =========================================================================

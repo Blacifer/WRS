@@ -501,8 +501,31 @@ wagonsRouter.post('/:wagonNumber/transition', authMiddleware, async (req: Reques
   let otpRef: string | null = null;
   if (validation.transitionType === 'OVERRIDE_SKIP' || validation.transitionType === 'OVERRIDE_BACKWARD' || validation.transitionType === 'REOPEN') {
     if (tokenToVerify) {
+      /*
+       * No test escape hatch here.
+       *
+       * This used to read `if (!consumed && !tokenToVerify.startsWith('test_'))`,
+       * which meant any string beginning with those five characters was
+       * accepted as a valid supervisor override token. It was not gated on
+       * NODE_ENV, so it was live in production.
+       *
+       * Verified exploitable before removal: a backward stage transition with
+       * otpToken "test_fabricated_no_otp_was_issued" succeeded, while the
+       * identical request without the prefix was correctly refused. The OTP
+       * requirement on overrides exists so that rewriting a wagon's lifecycle
+       * is deliberate and confirmed by a second factor; a prefix anyone can
+       * type defeats that entirely.
+       *
+       * The worst part was downstream: otpRef was then written to the audit
+       * log, so the record showed an OTP reference for a code that had never
+       * been issued. The override would read as properly authorised forever
+       * afterwards.
+       *
+       * Tests that need to exercise this path mint a real action token, which
+       * is what the rest of the suite already does.
+       */
       const consumed = otpService.consumeActionToken(tokenToVerify, 'OVERRIDE');
-      if (!consumed && !tokenToVerify.startsWith('test_')) {
+      if (!consumed) {
         res.status(401).json({
           success: false,
           error: 'INVALID_OTP_TOKEN',
