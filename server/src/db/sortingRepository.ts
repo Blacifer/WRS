@@ -237,12 +237,33 @@ export class SortingRepository {
       );
   }
 
-  /** Throughput for a day — the figure the DRM quoted as 900. */
-  public dailyThroughput(date: string): { date: string; total: number; passed: number; condemned: number } {
+  /**
+   * Throughput for a day — the figure the DRM quoted as 900.
+   *
+   * Returns the first and last record times as well as the counts, so a rate
+   * can be worked out from the span actually spent sorting rather than from
+   * the clock since midnight. Someone who sorts for two hours after lunch has
+   * not been working at a quarter of their real speed, and a figure that said
+   * so would be worse than showing none.
+   *
+   * The caller decides whether the span is long enough to quote a rate from.
+   * It is given the raw ends rather than a computed rate precisely so that
+   * judgement is made where the display rules live.
+   */
+  public dailyThroughput(date: string): {
+    date: string;
+    total: number;
+    passed: number;
+    condemned: number;
+    firstAt: string | null;
+    lastAt: string | null;
+  } {
     const row = this.db.prepare(`
       SELECT COUNT(*) AS total,
              SUM(CASE WHEN status = 'PASS' THEN 1 ELSE 0 END) AS passed,
-             SUM(CASE WHEN status = 'CONDEMNED' THEN 1 ELSE 0 END) AS condemned
+             SUM(CASE WHEN status = 'CONDEMNED' THEN 1 ELSE 0 END) AS condemned,
+             MIN(created_at) AS firstAt,
+             MAX(created_at) AS lastAt
       FROM spring_sorting_records
       WHERE substr(created_at, 1, 10) = ?
     `).get(date) as any;
@@ -251,7 +272,9 @@ export class SortingRepository {
       date,
       total: row?.total || 0,
       passed: row?.passed || 0,
-      condemned: row?.condemned || 0
+      condemned: row?.condemned || 0,
+      firstAt: row?.firstAt || null,
+      lastAt: row?.lastAt || null
     };
   }
 }

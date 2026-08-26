@@ -862,7 +862,7 @@ export class ApiClient {
     return this.request(`/sorting/stock?${params.toString()}`);
   }
 
-  public async getSortingThroughput(date?: string): Promise<{ success: boolean; data: { date: string; total: number; passed: number; condemned: number } }> {
+  public async getSortingThroughput(date?: string): Promise<{ success: boolean; data: { date: string; total: number; passed: number; condemned: number; firstAt: string | null; lastAt: string | null } }> {
     const params = date ? `?date=${encodeURIComponent(date)}` : '';
     return this.request(`/sorting/throughput${params}`);
   }

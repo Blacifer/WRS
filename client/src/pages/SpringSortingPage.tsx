@@ -26,6 +26,7 @@ import { getBandOptions } from '../../../shared/classification/bandEntry.ts';
 import { listWagonDesignations, getWagonSpringConfig } from '../../../shared/classification/wagonTypes.ts';
 import type { BogieType, SpringCondition, SpringPosition } from '../../../shared/types.ts';
 import { playPassChime, playCondemnedBuzz } from '../utils/audioFeedback.ts';
+import { readThroughput, DAILY_PILE } from '../../../shared/sorting/throughput.ts';
 
 const BAND_HEX: Record<string, string> = {
   BLUE: '#2563eb',
@@ -70,7 +71,9 @@ export function SpringSortingPage({ lang, onClose }: Props) {
   const [totals, setTotals] = useState({ total: 0, passed: 0, condemned: 0 });
   // Today's total across every session, which is the figure the DRM quoted as
   // ~900 and the one worth watching against it.
-  const [today, setToday] = useState<{ total: number; passed: number; condemned: number } | null>(null);
+  const [today, setToday] = useState<
+    { total: number; passed: number; condemned: number; firstAt: string | null; lastAt: string | null } | null
+  >(null);
   const [lastRecorded, setLastRecorded] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -245,6 +248,58 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           )}
         </div>
       </div>
+
+      {/* Pace.
+          The shop gets through around 900 springs a day and has never had a
+          way to see how that is going while it happens. This is the one
+          number the DRM asked about, so it is worth showing — and worth
+          refusing to show when there is not yet enough to support it. The
+          rules for that live in shared/sorting/throughput.ts, tested, rather
+          than in this component. */}
+      {today && (() => {
+        const pace = readThroughput(today);
+        return (
+          <div className="rounded-2xl border border-slate-700 bg-slate-900 px-5 py-4">
+            {pace.canQuoteRate ? (
+              <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2">
+                <div>
+                  <span className="text-3xl font-extrabold text-white tabular-nums">
+                    {pace.springsPerHour!.toLocaleString()}
+                  </span>
+                  <span className="text-sm text-slate-400 ml-2">
+                    {isHi ? 'स्प्रिंग / घंटा' : 'springs per hour'}
+                  </span>
+                </div>
+
+                {pace.hoursForDailyPile !== undefined && (
+                  <div className="text-sm text-slate-300">
+                    {isHi
+                      ? `इस रफ़्तार से ${DAILY_PILE.toLocaleString()} स्प्रिंग में `
+                      : `At this rate, ${DAILY_PILE.toLocaleString()} springs takes `}
+                    <b className="text-white tabular-nums">{pace.hoursForDailyPile}</b>
+                    {isHi ? ' घंटे' : ' hours'}
+                  </div>
+                )}
+
+                <div className="text-xs text-slate-500">
+                  {isHi
+                    ? `${pace.activeMinutes} मिनट में ${today.total.toLocaleString()} स्प्रिंग`
+                    : `measured over ${pace.activeMinutes} min of sorting, ${today.total.toLocaleString()} springs`}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-baseline gap-3">
+                <span className="text-sm text-slate-400">{pace.reason}</span>
+                {pace.activeMinutes > 0 && (
+                  <span className="text-xs text-slate-500">
+                    {isHi ? `${pace.activeMinutes} मिनट से` : `${pace.activeMinutes} min so far`}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* The work itself: one tap per spring */}
       <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-3">
