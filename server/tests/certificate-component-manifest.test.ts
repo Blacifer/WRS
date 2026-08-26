@@ -119,6 +119,77 @@ describe('Phase 3 M1: Release Certificate Serialized Component Manifest (R4)', (
   // -------------------------------------------------------------------------
   // 2. HTML Release Certificate with Section 3 Manifest
   // -------------------------------------------------------------------------
+
+  it('TC-CERT-QR-01: the certificate carries a real QR code, not a placeholder', () => {
+    /*
+     * The certificate used to build a full verification payload — issuer,
+     * certificate number, wagon, timestamp, hash prefix — and then discard it
+     * to render a styled box reading "QR VERIFIED / Scan for Authenticity".
+     *
+     * That is a false claim printed on the one document that says a named
+     * supervisor released a particular wagon. Anyone who tried to scan it
+     * would find nothing there, and would reasonably conclude the whole
+     * certificate was decorative.
+     *
+     * The QR now genuinely encodes the payload and has been verified to
+     * decode from a rendered image. This pins the two things checkable
+     * without a camera: something was drawn, and the old lie is gone.
+     */
+    const cert = CertificateGenerator.generate(
+      testWagon,
+      wagonRepo,
+      inspectionRepo,
+      componentRepo,
+      'html'
+    );
+    const html = cert.html as string;
+
+    assert.ok(
+      html.includes('<svg'),
+      'the certificate must contain a drawn QR code'
+    );
+    assert.ok(
+      !html.includes('QR VERIFIED'),
+      'the placeholder text must not come back'
+    );
+    assert.ok(
+      !html.includes('qr-code-placeholder'),
+      'the placeholder element must not come back'
+    );
+
+    // The generator emits one <path> whose subpaths are the dark modules, so
+    // the move commands count them. A QR of this payload runs to hundreds; a
+    // couple would mean something drew a box rather than a code.
+    const modules = (html.match(/M\d/g) || []).length;
+    assert.ok(
+      modules > 100,
+      `expected a QR made of many modules, counted ${modules}`
+    );
+  });
+
+  it('TC-CERT-QR-02: the QR payload identifies the certificate it is printed on', () => {
+    // A QR that scans but names the wrong wagon is worse than none: it would
+    // authenticate one vehicle's release against another's paperwork.
+    const cert = CertificateGenerator.generate(
+      testWagon,
+      wagonRepo,
+      inspectionRepo,
+      componentRepo,
+      'json'
+    ) as any;
+
+    const payload = cert.json?.qrData;
+    assert.ok(payload, 'the certificate must expose its QR payload');
+    assert.ok(payload.includes('INDIAN_RAILWAYS'), 'payload must name the issuer');
+    // generate() takes the wagon number as a string, and normalises it with
+    // trim().toUpperCase() before use, so compare against the same form the
+    // certificate itself was built from.
+    assert.ok(
+      payload.includes(testWagon.trim().toUpperCase()),
+      'payload must name the wagon the certificate is for'
+    );
+  });
+
   it('TC-CERT-MANIFEST-02: CertificateGenerator renders Section 3 Manifest table in printable HTML', () => {
     const cert = CertificateGenerator.generate(
       testWagon,

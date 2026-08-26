@@ -11,6 +11,32 @@ import { WagonRepository } from '../db/wagonRepository.ts';
 import { InspectionRepository } from '../db/repository.ts';
 import { ComponentRepository } from '../db/componentRepository.ts';
 import { getDatabase } from '../db/connection.ts';
+import qrcode from 'qrcode-generator';
+
+/**
+ * Renders the certificate's verification payload as a real, scannable QR code.
+ *
+ * This block used to be a styled box reading "QR VERIFIED / Scan for
+ * Authenticity" while the payload built a few lines above was discarded. A
+ * certificate is the document that says a named supervisor released a
+ * particular wagon; printing an unscannable box captioned "scan for
+ * authenticity" on it is a false claim on exactly the record that most needs
+ * to be true.
+ *
+ * Error correction is 'H' (~30% recoverable) rather than the usual 'M'. These
+ * are printed, handled in a workshop, and stuck to paperwork, so a smudge or
+ * a staple through one corner should not cost the read.
+ *
+ * Rendered as inline SVG rather than a raster: it stays sharp at any print
+ * size and keeps the document self-contained, with no external request from
+ * a page that may be opened on a machine with no network.
+ */
+function renderQrSvg(payload: string): string {
+  const qr = qrcode(0, 'H');
+  qr.addData(payload);
+  qr.make();
+  return qr.createSvgTag({ cellSize: 3, margin: 1, scalable: true });
+}
 
 export class CertificateGenerator {
   public static generate(
@@ -383,18 +409,18 @@ export class CertificateGenerator {
       border-left: 1px solid #e2e8f0;
       padding-left: 12px;
     }
-    .qr-code-placeholder {
-      width: 80px;
-      height: 80px;
-      background: #0f172a;
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 9px;
-      text-align: center;
-      padding: 4px;
-      border-radius: 4px;
+    .qr-code {
+      width: 88px;
+      height: 88px;
+    }
+    .qr-code svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      /* Print drivers routinely drop background graphics; without this the
+         modules vanish and the certificate carries a blank square. */
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     .footer {
       text-align: center;
@@ -549,10 +575,8 @@ export class CertificateGenerator {
         <div class="sig-hash"><strong>Certificate SHA-256:</strong> ${certHash}</div>
       </div>
       <div class="qr-box">
-        <div class="qr-code-placeholder">
-          QR VERIFIED<br>RDSO SECR<br>WRS RAIPUR
-        </div>
-        <div style="font-size: 8.5px; color: #64748b; margin-top: 4px;">Scan for Authenticity</div>
+        <div class="qr-code">${renderQrSvg(qrData)}</div>
+        <div style="font-size: 8.5px; color: #64748b; margin-top: 4px;">Scan to verify</div>
       </div>
     </div>
 
