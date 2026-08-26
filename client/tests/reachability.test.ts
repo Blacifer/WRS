@@ -63,7 +63,10 @@ const REDUNDANT: Record<string, string> = {
   scanComponentQR: 'the scanner uses getComponentByQR against the GET endpoint',
   getPartByCode: 'the inventory screen filters through getInventory',
   classify: 'classification is performed locally so it works offline',
-  getMe: 'session is restored from local storage on load'
+  getMe: 'session is restored from local storage on load',
+  getComponentHistory:
+    'the passport already shows a component history — it arrives with getComponentBySerial, ' +
+    'so this is a redundant sibling rather than a missing screen'
 };
 
 /**
@@ -74,10 +77,15 @@ const REDUNDANT: Record<string, string> = {
  * five features that shipped unreachable because nobody was counting.
  */
 const NO_INTERFACE_YET: Record<string, string> = {
-  upsertChecklistItem: 'adding a wagon-specific checklist item has no screen yet',
-  reservePart: 'reserving stores against a wagon has no screen yet',
-  getAcousticHistory: 'past acoustic diagnostics are recorded but never displayed',
-  getComponentHistory: 'a component passport does not yet show its own event history'
+  upsertChecklistItem:
+    'adding an item to a wagon MANDATORY checklist changes what the exit gate enforces for ' +
+    'that vehicle, so it needs a designed, audited flow rather than a form bolted on',
+  reservePart:
+    'reserving stores against a wagon needs a stores workflow that does not exist yet — ' +
+    'issuing and restocking are reachable, reserving is the part with no home',
+  getAcousticHistory:
+    'past acoustic runs are recorded and never shown; the genuine remaining gap of the four, ' +
+    'and the cheapest to close once someone wants it',
 };
 
 const EXEMPT = { ...REDUNDANT, ...NO_INTERFACE_YET };
