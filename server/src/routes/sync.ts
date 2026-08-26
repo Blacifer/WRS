@@ -8,7 +8,7 @@ import type { Request, Response, NextFunction } from '../framework/index.ts';
 import { getDatabase } from '../db/connection.ts';
 import { InspectionRepository } from '../db/repository.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
-import { optionalAuthMiddleware } from '../middleware/auth.ts';
+import { authMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 
 export const syncRouter = Router();
@@ -17,7 +17,29 @@ export const syncRouter = Router();
  * POST /api/sync/batch
  * Multi-entity idempotent batch synchronization for offline inspection, wagon, checklist & photo records
  */
-syncRouter.post('/batch', optionalAuthMiddleware, (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+/*
+ * Authentication is REQUIRED here, and every record synced is attributed to
+ * the authenticated user rather than to anything in the request body.
+ *
+ * This route used to use optionalAuthMiddleware and take the actor from
+ * client-supplied fields, falling back to a hardcoded 'usr_insp_001'. Both
+ * halves were exploitable and were verified so before this change:
+ *
+ *   - With no Authorization header at all, a stage transition was written
+ *     naming usr_sup_001 as the performer, role SUPERVISOR, isOverride true.
+ *     The permanent record said a named supervisor authorised an override
+ *     that no supervisor was involved in.
+ *
+ *   - The same unauthenticated route accepted a MANDATORY checklist item with
+ *     status PASS, attributed to whoever the body named. That is the exit
+ *     gate's entire premise — it counts mandatory items that passed — being
+ *     writable by anyone who can reach the port.
+ *
+ * The offline queue sends its token, so requiring one costs the real client
+ * nothing. A queue with no token should wait for a login rather than sync
+ * anonymously, which is the behaviour this now forces.
+ */
+syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   try {
     const {
       records = [],
@@ -42,6 +64,21 @@ syncRouter.post('/batch', optionalAuthMiddleware, (req: AuthenticatedRequest, re
 
     const syncedRecords: Array<{ clientTempId?: string; serverId: string; sequenceNumber?: number }> = [];
     const errors: Array<{ clientTempId?: string; entity?: string; error: string }> = [];
+
+    // Bound once, from the token, and used for every record in the batch.
+    const actorId = req.user?.id;
+    const actorName = req.user?.name || req.user?.username || 'Unknown';
+    const actorRole = req.user?.role || 'INSPECTOR';
+    if (!actorId) {
+      res.status(401).json({
+        success: false,
+        error: 'UNAUTHORIZED',
+        message: 'Synced records must name the person who made them.',
+        statusCode: 401,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
 
     // 1. Process Phase 1 inspections records
     if (Array.isArray(records)) {
@@ -87,7 +124,7 @@ syncRouter.post('/batch', optionalAuthMiddleware, (req: AuthenticatedRequest, re
               owningRailway: w.owningRailway || 'SECR',
               entryNotes: w.entryNotes || w.conditionNotes,
               entryDate: w.entryDate,
-              createdBy: req.user?.id || 'usr_insp_001'
+              createdBy: actorId
             });
           }
           syncedWagons++;
@@ -115,8 +152,10 @@ syncRouter.post('/batch', optionalAuthMiddleware, (req: AuthenticatedRequest, re
             conditionNotes: chk.conditionNotes,
             repairAction: chk.repairAction,
             repairNotes: chk.repairNotes,
-            inspectorId: req.user?.id || chk.inspectedBy || 'usr_insp_001',
-            inspectorName: req.user?.name || chk.inspectedByName || 'Inspector',
+            // Never chk.inspectedBy — a verdict is attributed to whoever was
+            // authenticated, not to whoever the payload names.
+            inspectorId: actorId,
+            inspectorName: actorName,
             photoId: chk.photoId
           });
           syncedChecklistItems++;
@@ -139,9 +178,12 @@ syncRouter.post('/batch', optionalAuthMiddleware, (req: AuthenticatedRequest, re
             fromStage: tr.fromStage,
             toStage: tr.toStage,
             transitionType: tr.transitionType || 'NORMAL',
-            performedBy: tr.performedBy || req.user?.id || 'usr_insp_001',
-            performerName: tr.performerName || req.user?.name || 'Inspector',
-            performerRole: tr.performerRole || req.user?.role || 'INSPECTOR',
+            // These previously took the body's value FIRST, so a caller could
+            // name any performer and claim any role, including SUPERVISOR on
+            // an override.
+            performedBy: actorId,
+            performerName: actorName,
+            performerRole: actorRole,
             isOverride: Boolean(tr.isOverride),
             overrideReason: tr.overrideJustification || tr.overrideReason,
             notes: tr.notes
@@ -168,7 +210,8 @@ syncRouter.post('/batch', optionalAuthMiddleware, (req: AuthenticatedRequest, re
             category: p.partCategory || p.category,
             partName: p.partName,
             imageData: p.imageBase64 || p.imageData,
-            inspectorId: req.user?.id || p.inspectorId || 'usr_insp_001',
+            // Same rule as the rest: attributed to the authenticated user.
+            inspectorId: actorId,
             inspectorName: req.user?.name || p.inspectorName || 'Inspector',
             tags: p.tags
           });

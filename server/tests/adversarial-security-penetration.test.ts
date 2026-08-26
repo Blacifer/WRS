@@ -296,6 +296,86 @@ describe('M5 Adversarial Security & Penetration Testing Suite', () => {
       assert.strictEqual(exportRes.status, 403, 'Supervisor attempting regulatory export must receive 403 Forbidden');
     });
 
+    it('PEN-02F: the offline sync endpoint requires authentication', async () => {
+      /*
+       * This was open. Verified exploitable before the fix, twice over:
+       *
+       *   - With no Authorization header, a stage transition was written into
+       *     the permanent record naming usr_sup_001 as performer, role
+       *     SUPERVISOR, isOverride true. The wagon's history then said a named
+       *     supervisor authorised an override no supervisor took part in.
+       *
+       *   - The same unauthenticated route accepted a MANDATORY checklist item
+       *     with status PASS. The exit gate counts mandatory items that
+       *     passed, so anyone who could reach the port could clear a wagon's
+       *     gate without inspecting anything.
+       *
+       * The offline queue already sends its token, so requiring one costs the
+       * real client nothing.
+       */
+      const forgedTransition = await mockFetch(expressApp, 'POST', '/api/sync/batch', {
+        transitions: [{
+          wagonNumber: 'SYNC/BOXNHL/00001',
+          fromStage: 'ENTRY_REGISTRATION',
+          toStage: 'DISMANTLING',
+          performedBy: 'usr_sup_001',
+          performerName: 'Somebody Who Did Not Do This',
+          performerRole: 'SUPERVISOR',
+          isOverride: true
+        }]
+      });
+      assert.strictEqual(forgedTransition.status, 401, 'unauthenticated sync must be refused');
+
+      const forgedPass = await mockFetch(expressApp, 'POST', '/api/sync/batch', {
+        checklistItems: [{
+          wagonNumber: 'SYNC/BOXNHL/00001',
+          category: 'BRAKE_SYSTEM',
+          partName: 'Injected Item',
+          status: 'PASS',
+          isMandatory: true
+        }]
+      });
+      assert.strictEqual(forgedPass.status, 401, 'unauthenticated checklist sync must be refused');
+    });
+
+    it('PEN-02G: synced records are attributed to the token, not to the payload', async () => {
+      /*
+       * The second half of the same fault. Even with a valid token, the
+       * transition path read `tr.performedBy || req.user?.id` — the body FIRST.
+       * An inspector could record a transition claiming a supervisor performed
+       * it, and claim the SUPERVISOR role while doing so.
+       *
+       * Attribution is the whole basis of the audit trail. A record naming the
+       * wrong person is worse than no record, because it is believed.
+       */
+      const wagonNumber = 'SYNC/BOXNHL/00002';
+      await mockFetch(expressApp, 'POST', '/api/wagons/register',
+        { wagonNumber, wagonType: 'BOXNHL', owningRailway: 'SECR' },
+        { Authorization: `Bearer ${supervisorToken}` });
+
+      const res = await mockFetch(expressApp, 'POST', '/api/sync/batch', {
+        transitions: [{
+          wagonNumber,
+          fromStage: 'ENTRY_REGISTRATION',
+          toStage: 'DISMANTLING',
+          performedBy: 'usr_sup_001',
+          performerName: 'Still Not Me',
+          performerRole: 'SUPERVISOR'
+        }]
+      }, { Authorization: `Bearer ${inspectorToken}` });
+
+      assert.strictEqual(res.status, 200, 'a legitimate authenticated sync must still work');
+
+      const row = db.prepare(
+        'SELECT performed_by, performer_name, performer_role FROM wagon_transitions ' +
+        'WHERE wagon_number = ? ORDER BY rowid DESC LIMIT 1'
+      ).get(wagonNumber) as any;
+
+      assert.notStrictEqual(row.performed_by, 'usr_sup_001', 'the payload must not choose the performer');
+      assert.notStrictEqual(row.performer_name, 'Still Not Me');
+      assert.strictEqual(row.performer_role, 'INSPECTOR', 'the payload must not choose the role either');
+    });
+
     it('PEN-02E: a fabricated "test_" token cannot authorise a supervisor override', async () => {
       /*
        * The override path used to accept any token beginning with "test_":
