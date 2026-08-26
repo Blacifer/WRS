@@ -14,6 +14,7 @@ import { SoundDiagnosticTool } from '../components/SoundDiagnosticTool.tsx';
 import { VoiceInspectionToolbar } from '../components/VoiceInspectionToolbar.tsx';
 import { CaliperCamera } from '../components/CaliperCamera.tsx';
 import { readGatePanel } from '../services/gatePanel.ts';
+import { readWagonProgress, canBulkClear } from '../services/wagonProgress.ts';
 import { computeComponentVerdict, resolveComponentTarget } from '../services/classification.ts';
 import { SingleWagonTestForm } from '../components/SingleWagonTestForm.tsx';
 import { playPassChime, playCondemnedBuzz } from '../utils/audioFeedback.ts';
@@ -714,12 +715,19 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
     );
   }
 
-  const currentStageIndex = wagon ? stageList.indexOf(wagon.currentStage) : 0;
-  const isReleased = wagon?.currentStage === 'RELEASE';
-  const pendingCount = checklist.filter((i) => !i.status || i.status === 'PENDING').length;
+  // Derived in wagonProgress.ts, where it is tested. These were inline string
+  // comparisons; the release stage in particular is RELEASE and not RELEASED,
+  // and getting that wrong shows a released wagon as still in progress with no
+  // error anywhere.
+  const progress = readWagonProgress(wagon, checklist);
+  const currentStageIndex = progress.currentStageIndex;
+  const isReleased = progress.isReleased;
+  const pendingCount = progress.pendingCount;
 
   const handleBulkClear = async () => {
-    if (bulkAttestation.trim().length < 10) return;
+    // The server enforces the same minimum; this is here to avoid a pointless
+    // round trip and to be able to say why.
+    if (!canBulkClear(bulkAttestation, pendingCount).allowed) return;
     setIsBulkClearing(true);
     try {
       await api.bulkClearChecklist({
@@ -736,7 +744,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
       setIsBulkClearing(false);
     }
   };
-  const isQCGate = wagon?.currentStage === 'FINAL_QC_GATE';
+  const isQCGate = progress.isAtQcGate;
 
   return (
     <div className="space-y-6">

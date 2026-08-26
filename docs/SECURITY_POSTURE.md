@@ -131,3 +131,23 @@ a posture document that lists only strengths is not worth reading.
 security audit, GIGW compliance, and a decision on hosting (CRIS/RailTel rather
 than NIC, most likely) are each separate exercises with their own lead times.
 Start them before the code is finished, not after.
+
+## One capability that qualifies the "nothing gets left out" claim
+
+A supervisor can bulk-clear a wagon's remaining PENDING checklist items to
+PASS in one action, by supplying a written attestation.
+
+This is deliberate and it is guarded: it requires SUPERVISOR or ADMIN, the
+attestation is enforced at a minimum of ten characters by the repository
+rather than only by the form, SPRINGS are excluded entirely because a spring's
+status must come from a real measured height, every cleared item records the
+attestation text in its condition notes, and the action is written to the
+audit chain against the supervisor who performed it.
+
+It is written down here because it is the one path by which the exit gate's
+promise becomes a supervisor's signature rather than an item-by-item record,
+and anyone assessing this system should learn that from the documentation
+rather than from the code. It reflects a real workshop practice —
+exception-based inspection, where a supervisor attests to having physically
+verified the remainder — and the honest description of the gate is therefore
+"nothing leaves unaddressed", not "every item was individually measured".
