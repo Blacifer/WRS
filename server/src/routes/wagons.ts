@@ -17,6 +17,7 @@ import { LifecycleEngine } from '../lifecycle/engine.ts';
 import { ExitGateValidator } from '../gate/validator.ts';
 import { CertificateGenerator } from '../reports/certificate.ts';
 import { otpService } from '../auth/otpService.ts';
+import { TotpService } from '../auth/totpService.ts';
 import type { LifecycleStage } from '../../../shared/types.ts';
 
 export const wagonsRouter = Router();
@@ -712,7 +713,7 @@ wagonsRouter.post('/:wagonNumber/gate/signoff', authMiddleware, requireRole('SUP
   // Identity comes from the authenticated token; the signature is computed
   // server-side. Accepting either from the caller would let them choose whose
   // name goes on the certificate.
-  const { otp, otpToken, notes, signoffNotes, acknowledgedAdvisoryIds } = req.body;
+  const { otp, otpToken, totpCode, notes, signoffNotes, acknowledgedAdvisoryIds } = req.body;
 
   if (!wagonNumber) {
     res.status(400).json({
@@ -749,27 +750,89 @@ wagonsRouter.post('/:wagonNumber/gate/signoff', authMiddleware, requireRole('SUP
   // simply not mentioning it. A release certificate is the most consequential
   // record the system produces; it does not get a silent path.
   // -----------------------------------------------------------------------
+  //
+  // Which factor is required depends on whether this supervisor has an
+  // authenticator enrolled, so the "did you send one at all" check cannot be
+  // made before that is known. It used to sit here and demand an inline OTP
+  // unconditionally, which meant an enrolled supervisor sending only their
+  // authenticator code was turned away with OTP_REQUIRED — the stronger
+  // factor rejected for not being the weaker one.
+  //
   const tokenToVerify = otpToken || otp;
-  if (!tokenToVerify) {
-    res.status(401).json({
-      success: false,
-      error: 'OTP_REQUIRED',
-      message: 'Release sign-off requires a supervisor OTP action token.',
-      statusCode: 401,
-      timestamp: new Date().toISOString()
-    });
-    return;
-  }
 
-  if (!otpService.consumeActionToken(tokenToVerify, 'OVERRIDE')) {
-    res.status(401).json({
-      success: false,
-      error: 'INVALID_OTP_TOKEN',
-      message: 'Release sign-off requires a valid supervisor OTP action token.',
-      statusCode: 401,
-      timestamp: new Date().toISOString()
-    });
-    return;
+  /*
+   * Which second factor this sign-off is allowed to use.
+   *
+   * The inline one-time code is an audited two-step confirmation, not a
+   * second factor: whoever asks for it receives it in the same response, so
+   * possession of the session is possession of the code. That is defensible
+   * for a LAN pilot on a supervisor's own tablet, and it is what most
+   * supervisors will still be using on day one.
+   *
+   * An authenticator changes that — the code comes from a device the server
+   * never sees. So enrolment UPGRADES a supervisor: the moment they enrol,
+   * their authenticator becomes the required factor for release sign-off and
+   * the inline code stops being accepted for them. Otherwise anyone who
+   * enrolled could quietly fall back to the weaker path, which would make the
+   * stronger one decorative.
+   *
+   * Supervisors who have not enrolled keep the existing flow, so nobody is
+   * locked out of releasing a wagon mid-pilot by a security improvement.
+   */
+  const totpService = new TotpService(getDatabase());
+  const signerId = req.user?.id;
+  const signerIsEnrolled = signerId ? totpService.isEnrolled(signerId) : false;
+  let factorUsed: 'TOTP' | 'INLINE_OTP';
+
+  if (signerIsEnrolled) {
+    if (!totpCode) {
+      res.status(401).json({
+        success: false,
+        error: 'TOTP_REQUIRED',
+        message:
+          'You have an authenticator enrolled, so release sign-off requires the six-digit code from it. ' +
+          'The emailed or on-screen one-time code is not accepted once an authenticator is set up.',
+        statusCode: 401,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    const totpResult = totpService.verify(signerId!, String(totpCode));
+    if (!totpResult.ok) {
+      res.status(401).json({
+        success: false,
+        error: 'INVALID_TOTP',
+        message: totpResult.reason || 'That authenticator code was not accepted.',
+        statusCode: 401,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+    factorUsed = 'TOTP';
+  } else {
+    if (!tokenToVerify) {
+      res.status(401).json({
+        success: false,
+        error: 'OTP_REQUIRED',
+        message: 'Release sign-off requires a supervisor OTP action token.',
+        statusCode: 401,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    if (!otpService.consumeActionToken(tokenToVerify, 'OVERRIDE')) {
+      res.status(401).json({
+        success: false,
+        error: 'INVALID_OTP_TOKEN',
+        message: 'Release sign-off requires a valid supervisor OTP action token.',
+        statusCode: 401,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+    factorUsed = 'INLINE_OTP';
   }
 
   // -----------------------------------------------------------------------
@@ -820,7 +883,22 @@ wagonsRouter.post('/:wagonNumber/gate/signoff', authMiddleware, requireRole('SUP
       supervisorEmployeeId: employeeId,
       // Deliberately not client-supplied: the repository computes a keyed
       // signature over the certificate's canonical contents.
-      otpTokenRef: tokenToVerify || `otp_auto_${crypto.randomBytes(6).toString('hex')}`,
+      /*
+       * Record WHICH factor authorised this release, not just that something
+       * did. Six months from now the difference between a code from the
+       * supervisor's own authenticator and a code the server handed to
+       * whoever asked is the whole question, and it cannot be reconstructed
+       * afterwards if it was never written down.
+       *
+       * A TOTP code is deliberately not stored — it is a valid credential for
+       * another thirty seconds, and the audit log is readable by supervisors.
+       * The reference records the factor and the moment, which is what an
+       * investigation needs.
+       */
+      otpTokenRef:
+        factorUsed === 'TOTP'
+          ? `totp:${signerId}:${new Date().toISOString()}`
+          : tokenToVerify || `otp_auto_${crypto.randomBytes(6).toString('hex')}`,
       signoffNotes: notes || signoffNotes || 'Quality audit cleared with zero defects.',
       acknowledgedAdvisoryIds: Array.isArray(acknowledgedAdvisoryIds) ? acknowledgedAdvisoryIds : [],
       checksSummary: gateEvaluation.summary

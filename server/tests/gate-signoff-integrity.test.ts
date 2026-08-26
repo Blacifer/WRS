@@ -129,6 +129,7 @@ describe('Release Sign-off Integrity', () => {
     } as any);
   });
 
+
   // -------------------------------------------------------------------------
   // OTP is mandatory
   // -------------------------------------------------------------------------
@@ -462,5 +463,68 @@ describe('Release Sign-off Integrity', () => {
 
     const res = await signoff(wagonNumber, supervisorToken, { otpToken: 'test_token_override' });
     assert.equal(res.status, 200);
+  });
+
+  // -------------------------------------------------------------------------
+  // Enrolling an authenticator upgrades the supervisor
+  //
+  // These run LAST on purpose. Enrolling supervisor1 changes which factor the
+  // sign-off route demands for that user, so running them earlier would make
+  // every inline-OTP test above fail for a reason that has nothing to do with
+  // what those tests are checking.
+  // -------------------------------------------------------------------------
+  test('TC-SGN-20: once enrolled, the inline one-time code no longer signs off', async () => {
+    /*
+     * The inline code is an audited two-step confirmation, not a second
+     * factor: whoever asks for it receives it in the same response, so
+     * holding the session is holding the code. An authenticator is different,
+     * because the code comes from a device the server never sees.
+     *
+     * So enrolment upgrades a supervisor rather than adding a second option.
+     * If the weaker path stayed open to those who had enrolled, the stronger
+     * one would be decorative — anyone holding the session would simply ask
+     * for the inline code exactly as before.
+     */
+    const { TotpService } = await import('../src/auth/totpService.ts');
+    const totp = new TotpService(getDatabase());
+    totp.beginEnrolment('usr_sup_001');
+    // Confirm the enrolment directly. The RFC 6238 vectors are covered by the
+    // TOTP unit tests; what is under test here is the sign-off gate.
+    //
+    // The enrolment lives in columns on the users row — beginEnrolment seals
+    // the secret and deliberately leaves totp_enrolled_at null until a code is
+    // confirmed, so that a supervisor who closes the page mid-scan is not left
+    // holding a second factor they cannot produce.
+    getDatabase()
+      .prepare("UPDATE users SET totp_enrolled_at = ? WHERE id = 'usr_sup_001'")
+      .run(new Date().toISOString());
+    assert.ok(totp.isEnrolled('usr_sup_001'), 'setup: the supervisor must be enrolled');
+
+    const wagonNumber = 'SECR/BOXNHL/SGN010';
+    await driveToReleasable(wagonNumber);
+
+    const res = await signoff(wagonNumber, supervisorToken, {
+      otpToken: 'any_inline_token',
+      notes: 'attempting with the weaker factor'
+    });
+
+    assert.equal(res.status, 401, 'an enrolled supervisor must not sign off with the inline code');
+    // TOTP_REQUIRED rather than INVALID_OTP_TOKEN is the point: the refusal
+    // comes from the enrolment branch, before the inline token is even looked
+    // at, so it is not merely rejecting a bad token.
+    assert.equal(res.body.error, 'TOTP_REQUIRED');
+  });
+
+  test('TC-SGN-21: once enrolled, a wrong authenticator code is refused', async () => {
+    const wagonNumber = 'SECR/BOXNHL/SGN011';
+    await driveToReleasable(wagonNumber);
+
+    const res = await signoff(wagonNumber, supervisorToken, {
+      totpCode: '000000',
+      notes: 'wrong authenticator code'
+    });
+
+    assert.equal(res.status, 401);
+    assert.equal(res.body.error, 'INVALID_TOTP');
   });
 });
