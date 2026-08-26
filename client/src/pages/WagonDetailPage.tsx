@@ -13,6 +13,7 @@ import { ReleaseCertificateModal } from '../components/ReleaseCertificateModal.t
 import { SoundDiagnosticTool } from '../components/SoundDiagnosticTool.tsx';
 import { VoiceInspectionToolbar } from '../components/VoiceInspectionToolbar.tsx';
 import { CaliperCamera } from '../components/CaliperCamera.tsx';
+import { readGatePanel } from '../services/gatePanel.ts';
 import { computeComponentVerdict, resolveComponentTarget } from '../services/classification.ts';
 import { SingleWagonTestForm } from '../components/SingleWagonTestForm.tsx';
 import { playPassChime, playCondemnedBuzz } from '../utils/audioFeedback.ts';
@@ -1204,8 +1205,13 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
         </div>
       )}
 
-      {/* Tab 2: Zero-Defect Exit Gate */}
-      {activeTab === 'GATE' && gateStatus && (
+      {/* Tab 2: Zero-Defect Exit Gate
+          The readings below come from readGatePanel rather than being derived
+          inline: this is the panel a supervisor reads before releasing a wagon,
+          and the rules behind it belong somewhere they can be tested. */}
+      {activeTab === 'GATE' && gateStatus && (() => {
+        const gatePanel = readGatePanel(gateStatus, wagon, { isReleased });
+        return (
         <div className="space-y-6">
           {/* Gate Overview Status Card */}
           <div
@@ -1224,7 +1230,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                       : 'bg-rose-600 text-white animate-pulse'
                   }`}
                 >
-                  {gateStatus.canRelease ? 'ZERO-DEFECT CLEARED' : 'RELEASE BLOCKED'}
+                  {gatePanel.headline}
                 </span>
                 <h3 className="text-xl font-black text-white mt-2">{t('exitGate.title')}</h3>
                 <p className="text-xs text-slate-300 mt-1">
@@ -1234,7 +1240,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                 </p>
               </div>
 
-              {gateStatus.canRelease && !isReleased && (
+              {gatePanel.offerSignoff && (
                 <button
                   onClick={() => setShowSignoffModal(true)}
                   className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-emerald-600/30 transition min-h-[48px] flex items-center gap-2"
@@ -1249,30 +1255,28 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
               <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
                 <p className="text-[11px] text-slate-400 font-semibold">{t('exitGate.rule1')}</p>
                 <p className="text-lg font-black text-white mt-1">
-                  {gateStatus.summary?.passedMandatory} / {gateStatus.summary?.totalMandatory} Passed
+                  {gatePanel.tiers[0].value}
                 </p>
               </div>
 
               <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
                 <p className="text-[11px] text-slate-400 font-semibold">{t('exitGate.rule2')}</p>
                 <p className="text-lg font-black text-white mt-1">
-                  {gateStatus.summary?.unaddressedCondemned} Unresolved
+                  {gatePanel.tiers[1].value}
                 </p>
               </div>
 
               <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
                 <p className="text-[11px] text-slate-400 font-semibold">{t('exitGate.rule3')}</p>
                 <p className="text-lg font-black text-white mt-1">
-                  {gateStatus.summary?.springCheck?.hasCondemnedSprings ? '⚠️ CONDEMNED' : '✓ CLEAR'}
+                  {gatePanel.tiers[2].value}
                 </p>
               </div>
 
               <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
                 <p className="text-[11px] text-slate-400 font-semibold">{t('exitGate.rule4')}</p>
                 <p className="text-lg font-black text-white mt-1">
-                  {wagon?.currentStage === 'FINAL_QC_GATE' || wagon?.currentStage === 'RELEASE'
-                    ? '✓ REACHED'
-                    : 'STAGE ' + wagon?.currentStage}
+                  {gatePanel.tiers[3].value}
                 </p>
               </div>
             </div>
@@ -1366,7 +1370,8 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
             />
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Tab 3: Photo Evidence Gallery */}
       {activeTab === 'PHOTOS' && (
