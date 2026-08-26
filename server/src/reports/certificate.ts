@@ -560,7 +560,14 @@ export class CertificateGenerator {
                 <td>${c.manufacturer} (${c.manufacturingDate ? c.manufacturingDate.slice(0, 7) : '2024'})</td>
               </tr>
             `).join('')
-            : `<tr><td colspan="6" style="text-align: center; color: #64748b; padding: 10px;">All high-value serialized components (Wheelsets, CTRB Bearings, Draft Gears, Bogies) verified in Stores Passport Ledger.</td></tr>`
+            : // An empty manifest means no serialised component was linked to this
+              // wagon. It used to print "All high-value serialized components
+              // ... verified in Stores Passport Ledger", which turned an
+              // absence of records into a positive assurance on a safety
+              // certificate — a reader would take it as confirmation that the
+              // wheelsets and bearings had been checked against the ledger,
+              // when nothing had been recorded at all. State the fact instead.
+              `<tr><td colspan="6" style="text-align: center; color: #64748b; padding: 10px;">No serialised components are linked to this wagon. This section makes no statement about them.</td></tr>`
         }
       </tbody>
     </table>

@@ -495,7 +495,15 @@ describe('CHALLENGER 2: Milestone 1 Concurrency, Integrity & API Stress Harness'
 
       const htmlResult = CertificateGenerator.generate(emptyWagon, wagonRepo, inspectionRepo, componentRepo, 'html', { provisional: true });
       assert.ok(htmlResult.html);
-      assert.ok(htmlResult.html.includes('All high-value serialized components'));
+      // The section renders, and says plainly that there is nothing to report
+      // rather than claiming the components were verified. See
+      // TC-CERT-MANIFEST-03 for why that distinction matters on a release
+      // certificate.
+      assert.ok(htmlResult.html.includes('No serialised components are linked to this wagon'));
+      assert.ok(
+        !htmlResult.html.includes('All high-value serialized components'),
+        'an empty manifest must not assert that components were verified'
+      );
     });
 
     it('CERT-04: Stress & throughput testing: 100 consecutive certificate generations execute with high performance (< 100ms per cert)', () => {

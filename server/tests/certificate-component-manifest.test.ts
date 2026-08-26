@@ -240,7 +240,26 @@ describe('Phase 3 M1: Release Certificate Serialized Component Manifest (R4)', (
     const cert = CertificateGenerator.generate(emptyWagon, wagonRepo, inspectionRepo, 'html');
     assert.ok(cert.html);
     assert.ok(cert.html.includes('3. Serialized Component Health Passport Manifest (RDSO R4 Serialization)'));
-    assert.ok(cert.html.includes('All high-value serialized components'));
+
+    // The section still renders, so the certificate does not simply omit the
+    // question of serialised components.
+    assert.ok(cert.html.includes('No serialised components are linked to this wagon'));
+
+    /*
+     * And it must not claim they were checked.
+     *
+     * This assertion used to require the opposite. The empty state read "All
+     * high-value serialized components (Wheelsets, CTRB Bearings, Draft
+     * Gears, Bogies) verified in Stores Passport Ledger", which turns having
+     * no records into a statement that the wheelsets and bearings were
+     * verified against the ledger. On a release certificate that is the
+     * difference between "we did not record this" and "we checked it", and
+     * the test was pinning the wrong one of those.
+     */
+    assert.ok(
+      !cert.html.includes('All high-value serialized components'),
+      'an empty manifest must not assert that components were verified'
+    );
   });
 
   // -------------------------------------------------------------------------
