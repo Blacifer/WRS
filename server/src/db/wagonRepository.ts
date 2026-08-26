@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import { logAuditEvent } from './auditLog.ts';
 import { config } from '../config/index.ts';
 import { signCertificate } from '../reports/certificateSigning.ts';
+import * as analytics from './wagonAnalytics.ts';
 import { CASNUB_CHECKLIST_TEMPLATE } from './checklistTemplate.ts';
 import { validateSpringNests } from '../../../shared/classification/nestGrouping.ts';
 import { getSpringCountOptions, buildSpringQueue } from '../../../shared/classification/springCounts.ts';
@@ -1869,281 +1870,24 @@ export class WagonRepository {
 
   // -------------------------------------------------------------------------
   // Analytics & DRM Dashboards
+  //
+  // Implemented in wagonAnalytics.ts. They stay on the repository so callers
+  // are unaffected by the move, but the queries themselves now live somewhere
+  // this file is not responsible for.
   // -------------------------------------------------------------------------
 
-  public getAnalyticsPipeline(): any {
-    const stages: LifecycleStage[] = [
-      'ENTRY_REGISTRATION', 'DISMANTLING', 'COMPONENT_INSPECTION',
-      'REPAIR_REPLACEMENT', 'REASSEMBLY', 'FINAL_QC_GATE', 'RELEASE'
-    ];
-
-    const counts: Record<LifecycleStage, number> = {
-      ENTRY_REGISTRATION: 0,
-      DISMANTLING: 0,
-      COMPONENT_INSPECTION: 0,
-      REPAIR_REPLACEMENT: 0,
-      REASSEMBLY: 0,
-      FINAL_QC_GATE: 0,
-      RELEASE: 0
-    };
-
-    const rows = this.db.prepare(`
-      SELECT current_stage, COUNT(*) as count
-      FROM wagons
-      GROUP BY current_stage
-    `).all() as Array<{ current_stage: LifecycleStage; count: number }>;
-
-    for (const r of rows) {
-      if (r.current_stage in counts) {
-        counts[r.current_stage] = r.count;
-      }
-    }
-
-    let totalActive = 0;
-    for (const stage of stages) {
-      if (stage !== 'RELEASE') {
-        totalActive += counts[stage];
-      }
-    }
-
-    const totalReleased = counts.RELEASE;
-
-    return {
-      counts,
-      totalActive,
-      totalReleased,
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  public getAnalyticsTAT(): any {
-    const rows = this.db.prepare(`
-      SELECT entry_date, actual_release_date
-      FROM wagons
-      WHERE current_stage = 'RELEASE' AND actual_release_date IS NOT NULL
-    `).all() as Array<{ entry_date: string; actual_release_date: string }>;
-
-    if (rows.length === 0) {
-      return {
-        averageHours: 0,
-        medianHours: 0,
-        minHours: 0,
-        maxHours: 0,
-        p90Hours: 0,
-        completedWagonsCount: 0,
-        trends: []
-      };
-    }
-
-    const durations: number[] = [];
-    const trendMap: Record<string, { totalHours: number; count: number }> = {};
-
-    for (const r of rows) {
-      const entryTime = new Date(r.entry_date).getTime();
-      const releaseTime = new Date(r.actual_release_date).getTime();
-      const hours = Math.max(0, (releaseTime - entryTime) / (1000 * 60 * 60));
-      durations.push(hours);
-
-      const period = r.actual_release_date.slice(0, 10);
-      if (!trendMap[period]) {
-        trendMap[period] = { totalHours: 0, count: 0 };
-      }
-      trendMap[period].totalHours += hours;
-      trendMap[period].count += 1;
-    }
-
-    durations.sort((a, b) => a - b);
-    const sum = durations.reduce((acc, v) => acc + v, 0);
-    const averageHours = Math.round((sum / durations.length) * 10) / 10;
-    const medianHours = Math.round(durations[Math.floor(durations.length / 2)] * 10) / 10;
-    const minHours = Math.round(durations[0] * 10) / 10;
-    const maxHours = Math.round(durations[durations.length - 1] * 10) / 10;
-    const p90Index = Math.min(durations.length - 1, Math.floor(durations.length * 0.9));
-    const p90Hours = Math.round(durations[p90Index] * 10) / 10;
-
-    const trends = Object.entries(trendMap).map(([period, data]) => ({
-      period,
-      avgHours: Math.round((data.totalHours / data.count) * 10) / 10,
-      count: data.count
-    })).sort((a, b) => a.period.localeCompare(b.period));
-
-    return {
-      averageHours,
-      medianHours,
-      minHours,
-      maxHours,
-      p90Hours,
-      completedWagonsCount: durations.length,
-      trends
-    };
-  }
-
-  public getAnalyticsThroughput(): any {
-    const entryRows = this.db.prepare(`
-      SELECT substr(entry_date, 1, 10) as dt, COUNT(*) as cnt
-      FROM wagons
-      GROUP BY dt
-      ORDER BY dt DESC
-      LIMIT 30
-    `).all() as Array<{ dt: string; cnt: number }>;
-
-    const releaseRows = this.db.prepare(`
-      SELECT substr(actual_release_date, 1, 10) as dt, COUNT(*) as cnt
-      FROM wagons
-      WHERE current_stage = 'RELEASE' AND actual_release_date IS NOT NULL
-      GROUP BY dt
-      ORDER BY dt DESC
-      LIMIT 30
-    `).all() as Array<{ dt: string; cnt: number }>;
-
-    const entryMap: Record<string, number> = {};
-    for (const r of entryRows) entryMap[r.dt] = r.cnt;
-
-    const releaseMap: Record<string, number> = {};
-    for (const r of releaseRows) releaseMap[r.dt] = r.cnt;
-
-    const allDates = Array.from(new Set([...Object.keys(entryMap), ...Object.keys(releaseMap)])).sort();
-
-    const daily = allDates.map(date => ({
-      date,
-      entered: entryMap[date] || 0,
-      released: releaseMap[date] || 0
-    }));
-
-    return {
-      daily,
-      weekly: daily.slice(-7),
-      monthly: daily
-    };
-  }
-
-  public getAnalyticsParts(): any {
-    const validCategories: CASNUBCategory[] = [
-      'SPRINGS', 'WHEELS_AXLES', 'BEARINGS', 'BRAKE_SYSTEM',
-      'COUPLERS_DRAFT_GEAR', 'BOGIE_FRAME_BOLSTER', 'FRICTION_WEDGES', 'BODY_UNDERFRAME'
-    ];
-
-    const categoryBreakdown: Record<string, any> = {};
-    for (const cat of validCategories) {
-      categoryBreakdown[cat] = {
-        total: 0,
-        pass: 0,
-        fail: 0,
-        condemned: 0,
-        repaired: 0,
-        replaced: 0
-      };
-    }
-
-    const rows = this.db.prepare(`
-      SELECT category, status, COUNT(*) as count
-      FROM checklist_items
-      GROUP BY category, status
-    `).all() as Array<{ category: string; status: string; count: number }>;
-
-    let totalInspected = 0;
-    let totalPassed = 0;
-    let totalFailed = 0;
-    let totalCondemned = 0;
-    let totalRepaired = 0;
-    let totalReplaced = 0;
-
-    for (const r of rows) {
-      if (categoryBreakdown[r.category]) {
-        categoryBreakdown[r.category].total += r.count;
-        totalInspected += r.count;
-
-        if (r.status === 'PASS') {
-          categoryBreakdown[r.category].pass += r.count;
-          totalPassed += r.count;
-        } else if (r.status === 'FAIL') {
-          categoryBreakdown[r.category].fail += r.count;
-          totalFailed += r.count;
-        } else if (r.status === 'CONDEMNED') {
-          categoryBreakdown[r.category].condemned += r.count;
-          totalCondemned += r.count;
-        } else if (r.status === 'REPAIRED') {
-          categoryBreakdown[r.category].repaired += r.count;
-          totalRepaired += r.count;
-        } else if (r.status === 'REPLACED') {
-          categoryBreakdown[r.category].replaced += r.count;
-          totalReplaced += r.count;
-        }
-      }
-    }
-
-    return {
-      totalInspected,
-      totalPassed,
-      totalFailed,
-      totalCondemned,
-      totalRepaired,
-      totalReplaced,
-      categoryBreakdown
-    };
-  }
-
-  public getAnalyticsInspectors(): any {
-    const rows = this.db.prepare(`
-      SELECT 
-        inspector_id,
-        inspector_name,
-        COUNT(*) as total,
-        SUM(CASE WHEN status = 'PASS' THEN 1 ELSE 0 END) as passed,
-        SUM(CASE WHEN status = 'FAIL' THEN 1 ELSE 0 END) as failed,
-        SUM(CASE WHEN status = 'CONDEMNED' THEN 1 ELSE 0 END) as condemned
-      FROM checklist_items
-      GROUP BY inspector_id, inspector_name
-      ORDER BY total DESC
-    `).all() as Array<{
-      inspector_id: string;
-      inspector_name: string;
-      total: number;
-      passed: number;
-      failed: number;
-      condemned: number;
-    }>;
-
-    return {
-      inspectors: rows.map(r => ({
-        inspectorId: r.inspector_id,
-        inspectorName: r.inspector_name,
-        inspectionsCompleted: r.total,
-        partsPassed: r.passed,
-        partsFailed: r.failed,
-        partsCondemned: r.condemned
-      }))
-    };
-  }
-
+  public getAnalyticsPipeline(): any { return analytics.getAnalyticsPipeline(this.db); }
+  public getAnalyticsTAT(): any { return analytics.getAnalyticsTAT(this.db); }
+  public getAnalyticsThroughput(): any { return analytics.getAnalyticsThroughput(this.db); }
+  public getAnalyticsParts(): any { return analytics.getAnalyticsParts(this.db); }
+  public getAnalyticsInspectors(): any { return analytics.getAnalyticsInspectors(this.db); }
+  // Passed the repository rather than the handle: this one needs the exit
+  // gate evaluated per wagon, which is not a query.
   public getAnalyticsBlockers(): any {
-    const wagons = this.db.prepare(`
-      SELECT wagon_number, wagon_type, current_stage, entry_date
-      FROM wagons
-      WHERE current_stage != 'RELEASE'
-    `).all() as Array<{
-      wagon_number: string;
-      wagon_type: string;
-      current_stage: LifecycleStage;
-      entry_date: string;
-    }>;
-
-    const blockedWagons: any[] = [];
-    for (const w of wagons) {
-      const evaluation = this.evaluateExitGate(w.wagon_number);
-      if (!evaluation.canRelease && evaluation.blockers.length > 0) {
-        blockedWagons.push({
-          wagonNumber: w.wagon_number,
-          wagonType: w.wagon_type,
-          currentStage: w.current_stage,
-          blockers: evaluation.blockers,
-          blockerDetails: evaluation.blockerDetails,
-          entryDate: w.entry_date
-        });
-      }
-    }
-
-    return { blockedWagons };
+    return analytics.getAnalyticsBlockers({
+      db: this.db,
+      evaluateExitGate: (w: string) => this.evaluateExitGate(w)
+    });
   }
 
   // -------------------------------------------------------------------------
