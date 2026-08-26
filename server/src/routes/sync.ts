@@ -64,6 +64,9 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
 
     const syncedRecords: Array<{ clientTempId?: string; serverId: string; sequenceNumber?: number }> = [];
     const errors: Array<{ clientTempId?: string; entity?: string; error: string }> = [];
+    // Rejected because someone else's work is newer or more severe. Not
+    // failures — decisions — so they are reported separately from errors.
+    const conflicts: Array<Record<string, unknown>> = [];
 
     // Bound once, from the token, and used for every record in the batch.
     const actorId = req.user?.id;
@@ -142,6 +145,59 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
     if (Array.isArray(checklistItems)) {
       for (const chk of checklistItems) {
         try {
+          /*
+           * Conflict handling for work captured offline.
+           *
+           * A queued item was judged at some point in the past on a device
+           * that could not see what anyone else was doing. Applying it blindly
+           * is how this went wrong before: an inspector marked a brake beam
+           * CONDEMNED with the note "visible crack", a second inspector's
+           * stale queued PASS synced afterwards, and the crack disappeared
+           * from the record. The gate counts mandatory items that passed, so
+           * the wagon became releasable with a cracked beam.
+           *
+           * Two rules, and both report rather than fail silently — an
+           * inspector who is not told their offline work was rejected believes
+           * it was recorded.
+           */
+          // getChecklistItems returns { wagonNumber, categories, allItems } —
+          // grouped for display, not a bare array.
+          const existing = (wagonRepo.getChecklistItems(chk.wagonNumber)?.allItems || [])
+            .find((it: any) => it.partName === chk.partName &&
+                               (it.bogiePosition || 'NONE') === (chk.bogiePosition || 'NONE'));
+
+          if (existing) {
+            // Rule 1: a sync never downgrades a condemnation. A repair is
+            // recorded through repairAction and re-inspection, not by a queued
+            // PASS arriving later and overwriting the finding.
+            const downgradesCondemnation =
+              existing.status === 'CONDEMNED' && chk.status && chk.status !== 'CONDEMNED';
+
+            // Rule 2: a queued judgement older than the server's current one
+            // is stale. Someone has looked at this since.
+            const capturedAt = chk.createdAt || chk.capturedAt || chk.clientTimestamp;
+            const isStale =
+              capturedAt && existing.updatedAt &&
+              Date.parse(capturedAt) < Date.parse(existing.updatedAt);
+
+            if (downgradesCondemnation || isStale) {
+              conflicts.push({
+                clientTempId: chk.clientTempId || chk.id,
+                entity: 'CHECKLIST',
+                wagonNumber: chk.wagonNumber,
+                partName: chk.partName,
+                attempted: chk.status,
+                kept: existing.status,
+                reason: downgradesCondemnation
+                  ? `"${chk.partName}" was condemned by ${existing.inspectorName || 'another inspector'} ` +
+                    `after this was recorded. The condemnation stands — record a repair instead if it was fixed.`
+                  : `"${chk.partName}" was updated by ${existing.inspectorName || 'someone else'} ` +
+                    `after this was recorded offline, so it was not overwritten.`
+              });
+              continue;
+            }
+          }
+
           wagonRepo.upsertChecklistItem({
             wagonNumber: chk.wagonNumber,
             category: chk.category,
@@ -237,6 +293,11 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
       syncedChecklistItems,
       syncedPhotos,
       failedCount: errors.length,
+      // Surfaced so the device can tell the inspector which of their offline
+      // judgements were not applied, and why. Silently dropping them would
+      // leave someone believing a verdict was recorded when it was not.
+      conflictCount: conflicts.length,
+      conflicts,
       syncedRecords,
       errors: errors.length > 0 ? errors : undefined,
       meta: {

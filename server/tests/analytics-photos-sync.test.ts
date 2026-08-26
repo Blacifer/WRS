@@ -214,4 +214,60 @@ describe('Phase 2 R4, R5, R6: DRM Analytics, Photo Evidence & Batch Sync', () =>
     assert.equal(syncRes.body.syncedTransitions, 1);
     assert.equal(syncRes.body.syncedPhotos, 1);
   });
+
+  test('TC-SYNC-05: a stale offline PASS cannot overwrite a condemnation', async () => {
+    /*
+     * The scenario that made this rule necessary, reproduced.
+     *
+     * An inspector marked a brake beam CONDEMNED with the note "visible
+     * crack". A second inspector had judged the same component PASS earlier
+     * while offline; when their device reconnected, the queued PASS was
+     * applied and the condemnation disappeared — note and all. The exit gate
+     * counts mandatory items that passed, so the wagon became releasable with
+     * a cracked beam and nothing in the record said otherwise.
+     *
+     * Last-write-wins is the wrong resolution when one of the writes is a
+     * safety finding. A repair is recorded as a repair; it does not arrive as
+     * a stale PASS from a tablet that could not see the crack.
+     */
+    const wagonNumber = 'WR/BOXNHL/66005';
+    const partName = 'Brake Beam Conflict';
+
+    await app.dispatch({
+      method: 'POST', url: '/api/wagons/register',
+      headers: { authorization: `Bearer ${supervisorToken}`, 'content-type': 'application/json' },
+      body: { wagonNumber, wagonType: 'BOXNHL', owningRailway: 'WR' }
+    });
+
+    const condemn = await app.dispatch({
+      method: 'POST', url: '/api/sync/batch',
+      headers: { authorization: `Bearer ${inspectorToken}`, 'content-type': 'application/json' },
+      body: { checklistItems: [{
+        wagonNumber, category: 'BRAKE_SYSTEM', partName,
+        status: 'CONDEMNED', isMandatory: true, conditionNotes: 'visible crack'
+      }] }
+    });
+    assert.equal(condemn.status, 200);
+
+    const stalePass = await app.dispatch({
+      method: 'POST', url: '/api/sync/batch',
+      headers: { authorization: `Bearer ${inspectorToken}`, 'content-type': 'application/json' },
+      body: { checklistItems: [{
+        wagonNumber, category: 'BRAKE_SYSTEM', partName,
+        status: 'PASS', isMandatory: true, conditionNotes: 'looked fine to me'
+      }] }
+    });
+
+    assert.equal(stalePass.status, 200, 'the batch itself still succeeds');
+    assert.equal(stalePass.body.syncedChecklistItems, 0, 'the downgrade must not be applied');
+    assert.equal(stalePass.body.conflictCount, 1, 'and it must be reported, not silently dropped');
+
+    const after = await app.dispatch({
+      method: 'GET', url: `/api/wagons/${encodeURIComponent(wagonNumber)}/checklist`,
+      headers: { authorization: `Bearer ${supervisorToken}` }
+    });
+    const item = (after.body.data.allItems || []).find((i: any) => i.partName === partName);
+    assert.equal(item.status, 'CONDEMNED', 'the condemnation must stand');
+    assert.match(item.conditionNotes || '', /visible crack/, 'and the finding must survive with it');
+  });
 });
