@@ -71,6 +71,37 @@ export default defineConfig({
   ],
   server: {
     port: 5173,
+
+    /*
+     * Bind every interface, not just loopback.
+     *
+     * Without this the dev server answers only to localhost, so a tablet on
+     * the shop wifi cannot reach it at all — which is most of the point of
+     * testing on a tablet.
+     */
+    host: true,
+
+    /*
+     * Hosts the dev server will answer to.
+     *
+     * Vite 5 and later reject any request whose Host header it does not
+     * recognise, as a defence against DNS rebinding. That is the right
+     * default, and it means a Cloudflare tunnel — which arrives with a
+     * Host of something.trycloudflare.com — gets "Blocked request. This host
+     * is not allowed" rather than the app.
+     *
+     * A tunnel is worth supporting because it is the only straightforward way
+     * to get HTTPS during testing, and the camera features (wagon number
+     * reading, caliper photos, QR scanning) are unavailable without it: a
+     * browser will not grant camera access to a plain-HTTP page unless it is
+     * localhost.
+     *
+     * Listed by suffix rather than opened to everything, so this stays a
+     * decision about which tunnels are expected rather than a blanket
+     * disabling of the check. LAN addresses are covered by `host` above.
+     */
+    allowedHosts: ['.trycloudflare.com', '.ngrok-free.app', '.ngrok.io', 'localhost'],
+
     proxy: {
       '/api': {
         target: 'http://localhost:3000',
