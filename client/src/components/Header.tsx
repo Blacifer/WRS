@@ -228,45 +228,10 @@ export const Header: React.FC<HeaderProps> = ({
                 🚂 {dict.nav.wagons || 'Wagons Pipeline'}
               </button>
 
-              {isAdmin && (
-                <button
-                  data-testid="nav-dashboard"
-                  onClick={() => onSelectTab('dashboard')}
-                  className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                    activeTab === 'dashboard'
-                      ? 'text-white'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  📊 {dict.nav.dashboard || 'DRM Dashboard'}
-                </button>
-              )}
 
               {isSupervisorOrAdmin && (
                 <>
-                  <button
-                    data-testid="nav-inventory"
-                    onClick={() => onSelectTab('inventory')}
-                    className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                      activeTab === 'inventory'
-                        ? 'text-white'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    📦 {dict.nav.inventory || 'Stores & Inventory'}
-                  </button>
 
-                  <button
-                    data-testid="nav-passports"
-                    onClick={() => onSelectTab('passports')}
-                    className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                      activeTab === 'passports'
-                        ? 'text-white'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    🪪 {dict.nav.passports || 'Component Passports'}
-                  </button>
                 </>
               )}
 
@@ -293,6 +258,49 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 🔬 {currentLang === 'hi' ? 'स्प्रिंग बैच' : 'Spring Batch'}
               </button>
+
+              {/* The two things the DRM actually asked for come first: the
+                  wagon pipeline and the spring flows. What follows the rule is
+                  the surrounding workshop machinery — useful, but it was
+                  leading the navigation and making the app read as inventory
+                  software rather than as a QC tool. */}
+              <span aria-hidden="true" className="hidden sm:inline-block w-px h-5 bg-slate-700 mx-1 self-center"></span>
+
+              {isAdmin && (
+                <button
+                  data-testid="nav-dashboard"
+                  onClick={() => onSelectTab('dashboard')}
+                  className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
+                    activeTab === 'dashboard'
+                      ? 'text-white'
+                      : 'text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  📊 {dict.nav.dashboard || 'DRM Dashboard'}
+                </button>
+              )}
+                  <button
+                    data-testid="nav-inventory"
+                    onClick={() => onSelectTab('inventory')}
+                    className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
+                      activeTab === 'inventory'
+                        ? 'text-white'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    📦 {dict.nav.inventory || 'Stores & Inventory'}
+                  </button>
+                  <button
+                    data-testid="nav-passports"
+                    onClick={() => onSelectTab('passports')}
+                    className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
+                      activeTab === 'passports'
+                        ? 'text-white'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    🪪 {dict.nav.passports || 'Component Passports'}
+                  </button>
 
               {isSupervisorOrAdmin && (
                 <button
