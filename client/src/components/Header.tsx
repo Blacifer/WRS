@@ -9,6 +9,7 @@ import { getDictionary } from '../i18n/index.ts';
 import type { LanguageCode } from '../i18n/index.ts';
 import { offlineDb } from '../services/offlineDb.ts';
 import { GlobeIcon, RefreshCwIcon, LogOutIcon, ShieldIcon } from './Icons.tsx';
+import { isInPilotNav } from '../config/pilotScope.ts';
 
 export type { NavigationTab };
 
@@ -266,7 +267,7 @@ export const Header: React.FC<HeaderProps> = ({
                   software rather than as a QC tool. */}
               <span aria-hidden="true" className="hidden sm:inline-block w-px h-5 bg-slate-700 mx-1 self-center"></span>
 
-              {isAdmin && (
+              {isAdmin && isInPilotNav('dashboard', user?.role) && (
                 <button
                   data-testid="nav-dashboard"
                   onClick={() => onSelectTab('dashboard')}
@@ -279,6 +280,7 @@ export const Header: React.FC<HeaderProps> = ({
                   📊 {dict.nav.dashboard || 'DRM Dashboard'}
                 </button>
               )}
+                  {isInPilotNav('inventory', user?.role) && (
                   <button
                     data-testid="nav-inventory"
                     onClick={() => onSelectTab('inventory')}
@@ -290,6 +292,8 @@ export const Header: React.FC<HeaderProps> = ({
                   >
                     📦 {dict.nav.inventory || 'Stores & Inventory'}
                   </button>
+                  )}
+                  {isInPilotNav('passports', user?.role) && (
                   <button
                     data-testid="nav-passports"
                     onClick={() => onSelectTab('passports')}
@@ -301,8 +305,9 @@ export const Header: React.FC<HeaderProps> = ({
                   >
                     🪪 {dict.nav.passports || 'Component Passports'}
                   </button>
+                  )}
 
-              {isSupervisorOrAdmin && (
+              {isSupervisorOrAdmin && isInPilotNav('history', user?.role) && (
                 <button
                   data-testid="nav-history"
                   onClick={() => onSelectTab('history')}
@@ -316,7 +321,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               )}
 
-              {isAdmin && (
+              {isAdmin && isInPilotNav('analytics', user?.role) && (
                 <button
                   data-testid="nav-analytics"
                   onClick={() => onSelectTab('analytics')}
@@ -330,7 +335,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               )}
 
-              {isSupervisorOrAdmin && (
+              {isSupervisorOrAdmin && isInPilotNav('admin', user?.role) && (
                 <button
                   data-testid="nav-admin"
                   onClick={() => onSelectTab('admin')}
@@ -357,7 +362,7 @@ export const Header: React.FC<HeaderProps> = ({
                 📖 {dict.nav.manual || 'Ask the Manual'}
               </button>
 
-              {isSupervisorOrAdmin && (
+              {isSupervisorOrAdmin && isInPilotNav('learning', user?.role) && (
                 <button
                   data-testid="nav-learning"
                   onClick={() => onSelectTab('learning')}
@@ -385,7 +390,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               )}
 
-              {isAdmin && (
+              {isAdmin && isInPilotNav('users', user?.role) && (
                 <button
                   data-testid="nav-users"
                   onClick={() => onSelectTab('users')}
