@@ -73,7 +73,13 @@ describe('Wagon Type Registry', () => {
 
   it('TC-WGN-06: every entry cites the table it came from', () => {
     for (const w of WAGON_SPRING_CONFIGS) {
-      assert.match(w.tableRef, /WMM 2\.0 Table 1\.[123]/, `${w.designation} has no source`);
+      /*
+       * Widened from /Table 1\.[123]/ once entries arrived from the Chapter 6
+       * springs-per-bogie table. The point of this assertion is that every
+       * entry cites a real place in the manual — not that the manual keeps all
+       * its wagon data in one table, which it does not.
+       */
+      assert.match(w.tableRef, /WMM 2\.0 (Table 1\.[123]|Chapter \d)/, `${w.designation} has no source`);
     }
   });
 
@@ -82,8 +88,17 @@ describe('Wagon Type Registry', () => {
       for (const [k, v] of Object.entries(w.counts)) {
         assert.ok(Number.isInteger(v) && v > 0 && v <= 20, `${w.designation}.${k} = ${v}`);
       }
-      // Every CASNUB variant in these tables carries four snubbers.
-      assert.strictEqual(w.counts.snubber, 4, `${w.designation} snubber count`);
+      /*
+       * Four snubbers is a CASNUB property, not a universal one. BOXNS rides
+       * an LWLH25 bogie and carries eight — the first entry in this registry
+       * that is not a CASNUB, and it broke this assertion the moment it was
+       * added from the manual. Scoped to what it was actually true of.
+       */
+      if (w.bogieDescription.includes('CASNUB')) {
+        assert.strictEqual(w.counts.snubber, 4, `${w.designation} snubber count`);
+      } else {
+        assert.ok(w.counts.snubber > 0, `${w.designation} must carry some snubbers`);
+      }
     }
   });
 

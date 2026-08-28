@@ -55,6 +55,7 @@ export interface WagonSpringConfig {
 const T11 = 'WMM 2.0 Table 1.1 (Open Wagons)';
 const T12 = 'WMM 2.0 Table 1.2 (Covered Wagons)';
 const T13 = 'WMM 2.0 Table 1.3 (Flat Wagons)';
+const C6 = 'WMM 2.0 Chapter 6 (Bogie) — springs per bogie table';
 
 export const WAGON_SPRING_CONFIGS: WagonSpringConfig[] = [
   // ---------------------------------------------------------------- OPEN ---
@@ -72,6 +73,27 @@ export const WAGON_SPRING_CONFIGS: WagonSpringConfig[] = [
   { designation: 'BOSTHS', category: 'OPEN', axleLoad: '20.32t', bogieDescription: 'CASNUB 22 HS (mod-I)', bogieType: 'CASNUB_22_HS', counts: { outer: 12, inner: 12, snubber: 4 }, tableRef: T11, notes: 'High speed version of BOST.' },
   { designation: 'BOSTHS M1', category: 'OPEN', axleLoad: '22.32t', bogieDescription: 'Modified CASNUB 22 HS (Mod-I)', bogieType: 'CASNUB_22_HS', counts: { outer: 14, inner: 14, snubber: 4 }, tableRef: T11, notes: 'High axle load version of BOSTHS.' },
   { designation: 'BOSTHS M2', category: 'OPEN', axleLoad: '22.32t', bogieDescription: 'Modified CASNUB 22 HS (Mod-II)', bogieType: 'CASNUB_22_HS', counts: { outer: 12, inner: 12, snubber: 4 }, tableRef: T11 },
+
+  // ---------------------------------------------------- WRS RAIPUR TYPES ---
+  // Added from the WMM 2.0 Chapter 6 springs-per-bogie table after WRS Raipur
+  // supplied its 2025-26 out-turn return. These are wagons the shop actually
+  // overhauls in volume that this file did not know about: BOBRN alone is 319
+  // a year, and the BRN/BFKN/BFNS group 610.
+  //
+  // Worth noting what the table shows, because the app previously assumed
+  // otherwise: spring counts vary by WAGON, not only by bogie. BOBRN and BRN
+  // both ride CASNUB 22 NLB and carry 14 outer, while BOXN on the same bogie
+  // carries 12. Keying spring counts off the bogie alone would have been
+  // wrong for every one of these.
+  { designation: 'BOBRN', category: 'OPEN', axleLoad: '20.32t', bogieDescription: 'CASNUB 22 NLB', bogieType: 'CASNUB_22_NLB', counts: { outer: 14, inner: 8, snubber: 4 }, tableRef: C6, notes: 'Bottom-discharge ore wagon. 319 overhauled at Raipur in 2025-26.' },
+  { designation: 'BOBYN', category: 'OPEN', axleLoad: '20.32t', bogieDescription: 'CASNUB 22 NLB', bogieType: 'CASNUB_22_NLB', counts: { outer: 14, inner: 8, snubber: 4 }, tableRef: C6 },
+  { designation: 'BCNHL', category: 'COVERED', axleLoad: '22.9t', bogieDescription: 'CASNUB 22 HS', bogieType: 'CASNUB_22_HS', counts: { outer: 14, inner: 14, snubber: 4 }, tableRef: C6 },
+  { designation: 'BTAP', category: 'OPEN', axleLoad: '20.32t', bogieDescription: 'CASNUB 22 NLB', bogieType: 'CASNUB_22_NLB', counts: { outer: 12, inner: 8, snubber: 4 }, tableRef: 'WMM 2.0 Chapter 1 (Alumina Tank Wagon BTAP)', notes: 'Alumina tank wagon. 12 outer on the same bogie BOBRN carries 14 on — the counts are per wagon, not per bogie.' },
+  // Bogies with no G-95 band table held here: count the springs, do not
+  // classify them. Same treatment as the NLC entries above.
+  { designation: 'BOXNS', category: 'OPEN', axleLoad: '25.0t', bogieDescription: 'LWLH25', bogieType: null, counts: { outer: 12, inner: 12, snubber: 8 }, tableRef: C6, notes: 'LWLH25 bogie — no G-95 band table held, and the only Raipur type with 8 snubbers. 369 overhauled in 2025-26.' },
+  { designation: 'BLCA', category: 'FLAT', axleLoad: '20.32t', bogieDescription: 'LCCF 20 (C)', bogieType: null, counts: { outer: 14, inner: 12, snubber: 4 }, tableRef: C6, notes: 'Container flat. LCCF bogie — no G-95 band table held.' },
+
   // Bogies with no G-95 band table held in this system.
   { designation: 'BOYEL', category: 'OPEN', axleLoad: '25.0t', bogieDescription: 'CASNUB 22 NLC', bogieType: null, counts: { outer: 14, inner: 14, snubber: 4 }, tableRef: T11, notes: 'NLC bogie — no G-95 band table held; springs can be counted but not classified.' },
   { designation: 'BOXNEL', category: 'OPEN', axleLoad: '25.0t', bogieDescription: 'CASNUB 22 NLC', bogieType: null, counts: { outer: 14, inner: 14, snubber: 4 }, tableRef: T11, notes: 'NLC bogie — no G-95 band table held.' },
@@ -88,7 +110,7 @@ export const WAGON_SPRING_CONFIGS: WagonSpringConfig[] = [
   { designation: 'BCNAHS M1', category: 'COVERED', axleLoad: '22.82t', bogieDescription: 'CASNUB 22 HS (Modified)', bogieType: 'CASNUB_22_HS', counts: { outer: 14, inner: 14, snubber: 4 }, tableRef: T12 },
 
   // ---------------------------------------------------------------- FLAT ---
-  { designation: 'BRN', category: 'FLAT', axleLoad: '20.32t', bogieDescription: 'CASNUB 22 NLB', bogieType: 'CASNUB_22_NLB', counts: { outer: 12, inner: 8, snubber: 4 }, tableRef: T13, notes: 'Designed for rails and heavy steel products.' },
+  { designation: 'BRN', category: 'FLAT', axleLoad: '20.32t', bogieDescription: 'CASNUB 22 NLB', bogieType: 'CASNUB_22_NLB', counts: { outer: 12, inner: 8, snubber: 4 }, tableRef: T13, notes: 'Designed for rails and heavy steel products. CONFLICT: WMM 2.0 Chapter 6 gives 14 outer for BRN, Table 1.3 gives 12. Unresolved — the count is used for nest completeness, so ask the shop before relying on it.' },
   { designation: 'BRN 22.9', category: 'FLAT', axleLoad: '22.9t', bogieDescription: 'CASNUB 22 HS', bogieType: 'CASNUB_22_HS', counts: { outer: 14, inner: 14, snubber: 4 }, tableRef: T13 },
   { designation: 'BRNA', category: 'FLAT', axleLoad: '20.32t', bogieDescription: 'CASNUB 22 NLB', bogieType: 'CASNUB_22_NLB', counts: { outer: 12, inner: 8, snubber: 4 }, tableRef: T13 },
   { designation: 'BRNAHS', category: 'FLAT', axleLoad: '20.32t', bogieDescription: 'CASNUB 22 HS', bogieType: 'CASNUB_22_HS', counts: { outer: 14, inner: 12, snubber: 4 }, tableRef: T13, notes: 'High speed variant of BRNA.' },

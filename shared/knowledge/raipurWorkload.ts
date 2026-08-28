@@ -40,37 +40,47 @@ export interface RaipurWagonVolume {
   /** All three, for ranking. */
   total: number;
   /**
-   * Whether the app holds a spring configuration for this designation.
+   * The app knows how many springs of each kind this wagon carries.
    *
-   * False means the app will count its springs but decline to classify them,
-   * which is the correct behaviour for a type whose bogie and spring layout
-   * nobody has given us. It is a gap to be filled from RDSO tables, never by
-   * assuming it resembles a similar-sounding type.
+   * False means it does not, and will not guess. A gap to be filled from an
+   * RDSO table, never by assuming a type resembles a similar-sounding one.
    */
   configured: boolean;
+
+  /**
+   * The app can also put those springs in a G-95 band.
+   *
+   * Deliberately separate from `configured`, because they are different
+   * things and collapsing them would overstate what the app does. BOXNS rides
+   * an LWLH25 bogie and BLCA an LCCF: the counts are known, so the app can
+   * tell an inspector how many springs to expect and notice a missing one,
+   * but it holds no band table for those bogies and will not classify a
+   * height against one. Counting without classifying is the honest half.
+   */
+  classifiable: boolean;
 }
 
 /** Wagons turned out at WRS Raipur, 2025–26, busiest first. */
 export const RAIPUR_WORKLOAD_2025_26: RaipurWagonVolume[] = [
-  { designation: 'BOXNHL', poh: 2503, npoh: 12, roh: 8, total: 2523, configured: true },
-  { designation: 'BRN/BFKN/BFNS', poh: 519, npoh: 34, roh: 57, total: 610, configured: false },
-  { designation: 'BOST', poh: 457, npoh: 1, roh: 0, total: 458, configured: true },
-  { designation: 'BOXN', poh: 395, npoh: 12, roh: 9, total: 416, configured: true },
-  { designation: 'BOXNS', poh: 369, npoh: 0, roh: 0, total: 369, configured: false },
-  { designation: 'BOBRN', poh: 305, npoh: 14, roh: 0, total: 319, configured: false },
-  { designation: 'BOXNR', poh: 278, npoh: 5, roh: 2, total: 285, configured: true },
-  { designation: 'BTAP', poh: 156, npoh: 0, roh: 0, total: 156, configured: false },
-  { designation: 'BOBSN', poh: 136, npoh: 0, roh: 0, total: 136, configured: false },
-  { designation: 'BVZI', poh: 132, npoh: 0, roh: 0, total: 132, configured: false },
-  { designation: 'BFNV', poh: 102, npoh: 0, roh: 0, total: 102, configured: false },
-  { designation: 'BCN', poh: 61, npoh: 0, roh: 0, total: 61, configured: true },
-  { designation: 'BLC', poh: 0, npoh: 0, roh: 45, total: 45, configured: false },
-  { designation: 'BOBYN', poh: 39, npoh: 0, roh: 8, total: 47, configured: false },
-  { designation: 'BVCM', poh: 38, npoh: 0, roh: 0, total: 38, configured: false },
-  { designation: 'BOXNLW', poh: 35, npoh: 8, roh: 0, total: 43, configured: true },
-  { designation: 'BCNHL', poh: 3, npoh: 2, roh: 0, total: 5, configured: false },
-  { designation: 'BWTB', poh: 1, npoh: 0, roh: 0, total: 1, configured: true },
-  { designation: 'BOXNHAM', poh: 1, npoh: 0, roh: 0, total: 1, configured: true }
+  { designation: 'BOXNHL', poh: 2503, npoh: 12, roh: 8, total: 2523, configured: true, classifiable: true },
+  { designation: 'BRN/BFKN/BFNS', poh: 519, npoh: 34, roh: 57, total: 610, configured: false, classifiable: false },
+  { designation: 'BOST', poh: 457, npoh: 1, roh: 0, total: 458, configured: true, classifiable: true },
+  { designation: 'BOXN', poh: 395, npoh: 12, roh: 9, total: 416, configured: true, classifiable: true },
+  { designation: 'BOXNS', poh: 369, npoh: 0, roh: 0, total: 369, configured: true, classifiable: false },
+  { designation: 'BOBRN', poh: 305, npoh: 14, roh: 0, total: 319, configured: true, classifiable: true },
+  { designation: 'BOXNR', poh: 278, npoh: 5, roh: 2, total: 285, configured: true, classifiable: true },
+  { designation: 'BTAP', poh: 156, npoh: 0, roh: 0, total: 156, configured: true, classifiable: true },
+  { designation: 'BOBSN', poh: 136, npoh: 0, roh: 0, total: 136, configured: false, classifiable: false },
+  { designation: 'BVZI', poh: 132, npoh: 0, roh: 0, total: 132, configured: false, classifiable: false },
+  { designation: 'BFNV', poh: 102, npoh: 0, roh: 0, total: 102, configured: false, classifiable: false },
+  { designation: 'BCN', poh: 61, npoh: 0, roh: 0, total: 61, configured: true, classifiable: true },
+  { designation: 'BLC', poh: 0, npoh: 0, roh: 45, total: 45, configured: false, classifiable: false },
+  { designation: 'BOBYN', poh: 39, npoh: 0, roh: 8, total: 47, configured: true, classifiable: true },
+  { designation: 'BVCM', poh: 38, npoh: 0, roh: 0, total: 38, configured: false, classifiable: false },
+  { designation: 'BOXNLW', poh: 35, npoh: 8, roh: 0, total: 43, configured: true, classifiable: true },
+  { designation: 'BCNHL', poh: 3, npoh: 2, roh: 0, total: 5, configured: true, classifiable: true },
+  { designation: 'BWTB', poh: 1, npoh: 0, roh: 0, total: 1, configured: true, classifiable: true },
+  { designation: 'BOXNHAM', poh: 1, npoh: 0, roh: 0, total: 1, configured: true, classifiable: true }
 ];
 
 /** Everything turned out in 2025–26. */
@@ -99,11 +109,26 @@ export function unconfiguredTypes(): RaipurWagonVolume[] {
   return RAIPUR_WORKLOAD_2025_26.filter((w) => !w.configured);
 }
 
-/** Share of the year's work the app can classify springs for. */
-export function configuredCoverage(): { covered: number; total: number; percent: number } {
-  const covered = RAIPUR_WORKLOAD_2025_26
-    .filter((w) => w.configured)
-    .reduce((sum, w) => sum + w.total, 0);
+/**
+ * Two different coverage figures, because they answer different questions.
+ *
+ * `counted` is the share of Raipur's work where the app knows how many
+ * springs a wagon carries — enough to notice one missing. `classified` is the
+ * share where it can also place a spring in a G-95 band, which is the actual
+ * inspection. The second is always the smaller and is the one worth quoting.
+ */
+export function configuredCoverage(): {
+  counted: number;
+  classified: number;
+  total: number;
+  countedPercent: number;
+  classifiedPercent: number;
+} {
   const total = RAIPUR_WORKLOAD_2025_26.reduce((sum, w) => sum + w.total, 0);
-  return { covered, total, percent: Math.round((covered / total) * 1000) / 10 };
+  const counted = RAIPUR_WORKLOAD_2025_26.filter((w) => w.configured)
+    .reduce((sum, w) => sum + w.total, 0);
+  const classified = RAIPUR_WORKLOAD_2025_26.filter((w) => w.classifiable)
+    .reduce((sum, w) => sum + w.total, 0);
+  const pc = (n: number) => Math.round((n / total) * 1000) / 10;
+  return { counted, classified, total, countedPercent: pc(counted), classifiedPercent: pc(classified) };
 }
