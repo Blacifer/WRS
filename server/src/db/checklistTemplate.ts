@@ -53,7 +53,7 @@ export const CASNUB_CHECKLIST_TEMPLATE: ChecklistTemplateItem[] = [
   // inspector is not left looking for a gauge that was never specified.
   { category: 'BEARINGS', partName: 'CTRB Cartridge Bearing Rotation', bogiePosition: 'BOGIE_1', isMandatory: 1, std: 'RDSO G-81' },
   { category: 'BEARINGS', partName: 'CTRB End Cap — visual inspection (no dimensional limit published)', bogiePosition: 'BOGIE_1', isMandatory: 1, std: 'RDSO G-81 / WRS Raipur practice' },
-  { category: 'BEARINGS', partName: 'Axle Box Adapter Crown Wear', bogiePosition: 'BOGIE_1', isMandatory: 1, std: 'RDSO G-81' },
+  { category: 'BEARINGS', partName: 'Axle Box Adapter Crown Lug Wear (Max 4.0mm)', bogiePosition: 'BOGIE_1', isMandatory: 1, std: 'WMM 2.0 §309B' },
   // Split from the previous generic "Grease Seals & End Cap Bolts" into the three
   // items the Railway Board's Must-Change list (WMM 2.0 Appx-V, A-4/A-5/A-6) mandates
   // 100% replacement of during POH — not just inspection.

@@ -82,7 +82,7 @@ describe('Routing a checklist item to a measurement', () => {
     for (const part of [
       'CTRB Cartridge Bearing Rotation',
       'CTRB End Cap Screws (100% Replace — POH)',
-      'Axle Box Adapter Crown Wear'
+      'CTRB End Cap — visual inspection (no dimensional limit published)'
     ]) {
       expect(resolveComponentTarget(part, 'BEARINGS'), part).toBeNull();
     }
@@ -111,5 +111,60 @@ describe('Routing a checklist item to a measurement', () => {
     // checks rather than misleading ones.
     expect(resolveComponentTarget('Wheel Flange Thickness', 'WHEELS_AXLES')).toBe('WHEEL_FLANGE');
     expect(resolveComponentTarget('Brake Block Thickness', 'BRAKE_SYSTEM')).toBe('BRAKE_BLOCK');
+  });
+});
+
+describe('Adapter wear, WMM 2.0 §309B', () => {
+  /*
+   * These limits were treated as missing for most of this project and routed
+   * to the shop as an open question. They were in the manual the whole time,
+   * listed under "Adapter Crown lugs" rather than the "axle box adapter crown
+   * wear" that was searched for.
+   *
+   * Worth a test for the boundary specifically: a wear check passes AT its
+   * limit and fails past it, and getting that backwards condemns serviceable
+   * components or passes worn ones.
+   */
+  it('passes at the limit and condemns past it', () => {
+    expect(computeComponentVerdict('ADAPTER_CROWN_LUGS', 4.0, 'CASNUB_22_NLB', 'USED').status).toBe('PASS');
+    expect(computeComponentVerdict('ADAPTER_CROWN_LUGS', 4.1, 'CASNUB_22_NLB', 'USED').status).toBe('CONDEMNED');
+    expect(computeComponentVerdict('ADAPTER_CROWN_SEAT', 3.5, 'CASNUB_22_NLB', 'USED').status).toBe('PASS');
+    expect(computeComponentVerdict('ADAPTER_CROWN_SEAT', 3.6, 'CASNUB_22_NLB', 'USED').status).toBe('CONDEMNED');
+  });
+
+  it('treats no wear as the good case, not as a missing reading', () => {
+    // Min is zero on a wear check. A brand-new adapter measures zero and must
+    // not read as out of range.
+    for (const target of ['ADAPTER_CROWN_LUGS', 'ADAPTER_CROWN_SEAT', 'ADAPTER_THRUST_SHOULDER', 'ADAPTER_SIDES'] as const) {
+      expect(computeComponentVerdict(target, 0, 'CASNUB_22_NLB', 'USED').status, target).toBe('PASS');
+    }
+  });
+
+  it('offers a caliper now that the limit is sourced', () => {
+    /*
+     * This item used to be in the no-caliper list above, correctly, because
+     * no figure had been found for it. §309B was found on 27 August 2026, so
+     * it must now route to a real target — otherwise the limit exists in the
+     * registry and nothing can reach it.
+     */
+    expect(resolveComponentTarget('Axle Box Adapter Crown Lug Wear (Max 4.0mm)', 'BEARINGS'))
+      .toBe('ADAPTER_CROWN_LUGS');
+    // And must not fall through to the CTRB branch, which is still suppressed.
+    expect(resolveComponentTarget('Axle Box Adapter Crown Lug Wear (Max 4.0mm)', 'BEARINGS'))
+      .not.toBeNull();
+  });
+
+  it('cites the clause, not just a standard', () => {
+    // §309B is a specific table. "RDSO G-81" was what this check used to cite,
+    // which is where the figure is not.
+    const r = computeComponentVerdict('ADAPTER_CROWN_LUGS', 2, 'CASNUB_22_NLB', 'USED');
+    expect(r.tableReference).toContain('309B');
+  });
+
+  it('keeps the thrust shoulder distinct — it is far tighter', () => {
+    // 0.7 mm against 4.0 mm for the crown lugs. Sharing one limit across the
+    // adapter would pass a thrust shoulder five times past condemning.
+    expect(computeComponentVerdict('ADAPTER_THRUST_SHOULDER', 1.0, 'CASNUB_22_NLB', 'USED').status).toBe('CONDEMNED');
+    expect(computeComponentVerdict('ADAPTER_CROWN_LUGS', 1.0, 'CASNUB_22_NLB', 'USED').status).toBe('PASS');
   });
 });

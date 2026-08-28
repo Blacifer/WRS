@@ -81,7 +81,7 @@ describe('Tolerance Verification Status', () => {
       'CTRB Cartridge Bearing Rotation',
       'CTRB End Cap Screws (100% Replace — POH)',
       'CTRB Grease Seal (100% Replace — POH)',
-      'Axle Box Adapter Crown Wear'
+      'CTRB End Cap — visual inspection (no dimensional limit published)'
     ]) {
       assert.strictEqual(
         resolveComponentTarget(partName, 'BEARINGS'),
@@ -89,6 +89,24 @@ describe('Tolerance Verification Status', () => {
         `${partName} must not offer a caliper reading`
       );
     }
+  });
+
+  it('TC-VER-06b: the adapter DOES offer one, now that §309B was found', () => {
+    /*
+     * "Axle Box Adapter Crown Wear" was in the list above until 27 August
+     * 2026, correctly — no figure had been found for it, so no caliper was
+     * offered.
+     *
+     * It was in WMM 2.0 all along, under §309B WEAR LIMITS as "Adapter Crown
+     * lugs", 4.0 mm. The search had been for the words the app used rather
+     * than the words the manual uses. Absence of a search hit is not absence
+     * of a limit, and this assertion flipping is the record of that.
+     */
+    assert.strictEqual(
+      resolveComponentTarget('Axle Box Adapter Crown Lug Wear (Max 4.0mm)', 'BEARINGS'),
+      'ADAPTER_CROWN_LUGS',
+      'the adapter now has a sourced limit and must offer its caliper'
+    );
   });
 
   it('TC-VER-07: components that do have a sourced limit still get their caliper', () => {

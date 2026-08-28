@@ -31,6 +31,25 @@ export interface ComponentToleranceSpec {
 }
 
 export const COMPONENT_TOLERANCE_SPECS: Record<Exclude<CVComponentTarget, 'OUTER_SPRING' | 'INNER_SPRING' | 'SNUBBER_SPRING'>, ComponentToleranceSpec> = {
+  /*
+   * Adapter and side frame wear limits, WMM 2.0 §309B.
+   *
+   * These were an open question routed to the shop for days, on the belief
+   * that no published figure existed. It did. The search had been for "axle
+   * box adapter crown wear"; the manual lists it under §309B WEAR LIMITS as
+   * "Adapter Crown lugs", and page 148 corroborates with new and condemning
+   * dimensions (156 mm new, 164 mm condemning, 4 mm wear).
+   *
+   * Worth remembering as a research failure rather than a data absence: the
+   * figure was there for months while the app carried the check as
+   * unmeasurable. Absence of a search hit is not absence of a limit.
+   *
+   * Max-only wear checks — min is zero because no wear is the good case.
+   */
+  ADAPTER_CROWN_LUGS: { nominalValue: 0.0, minPermissible: 0.0, maxPermissible: 4.0, tableRef: 'WMM 2.0 §309B (Adapter Crown lugs)' },
+  ADAPTER_CROWN_SEAT: { nominalValue: 0.0, minPermissible: 0.0, maxPermissible: 3.5, tableRef: 'WMM 2.0 §309B (Adapter crown seat)' },
+  ADAPTER_THRUST_SHOULDER: { nominalValue: 0.0, minPermissible: 0.0, maxPermissible: 0.7, tableRef: 'WMM 2.0 §309B (Adapter Thrust shoulder)' },
+  ADAPTER_SIDES: { nominalValue: 0.0, minPermissible: 0.0, maxPermissible: 3.0, tableRef: 'WMM 2.0 §309B (Adapter sides)' },
   FRICTION_WEDGE: { nominalValue: 136.0, minPermissible: 129.0, maxPermissible: 138.0, tableRef: 'RDSO G-95 Para 4.4' },
   // Preferred over FRICTION_WEDGE — matches the checklist's own two separate
   // line items (Vertical Face / Slope Surface), each with its own WMM 2.0
@@ -323,6 +342,23 @@ export function resolveComponentTarget(partName: string, category: string): CVCo
     return withApprovedLimit('FRICTION_WEDGE');
   }
   if (category === 'BEARINGS' || name.includes('end cap') || name.includes('ctrb') || name.includes('bearing') || name.includes('कैप')) {
+    /*
+     * The adapter checks are real measurements with a published limit —
+     * WMM 2.0 §309B — so they route to their own targets rather than falling
+     * into the CTRB branch below and being suppressed with it.
+     *
+     * Checked before the CTRB fallthrough because "Axle Box Adapter..."
+     * contains neither "ctrb" nor "end cap" but does arrive under BEARINGS,
+     * and without this it would resolve to CTRB_END_CAP and offer no caliper
+     * for a check that now has one.
+     */
+    if (name.includes('adapter')) {
+      if (name.includes('thrust shoulder')) return withApprovedLimit('ADAPTER_THRUST_SHOULDER');
+      if (name.includes('crown seat')) return withApprovedLimit('ADAPTER_CROWN_SEAT');
+      if (name.includes('crown')) return withApprovedLimit('ADAPTER_CROWN_LUGS');
+      if (name.includes('side')) return withApprovedLimit('ADAPTER_SIDES');
+    }
+
     // Routed normally. Whether a caliper button appears is decided at the end
     // of this function by the spec's own verificationStatus, not by a special
     // case here — CTRB_END_CAP is PENDING_SIGNOFF, so it resolves to null

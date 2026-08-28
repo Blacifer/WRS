@@ -139,6 +139,30 @@ export const RDSO_TOLERANCE_SPECS = {
   // The numbers below exist only so the shape is complete. PENDING_SIGNOFF is
   // what stopped them ever reaching an inspector while the question was open,
   // and it must stay: there is nothing to sign off.
+  ADAPTER_CROWN_LUGS: {
+    componentType: 'ADAPTER_CROWN_LUGS',
+    nameEn: 'Axle Box Adapter — Crown Lug Wear',
+    nameHi: 'एक्सल बॉक्स एडाप्टर — क्राउन लग घिसाव',
+    rdsoStandard: 'WMM 2.0 §309B (Adapter Crown lugs)',
+    nominalValue: 0.0,
+    minPermissible: 0.0,
+    maxPermissible: 4.0,
+    diameterNominal: 0,
+    unit: 'mm',
+    verificationStatus: 'VERIFIED'
+  },
+  ADAPTER_CROWN_SEAT: {
+    componentType: 'ADAPTER_CROWN_SEAT',
+    nameEn: 'Axle Box Adapter — Crown Seat Wear',
+    nameHi: 'एक्सल बॉक्स एडाप्टर — क्राउन सीट घिसाव',
+    rdsoStandard: 'WMM 2.0 §309B (Adapter crown seat)',
+    nominalValue: 0.0,
+    minPermissible: 0.0,
+    maxPermissible: 3.5,
+    diameterNominal: 0,
+    unit: 'mm',
+    verificationStatus: 'VERIFIED'
+  },
   CTRB_END_CAP: {
     componentType: 'CTRB_END_CAP',
     nameEn: 'CTRB End Cap (Gap & Bolt Deflection)',

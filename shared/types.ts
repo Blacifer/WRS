@@ -1185,6 +1185,11 @@ export type CVComponentTarget =
   // match instead of sharing one ambiguous target between both.
   | 'FRICTION_WEDGE_VERTICAL'
   | 'FRICTION_WEDGE_SLOPE'
+  // Adapter wear, WMM 2.0 §309B. Max-only checks: no wear is the good case.
+  | 'ADAPTER_CROWN_LUGS'
+  | 'ADAPTER_CROWN_SEAT'
+  | 'ADAPTER_THRUST_SHOULDER'
+  | 'ADAPTER_SIDES'
   | 'CTRB_END_CAP'
   | 'CTRB_BEARING_END_CAP'
   | 'WHEEL_FLANGE'
