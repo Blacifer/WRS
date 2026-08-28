@@ -86,6 +86,7 @@ export const WAGON_SPRING_CONFIGS: WagonSpringConfig[] = [
   // carries 12. Keying spring counts off the bogie alone would have been
   // wrong for every one of these.
   { designation: 'BOBRN', category: 'OPEN', axleLoad: '20.32t', bogieDescription: 'CASNUB 22 NLB', bogieType: 'CASNUB_22_NLB', counts: { outer: 14, inner: 8, snubber: 4 }, tableRef: C6, notes: 'Bottom-discharge ore wagon. 319 overhauled at Raipur in 2025-26.' },
+  { designation: 'BOBSN', category: 'OPEN', axleLoad: '22.9t', bogieDescription: 'CASNUB 22 NLB (modified)', bogieType: 'CASNUB_22_NLB', counts: { outer: 14, inner: 10, snubber: 4 }, tableRef: C6, notes: '136 overhauled at Raipur in 2025-26.' },
   { designation: 'BOBYN', category: 'OPEN', axleLoad: '20.32t', bogieDescription: 'CASNUB 22 NLB', bogieType: 'CASNUB_22_NLB', counts: { outer: 14, inner: 8, snubber: 4 }, tableRef: C6 },
   { designation: 'BCNHL', category: 'COVERED', axleLoad: '22.9t', bogieDescription: 'CASNUB 22 HS', bogieType: 'CASNUB_22_HS', counts: { outer: 14, inner: 14, snubber: 4 }, tableRef: C6 },
   { designation: 'BTAP', category: 'OPEN', axleLoad: '20.32t', bogieDescription: 'CASNUB 22 NLB', bogieType: 'CASNUB_22_NLB', counts: { outer: 12, inner: 8, snubber: 4 }, tableRef: 'WMM 2.0 Chapter 1 (Alumina Tank Wagon BTAP)', notes: 'Alumina tank wagon. 12 outer on the same bogie BOBRN carries 14 on — the counts are per wagon, not per bogie.' },

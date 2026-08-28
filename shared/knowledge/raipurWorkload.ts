@@ -60,6 +60,23 @@ export interface RaipurWagonVolume {
   classifiable: boolean;
 }
 
+/**
+ * What the manual does NOT contain, so nobody searches for it twice.
+ *
+ * Every remaining unconfigured type was looked for across all 659 pages:
+ *
+ *   BVZI   a brake van on an ICF bogie, not a CASNUB — a different spring
+ *          arrangement entirely, and outside everything this app holds.
+ *   BFNV   appears only as a certification amendment record. Bogie named
+ *          (LWLH), spring counts given nowhere.
+ *   BVCM   appears once, as a speed figure.
+ *   BLC    appears as dimensions only.
+ *   BFKN   does not appear in the manual at all.
+ *
+ * These need a source other than WMM 2.0. They are not an oversight and they
+ * will not be found by looking harder at the same document.
+ */
+
 /** Wagons turned out at WRS Raipur, 2025–26, busiest first. */
 export const RAIPUR_WORKLOAD_2025_26: RaipurWagonVolume[] = [
   { designation: 'BOXNHL', poh: 2503, npoh: 12, roh: 8, total: 2523, configured: true, classifiable: true },
@@ -70,7 +87,7 @@ export const RAIPUR_WORKLOAD_2025_26: RaipurWagonVolume[] = [
   { designation: 'BOBRN', poh: 305, npoh: 14, roh: 0, total: 319, configured: true, classifiable: true },
   { designation: 'BOXNR', poh: 278, npoh: 5, roh: 2, total: 285, configured: true, classifiable: true },
   { designation: 'BTAP', poh: 156, npoh: 0, roh: 0, total: 156, configured: true, classifiable: true },
-  { designation: 'BOBSN', poh: 136, npoh: 0, roh: 0, total: 136, configured: false, classifiable: false },
+  { designation: 'BOBSN', poh: 136, npoh: 0, roh: 0, total: 136, configured: true, classifiable: true },
   { designation: 'BVZI', poh: 132, npoh: 0, roh: 0, total: 132, configured: false, classifiable: false },
   { designation: 'BFNV', poh: 102, npoh: 0, roh: 0, total: 102, configured: false, classifiable: false },
   { designation: 'BCN', poh: 61, npoh: 0, roh: 0, total: 61, configured: true, classifiable: true },
