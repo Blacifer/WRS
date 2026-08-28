@@ -14,6 +14,12 @@
 
 import { describe, it, expect } from 'vitest';
 import { extractCandidates, MIN_CONFIDENCE } from './wagonNumberOcr.ts';
+import { computeCheckDigit } from '../../../shared/wagons/wagonNumber.ts';
+
+/** A wagon number that satisfies the §417 check digit. */
+function realNumber(firstTen: string): string {
+  return firstTen + computeCheckDigit(firstTen);
+}
 
 describe('Extracting a wagon number from recognised text', () => {
   it('finds an eleven-digit number on its own', () => {
@@ -84,5 +90,43 @@ describe('The refusal threshold', () => {
     // keystrokes, a wrong one costs an overhaul recorded against the wrong
     // wagon and found months later.
     expect(MIN_CONFIDENCE).toBeGreaterThanOrEqual(0.6);
+  });
+});
+
+describe('Checking its own reading', () => {
+  it('marks a candidate that satisfies the check digit', () => {
+    const good = realNumber('2207190123');
+    const c = extractCandidates(good, 0.9);
+    expect(c[0].text).toBe(good);
+    expect(c[0].checkDigitValid).toBe(true);
+    expect(c[0].impliedType).toBe('BOXNHL');
+  });
+
+  it('marks one that does not', () => {
+    const good = realNumber('2207190123');
+    const wrong = good.slice(0, 10) + ((Number(good[10]) + 1) % 10);
+    const c = extractCandidates(wrong, 0.95);
+    expect(c[0].checkDigitValid).toBe(false);
+    expect(c[0].impliedType).toBeUndefined();
+  });
+
+  it('prefers a valid number over a confident invalid one', () => {
+    /*
+     * The ordering that matters. OCR confidence describes certainty about
+     * glyph shapes; the check digit describes whether the digits can be a
+     * wagon number at all. Before this, a confident misread was offered
+     * first — which is the failure that attaches an overhaul to the wrong
+     * vehicle.
+     */
+    const good = realNumber('7202150789');
+    const bad = '99999999999';
+    const c = extractCandidates(`${bad} ${good}`, 0.9);
+    expect(c[0].text).toBe(good);
+    expect(c[0].checkDigitValid).toBe(true);
+  });
+
+  it('does not claim a check on something that is not eleven digits', () => {
+    const c = extractCandidates('4567890', 0.9);
+    expect(c[0].checkDigitValid).toBe(false);
   });
 });

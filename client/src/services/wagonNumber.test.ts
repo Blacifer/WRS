@@ -11,7 +11,7 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  readWagonNumber,
+  parseWagonNumber,
   computeCheckDigit,
   TYPE_CODES,
   RAILWAY_CODES
@@ -25,7 +25,7 @@ function valid(firstTen: string): string {
 describe('Taking a number apart', () => {
   it('reads type, railway, year and serial from the digits', () => {
     const n = valid('2207190123'); // BOXNHL, South Eastern, 2019
-    const r = readWagonNumber(n);
+    const r = parseWagonNumber(n);
     expect(r.valid).toBe(true);
     expect(r.wagonType).toBe('BOXNHL');
     expect(r.owningRailway).toBe('South Eastern Railway');
@@ -53,7 +53,7 @@ describe('Taking a number apart', () => {
 
   it('does not pretend to know an unallocated type code', () => {
     // 99 is not allocated. Better to say nothing than to invent a wagon.
-    const r = readWagonNumber(valid('9901190123'));
+    const r = parseWagonNumber(valid('9901190123'));
     expect(r.wagonType).toBeUndefined();
     expect(r.valid).toBe(true); // the number is still well-formed
   });
@@ -77,7 +77,7 @@ describe('Catching a wrong number', () => {
           const wrong = good.slice(0, pos) + d + good.slice(pos + 1);
           tested++;
           expect(
-            readWagonNumber(wrong).valid,
+            parseWagonNumber(wrong).valid,
             `a single wrong digit at position ${pos + 1} of ${good} was not caught`
           ).toBe(false);
         }
@@ -104,7 +104,7 @@ describe('Catching a wrong number', () => {
         if (good[i] === good[i + 1]) continue;
         const swapped = good.slice(0, i) + good[i + 1] + good[i] + good.slice(i + 2);
         total++;
-        if (!readWagonNumber(swapped).valid) caught++;
+        if (!parseWagonNumber(swapped).valid) caught++;
       }
     }
     const rate = caught / total;
@@ -116,7 +116,7 @@ describe('Catching a wrong number', () => {
   it('explains the problem in words an inspector can act on', () => {
     const good = valid('2207190123');
     const wrong = good.slice(0, 4) + '8' + good.slice(5);
-    const r = readWagonNumber(wrong);
+    const r = parseWagonNumber(wrong);
     expect(r.valid).toBe(false);
     expect(r.problem).toMatch(/check digit/i);
     expect(r.problem, 'must tell them what to do').toMatch(/check it against the wagon/i);
@@ -125,7 +125,7 @@ describe('Catching a wrong number', () => {
   it('handles a half-typed number without throwing', () => {
     // The realistic caller is a screen with a number being typed into it.
     for (const partial of ['', '2', '22071', '220719012', '220719012345678']) {
-      const r = readWagonNumber(partial);
+      const r = parseWagonNumber(partial);
       expect(r.valid).toBe(false);
       expect(r.problem).toMatch(/eleven digits/);
     }
@@ -134,7 +134,7 @@ describe('Catching a wrong number', () => {
   it('ignores spacing, since stencils are spaced in groups', () => {
     const good = valid('2207190123');
     const spaced = good.slice(0, 4) + ' ' + good.slice(4, 8) + '  ' + good.slice(8);
-    expect(readWagonNumber(spaced).valid).toBe(true);
+    expect(parseWagonNumber(spaced).valid).toBe(true);
   });
 });
 

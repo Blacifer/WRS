@@ -31,6 +31,7 @@
  */
 
 import Tesseract from 'tesseract.js';
+import { parseWagonNumber } from '../../../shared/wagons/wagonNumber.ts';
 
 export interface WagonNumberCandidate {
   /** The reading, cleaned of spacing and stray punctuation. */
@@ -39,6 +40,18 @@ export interface WagonNumberCandidate {
   confidence: number;
   /** True when the reading is eleven digits, as an IR wagon number should be. */
   matchesStandardFormat: boolean;
+  /**
+   * True when the eleven digits satisfy the §417 check digit.
+   *
+   * This is the strongest signal available and it does not come from the
+   * recogniser. OCR confidence says how sure Tesseract is about the shapes it
+   * saw; the check digit says whether the digits can be a real wagon number at
+   * all. A misread almost always fails it, so a reading that passes is worth
+   * more than a high-confidence reading that does not.
+   */
+  checkDigitValid: boolean;
+  /** Wagon type implied by the first two digits, when the check passes. */
+  impliedType?: string;
 }
 
 export interface WagonNumberResult {
@@ -90,16 +103,28 @@ export function extractCandidates(rawText: string, confidence: number): WagonNum
   for (const run of runs) {
     if (seen.has(run)) continue;
     seen.add(run);
+    const parsed = run.length === 11 ? parseWagonNumber(run) : null;
     candidates.push({
       text: run,
       confidence,
-      matchesStandardFormat: run.length === 11
+      matchesStandardFormat: run.length === 11,
+      checkDigitValid: parsed?.valid === true,
+      impliedType: parsed?.valid ? parsed.wagonType : undefined
     });
   }
 
-  // An eleven-digit run is what a wagon number looks like, so prefer those;
-  // then longer over shorter, since a truncated read is the common failure.
+  /*
+   * Ordering, strongest evidence first.
+   *
+   * A passing check digit outranks everything, including OCR confidence.
+   * Tesseract's confidence describes how certain it is about the glyph shapes;
+   * the check digit describes whether those digits can be a wagon number at
+   * all. Roughly nine in ten misreads fail it, so a candidate that passes is
+   * far more likely correct than a confident one that does not — and before
+   * this, a confident misread would have been offered first.
+   */
   return candidates.sort((a, b) => {
+    if (a.checkDigitValid !== b.checkDigitValid) return a.checkDigitValid ? -1 : 1;
     if (a.matchesStandardFormat !== b.matchesStandardFormat) return a.matchesStandardFormat ? -1 : 1;
     return b.text.length - a.text.length;
   });
@@ -133,6 +158,22 @@ export async function readWagonNumber(image: string | Blob | HTMLCanvasElement):
         candidate: null,
         alternatives: [],
         reason: 'No number could be read from that photograph. Move closer, or type it in.'
+      };
+    }
+
+    /*
+     * A candidate whose check digit passes is offered even when the recogniser
+     * was unsure, because the arithmetic is better evidence than the
+     * confidence score. The reading is still shown for a person to confirm —
+     * a valid check digit means "no reason to doubt this", never "certainly
+     * right".
+     */
+    const checked = candidates.find((c) => c.checkDigitValid);
+    if (checked) {
+      return {
+        ok: true,
+        candidate: checked,
+        alternatives: candidates.filter((c) => c !== checked)
       };
     }
 

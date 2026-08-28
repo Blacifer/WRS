@@ -119,14 +119,18 @@ export function computeCheckDigit(firstTen: string): number {
 }
 
 /**
- * Reads everything the number itself can tell us.
+ * Parses everything the number itself can tell us.
+ *
+ * Named parse rather than read to keep it distinct from the OCR module's
+ * readWagonNumber, which reads a number off a photograph. This one reads
+ * meaning out of the digits once you have them.
  *
  * Deliberately returns a reading for a malformed number too, with `problem`
  * set, rather than throwing. The caller is usually a screen with a
  * half-typed number in it, and an exception on every keystroke would be
  * useless to it.
  */
-export function readWagonNumber(raw: string): WagonNumberReading {
+export function parseWagonNumber(raw: string): WagonNumberReading {
   const digits = (raw || '').replace(/\D/g, '');
 
   if (digits.length !== 11) {
@@ -176,5 +180,5 @@ export function readWagonNumber(raw: string): WagonNumberReading {
  * still shows a reading before using it.
  */
 export function passesCheck(raw: string): boolean {
-  return readWagonNumber(raw).valid;
+  return parseWagonNumber(raw).valid;
 }

@@ -161,6 +161,25 @@ export function WagonNumberCamera({ lang, onRead, onClose }: Props) {
                   ? (isHi ? '11 अंक, मानक' : 'eleven digits, as expected')
                   : (isHi ? 'मानक 11 अंक नहीं — ध्यान दें' : 'not the standard eleven digits — check carefully')}
               </p>
+
+              {/* The check digit is stronger evidence than the recogniser's own
+                  confidence, so it is said plainly rather than buried in a
+                  percentage. A wagon type derived from the digits also tells
+                  the reader the number was understood, not just transcribed. */}
+              {result.candidate.checkDigitValid ? (
+                <p className="text-[11px] text-emerald-300">
+                  {isHi ? '✓ चेक अंक सही' : '✓ Check digit valid'}
+                  {result.candidate.impliedType
+                    ? ` · ${isHi ? 'वैगन प्रकार' : 'reads as'} ${result.candidate.impliedType}`
+                    : ''}
+                </p>
+              ) : (
+                <p className="text-[11px] text-amber-300">
+                  {isHi
+                    ? '⚠ चेक अंक मेल नहीं खाता — वैगन पर मिलान करें'
+                    : '⚠ Check digit does not match — compare against the wagon before using this'}
+                </p>
+              )}
               <button
                 onClick={() => onRead(result.candidate!.text)}
                 className="w-full min-h-[44px] rounded-lg bg-white text-black text-sm font-extrabold"
