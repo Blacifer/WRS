@@ -5,7 +5,8 @@
  * THE authoritative default checklist applied to every wagon registered in
  * this workshop. Reconciled against RDSO Technical Pamphlet G-95 Rev-II and
  * the Wagon Maintenance Manual 2.0 (including Appendix-V's Must-Change list
- * and the WRS Raipur Mark-50 Draft Gear gauge boards).
+ * and, formerly, the WRS Raipur Mark-50 gauge boards — see the note in the
+ * COUPLERS_DRAFT_GEAR section for why those checks were withdrawn).
  *
  * This lives in its own module because it is production data, not demo data.
  * It previously sat inside seed.ts, which meant the code path that registers
@@ -72,31 +73,41 @@ export const CASNUB_CHECKLIST_TEMPLATE: ChecklistTemplateItem[] = [
   // implicated in train-parting/uncoupling incidents, not routine wear items.
   { category: 'COUPLERS_DRAFT_GEAR', partName: 'CBC Knuckle Nose Wear (100% Replace — POH, WD-70-BD-10)', bogiePosition: 'BODY', isMandatory: 1, std: 'WMM 2.0 Appx-V B-1' },
   { category: 'COUPLERS_DRAFT_GEAR', partName: 'CBC Lock (100% Replace — POH, WD-70-BD-10)', bogiePosition: 'BODY', isMandatory: 1, std: 'WMM 2.0 Appx-V B-2' },
-  { category: 'COUPLERS_DRAFT_GEAR', partName: 'Mark-50 Draft Gear Housing', bogiePosition: 'BODY', isMandatory: 1, std: 'RDSO 49-BD-08' },
+  { category: 'COUPLERS_DRAFT_GEAR', partName: 'Draft Gear Housing', bogiePosition: 'BODY', isMandatory: 1, std: 'RDSO 49-BD-08' },
   { category: 'COUPLERS_DRAFT_GEAR', partName: 'Striker Casting Wear Plate (100% Replace — POH)', bogiePosition: 'BODY', isMandatory: 1, std: 'WMM 2.0 Appx-V B-7' },
-  // Mark-50 Draft Gear recondition gauges, sourced from the WRS Raipur
-  // shop-floor gauge reference boards (photographed on site, 2026-08-22),
-  // not from a numbered RDSO/WMM clause — cited by Gauge No. as printed on
-  // each board. The 7 items below with a caliper-measurable dimension are
-  // wired into the AR Caliper flow (see DG_* entries in shared/types.ts,
-  // server/src/routes/cv.ts, client/src/services/classification.ts). The
-  // remaining 6 are physical GO/NO-GO or rotate-and-check gauges performed
-  // by hand — deliberately left as a manual PASS/FAIL item, not a fake
-  // digital measurement.
-  { category: 'COUPLERS_DRAFT_GEAR', partName: 'Draft Gear Housing Box Profile Gauge (Gauge No. 27200)', bogiePosition: 'BODY', isMandatory: 1, std: 'WRS Raipur Gauge 27200 / BE/91-62-1' },
-  { category: 'COUPLERS_DRAFT_GEAR', partName: 'Draft Gear Housing Wall Thickness (Min 15.88mm)', bogiePosition: 'BODY', isMandatory: 1, std: 'WRS Raipur Gauge BE/91-62-6' },
-  { category: 'COUPLERS_DRAFT_GEAR', partName: 'Draft Gear Centre Wedge Location Gauge (59.54–61.11mm)', bogiePosition: 'BODY', isMandatory: 1, std: 'WRS Raipur Gauge BE/91-72-1' },
-  { category: 'COUPLERS_DRAFT_GEAR', partName: 'Draft Gear Movable Plate Location Gauge (141.27–144.48mm)', bogiePosition: 'BODY', isMandatory: 1, std: 'WRS Raipur Gauge BE/91-61-10' },
-  { category: 'COUPLERS_DRAFT_GEAR', partName: 'Draft Gear Movable Plate Rotation Gauge (180° Test)', bogiePosition: 'BODY', isMandatory: 1, std: 'WRS Raipur Gauge BE/91-61-10' },
-  { category: 'COUPLERS_DRAFT_GEAR', partName: 'Draft Gear Outer Coil Spring (Free Height Min 342mm)', bogiePosition: 'BODY', isMandatory: 1, std: 'WRS Raipur Gauge BE/91-61-6' },
-  { category: 'COUPLERS_DRAFT_GEAR', partName: 'Draft Gear Inner Coil Spring (Free Height Min 342mm)', bogiePosition: 'BODY', isMandatory: 1, std: 'WRS Raipur Gauge BE/91-61-7A' },
-  { category: 'COUPLERS_DRAFT_GEAR', partName: 'Draft Gear Corner Coil Spring (Free Height Min 286mm)', bogiePosition: 'BODY', isMandatory: 1, std: 'WRS Raipur Gauge BE/91-61-7a' },
-  { category: 'COUPLERS_DRAFT_GEAR', partName: 'Draft Gear Release Spring (Free Height Min 123mm)', bogiePosition: 'BODY', isMandatory: 1, std: 'WRS Raipur Gauge BE/91-61-8' },
-  { category: 'COUPLERS_DRAFT_GEAR', partName: 'Draft Gear Wedge Shoe Gap Gauge (Max 0.38mm)', bogiePosition: 'BODY', isMandatory: 1, std: 'WRS Raipur Gauge BE/91-61-2' },
-  { category: 'COUPLERS_DRAFT_GEAR', partName: 'Draft Gear Centre Wedge Gap Gauge (Max 0.38mm)', bogiePosition: 'BODY', isMandatory: 1, std: 'WRS Raipur Gauge BE/91-61-1' },
-  { category: 'COUPLERS_DRAFT_GEAR', partName: 'Draft Gear Outer Stationary Plate Gap Gauge (Max 0.38mm)', bogiePosition: 'BODY', isMandatory: 1, std: 'WRS Raipur Gauge BE/91-61-3' },
-  { category: 'COUPLERS_DRAFT_GEAR', partName: 'Draft Gear Taper Stationary Plate Gauge (NO GO 0.25mm)', bogiePosition: 'BODY', isMandatory: 1, std: 'WRS Raipur Gauge BE/91-61-4' },
-  { category: 'COUPLERS_DRAFT_GEAR', partName: 'Draft Gear Spring Seat Gap Gauge (Max 0.38mm)', bogiePosition: 'BODY', isMandatory: 1, std: 'WRS Raipur Gauge BE/91-61-5' },
+  /*
+   * The Mark-50 gauge checks that used to sit here have been removed.
+   *
+   * WRS Raipur, 27 August 2026: "Presently we are not overhauling MK-50.
+   * MK-50 draft gear replaced by upgraded High capacity 71-BD draft gear, and
+   * presently we have no any MK-50 gauges."
+   *
+   * Fourteen MANDATORY items were asking inspectors to check a draft gear the
+   * shop does not overhaul, using gauge numbers it no longer holds. Every one
+   * would have been permanently incompletable, so every wagon's exit gate
+   * would have been permanently blocked — and the only way past would have
+   * been a supervisor bulk-clear, which would have turned the exception into
+   * the normal path and hollowed out the gate entirely.
+   *
+   * They came from photographs of the shop's own gauge reference boards taken
+   * on 22 August. The boards are apparently still on the wall; the gauges and
+   * the work are not. A photograph of a board is evidence that a board exists,
+   * which is not the same as evidence of what the shop does — and that
+   * distinction is the whole lesson here.
+   *
+   * WHAT REPLACES THEM
+   * ------------------
+   * One item, below, against RDSO STR 49-BD-08, which governs high capacity
+   * draft gear whichever type is fitted. It is deliberately not prescriptive
+   * about dimensions: WMM 2.0 predates 71-BD and names only RF-361, MK-50 and
+   * MINER SL-76, so this system holds no verified figures for what Raipur now
+   * fits. Inventing some would repeat exactly the mistake being corrected.
+   *
+   * When the 71-BD limits arrive — from RDSO STR 49-BD-08 itself or from the
+   * shop's own gauge board for the new gear — they belong here, as measurable
+   * items with their source cited.
+   */
+  { category: 'COUPLERS_DRAFT_GEAR', partName: 'High Capacity Draft Gear — condition, free movement and seating', bogiePosition: 'BODY', isMandatory: 1, std: 'RDSO STR 49-BD-08 (type as fitted)' },
 
   // 6. BOGIE_FRAME_BOLSTER
   { category: 'BOGIE_FRAME_BOLSTER', partName: 'Side Frame Column Liners', bogiePosition: 'BOGIE_1', isMandatory: 1, std: 'RDSO G-95' },

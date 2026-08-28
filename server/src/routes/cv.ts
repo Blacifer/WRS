@@ -229,6 +229,19 @@ export const RDSO_TOLERANCE_SPECS = {
     unit: 'mm',
     verificationStatus: 'VERIFIED'
   },
+  /*
+   * WARNING — these are MARK-50 figures and no checklist item reaches them.
+   *
+   * WRS Raipur confirmed on 27 August 2026 that it no longer overhauls MK-50
+   * and holds no MK-50 gauges; the checklist items that routed here were
+   * withdrawn. The dimensions are kept because RDSO STR 49-BD-08 governs high
+   * capacity draft gear generally and the structure will be reusable.
+   *
+   * They must NOT be reused for the 71-BD gear now fitted. Different gear,
+   * different dimensions. Wiring a 71-BD item to a MK-50 limit would produce
+   * a confident verdict against the wrong specification, which is worse than
+   * having no check at all.
+   */
   DG_OUTER_COIL_SPRING: {
     componentType: 'DG_OUTER_COIL_SPRING',
     nameEn: 'Draft Gear Outer Coil Spring (Free Height)',

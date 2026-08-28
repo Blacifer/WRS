@@ -56,6 +56,19 @@ export const COMPONENT_TOLERANCE_SPECS: Record<Exclude<CVComponentTarget, 'OUTER
   // gauging (see server/src/routes/cv.ts for the full reasoning).
   DG_CENTRE_WEDGE_LOCATION: { nominalValue: 60.325, minPermissible: 59.54, maxPermissible: 61.11, tableRef: 'WRS Raipur Gauge BE/91-72-1' },
   DG_MOVABLE_PLATE_LOCATION: { nominalValue: 142.875, minPermissible: 141.27, maxPermissible: 144.48, tableRef: 'WRS Raipur Gauge BE/91-61-10' },
+  /*
+   * WARNING — these are MARK-50 figures and no checklist item reaches them.
+   *
+   * WRS Raipur confirmed on 27 August 2026 that it no longer overhauls MK-50
+   * and holds no MK-50 gauges; the checklist items that routed here were
+   * withdrawn. The dimensions are kept because RDSO STR 49-BD-08 governs high
+   * capacity draft gear generally and the structure will be reusable.
+   *
+   * They must NOT be reused for the 71-BD gear now fitted. Different gear,
+   * different dimensions. Wiring a 71-BD item to a MK-50 limit would produce
+   * a confident verdict against the wrong specification, which is worse than
+   * having no check at all.
+   */
   DG_OUTER_COIL_SPRING: { nominalValue: 342.0, minPermissible: 342.0, maxPermissible: 400.0, tableRef: 'WRS Raipur Gauge BE/91-61-6' },
   DG_INNER_COIL_SPRING: { nominalValue: 342.0, minPermissible: 342.0, maxPermissible: 400.0, tableRef: 'WRS Raipur Gauge BE/91-61-7A' },
   DG_CORNER_COIL_SPRING: { nominalValue: 286.0, minPermissible: 286.0, maxPermissible: 340.0, tableRef: 'WRS Raipur Gauge BE/91-61-7a' },
