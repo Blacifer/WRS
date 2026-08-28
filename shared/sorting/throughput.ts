@@ -4,15 +4,15 @@
  *
  * WHY THIS IS ITS OWN FILE
  * ------------------------
- * The app records ~900 springs a day being sorted and never says how fast.
- * That is the DRM's own number and the whole reason the sorting screen
- * exists, so it is worth showing — but a throughput figure is a claim about
- * the shop's performance, and a wrong one is worse than none.
+ * The app records roughly 700 springs a shift being sorted and never says how
+ * fast. That is the whole reason the sorting screen exists, so it is worth
+ * showing — but a throughput figure is a claim about the shop's performance,
+ * and a wrong one is worse than none.
  *
  * The dangerous case is a rate computed from a handful of taps over a few
- * seconds. Five springs in twenty seconds is 900 an hour, which would put an
- * absurd number on screen in front of the person who knows what the real
- * figure is. So the rules for refusing to quote a rate matter more than the
+ * seconds. Five springs in twenty seconds reads as 900 an hour, which would
+ * put an absurd number on screen in front of the person who knows what the
+ * real figure is. So the rules for refusing to quote a rate matter more than the
  * arithmetic, and they live here where they can be tested rather than inside
  * a component where they cannot.
  *
@@ -22,13 +22,22 @@
  */
 
 /**
- * The pile the shop gets through in a day, as the DRM described it.
+ * The pile the shop gets through in a shift.
  *
- * Used only to express a measured rate in the shop's own terms — "at this
- * rate the day's pile takes N hours". It is not a target the app holds
- * anyone to, and nothing fails if it is not met.
+ * 700, confirmed by Girish Kumar, SSE at WRS Raipur, on 27 August 2026:
+ * "Approximately 700 springs (including outer, inner and snubber springs)
+ * are used in one shift during POH work."
+ *
+ * This replaces the 900 the app previously quoted, which came from the DRM's
+ * description second-hand. Both figures may be true of different things —
+ * springs sorted versus springs fitted, or a different shift — but the shop's
+ * own first-hand number is the one to put on a screen an inspector reads.
+ *
+ * Used only to express a measured rate in the shop's own terms: "at this rate
+ * the shift's pile takes N hours". It is not a target anyone is held to, and
+ * nothing fails if it is not met.
  */
-export const DAILY_PILE = 900;
+export const DAILY_PILE = 700;
 
 /**
  * Below these, no rate is quoted.
