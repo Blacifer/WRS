@@ -157,7 +157,9 @@ export async function readWagonNumber(image: string | Blob | HTMLCanvasElement):
         ok: false,
         candidate: null,
         alternatives: [],
-        reason: 'No number could be read from that photograph. Move closer, or type it in.'
+        reason:
+          'No number could be read from that photograph. This reads the eleven digits ' +
+          'painted on the wagon — point it at those, move closer, or type them in.'
       };
     }
 
@@ -182,10 +184,27 @@ export async function readWagonNumber(image: string | Blob | HTMLCanvasElement):
         ok: false,
         candidate: null,
         alternatives: candidates,
-        reason:
-          `The number was not read clearly enough to offer (${(confidence * 100).toFixed(0)}% certain). ` +
-          `A wagon number that is wrong by one digit attaches the whole overhaul to another vehicle, ` +
-          `so it is better to type it.`
+        /*
+         * Say what it was looking for, not just how unsure it was.
+         *
+         * A photograph of a spring, or of a calibration label, produces digits
+         * and a low percentage — and "19% certain" tells the reader nothing
+         * about why. It was reported from the field as a puzzling result when
+         * the app was, correctly, refusing. The refusal was right; the
+         * explanation was not.
+         *
+         * When digits were found but none of them satisfies the §417 check
+         * digit, that is the more useful thing to say: these are not a wagon
+         * number, whatever else they are.
+         */
+        reason: candidates.some((c) => c.matchesStandardFormat)
+          ? `Eleven digits were read but they do not check out as a wagon number ` +
+            `(${(confidence * 100).toFixed(0)}% certain). Point the camera at the number painted ` +
+            `on the wagon, or type it in — a number wrong by one digit attaches the whole ` +
+            `overhaul to another vehicle.`
+          : `No wagon number could be made out (${(confidence * 100).toFixed(0)}% certain). ` +
+            `This reads the eleven digits painted on the wagon; if that is not what the ` +
+            `camera is pointed at, it will not find one.`
       };
     }
 

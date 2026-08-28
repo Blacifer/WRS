@@ -27,6 +27,7 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
   const [showRegisterModal, setShowRegisterModal] = useState<boolean>(false);
   // Reads the number painted on the wagon rather than having it typed.
   const [showNumberCamera, setShowNumberCamera] = useState(false);
+  const [showSearchCamera, setShowSearchCamera] = useState(false);
   const [newWagonNumber, setNewWagonNumber] = useState<string>('');
   const [newWagonType, setNewWagonType] = useState<string>('BOXNHL');
   const [newOwningRailway, setNewOwningRailway] = useState<string>('SECR');
@@ -171,8 +172,23 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
             placeholder={isHi ? 'वैगन संख्या, रेलवे, प्रकार खोजें...' : 'Search wagon number, railway, type...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 min-h-[48px]"
+            className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-4 pr-14 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 min-h-[48px]"
           />
+          {/*
+            Scanning to FIND a wagon, which is the common case. The camera used
+            to exist only inside the Register New Wagon form — a rare action —
+            so in practice nobody could reach it: an inspector never opens that
+            form, and a supervisor opens it a few times a month.
+          */}
+          <button
+            type="button"
+            onClick={() => setShowSearchCamera(true)}
+            title={isHi ? 'वैगन पर लिखा नंबर पढ़ें' : 'Read the number painted on the wagon'}
+            aria-label={isHi ? 'वैगन नंबर स्कैन करें' : 'Scan a wagon number'}
+            className="absolute right-2 top-1/2 -translate-y-1/2 min-h-[40px] min-w-[40px] px-2 rounded-lg border border-amber-600 text-amber-300 hover:bg-amber-950/50 text-base"
+          >
+            📷
+          </button>
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
@@ -278,6 +294,20 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
             );
           })}
         </div>
+      )}
+
+      {/* Scanning to FIND a wagon, which is the common case. The camera used
+          to exist only inside the Register New Wagon form — a rare action — so
+          in practice nobody could reach it. */}
+      {showSearchCamera && (
+        <WagonNumberCamera
+          lang={isHi ? 'hi' : 'en'}
+          onRead={(num) => {
+            setSearchQuery(num);
+            setShowSearchCamera(false);
+          }}
+          onClose={() => setShowSearchCamera(false)}
+        />
       )}
 
       {/* Register Wagon Modal */}

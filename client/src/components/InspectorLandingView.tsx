@@ -16,6 +16,7 @@ import { getDictionary } from '../i18n/index.ts';
 import { offlineDb } from '../services/offlineDb.ts';
 import { api } from '../services/api.ts';
 import { CameraIcon, RefreshCwIcon, GlobeIcon, CheckCircleIcon, ShieldIcon } from './Icons.tsx';
+import { WagonNumberCamera } from './WagonNumberCamera.tsx';
 
 export interface InspectorLandingViewProps {
   user: User;
@@ -53,6 +54,7 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [isWagonSelectorOpen, setIsWagonSelectorOpen] = useState<boolean>(false);
   const [manualInput, setManualInput] = useState<string>('');
+  const [showNumberCamera, setShowNumberCamera] = useState(false);
   const [activeWagonInfo, setActiveWagonInfo] = useState<WagonRecord | null>(null);
   const [activeWagonLoadFailed, setActiveWagonLoadFailed] = useState<boolean>(false);
   const [recentWagons, setRecentWagons] = useState<WagonRecord[]>([]);
@@ -558,6 +560,21 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
                   placeholder="e.g. SECR-BOXN-202"
                   className="flex-1 min-h-[48px] px-4 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-sm focus:outline-none focus:border-blue-500 uppercase"
                 />
+                {/*
+                  An inspector had no way to read a wagon number with the
+                  camera at all — it existed only inside the supervisor's
+                  Register New Wagon form. Typing eleven digits with gloves on,
+                  standing at the wagon, is exactly the task a camera is for.
+                */}
+                <button
+                  type="button"
+                  onClick={() => setShowNumberCamera(true)}
+                  title={isHi ? 'वैगन पर लिखा नंबर पढ़ें' : 'Read the number painted on the wagon'}
+                  aria-label={isHi ? 'वैगन नंबर स्कैन करें' : 'Scan a wagon number'}
+                  className="min-h-[48px] px-4 rounded-xl border border-amber-600 text-amber-300 hover:bg-amber-950/50 text-base"
+                >
+                  📷
+                </button>
                 <button
                   type="submit"
                   disabled={!manualInput.trim()}
@@ -567,6 +584,17 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
                 </button>
               </div>
             </form>
+
+            {showNumberCamera && (
+              <WagonNumberCamera
+                lang={isHi ? 'hi' : 'en'}
+                onRead={(num) => {
+                  setManualInput(num);
+                  setShowNumberCamera(false);
+                }}
+                onClose={() => setShowNumberCamera(false)}
+              />
+            )}
           </div>
         </div>
       )}
