@@ -27,6 +27,13 @@ interface Hit {
   citation: string;
 }
 
+interface Answer {
+  subject: string;
+  answer: string;
+  source: string;
+  verified: boolean;
+}
+
 /** Questions inspectors actually need answered, as one-tap starting points. */
 const COMMON_QUESTIONS: { en: string; hi: string }[] = [
   { en: 'brake block condemning limit', hi: 'ब्रेक ब्लॉक कंडमिंग सीमा' },
@@ -57,6 +64,14 @@ export const ManualSearchPage: React.FC<ManualSearchPageProps> = ({ lang }) => {
 
   const [query, setQuery] = useState('');
   const [hits, setHits] = useState<Hit[] | null>(null);
+  /*
+   * Direct answers from the app's own verified figures, shown above the
+   * manual passages. Asked about brake air pressure, searching the PDF
+   * returned a passage about leader nut sleeves while the app held the
+   * answer — 4.9-5.1 kg/cm2, from §720-C — in the table it classifies
+   * against. These are that table, made askable.
+   */
+  const [answers, setAnswers] = useState<Answer[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<number | null>(null);
@@ -77,6 +92,7 @@ export const ManualSearchPage: React.FC<ManualSearchPageProps> = ({ lang }) => {
     try {
       const res = await api.searchManual(q.trim());
       setHits(res.data.hits);
+      setAnswers(res.data.answers || []);
     } catch (e: any) {
       setError(e?.message || 'Search failed');
       setHits(null);
@@ -180,6 +196,31 @@ export const ManualSearchPage: React.FC<ManualSearchPageProps> = ({ lang }) => {
               ? 'अलग शब्दों से प्रयास करें — जैसे पुर्जे का नाम और "सीमा"।'
               : 'Try different words — the component name plus “limit” or “wear” usually works.'}
           </p>
+        </div>
+      )}
+
+      {answers && answers.length > 0 && (
+        <div className="space-y-2 mb-5">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-400">
+            {isHi ? 'सीधा उत्तर — इसी ऐप के सत्यापित आँकड़ों से' : 'Direct answer — from this app’s own verified figures'}
+          </p>
+          {answers.map((a, idx) => (
+            <div
+              key={idx}
+              className="rounded-xl border border-emerald-800/70 bg-emerald-950/25 px-4 py-3"
+            >
+              <p className="text-[11px] text-emerald-300/80">{a.subject}</p>
+              <p className="text-lg font-bold text-white mt-0.5">{a.answer}</p>
+              <p className="text-[11px] text-slate-400 mt-1.5 font-mono">{a.source}</p>
+              {!a.verified && (
+                <p className="text-[11px] text-amber-300 mt-1">
+                  {isHi
+                    ? 'यह आँकड़ा अभी पुष्टि के अधीन है — उपयोग से पहले जाँच लें।'
+                    : 'This figure is not settled — sources disagree. Confirm before relying on it.'}
+                </p>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
