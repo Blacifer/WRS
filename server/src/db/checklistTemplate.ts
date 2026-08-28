@@ -48,7 +48,11 @@ export const CASNUB_CHECKLIST_TEMPLATE: ChecklistTemplateItem[] = [
   { category: 'WHEELS_AXLES', partName: 'Axle Journal UST Flaw Detection', bogiePosition: 'BOGIE_2', isMandatory: 1, std: 'RDSO ND-97' },
 
   // 3. BEARINGS
+  // The end cap is a visual check, confirmed by WRS Raipur on 27 August 2026:
+  // no dimensional detail exists for it. Named as a visual inspection so an
+  // inspector is not left looking for a gauge that was never specified.
   { category: 'BEARINGS', partName: 'CTRB Cartridge Bearing Rotation', bogiePosition: 'BOGIE_1', isMandatory: 1, std: 'RDSO G-81' },
+  { category: 'BEARINGS', partName: 'CTRB End Cap — visual inspection (no dimensional limit published)', bogiePosition: 'BOGIE_1', isMandatory: 1, std: 'RDSO G-81 / WRS Raipur practice' },
   { category: 'BEARINGS', partName: 'Axle Box Adapter Crown Wear', bogiePosition: 'BOGIE_1', isMandatory: 1, std: 'RDSO G-81' },
   // Split from the previous generic "Grease Seals & End Cap Bolts" into the three
   // items the Railway Board's Must-Change list (WMM 2.0 Appx-V, A-4/A-5/A-6) mandates

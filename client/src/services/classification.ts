@@ -42,6 +42,29 @@ export const COMPONENT_TOLERANCE_SPECS: Record<Exclude<CVComponentTarget, 'OUTER
   // PENDING_SIGNOFF is what keeps them from being shown as a verdict or
   // offered as a caliper reading. When a real figure is signed off, flipping
   // this one field turns the check on everywhere.
+  /*
+   * RESOLVED — there is no dimensional check, and there never was.
+   *
+   * WRS Raipur, 27 August 2026: "In axle End cap of CTRB only visual
+   * inspection done, no any dimensional detail available to us."
+   *
+   * These placeholder figures sat here for the whole project marked
+   * PENDING_SIGNOFF, on the assumption that a gap limit existed somewhere and
+   * we had not found it. We had not found it because it does not exist. The
+   * shop inspects the end cap by eye, and the mandatory work is replacing the
+   * screws at POH, not measuring a gap.
+   *
+   * Kept as a record rather than deleted, because the useful part is the
+   * history: the numbers were invented to complete a data structure, were
+   * never allowed to produce a verdict, and are now confirmed to have been
+   * describing a check nobody performs. PENDING_SIGNOFF did its job — it
+   * stopped a fabricated tolerance from ever reaching an inspector while the
+   * question was open. Deleting them silently would erase the evidence that
+   * the guard worked.
+   *
+   * verificationStatus stays PENDING_SIGNOFF and must never be flipped: there
+   * is nothing to sign off.
+   */
   CTRB_END_CAP: { nominalValue: 1.5, minPermissible: 0.5, maxPermissible: 3.0, tableRef: 'RDSO G-81 Wheelset', verificationStatus: 'PENDING_SIGNOFF' },
   CTRB_BEARING_END_CAP: { nominalValue: 1.5, minPermissible: 0.5, maxPermissible: 3.0, tableRef: 'RDSO G-81 Wheelset', verificationStatus: 'PENDING_SIGNOFF' },
   WHEEL_FLANGE: { nominalValue: 28.5, minPermissible: 16.0, maxPermissible: 31.0, tableRef: 'RDSO G-95 Para 5.2 / WMM 2.0 §607(a), §7' },

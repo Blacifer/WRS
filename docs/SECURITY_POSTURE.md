@@ -151,3 +151,23 @@ rather than from the code. It reflects a real workshop practice —
 exception-based inspection, where a supervisor attests to having physically
 verified the remainder — and the honest description of the gate is therefore
 "nothing leaves unaddressed", not "every item was individually measured".
+
+## One open data question, now closed
+
+The CTRB end-cap gap was carried as an unresolved figure for the whole build:
+a tolerance the app held but refused to use, marked PENDING_SIGNOFF, on the
+assumption that a published limit existed somewhere we had not looked.
+
+WRS Raipur settled it on 27 August 2026: "In axle End cap of CTRB only visual
+inspection done, no any dimensional detail available to us."
+
+There is no limit because there is no measurement. The end cap is checked by
+eye and its screws are replaced at POH, and the checklist now says so.
+
+It is recorded here because of how it behaved while the answer was unknown.
+The app held placeholder numbers so the data structure was complete, and a
+single field — verificationStatus — kept them from ever producing a verdict or
+offering a caliper. For four months the honest behaviour was maintained by a
+flag rather than by anyone remembering. That is the pattern worth repeating
+the next time a figure is missing: hold the shape, refuse the judgement, and
+make the refusal a property of the data rather than a note in a comment.

@@ -129,10 +129,16 @@ export const RDSO_TOLERANCE_SPECS = {
   },
   // The only spec in the registry with no sourced limit. WMM 2.0 gives a
   // torque and a must-change-screw procedure for the end cap and no gap
-  // figure at all; none was found in G-81 either. The numbers below exist
-  // only so the shape is complete — PENDING_SIGNOFF is what stops them being
-  // used to judge anything, and it is a field rather than this comment
-  // precisely so the rule is enforced instead of remembered.
+  // figure at all; none was found in G-81 either.
+  //
+  // RESOLVED on 27 August 2026. WRS Raipur: "In axle End cap of CTRB only
+  // visual inspection done, no any dimensional detail available to us."
+  // There is no gap limit because there is no gap measurement — the end cap
+  // is checked by eye and its screws are replaced at POH.
+  //
+  // The numbers below exist only so the shape is complete. PENDING_SIGNOFF is
+  // what stopped them ever reaching an inspector while the question was open,
+  // and it must stay: there is nothing to sign off.
   CTRB_END_CAP: {
     componentType: 'CTRB_END_CAP',
     nameEn: 'CTRB End Cap (Gap & Bolt Deflection)',
