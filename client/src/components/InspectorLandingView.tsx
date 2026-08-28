@@ -55,6 +55,33 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
   const [isWagonSelectorOpen, setIsWagonSelectorOpen] = useState<boolean>(false);
   const [manualInput, setManualInput] = useState<string>('');
   const [showNumberCamera, setShowNumberCamera] = useState(false);
+
+  /*
+   * Which job this person is doing.
+   *
+   * Springs and wagons are different work, done by different people, and
+   * clubbing them made the spring screen open with "No Active Wagon — scan a
+   * QR code or select a wagon to get started". For somebody whose whole shift
+   * is sorting ~700 springs, that is the wrong question, asked first, in the
+   * largest box on the screen.
+   *
+   * Remembered per device, because a person sorting springs today is almost
+   * certainly sorting springs tomorrow, and asking every morning is its own
+   * kind of noise. Changing it is one tap.
+   */
+  const [workMode, setWorkMode] = useState<'SPRINGS' | 'WAGON' | null>(() => {
+    try {
+      const saved = localStorage.getItem('wrs-work-mode');
+      return saved === 'SPRINGS' || saved === 'WAGON' ? saved : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const chooseWorkMode = (mode: 'SPRINGS' | 'WAGON') => {
+    setWorkMode(mode);
+    try { localStorage.setItem('wrs-work-mode', mode); } catch {}
+  };
   const [activeWagonInfo, setActiveWagonInfo] = useState<WagonRecord | null>(null);
   const [activeWagonLoadFailed, setActiveWagonLoadFailed] = useState<boolean>(false);
   const [recentWagons, setRecentWagons] = useState<WagonRecord[]>([]);
@@ -182,7 +209,10 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
         </div>
       </div>
 
-      {/* 2. Active Wagon Summary Card */}
+      {/* 2. Active Wagon Summary Card — wagon work only.
+             A spring sorter has no wagon and does not want to be asked for
+             one; this used to be the first and largest thing they saw. */}
+      {workMode === 'WAGON' && (
       <div data-testid="active-wagon-card" className="bg-gradient-to-r from-blue-950/40 via-slate-900 to-indigo-950/30 border-2 border-blue-500/40 rounded-3xl p-5 sm:p-7 shadow-2xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none"></div>
 
@@ -289,6 +319,73 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
           </div>
         )}
       </div>
+
+      )}
+
+      {/* Choosing the job, when it has not been chosen yet. */}
+      {workMode === null && (
+        <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
+          <div>
+            <h2 className="text-lg font-extrabold text-white">
+              {isHi ? 'आज आप क्या कर रहे हैं?' : 'What are you working on today?'}
+            </h2>
+            <p className="text-xs text-slate-400 mt-1">
+              {isHi
+                ? 'बाद में कभी भी बदल सकते हैं'
+                : 'You can change this any time — it just decides what this screen shows.'}
+            </p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <button
+              data-testid="choose-springs"
+              onClick={() => chooseWorkMode('SPRINGS')}
+              className="min-h-[110px] p-5 rounded-2xl border-2 border-sky-500/50 bg-sky-950/30 hover:border-sky-400 text-left transition"
+            >
+              <div className="text-3xl">⚖️</div>
+              <div className="text-lg font-extrabold text-white mt-2">
+                {isHi ? 'स्प्रिंग' : 'Springs'}
+              </div>
+              <div className="text-xs text-slate-300 mt-1">
+                {isHi ? 'छँटाई, मापन, समूह' : 'Sorting, measuring, grouping'}
+              </div>
+            </button>
+            <button
+              data-testid="choose-wagon"
+              onClick={() => chooseWorkMode('WAGON')}
+              className="min-h-[110px] p-5 rounded-2xl border-2 border-orange-500/50 bg-orange-950/30 hover:border-orange-400 text-left transition"
+            >
+              <div className="text-3xl">🚃</div>
+              <div className="text-lg font-extrabold text-white mt-2">
+                {isHi ? 'वैगन' : 'A wagon'}
+              </div>
+              <div className="text-xs text-slate-300 mt-1">
+                {isHi ? 'जाँच सूची और रिलीज़ गेट' : 'Checklist and exit gate'}
+              </div>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Switching jobs, once one has been chosen. Deliberately small and at
+          the top of the actions: needed rarely, but never hidden. */}
+      {workMode !== null && (
+        <div className="flex items-center justify-between px-1">
+          <span className="text-xs text-slate-400">
+            {workMode === 'SPRINGS'
+              ? (isHi ? 'स्प्रिंग कार्य' : 'Working on springs')
+              : (isHi ? 'वैगन कार्य' : 'Working on a wagon')}
+          </span>
+          <button
+            data-testid="switch-work-mode"
+            onClick={() => chooseWorkMode(workMode === 'SPRINGS' ? 'WAGON' : 'SPRINGS')}
+            className="text-xs font-bold text-slate-300 underline underline-offset-2 hover:text-white min-h-[32px] px-1"
+          >
+            {workMode === 'SPRINGS'
+              ? (isHi ? 'वैगन पर जाएँ' : 'Switch to a wagon')
+              : (isHi ? 'स्प्रिंग पर जाएँ' : 'Switch to springs')}
+          </button>
+        </div>
+      )}
 
       {/* 3. Primary actions.
              Springs lead because that is the live workflow at Raipur and the
@@ -401,6 +498,9 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
           </div>
         </div>
 
+        {/* Wagon work only. Somebody sorting springs has no use for these and
+            should not have to scroll past them. */}
+        {workMode !== 'SPRINGS' && (
         <div>
           <div className="flex items-center justify-between mb-3 px-1">
             <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">
@@ -485,6 +585,7 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
           </button>
           </div>
         </div>
+        )}
       </div>
 
       {/* 4. Wagon Switcher / Quick Picker Modal */}
