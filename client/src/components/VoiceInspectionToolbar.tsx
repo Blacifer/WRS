@@ -8,6 +8,8 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
+
+import { decideRetry } from '../../../shared/voice/retryPolicy.ts';
 import type {
   CASNUBCategory,
   ChecklistItem,
@@ -96,6 +98,18 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
   const recognitionRef = useRef<any>(null);
   const shouldKeepListeningRef = useRef<boolean>(false);
   const transcriptDebounceRef = useRef<any>(null);
+  /*
+   * Consecutive failures, and the pending restart timer.
+   *
+   * Web Speech restarts itself on every `onend` while listening. With no
+   * counter and no delay, one persistent error becomes a tight infinite loop:
+   * start → error → end → start. Observed in the field as ~150 "[Web Speech
+   * Error] network" lines in a couple of seconds, which on a tablet is a
+   * flat battery and a hammered endpoint rather than a cosmetic annoyance.
+   */
+  const consecutiveErrorsRef = useRef<number>(0);
+  const lastErrorRef = useRef<string | null>(null);
+  const restartTimerRef = useRef<any>(null);
 
   // Simulation test chips (English & Hindi)
   const simulationChips: VoiceSimulationChip[] = [
@@ -207,6 +221,8 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
             transcriptDebounceRef.current = setTimeout(() => {
               handleProcessTranscript(currentText);
             }, 750);
+            // Speech came through, so whatever was failing has recovered.
+            consecutiveErrorsRef.current = 0;
           }
         }
       };
@@ -218,22 +234,42 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
           setMicStatus('ERROR');
           setIsListening(false);
           shouldKeepListeningRef.current = false;
-        } else if (event.error === 'no-speech') {
-          // Normal timeout on silence; will auto-restart if continuous
         } else {
-          setErrorMessage(`Speech recognition notice: ${event.error}`);
+          // What to do about it is decided in onend by the retry policy, which
+          // is shared and tested. Here we only record what went wrong.
+          lastErrorRef.current = event.error;
         }
       };
 
       recognition.onend = () => {
-        if (shouldKeepListeningRef.current) {
-          try {
-            recognition.start();
-          } catch {
-            // Ignore if already active
-          }
+        const decision = decideRetry(
+          consecutiveErrorsRef.current,
+          lastErrorRef.current,
+          shouldKeepListeningRef.current
+        );
+        if (decision.countsAsFailure) consecutiveErrorsRef.current += 1;
+        lastErrorRef.current = null;
+
+        clearTimeout(restartTimerRef.current);
+
+        if (decision.shouldRetry) {
+          restartTimerRef.current = setTimeout(() => {
+            if (!shouldKeepListeningRef.current) return;
+            try {
+              recognition.start();
+            } catch {
+              // Already active — harmless.
+            }
+          }, decision.delayMs);
+          return;
+        }
+
+        shouldKeepListeningRef.current = false;
+        setIsListening(false);
+        if (decision.giveUpMessage) {
+          setMicStatus('ERROR');
+          setErrorMessage(decision.giveUpMessage);
         } else {
-          setIsListening(false);
           setMicStatus('IDLE');
         }
       };
@@ -255,6 +291,16 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
       if (transcriptDebounceRef.current) {
         clearTimeout(transcriptDebounceRef.current);
       }
+      /*
+       * The pending restart must go too. shouldKeepListening is already false
+       * above and the timer checks it before starting, so this is belt and
+       * braces — but a timer that outlives its component is how a screen the
+       * inspector has left keeps holding the microphone.
+       */
+      if (restartTimerRef.current) {
+        clearTimeout(restartTimerRef.current);
+      }
+      consecutiveErrorsRef.current = 0;
     };
   }, [voiceLang]);
 
@@ -326,6 +372,10 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
       setErrorMessage(null);
       if (recognitionRef.current) {
         try {
+          // A fresh start is a fresh run: an earlier failing session must not
+          // leave this one already partway to its ceiling.
+          consecutiveErrorsRef.current = 0;
+          lastErrorRef.current = null;
           recognitionRef.current.start();
           setIsListening(true);
           setMicStatus('LISTENING');
