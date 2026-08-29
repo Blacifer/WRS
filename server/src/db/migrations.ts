@@ -688,6 +688,49 @@ export function runMigrations(db: DatabaseSync): void {
     }
   }
 
+  /*
+   * Correcting a mistapped spring.
+   *
+   * Sorting is one tap per spring, ~700 a shift. A wrong tap is not a
+   * possibility, it is a certainty, and there was no way to fix one. An
+   * inspector who cannot correct a mistake either stops trusting the record
+   * or starts keeping the corrections on paper — and the paper version is the
+   * thing this replaces.
+   *
+   * The records are append-only at the database engine (triggers refuse
+   * UPDATE and DELETE), which is right for an audit trail and stays that way.
+   * So a correction appends a NEW record carrying `supersedes`, pointing back
+   * at the one it replaces. The old row is never touched.
+   *
+   * Deliberately only one column. Marking the old record "superseded_by"
+   * would be an UPDATE, which the trigger refuses and should — so the link is
+   * held by the new record alone, and the tally excludes any row whose id
+   * appears in some other row's `supersedes`.
+   */
+  const sortCols = db.prepare("PRAGMA table_info(spring_sorting_records)").all() as any[];
+  if (sortCols.length > 0 && !sortCols.some((c) => c.name === 'supersedes')) {
+    db.exec('ALTER TABLE spring_sorting_records ADD COLUMN supersedes TEXT DEFAULT NULL;');
+  }
+
+  /*
+   * ...and whether the correcting record stands for a spring at all.
+   *
+   * `supersedes` alone cannot express a plain undo. A correction — "that was
+   * a Yellow, not a Green" — appends a row that replaces the old one and is
+   * itself a spring, so it counts. An undo — "that tap was an accident,
+   * there is no spring" — appends a row that replaces the old one and counts
+   * for nothing. Both look identical without this flag, which is why undoing
+   * a spring briefly made the tally go UP: the old row was excluded and the
+   * void row counted itself.
+   *
+   * A void row is still written rather than the old one deleted, because the
+   * table is append-only at the database engine and the withdrawal is part of
+   * the record. It is simply never counted.
+   */
+  if (sortCols.length > 0 && !sortCols.some((c) => c.name === 'voided')) {
+    db.exec('ALTER TABLE spring_sorting_records ADD COLUMN voided INTEGER NOT NULL DEFAULT 0;');
+  }
+
 
   // Learned parameter history — see the table comment in schema.sql.
   db.exec(`

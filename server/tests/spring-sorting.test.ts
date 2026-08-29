@@ -202,4 +202,119 @@ describe('Spring Sorting', () => {
     assert.strictEqual(payload.total, 50);
     assert.strictEqual(verifyAuditChain(db).verified, true);
   });
+
+  /*
+   * Undo.
+   *
+   * Sorting is one tap per spring and roughly 700 a shift, so a wrong tap is
+   * a certainty. These tests exist because the first implementation made the
+   * count go UP when a spring was taken back — it excluded the superseded row
+   * and then counted the row that withdrew it. An undo button that increases
+   * the tally is worse than no undo button: it teaches the inspector that the
+   * number on the screen is not the number in the pile.
+   */
+  const replacement = {
+    bogieType: 'CASNUB_22_NLB' as const,
+    condition: 'USED' as const,
+    springPosition: 'OUTER' as const,
+    measuredFreeHeight: 262.0,
+    classifiedBand: 'BLUE' as const,
+    bandRoman: 'Band I',
+    status: 'PASS' as const,
+    tableReference: 'Table 28',
+    inspectorId: 'usr_insp_001'
+  };
+
+  it('TC-SRT-11: taking a tap back lowers the count by exactly one', () => {
+    sort('OUTER', 'GREEN', 258.5, 5);
+    assert.strictEqual(repo.batchSummary('batch_1').total, 5);
+
+    const result = repo.correctLast('batch_1', null, 'usr_insp_001');
+    assert.ok(result, 'there was a spring to undo');
+    assert.strictEqual(repo.batchSummary('batch_1').total, 4, 'undo must subtract, never add');
+  });
+
+  it('TC-SRT-12: every tally agrees after an undo, not just the batch total', () => {
+    // The original defect was one query out of four missing the exclusion.
+    // A stock figure that disagrees with the session figure sends someone to
+    // the rack for a spring that is not there.
+    sort('OUTER', 'GREEN', 258.5, 3);
+    repo.correctLast('batch_1', null, 'usr_insp_001');
+
+    const today = new Date().toISOString().slice(0, 10);
+    const stock = repo.stockByBand('CASNUB_22_NLB', 'USED')
+      .reduce((sum, r) => sum + r.count, 0);
+    const byBand = repo.batchSummary('batch_1').byBand
+      .reduce((sum, r) => sum + r.count, 0);
+
+    assert.strictEqual(repo.batchSummary('batch_1').total, 2);
+    assert.strictEqual(stock, 2, 'stock on hand');
+    assert.strictEqual(byBand, 2, 'the batch band breakdown');
+    assert.strictEqual(repo.dailyThroughput(today).total, 2, 'the day\'s throughput');
+  });
+
+  it('TC-SRT-13: nothing is deleted — the withdrawal is part of the record', () => {
+    sort('OUTER', 'GREEN', 258.5, 1);
+    const original = (db.prepare('SELECT id FROM spring_sorting_records').get() as any).id;
+
+    const result = repo.correctLast('batch_1', null, 'usr_insp_001')!;
+    assert.strictEqual(result.correctedId, original);
+
+    const rows = db.prepare('SELECT id, supersedes, voided FROM spring_sorting_records ORDER BY rowid').all() as any[];
+    assert.strictEqual(rows.length, 2, 'both the spring and its withdrawal survive');
+    assert.strictEqual(rows[0].id, original, 'the original row is untouched');
+    assert.strictEqual(rows[1].supersedes, original);
+    assert.strictEqual(rows[1].voided, 1);
+    assert.strictEqual(repo.batchSummary('batch_1').total, 0);
+  });
+
+  it('TC-SRT-14: undoing repeatedly walks back, and stops at empty', () => {
+    // The button an inspector taps twice. It must never go negative and must
+    // never start voiding its own voids.
+    sort('OUTER', 'GREEN', 258.5, 3);
+    for (let i = 0; i < 3; i++) {
+      assert.ok(repo.correctLast('batch_1', null, 'usr_insp_001'), `undo ${i + 1}`);
+    }
+    assert.strictEqual(repo.batchSummary('batch_1').total, 0);
+
+    for (let i = 0; i < 5; i++) {
+      assert.strictEqual(
+        repo.correctLast('batch_1', null, 'usr_insp_001'),
+        null,
+        'undoing an empty session reports nothing to undo rather than throwing'
+      );
+    }
+    assert.strictEqual(repo.batchSummary('batch_1').total, 0, 'never below zero');
+  });
+
+  it('TC-SRT-15: a correction replaces the spring rather than removing it', () => {
+    // Distinct from an undo: the spring exists, it was filed in the wrong
+    // band. The count must hold and the band must move.
+    sort('OUTER', 'GREEN', 258.5, 4);
+    const result = repo.correctLast('batch_1', replacement, 'usr_insp_001')!;
+    assert.ok(result.newId, 'a correction produces a replacement record');
+
+    const summary = repo.batchSummary('batch_1');
+    assert.strictEqual(summary.total, 4, 'a correction is not a removal');
+
+    const bands = Object.fromEntries(summary.byBand.map((b) => [b.band, b.count]));
+    assert.strictEqual(bands.GREEN, 3);
+    assert.strictEqual(bands.BLUE, 1, 'the corrected spring moved band');
+  });
+
+  it('TC-SRT-16: a correction can be undone in its turn', () => {
+    // Correct a spring, then take the whole thing back. The undo must land on
+    // the correction — the newest live record — not on some earlier row.
+    sort('OUTER', 'GREEN', 258.5, 2);
+    const corrected = repo.correctLast('batch_1', replacement, 'usr_insp_001')!;
+    assert.strictEqual(repo.batchSummary('batch_1').total, 2);
+
+    const undone = repo.correctLast('batch_1', null, 'usr_insp_001')!;
+    assert.strictEqual(undone.correctedId, corrected.newId, 'undo takes the newest live record');
+    assert.strictEqual(repo.batchSummary('batch_1').total, 1);
+
+    const bands = Object.fromEntries(repo.batchSummary('batch_1').byBand.map((b) => [b.band, b.count]));
+    assert.strictEqual(bands.BLUE, undefined, 'the corrected spring is gone entirely');
+    assert.strictEqual(bands.GREEN, 1);
+  });
 });

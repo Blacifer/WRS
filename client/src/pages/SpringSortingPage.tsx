@@ -136,6 +136,34 @@ export function SpringSortingPage({ lang, onClose }: Props) {
     }
   };
 
+  /*
+   * Correcting the last spring.
+   *
+   * One tap per spring, ~700 a shift, means a wrong tap is a certainty rather
+   * than a risk — and without a way to fix one, an inspector either stops
+   * trusting the tally or keeps corrections on paper.
+   *
+   * Nothing is deleted. The server appends a superseding record and both
+   * survive, so the correction is itself part of the trail.
+   */
+  const undoLast = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.undoLastSortedSpring(batchId);
+      if (!res.data.corrected) {
+        setError(res.data.message || (isHi ? 'पूर्ववत करने के लिए कुछ नहीं है' : 'Nothing to undo yet.'));
+      } else {
+        setLastRecorded(isHi ? 'हटाया गया' : 'Removed');
+      }
+      await refresh();
+    } catch (e: any) {
+      setError(e?.message || (isHi ? 'पूर्ववत नहीं हो सका' : 'Could not undo that spring'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const finish = async () => {
     setBusy(true);
     try {
@@ -301,6 +329,21 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         );
       })()}
 
+      {/* Correcting the last tap. Placed with the work rather than in a menu:
+          it is needed in the second after a mistake, not later. */}
+      {totals.total > 0 && (
+        <div className="flex justify-end">
+          <button
+            data-testid="undo-last-spring"
+            onClick={undoLast}
+            disabled={busy}
+            className="min-h-[44px] px-4 rounded-xl border border-slate-600 text-slate-300 hover:bg-slate-800 text-sm font-bold disabled:opacity-40"
+          >
+            ↩ {isHi ? 'पिछला हटाएँ' : 'Undo last spring'}
+          </button>
+        </div>
+      )}
+
       {/* The work itself: one tap per spring */}
       <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-3">
         <p className="text-sm font-bold text-white">
@@ -399,7 +442,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
                   />
                   <span className="text-sm font-bold text-white w-20">{t.band}</span>
                   <span className="text-sm text-slate-300 tabular-nums w-24">
-                    {t.count} {isHi ? 'स्प्रिंग' : 'springs'}
+                    {t.count} {isHi ? 'स्प्रिंग' : t.count === 1 ? 'spring' : 'springs'}
                   </span>
                   {cap && (
                     <span className="text-xs text-slate-400 tabular-nums">

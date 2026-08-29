@@ -35,6 +35,19 @@ export interface SortingRecordInput {
   inspectorId: string;
   inspectorName?: string | null;
   syncId?: string | null;
+  /**
+   * The record this one replaces, when correcting a mistap.
+   *
+   * Only the correcting record carries the link. Marking the original would
+   * be an UPDATE, which the append-only trigger refuses — correctly.
+   */
+  supersedes?: string | null;
+  /**
+   * True when this record withdraws the one it supersedes without putting a
+   * spring in its place — a mistap taken back. It is written, kept and
+   * attributed like any other row, and counted nowhere.
+   */
+  voided?: boolean;
 }
 
 export interface BandTally {
@@ -52,6 +65,22 @@ export interface NestCapacity {
   /** Complete nests this band alone can supply. */
   completeNests: number;
 }
+
+/**
+ * The rows that stand for a spring somebody is actually holding.
+ *
+ * Two exclusions, and they are not the same one twice. A row named in some
+ * other row's `supersedes` has been replaced, so counting it would count the
+ * spring twice — once wrong and once right. A row marked `voided` was itself
+ * the taking-back of a tap, so it stands for no spring at all.
+ *
+ * Kept in one place because it must be applied to every tally without
+ * exception. The first version of undo left it off the batch total, and the
+ * count went UP when an inspector corrected a spring — the single most
+ * confidence-destroying thing an undo button can do.
+ */
+const LIVE_RECORDS =
+  "voided = 0 AND id NOT IN (SELECT supersedes FROM spring_sorting_records WHERE supersedes IS NOT NULL)";
 
 export class SortingRepository {
   private db: DatabaseSync;
@@ -86,8 +115,8 @@ export class SortingRepository {
         id, batch_id, bogie_type, spring_condition, spring_position,
         measured_height, height_is_approximate, classified_band, band_roman,
         status, damage_type, condemnation_reason, table_reference,
-        inspector_id, inspector_name, sync_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        inspector_id, inspector_name, sync_id, supersedes, voided
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       input.batchId,
@@ -104,10 +133,85 @@ export class SortingRepository {
       input.tableReference ?? null,
       input.inspectorId,
       input.inspectorName ?? null,
-      input.syncId ?? null
+      input.syncId ?? null,
+      input.supersedes ?? null,
+      input.voided ? 1 : 0
     );
 
     return { id };
+  }
+
+  /**
+   * Corrects the last spring recorded in a batch.
+   *
+   * Sorting is one tap per spring, roughly 700 a shift, so a wrong tap is a
+   * certainty rather than a risk. There was no way to fix one, and an
+   * inspector who cannot correct a mistake either stops trusting the record
+   * or keeps the corrections on paper — and paper is the thing this replaces.
+   *
+   * Nothing is deleted or altered. The table is append-only at the database
+   * engine and stays that way: this appends a NEW record carrying
+   * `supersedes`, pointing back at the one it replaces. Both rows survive, so
+   * the correction itself is part of the record — which is what an audit
+   * trail is for. Counts simply stop including the superseded row.
+   *
+   * Returns null when there is nothing to correct, rather than throwing: the
+   * caller is a button an inspector may tap twice.
+   */
+  public correctLast(
+    batchId: string,
+    replacement: Omit<SortingRecordInput, 'batchId' | 'supersedes'> | null,
+    actorId: string
+  ): { correctedId: string; newId: string | null } | null {
+    const last = this.db.prepare(`
+      SELECT id FROM spring_sorting_records
+      WHERE batch_id = ?
+        AND voided = 0
+        AND id NOT IN (
+          SELECT supersedes FROM spring_sorting_records
+          WHERE supersedes IS NOT NULL AND batch_id = ?
+        )
+      ORDER BY created_at DESC, rowid DESC
+      LIMIT 1
+    `).get(batchId, batchId) as { id: string } | undefined;
+
+    if (!last) return null;
+
+    /*
+     * A plain undo — the tap was an accident and there is no spring to
+     * re-record — still appends a row, because the alternative is deleting
+     * one. It carries the original's details so the record remains readable,
+     * `supersedes` takes the original out of the count, and `voided` keeps
+     * the withdrawal itself out of it. Without the second flag the undo would
+     * remove one spring and add one back, which is how the tally first went
+     * up when an inspector took a tap back.
+     */
+    const base = replacement ?? (this.db.prepare(
+      'SELECT * FROM spring_sorting_records WHERE id = ?'
+    ).get(last.id) as any);
+
+    const { id: newId } = this.record({
+      batchId,
+      bogieType: replacement ? replacement.bogieType : base.bogie_type,
+      condition: replacement ? replacement.condition : base.spring_condition,
+      springPosition: replacement ? replacement.springPosition : base.spring_position,
+      measuredFreeHeight: replacement ? replacement.measuredFreeHeight : base.measured_height,
+      heightIsApproximate: replacement ? replacement.heightIsApproximate : base.height_is_approximate === 1,
+      classifiedBand: replacement ? replacement.classifiedBand : base.classified_band,
+      bandRoman: replacement ? replacement.bandRoman : base.band_roman,
+      status: replacement ? replacement.status : base.status,
+      damageType: replacement ? replacement.damageType : base.damage_type,
+      condemnationReason: replacement
+        ? replacement.condemnationReason
+        : 'Withdrawn by the inspector — recorded in error.',
+      tableReference: replacement ? replacement.tableReference : base.table_reference,
+      inspectorId: actorId,
+      inspectorName: replacement?.inspectorName,
+      supersedes: last.id,
+      voided: replacement === null
+    } as SortingRecordInput);
+
+    return { correctedId: last.id, newId: replacement ? newId : null };
   }
 
   /**
@@ -144,13 +248,15 @@ export class SortingRepository {
       SELECT COUNT(*) AS total,
              SUM(CASE WHEN status = 'PASS' THEN 1 ELSE 0 END) AS passed,
              SUM(CASE WHEN status = 'CONDEMNED' THEN 1 ELSE 0 END) AS condemned
-      FROM spring_sorting_records WHERE batch_id = ?
+      FROM spring_sorting_records
+      WHERE batch_id = ? AND ${LIVE_RECORDS}
     `).get(batchId) as any;
 
     const byBand = this.db.prepare(`
       SELECT classified_band AS band, spring_position AS springPosition, COUNT(*) AS count
       FROM spring_sorting_records
       WHERE batch_id = ? AND status = 'PASS' AND classified_band IS NOT NULL
+        AND ${LIVE_RECORDS}
       GROUP BY classified_band, spring_position
       ORDER BY spring_position, classified_band
     `).all(batchId) as any[];
@@ -178,7 +284,10 @@ export class SortingRepository {
       'spring_condition = ?',
       "status = 'PASS'",
       'classified_band IS NOT NULL',
-      'assigned_wagon_number IS NULL'
+      'assigned_wagon_number IS NULL',
+      // A corrected spring must not be counted twice — once wrong and once
+      // right — and a withdrawn tap is not stock at all.
+      LIVE_RECORDS
     ];
     const params: any[] = [bogieType, condition];
 
@@ -265,7 +374,7 @@ export class SortingRepository {
              MIN(created_at) AS firstAt,
              MAX(created_at) AS lastAt
       FROM spring_sorting_records
-      WHERE substr(created_at, 1, 10) = ?
+      WHERE substr(created_at, 1, 10) = ? AND ${LIVE_RECORDS}
     `).get(date) as any;
 
     return {

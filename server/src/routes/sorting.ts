@@ -98,6 +98,62 @@ sortingRouter.post('/record', authMiddleware, (req: AuthenticatedRequest, res: R
 // ---------------------------------------------------------------------------
 // POST /api/sorting/batches/:batchId/close — one audit entry for the session
 // ---------------------------------------------------------------------------
+// POST /api/sorting/batches/:batchId/undo
+//
+// Corrects the last spring recorded in a batch.
+//
+// Sorting is one tap per spring, ~700 a shift, so a wrong tap is a certainty.
+// Nothing is deleted: the records are append-only at the database engine, and
+// this appends a superseding record instead. Both survive, so the correction
+// is itself part of the trail.
+// ---------------------------------------------------------------------------
+sortingRouter.post('/batches/:batchId/undo', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+  const batchId = req.params?.batchId;
+  const actorId = req.user?.id;
+
+  if (!batchId) {
+    res.status(400).json({
+      success: false, error: 'MISSING_BATCH', message: 'batchId is required',
+      statusCode: 400, timestamp: new Date().toISOString()
+    });
+    return;
+  }
+  if (!actorId) {
+    res.status(401).json({
+      success: false, error: 'UNAUTHORIZED',
+      message: 'A correction must name the person who made it.',
+      statusCode: 401, timestamp: new Date().toISOString()
+    });
+    return;
+  }
+
+  try {
+    const result = repo().correctLast(batchId, req.body?.replacement ?? null, actorId);
+    if (!result) {
+      // Nothing to undo. Not an error — the caller is a button someone may
+      // tap twice, or tap before recording anything.
+      res.status(200).json({
+        success: true,
+        data: { corrected: false, message: 'There is nothing to undo in this session yet.' },
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+    res.status(200).json({
+      success: true,
+      data: { corrected: true, ...result, summary: repo().batchSummary(batchId) },
+      timestamp: new Date().toISOString()
+    });
+  } catch (err: any) {
+    res.status(400).json({
+      success: false, error: 'UNDO_FAILED',
+      message: err?.message || 'That spring could not be corrected.',
+      statusCode: 400, timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
 sortingRouter.post('/batches/:batchId/close', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
   try {
     const batchId = req.params?.batchId;

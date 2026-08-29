@@ -862,6 +862,19 @@ export class ApiClient {
     return this.request(`/sorting/stock?${params.toString()}`);
   }
 
+  /**
+   * Corrects the last spring recorded in a sorting session.
+   *
+   * Nothing is deleted — the server appends a superseding record — so this is
+   * safe to call and safe to have called by accident.
+   */
+  public async undoLastSortedSpring(batchId: string): Promise<{
+    success: boolean;
+    data: { corrected: boolean; message?: string; correctedId?: string; summary?: any };
+  }> {
+    return this.request(`/sorting/batches/${encodeURIComponent(batchId)}/undo`, { method: 'POST' });
+  }
+
   public async getSortingThroughput(date?: string): Promise<{ success: boolean; data: { date: string; total: number; passed: number; condemned: number; firstAt: string | null; lastAt: string | null } }> {
     const params = date ? `?date=${encodeURIComponent(date)}` : '';
     return this.request(`/sorting/throughput${params}`);
