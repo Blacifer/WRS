@@ -302,6 +302,68 @@ describe('Spring Sorting', () => {
     assert.strictEqual(bands.BLUE, 1, 'the corrected spring moved band');
   });
 
+  /*
+   * Replaying a spring recorded offline.
+   *
+   * Sorting was the one workflow posting straight to the network with nothing
+   * behind it — a dropped connection on shop wifi lost the tap outright. The
+   * device now queues it and sends it later, which only works if a repeated
+   * delivery is recognised as the same spring. `sync_id` is UNIQUE, so
+   * without this the retry would throw, the queue would never drain, and
+   * every spring behind it would stay stuck on the tablet.
+   */
+  it('TC-SRT-17: replaying a queued spring records it once, not twice', () => {
+    const spring = {
+      batchId: 'batch_1', bogieType: 'CASNUB_22_NLB' as const, condition: 'USED' as const,
+      springPosition: 'OUTER' as const, measuredFreeHeight: 258.5,
+      classifiedBand: 'GREEN' as const, status: 'PASS' as const,
+      inspectorId: 'usr_insp_001', syncId: 'srt-1756450000000-ab12c'
+    };
+
+    const first = repo.record(spring);
+    assert.strictEqual(first.alreadyRecorded, false);
+
+    // The tablet did not hear the answer and sends it again.
+    const second = repo.record(spring);
+    assert.strictEqual(second.alreadyRecorded, true, 'the second delivery is the same spring');
+    assert.strictEqual(second.id, first.id, 'and answers with the record that exists');
+
+    assert.strictEqual(repo.batchSummary('batch_1').total, 1, 'one tap, one spring');
+  });
+
+  it('TC-SRT-18: a queue that is sent three times still counts once', () => {
+    // What a flaky connection actually does: partial deliveries, repeated.
+    const queue = [1, 2, 3].map((n) => ({
+      batchId: 'batch_1', bogieType: 'CASNUB_22_NLB' as const, condition: 'USED' as const,
+      springPosition: 'OUTER' as const, measuredFreeHeight: 258.5,
+      classifiedBand: 'GREEN' as const, status: 'PASS' as const,
+      inspectorId: 'usr_insp_001', syncId: `srt-queued-${n}`
+    }));
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      for (const spring of queue) repo.record(spring);
+    }
+
+    assert.strictEqual(repo.batchSummary('batch_1').total, 3, 'three springs, nine deliveries');
+    assert.strictEqual(
+      (db.prepare('SELECT COUNT(*) c FROM spring_sorting_records').get() as any).c,
+      3,
+      'and only three rows were ever written'
+    );
+  });
+
+  it('TC-SRT-19: springs without a syncId are never deduplicated together', () => {
+    /*
+     * Two springs of the same kind and the same height are two springs. Only
+     * the device-generated id makes a repeat recognisable, so an absent id
+     * must never be treated as a match — that would silently swallow every
+     * identical spring after the first, and identical springs are the normal
+     * case when a pile sorts into one band.
+     */
+    sort('OUTER', 'GREEN', 258.5, 6);
+    assert.strictEqual(repo.batchSummary('batch_1').total, 6);
+  });
+
   it('TC-SRT-16: a correction can be undone in its turn', () => {
     // Correct a spring, then take the whole thing back. The undo must land on
     // the correction — the newest live record — not on some earlier row.

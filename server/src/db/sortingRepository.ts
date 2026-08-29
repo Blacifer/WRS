@@ -96,7 +96,25 @@ export class SortingRepository {
    * is exactly when an unattributable record is least acceptable — 900 rows a
    * day with nobody's name against them is not a record, it is a rumour.
    */
-  public record(input: SortingRecordInput): { id: string } {
+  public record(input: SortingRecordInput): { id: string; alreadyRecorded: boolean } {
+    /*
+     * A spring recorded offline is replayed when the tablet reconnects, and a
+     * replay must be safe to repeat. The device stamps each tap with a
+     * `syncId` it generates once, so a second delivery of the same tap is
+     * recognisable as the same spring rather than a second one.
+     *
+     * Without this the retry is worse than the drop it recovers from: the
+     * column is UNIQUE, so a repeat throws, the batch never drains, and every
+     * spring behind it stays stuck on the device. Answering with the record
+     * that already exists is what lets the queue empty.
+     */
+    if (input.syncId) {
+      const seen = this.db
+        .prepare('SELECT id FROM spring_sorting_records WHERE sync_id = ?')
+        .get(input.syncId) as { id: string } | undefined;
+      if (seen) return { id: seen.id, alreadyRecorded: true };
+    }
+
     const signer = this.db
       .prepare('SELECT id, is_active FROM users WHERE id = ?')
       .get(input.inspectorId) as { id: string; is_active: number } | undefined;
@@ -138,7 +156,7 @@ export class SortingRepository {
       input.voided ? 1 : 0
     );
 
-    return { id };
+    return { id, alreadyRecorded: false };
   }
 
   /**

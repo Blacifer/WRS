@@ -14,12 +14,13 @@ import type {
 } from '../../../shared/types.ts';
 
 const DB_NAME = 'wrs_raipur_pwa_offline_db_v2';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 const STORE_PENDING_INSPECTIONS = 'pending_inspections';
 const STORE_PENDING_CHECKLIST = 'pending_checklist_items';
 const STORE_PENDING_PHOTOS = 'pending_photos';
 const STORE_PENDING_TRANSITIONS = 'pending_stage_transitions';
+const STORE_PENDING_SORTING = 'pending_sorted_springs';
 
 const STORE_CACHED_INSPECTIONS = 'cached_inspections';
 const STORE_CACHED_WAGONS = 'cached_wagons';
@@ -76,6 +77,36 @@ export interface PendingTransition {
   createdAt: string;
 }
 
+/**
+ * One sorted spring, held on the device until it reaches the server.
+ *
+ * Sorting is the highest-volume thing this app does — one tap per spring,
+ * roughly 700 a shift — and it was the only workflow posting straight to the
+ * network with nothing behind it. A dropped connection on shop-floor wifi
+ * lost the tap outright, which is the same wound as having no undo: an
+ * inspector who watches taps disappear goes back to paper.
+ *
+ * `syncId` is generated here, once, and never changes. It is what makes a
+ * replay safe — the server recognises a second delivery of the same tap as
+ * the same spring rather than a second one.
+ */
+export interface PendingSortedSpring {
+  clientTempId: string;
+  syncId: string;
+  batchId: string;
+  bogieType: string;
+  condition: string;
+  springPosition: string;
+  measuredFreeHeight: number;
+  heightIsApproximate?: boolean;
+  damageType?: string;
+  /** The band the inspector tapped. Held for the local tally only — the
+   *  stored verdict is always the server's, computed from the height. */
+  tappedBand: string | null;
+  condemned: boolean;
+  createdAt: string;
+}
+
 class MultiEntityOfflineDbManager {
   private dbPromise: Promise<IDBDatabase> | null = null;
   private syncListeners: Array<(count: number) => void> = [];
@@ -120,6 +151,11 @@ class MultiEntityOfflineDbManager {
         if (!db.objectStoreNames.contains(STORE_PENDING_TRANSITIONS)) {
           const s = db.createObjectStore(STORE_PENDING_TRANSITIONS, { keyPath: 'clientTempId' });
           s.createIndex('wagonNumber', 'wagonNumber', { unique: false });
+        }
+        if (!db.objectStoreNames.contains(STORE_PENDING_SORTING)) {
+          const s = db.createObjectStore(STORE_PENDING_SORTING, { keyPath: 'clientTempId' });
+          s.createIndex('batchId', 'batchId', { unique: false });
+          s.createIndex('createdAt', 'createdAt', { unique: false });
         }
 
         // Cache stores
@@ -258,7 +294,138 @@ class MultiEntityOfflineDbManager {
   }
 
   // -------------------------------------------------------------------------
-  // 5. Query Pending Counts & Records
+  // 5. Pending Sorted Springs (bulk sorting — the highest-volume path)
+  // -------------------------------------------------------------------------
+
+  public async enqueueSortedSpring(
+    spring: Omit<PendingSortedSpring, 'clientTempId' | 'syncId' | 'createdAt'>
+  ): Promise<PendingSortedSpring> {
+    const db = await this.openDb();
+    const clientTempId = `srt-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+    const pendingItem: PendingSortedSpring = {
+      ...spring,
+      clientTempId,
+      // The device's own id for this tap, fixed for its lifetime. The server
+      // dedupes on it, so replaying a queued spring cannot double-count it.
+      syncId: clientTempId,
+      createdAt: new Date().toISOString()
+    };
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_PENDING_SORTING, 'readwrite');
+      const req = tx.objectStore(STORE_PENDING_SORTING).put(pendingItem);
+      req.onsuccess = () => {
+        this.notifyPendingCountChange();
+        resolve(pendingItem);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  /** Queued springs for one session, oldest first — the order they were tapped. */
+  public async getPendingSorting(batchId?: string): Promise<PendingSortedSpring[]> {
+    try {
+      const db = await this.openDb();
+      const all = await this.getAllFromStore<PendingSortedSpring>(db, STORE_PENDING_SORTING);
+      const rows = batchId ? all.filter((r) => r.batchId === batchId) : all;
+      return rows.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Drops one queued spring.
+   *
+   * Used by sync when a spring has landed, and by undo when the inspector
+   * takes back a tap that never left the device. An undo of an unsynced tap
+   * has nothing to supersede on the server — the spring was never recorded —
+   * so removing it from the queue IS the correction, and no void row is
+   * needed.
+   */
+  public async removePendingSorting(clientTempId: string): Promise<void> {
+    try {
+      const db = await this.openDb();
+      await new Promise<void>((resolve) => {
+        const tx = db.transaction(STORE_PENDING_SORTING, 'readwrite');
+        const req = tx.objectStore(STORE_PENDING_SORTING).delete(clientTempId);
+        req.onsuccess = () => resolve();
+        req.onerror = () => resolve();
+      });
+      this.notifyPendingCountChange();
+    } catch {
+      /* nothing to remove */
+    }
+  }
+
+  /**
+   * Sends queued springs to the server, one at a time, deleting each as it
+   * lands.
+   *
+   * Deliberately per-record rather than one batch cleared wholesale. An
+   * inspector keeps tapping while a sync runs — that is the whole point of a
+   * background sync — and clearing the store at the end would destroy every
+   * spring tapped during the request. Each row is removed only once the
+   * server has confirmed that particular spring.
+   *
+   * Stops at the first failure and leaves the rest queued. A half-drained
+   * queue is fine; the order is preserved and the next attempt resumes.
+   */
+  public async syncPendingSorting(
+    apiBaseUrl: string = '/api',
+    token?: string
+  ): Promise<{ synced: number; remaining: number; error?: string }> {
+    const queued = await this.getPendingSorting();
+    if (queued.length === 0) return { synced: 0, remaining: 0 };
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    let synced = 0;
+    for (const spring of queued) {
+      try {
+        const response = await fetch(`${apiBaseUrl}/sorting/record`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            batchId: spring.batchId,
+            bogieType: spring.bogieType,
+            condition: spring.condition,
+            springPosition: spring.springPosition,
+            measuredFreeHeight: spring.measuredFreeHeight,
+            heightIsApproximate: spring.heightIsApproximate,
+            damageType: spring.damageType,
+            syncId: spring.syncId
+          })
+        });
+
+        if (!response.ok) {
+          return {
+            synced,
+            remaining: queued.length - synced,
+            error: `Sync stopped at HTTP ${response.status}`
+          };
+        }
+
+        // Landed — or was already there from an earlier attempt. Either way
+        // this spring is on the server and must leave the queue.
+        await this.removePendingSorting(spring.clientTempId);
+        synced++;
+      } catch (err: any) {
+        return {
+          synced,
+          remaining: queued.length - synced,
+          error: err?.message || 'Network error while syncing sorted springs'
+        };
+      }
+    }
+
+    return { synced, remaining: 0 };
+  }
+
+  // -------------------------------------------------------------------------
+  // 6. Query Pending Counts & Records
   // -------------------------------------------------------------------------
 
   public async getPendingCount(): Promise<number> {
@@ -268,7 +435,8 @@ class MultiEntityOfflineDbManager {
       const count2 = await this.countStore(db, STORE_PENDING_CHECKLIST);
       const count3 = await this.countStore(db, STORE_PENDING_PHOTOS);
       const count4 = await this.countStore(db, STORE_PENDING_TRANSITIONS);
-      return count1 + count2 + count3 + count4;
+      const count5 = await this.countStore(db, STORE_PENDING_SORTING);
+      return count1 + count2 + count3 + count4 + count5;
     } catch {
       return 0;
     }
@@ -318,7 +486,7 @@ class MultiEntityOfflineDbManager {
   }
 
   // -------------------------------------------------------------------------
-  // 6. Caching Helpers for Offline Browsing
+  // 7. Caching Helpers for Offline Browsing
   // -------------------------------------------------------------------------
 
   public async cacheWagons(wagons: WagonRecord[]): Promise<void> {
@@ -366,19 +534,25 @@ class MultiEntityOfflineDbManager {
   }
 
   // -------------------------------------------------------------------------
-  // 7. Multi-Entity Batch Sync with Server
+  // 8. Multi-Entity Batch Sync with Server
   // -------------------------------------------------------------------------
 
   public async syncPendingBatch(apiBaseUrl: string = '/api', token?: string): Promise<SyncResponse> {
+    // Sorted springs go first and by their own route, so the "sync now"
+    // button and the online event drain them too rather than leaving the
+    // shop's highest-volume work waiting on a wagon batch.
+    const sorting = await this.syncPendingSorting(apiBaseUrl, token);
+
     const pending = await this.getAllPending();
     const totalCount = pending.inspections.length + pending.checklist.length + pending.photos.length + pending.transitions.length;
 
     if (totalCount === 0) {
       return {
-        success: true,
-        syncedCount: 0,
-        failedCount: 0,
-        syncedRecords: []
+        success: !sorting.error,
+        syncedCount: sorting.synced,
+        failedCount: sorting.remaining,
+        syncedRecords: [],
+        ...(sorting.error ? { errors: [{ error: sorting.error }] } : {})
       };
     }
 
@@ -427,7 +601,10 @@ class MultiEntityOfflineDbManager {
       }
 
       this.notifyPendingCountChange();
-      return res;
+      return {
+        ...res,
+        syncedCount: (res.syncedCount || 0) + sorting.synced
+      };
     } catch (err: any) {
       console.error('[OfflineSync] Batch sync error:', err);
       return {
@@ -476,6 +653,11 @@ class MultiEntityOfflineDbManager {
   private async triggerAutoSync(): Promise<void> {
     const token = localStorage.getItem('wrs_token') || undefined;
     await this.syncPendingBatch('/api', token);
+  }
+
+  /** Whether the device believes it can reach the network at all. */
+  public isOnline(): boolean {
+    return typeof navigator === 'undefined' || navigator.onLine !== false;
   }
 }
 

@@ -60,7 +60,7 @@ sortingRouter.post('/record', authMiddleware, (req: AuthenticatedRequest, res: R
       damageNotes: b.damageNotes
     });
 
-    const { id } = repo().record({
+    const { id, alreadyRecorded } = repo().record({
       batchId: String(b.batchId),
       bogieType,
       condition,
@@ -78,10 +78,13 @@ sortingRouter.post('/record', authMiddleware, (req: AuthenticatedRequest, res: R
       syncId: b.syncId ?? b.sync_id ?? null
     });
 
-    res.status(201).json({
+    // 200 rather than 201 when this tap has been seen before: the device is
+    // replaying a spring recorded offline, and nothing new was created.
+    res.status(alreadyRecorded ? 200 : 201).json({
       success: true,
       data: {
         id,
+        alreadyRecorded,
         band: verdict.band,
         bandRoman: verdict.bandRoman,
         status: verdict.status,

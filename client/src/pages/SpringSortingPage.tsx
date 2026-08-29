@@ -27,6 +27,8 @@ import { listWagonDesignations, getWagonSpringConfig } from '../../../shared/cla
 import type { BogieType, SpringCondition, SpringPosition } from '../../../shared/types.ts';
 import { playPassChime, playCondemnedBuzz } from '../utils/audioFeedback.ts';
 import { readThroughput, DAILY_PILE } from '../../../shared/sorting/throughput.ts';
+import { offlineDb } from '../services/offlineDb.ts';
+import type { PendingSortedSpring } from '../services/offlineDb.ts';
 
 const BAND_HEX: Record<string, string> = {
   BLUE: '#2563eb',
@@ -78,6 +80,23 @@ export function SpringSortingPage({ lang, onClose }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /*
+   * Springs tapped on this device that have not reached the server yet.
+   *
+   * Held separately from the server's totals rather than folded into them,
+   * because the two are different claims. The server's figure is what is
+   * recorded; this is what is on the tablet and still owed. The screen adds
+   * them for the running count — an inspector counts the pile they have
+   * sorted, not the pile the server has heard about — and says plainly how
+   * many are still waiting.
+   */
+  const [pending, setPending] = useState<PendingSortedSpring[]>([]);
+  const [online, setOnline] = useState<boolean>(() => offlineDb.isOnline());
+
+  const readPending = useCallback(async () => {
+    setPending(await offlineDb.getPendingSorting(batchId));
+  }, [batchId]);
+
   const bandOptions = useMemo(
     () => getBandOptions(bogieType, condition, position),
     [bogieType, condition, position]
@@ -107,12 +126,90 @@ export function SpringSortingPage({ lang, onClose }: Props) {
     }
   }, [batchId, bogieType, condition, forWagon]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => { refresh(); readPending(); }, [refresh, readPending]);
 
+  /*
+   * Draining the queue.
+   *
+   * The browser's online event is the trigger, and a slow poll backs it up:
+   * `navigator.onLine` goes true the moment the wifi associates, which on a
+   * shop floor is well before anything is actually reachable, so a single
+   * attempt on that event is not enough.
+   */
+  useEffect(() => {
+    let cancelled = false;
+
+    const drain = async () => {
+      if (cancelled || !offlineDb.isOnline()) return;
+      const queued = await offlineDb.getPendingSorting(batchId);
+      if (queued.length === 0) return;
+      const token = localStorage.getItem('wrs_token') || undefined;
+      const result = await offlineDb.syncPendingSorting('/api', token);
+      if (cancelled) return;
+      await readPending();
+      if (result.synced > 0) await refresh();
+    };
+
+    const goOnline = () => { setOnline(true); drain(); };
+    const goOffline = () => setOnline(false);
+
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    const timer = window.setInterval(drain, 15000);
+    drain();
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+      window.clearInterval(timer);
+    };
+  }, [batchId, readPending, refresh]);
+
+  /**
+   * Records one spring.
+   *
+   * The tap is never lost. If the server cannot be reached — or simply fails
+   * — the spring goes into the device's queue and syncs later, because a
+   * dropped connection on shop wifi must not cost an inspector a spring they
+   * have already measured and put down.
+   *
+   * The band the inspector tapped drives the sound and the label, so the
+   * feedback is immediate either way. It is not the verdict: the stored
+   * classification is always the server's, computed from the height, online
+   * or on replay.
+   */
   const record = async (height: number, band: string | null, condemned: boolean) => {
     setBusy(true);
     setError(null);
+
+    const queueIt = async (why: string | null) => {
+      await offlineDb.enqueueSortedSpring({
+        batchId,
+        bogieType,
+        condition,
+        springPosition: position,
+        measuredFreeHeight: height,
+        heightIsApproximate: true,
+        tappedBand: band,
+        condemned
+      });
+      await readPending();
+      if (condemned) playCondemnedBuzz();
+      else playPassChime();
+      setLastRecorded(
+        condemned ? (isHi ? 'कंडम' : 'Condemned') : `${band}`
+      );
+      if (why) setError(null);
+    };
+
     try {
+      if (!offlineDb.isOnline()) {
+        setOnline(false);
+        await queueIt(null);
+        return;
+      }
+
       const res = await api.recordSortedSpring({
         batchId,
         bogieType,
@@ -129,8 +226,15 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           : `${res.data.band}`
       );
       await refresh();
-    } catch (e: any) {
-      setError(e?.message || (isHi ? 'दर्ज नहीं हो सका' : 'Could not record that spring'));
+    } catch {
+      // The request failed rather than the device being flagged offline —
+      // a dead tunnel, a sleeping server, a dropped packet. Same answer:
+      // keep the spring.
+      try {
+        await queueIt('failed');
+      } catch {
+        setError(isHi ? 'दर्ज नहीं हो सका' : 'Could not record that spring');
+      }
     } finally {
       setBusy(false);
     }
@@ -150,6 +254,34 @@ export function SpringSortingPage({ lang, onClose }: Props) {
     setBusy(true);
     setError(null);
     try {
+      /*
+       * Undo takes back the LAST tap, and while springs are queued the last
+       * tap is a queued one. Going to the server first would withdraw an
+       * older spring that was recorded correctly and leave the mistap sitting
+       * in the queue, waiting to sync — the inspector would watch the wrong
+       * spring disappear and the wrong one arrive.
+       *
+       * A queued spring was never recorded anywhere, so removing it from the
+       * queue is the whole correction. No void row is needed, and none is
+       * written: there is nothing on the server to supersede.
+       */
+      const queued = await offlineDb.getPendingSorting(batchId);
+      if (queued.length > 0) {
+        await offlineDb.removePendingSorting(queued[queued.length - 1].clientTempId);
+        await readPending();
+        setLastRecorded(isHi ? 'हटाया गया' : 'Removed');
+        return;
+      }
+
+      if (!offlineDb.isOnline()) {
+        setError(
+          isHi
+            ? 'ऑफ़लाइन — पहले से दर्ज स्प्रिंग नेटवर्क लौटने पर ही हटाई जा सकती है।'
+            : 'Offline — a spring already sent can only be taken back once the network is available.'
+        );
+        return;
+      }
+
       const res = await api.undoLastSortedSpring(batchId);
       if (!res.data.corrected) {
         setError(res.data.message || (isHi ? 'पूर्ववत करने के लिए कुछ नहीं है' : 'Nothing to undo yet.'));
@@ -175,6 +307,16 @@ export function SpringSortingPage({ lang, onClose }: Props) {
       setBusy(false);
     }
   };
+
+  /*
+   * What the inspector has sorted, which is the server's count plus whatever
+   * is still on the tablet. Anything less would show a number smaller than
+   * the pile in front of them the moment the wifi drops.
+   */
+  const pendingCount = pending.length;
+  const sessionTotal = totals.total + pendingCount;
+  const sessionPassed = totals.passed + pending.filter((p) => !p.condemned).length;
+  const sessionCondemned = totals.condemned + pending.filter((p) => p.condemned).length;
 
   const positionTallies = tallies.filter((t) => t.springPosition === position);
   const positionCapacity = capacity.filter((c) => c.springPosition === position);
@@ -252,13 +394,13 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm border-t border-slate-800 pt-3">
           <span className="text-slate-400">
             {isHi ? 'इस सत्र में' : 'This session'}:{' '}
-            <b className="text-white tabular-nums">{totals.total}</b>
+            <b className="text-white tabular-nums" data-testid="session-total">{sessionTotal}</b>
           </span>
           <span className="text-emerald-400">
-            {isHi ? 'उत्तीर्ण' : 'Passed'}: <b className="tabular-nums">{totals.passed}</b>
+            {isHi ? 'उत्तीर्ण' : 'Passed'}: <b className="tabular-nums">{sessionPassed}</b>
           </span>
           <span className="text-red-400">
-            {isHi ? 'कंडम' : 'Condemned'}: <b className="tabular-nums">{totals.condemned}</b>
+            {isHi ? 'कंडम' : 'Condemned'}: <b className="tabular-nums">{sessionCondemned}</b>
           </span>
           {lastRecorded && (
             <span className="text-slate-300">
@@ -275,6 +417,33 @@ export function SpringSortingPage({ lang, onClose }: Props) {
             </span>
           )}
         </div>
+
+        {/*
+          Springs on the tablet and not yet on the server.
+
+          Said plainly rather than hidden behind a spinner. An inspector whose
+          wifi has dropped needs to know two things: that their taps are being
+          kept, and that they are not finished until the count clears. Silence
+          on either point is what sends someone back to paper.
+        */}
+        {pendingCount > 0 && (
+          <div
+            data-testid="pending-sync-banner"
+            className="rounded-xl border border-amber-700/60 bg-amber-950/40 px-4 py-2.5 text-xs text-amber-200"
+          >
+            <b className="tabular-nums">{pendingCount}</b>{' '}
+            {isHi
+              ? 'स्प्रिंग इस टैबलेट पर सुरक्षित हैं और नेटवर्क लौटते ही अपने आप भेज दी जाएँगी। कुछ खोया नहीं है।'
+              : pendingCount === 1
+                ? 'spring is held on this tablet and will send itself when the network is back. Nothing is lost.'
+                : 'springs are held on this tablet and will send themselves when the network is back. Nothing is lost.'}
+            {!online && (
+              <span className="ml-1 font-bold">
+                {isHi ? 'अभी ऑफ़लाइन।' : 'Offline right now.'}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Pace.
@@ -331,7 +500,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
 
       {/* Correcting the last tap. Placed with the work rather than in a menu:
           it is needed in the second after a mistake, not later. */}
-      {totals.total > 0 && (
+      {sessionTotal > 0 && (
         <div className="flex justify-end">
           <button
             data-testid="undo-last-spring"
@@ -398,6 +567,16 @@ export function SpringSortingPage({ lang, onClose }: Props) {
                 ? 'एक नेस्ट एक ही समूह से आना चाहिए'
                 : 'A nest must come from one group, so the split is what matters'}
             </p>
+            {/* The stock figures come from the server, so while springs are
+                queued they are behind by exactly that many. Saying so is
+                better than showing a number that quietly under-counts. */}
+            {pendingCount > 0 && (
+              <p className="text-[11px] text-amber-400/90 mt-1">
+                {isHi
+                  ? `पिछले सिंक तक — ${pendingCount} स्प्रिंग अभी गिनी नहीं गई`
+                  : `As of the last sync — ${pendingCount} not counted here yet`}
+              </p>
+            )}
           </div>
           <label className="block">
             <span className="block text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">
@@ -460,10 +639,16 @@ export function SpringSortingPage({ lang, onClose }: Props) {
 
       <button
         onClick={finish}
-        disabled={busy || totals.total === 0}
+        disabled={busy || sessionTotal === 0 || pendingCount > 0}
         className="w-full min-h-[52px] rounded-xl bg-white text-black font-extrabold text-sm disabled:opacity-40 active:scale-95 transition-transform"
       >
-        {isHi ? 'सत्र समाप्त करें' : 'Finish sorting session'}
+        {pendingCount > 0
+          ? isHi
+            ? `${pendingCount} स्प्रिंग भेजी जानी बाकी — प्रतीक्षा करें`
+            : `${pendingCount} still to send — waiting for the network`
+          : isHi
+            ? 'सत्र समाप्त करें'
+            : 'Finish sorting session'}
       </button>
     </div>
   );

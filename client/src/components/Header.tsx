@@ -70,11 +70,18 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-40 bg-[#0a0a0a]/80 backdrop-blur-md border-b border-white/10 text-white select-none">
       {/* Top Branding Bar */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex items-center justify-between gap-2">
+      {/*
+        Wraps rather than overflowing, for the same reason the nav row below
+        does. The right-hand cluster only overflows once there is something to
+        sync, so it stayed hidden until the sorting queue started contributing
+        to the pending count — and sorting is the workflow most likely to be
+        offline, on the narrowest device, with the most in the queue.
+      */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2">
         {/* Left: Indian Railways Branding */}
         <div 
           onClick={() => onSelectTab(isInspector ? 'inspector_home' : 'wagons')}
-          className="flex items-center gap-3 cursor-pointer group"
+          className="flex items-center gap-3 cursor-pointer group min-w-0"
         >
           <div className="w-10 h-10 rounded-lg bg-blue-700 border border-blue-500 flex items-center justify-center font-black text-white text-lg shadow-inner group-hover:scale-105 transition-transform">
             IR
@@ -95,7 +102,7 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Right Controls: Connectivity, Pending Sync, Language Toggle, User & Logout */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3 min-w-0">
           {/* Online/Offline Status */}
           <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
             isOnline ? 'bg-emerald-950/60 text-emerald-300 border-emerald-800' : 'bg-amber-950/60 text-amber-300 border-amber-800'
@@ -113,7 +120,15 @@ export const Header: React.FC<HeaderProps> = ({
               className="min-h-[44px] px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-lg flex items-center gap-1.5 shadow transition-all active:scale-95"
             >
               <RefreshCwIcon size={14} className={isSyncing ? 'animate-spin' : ''} />
-              <span>{isSyncing ? dict.app.syncing : `${pendingCount} ${dict.app.syncQueue}`}</span>
+              {/* The count is the part that matters and is always shown; the
+                  word for it is dropped on the narrowest screens rather than
+                  pushing the row off the edge. */}
+              <span className="hidden sm:inline">
+                {isSyncing ? dict.app.syncing : `${pendingCount} ${dict.app.syncQueue}`}
+              </span>
+              <span className="sm:hidden tabular-nums">
+                {isSyncing ? '…' : pendingCount}
+              </span>
             </button>
           )}
 
