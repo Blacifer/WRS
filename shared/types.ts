@@ -413,6 +413,25 @@ export interface SyncResponse {
   syncedRecords: Array<{ clientTempId?: string; serverId: string; sequenceNumber: number }>;
   syncedIds?: string[];
   errors?: Array<{ clientTempId?: string; error: string }>;
+  /**
+   * Offline judgements the server refused, with the reason in plain words.
+   *
+   * A conflict is a decision, not a failure: a queued PASS arriving over
+   * another inspector's CONDEMNED is rejected so a crack cannot be erased by
+   * a stale verdict. Typed here because the device must SHOW these — the
+   * person who recorded them believes they were saved, and silently dropping
+   * them is how an inspector stops trusting the record.
+   */
+  conflictCount?: number;
+  conflicts?: Array<{
+    clientTempId?: string;
+    entity?: string;
+    wagonNumber?: string;
+    partName?: string;
+    attempted?: string;
+    kept?: string;
+    reason: string;
+  }>;
 }
 
 // -------------------------------------------------------------------------

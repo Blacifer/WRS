@@ -133,7 +133,7 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
           syncedWagons++;
         } catch (err: any) {
           errors.push({
-            clientTempId: w.id || w.wagonNumber,
+            clientTempId: w.clientTempId || w.id || w.wagonNumber,
             entity: 'WAGON',
             error: err.message || 'Failed to sync wagon'
           });
@@ -217,7 +217,11 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
           syncedChecklistItems++;
         } catch (err: any) {
           errors.push({
-            clientTempId: chk.id,
+            // clientTempId first: it is the id the device actually holds. This
+            // read `chk.id`, which queued items do not have, so every checklist
+            // failure was reported against `undefined` and the device could not
+            // tell WHICH item had failed.
+            clientTempId: chk.clientTempId || chk.id,
             entity: 'CHECKLIST',
             error: err.message || 'Failed to sync checklist item'
           });
@@ -247,7 +251,7 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
           syncedTransitions++;
         } catch (err: any) {
           errors.push({
-            clientTempId: tr.id,
+            clientTempId: tr.clientTempId || tr.id,
             entity: 'TRANSITION',
             error: err.message || 'Failed to sync stage transition'
           });
@@ -274,7 +278,7 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
           syncedPhotos++;
         } catch (err: any) {
           errors.push({
-            clientTempId: p.id,
+            clientTempId: p.clientTempId || p.id,
             entity: 'PHOTO',
             error: err.message || 'Failed to sync photo'
           });

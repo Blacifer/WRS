@@ -5,6 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { User, NavigationTab } from '../../../shared/types.ts';
+import type { SyncConflict } from '../services/offlineDb.ts';
 import { getDictionary } from '../i18n/index.ts';
 import type { LanguageCode } from '../i18n/index.ts';
 import { offlineDb } from '../services/offlineDb.ts';
@@ -34,6 +35,18 @@ export const Header: React.FC<HeaderProps> = ({
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  /*
+   * Offline judgements the server refused, held until the inspector dismisses
+   * them.
+   *
+   * The server has always built these, with a plain-language reason for each,
+   * "so the device can tell the inspector which of their offline judgements
+   * were not applied". Nothing on the device ever read them. The most
+   * important case is a queued PASS refused over another inspector's
+   * CONDEMNED — exactly the finding that must not disappear quietly — and it
+   * disappeared quietly.
+   */
+  const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -43,11 +56,18 @@ export const Header: React.FC<HeaderProps> = ({
     window.addEventListener('offline', handleOffline);
 
     const unsubscribe = offlineDb.onPendingCountChange(setPendingCount);
+    // Refusals arrive from whichever sync found them — including the
+    // automatic one that runs when the network returns, which is the one that
+    // actually happens in a shed.
+    const unsubscribeConflicts = offlineDb.onSyncConflicts((incoming) =>
+      setConflicts((prev) => [...prev, ...incoming])
+    );
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       unsubscribe();
+      unsubscribeConflicts();
     };
   }, []);
 
@@ -57,6 +77,8 @@ export const Header: React.FC<HeaderProps> = ({
     try {
       const token = localStorage.getItem('wrs_token') || undefined;
       await offlineDb.syncPendingBatch('/api', token);
+      // Conflicts arrive through the subscription above, so a manual sync and
+      // an automatic one behave identically.
     } finally {
       setIsSyncing(false);
     }
@@ -432,6 +454,47 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
       </nav>
+
+      {/*
+        Work the server refused, shown until it is acknowledged.
+
+        Deliberately not a toast. A verdict that was recorded on the shop
+        floor and then rejected is the one thing in this system an inspector
+        must not miss, and something that fades after four seconds is
+        something that gets missed. It stays until they dismiss it.
+      */}
+      {conflicts.length > 0 && (
+        <div
+          data-testid="sync-conflicts"
+          className="bg-amber-950/70 border-t border-amber-800 px-4 py-3"
+        >
+          <div className="max-w-7xl mx-auto space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-xs font-extrabold text-amber-200 uppercase tracking-wide">
+                {currentLang === 'hi'
+                  ? `${conflicts.length} ऑफ़लाइन प्रविष्टि लागू नहीं हुई`
+                  : `${conflicts.length} offline ${conflicts.length === 1 ? 'entry was' : 'entries were'} not applied`}
+              </p>
+              <button
+                onClick={() => setConflicts([])}
+                className="min-h-[32px] px-2.5 text-[11px] font-bold text-amber-300 hover:text-white border border-amber-800 rounded-md"
+              >
+                {currentLang === 'hi' ? 'समझ गया' : 'Got it'}
+              </button>
+            </div>
+            <ul className="space-y-1.5">
+              {conflicts.map((c, i) => (
+                <li key={c.clientTempId || i} className="text-xs text-amber-100/90 leading-snug">
+                  {c.wagonNumber && (
+                    <b className="text-amber-200">{c.wagonNumber}</b>
+                  )}{' '}
+                  {c.reason}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
     </header>
   );
 };

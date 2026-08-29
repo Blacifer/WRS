@@ -3,6 +3,7 @@
  * Indian Railways WRS Raipur Quality Control System
  */
 
+import { decideQueueSettlement } from '../../../shared/sync/settleQueue.ts';
 import type {
   InspectionRecord,
   SyncPayload,
@@ -12,6 +13,8 @@ import type {
   WagonPhotoRecord,
   WagonTransition
 } from '../../../shared/types.ts';
+
+export type SyncConflict = NonNullable<SyncResponse['conflicts']>[number];
 
 const DB_NAME = 'wrs_raipur_pwa_offline_db_v2';
 const DB_VERSION = 3;
@@ -110,6 +113,16 @@ export interface PendingSortedSpring {
 class MultiEntityOfflineDbManager {
   private dbPromise: Promise<IDBDatabase> | null = null;
   private syncListeners: Array<(count: number) => void> = [];
+  /*
+   * Told about work the server refused, from whichever sync discovered it.
+   *
+   * A listener rather than a return value because the sync that matters most
+   * is the automatic one — nobody taps a sync button; the network simply
+   * comes back and the queue drains on its own. That path had no caller to
+   * return anything to, so a refused judgement was found and thrown away in
+   * the same breath.
+   */
+  private conflictListeners: Array<(conflicts: SyncConflict[]) => void> = [];
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -585,22 +598,52 @@ class MultiEntityOfflineDbManager {
 
       const res = await response.json();
 
-      // Clear synced items
+      /*
+       * Removing what the server took, and ONLY what the server took.
+       *
+       * This used to clear each store outright on any 200, which lost work in
+       * two different ways.
+       *
+       * The first is a race: an inspector keeps working while a sync runs —
+       * that is the point of a background sync — and anything queued between
+       * reading the batch and clearing the store was destroyed without ever
+       * being sent. So deletion is now by the exact keys that were submitted.
+       *
+       * The second is worse, because it was silent and it hit the safety
+       * records. The server answers 200 even when individual items were
+       * refused, and it says which and why: an offline PASS arriving over
+       * another inspector's CONDEMNED is REJECTED, by design, so a crack
+       * cannot be erased by a stale queued verdict. The device then deleted
+       * that item anyway. The inspector's queue emptied, nothing was said,
+       * and a judgement they believed was recorded had been thrown away.
+       *
+       * Now:
+       *   accepted  — removed, it is on the server.
+       *   conflicted — removed, but RETURNED so the inspector is told. The
+       *                server rejected it as a decision, not a failure;
+       *                sending it again would only be refused again.
+       *   errored   — KEPT and retried. A queue that stays visibly non-empty
+       *               is a far better failure than one that empties by
+       *               deleting the work.
+       */
       const db = await this.openDb();
-      if (pending.inspections.length > 0) {
-        await this.clearStore(db, STORE_PENDING_INSPECTIONS);
-      }
-      if (pending.checklist.length > 0) {
-        await this.clearStore(db, STORE_PENDING_CHECKLIST);
-      }
-      if (pending.photos.length > 0) {
-        await this.clearStore(db, STORE_PENDING_PHOTOS);
-      }
-      if (pending.transitions.length > 0) {
-        await this.clearStore(db, STORE_PENDING_TRANSITIONS);
-      }
+      const settle = async (storeName: string, rows: Array<{ clientTempId: string }>) => {
+        const { remove } = decideQueueSettlement(rows, res);
+        for (const key of remove) {
+          await this.deleteFromStore(db, storeName, key);
+        }
+      };
+
+      await settle(STORE_PENDING_INSPECTIONS, pending.inspections);
+      await settle(STORE_PENDING_CHECKLIST, pending.checklist);
+      await settle(STORE_PENDING_PHOTOS, pending.photos);
+      await settle(STORE_PENDING_TRANSITIONS, pending.transitions);
 
       this.notifyPendingCountChange();
+      // Announced rather than only returned. These are the only record of an
+      // offline judgement that was refused, and the person who made it has to
+      // be told regardless of which sync found out.
+      this.reportConflicts(res.conflicts);
       return {
         ...res,
         syncedCount: (res.syncedCount || 0) + sorting.synced
@@ -617,6 +660,19 @@ class MultiEntityOfflineDbManager {
     }
   }
 
+  private deleteFromStore(db: IDBDatabase, storeName: string, key: string): Promise<void> {
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction(storeName, 'readwrite');
+        const req = tx.objectStore(storeName).delete(key);
+        req.onsuccess = () => resolve();
+        req.onerror = () => resolve();
+      } catch {
+        resolve();
+      }
+    });
+  }
+
   private clearStore(db: IDBDatabase, storeName: string): Promise<void> {
     return new Promise((resolve) => {
       try {
@@ -629,6 +685,30 @@ class MultiEntityOfflineDbManager {
         resolve();
       }
     });
+  }
+
+  /**
+   * Subscribes to work the server refused.
+   *
+   * Every sync path reports through here, so a conflict is surfaced whether
+   * the inspector pressed sync or the network simply returned.
+   */
+  public onSyncConflicts(callback: (conflicts: SyncConflict[]) => void): () => void {
+    this.conflictListeners.push(callback);
+    return () => {
+      this.conflictListeners = this.conflictListeners.filter((l) => l !== callback);
+    };
+  }
+
+  private reportConflicts(conflicts: SyncConflict[] | undefined): void {
+    if (!conflicts?.length) return;
+    for (const listener of this.conflictListeners) {
+      try {
+        listener(conflicts);
+      } catch (err) {
+        console.error(err);
+      }
+    }
   }
 
   public onPendingCountChange(callback: (count: number) => void): () => void {
