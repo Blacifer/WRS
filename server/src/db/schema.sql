@@ -224,6 +224,18 @@ CREATE TABLE IF NOT EXISTS checklist_items (
   inspector_name TEXT NOT NULL,
   photo_id TEXT DEFAULT NULL,
   phase1_inspection_id TEXT DEFAULT NULL,
+  -- Who decided this status: a person, or a spring measurement.
+  --
+  -- Spring rows are refreshed from the latest Phase-1 measurement on every
+  -- read of the checklist. That is right while nobody has looked at the part
+  -- and catastrophic once somebody has: a hand-written condemnation was being
+  -- rewritten to PASS on the next read, with the reason replaced by
+  -- "Auto-linked from spring measurement", no audit entry, and the exit gate
+  -- reading the same method. Free height is one failure mode out of several —
+  -- a cracked spring measures perfectly — so a passing measurement can never
+  -- overturn a person. These mark the rows a person has claimed.
+  manual_verdict_at TEXT DEFAULT NULL,
+  manual_verdict_by TEXT DEFAULT NULL,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   FOREIGN KEY (wagon_id) REFERENCES wagons(id) ON DELETE RESTRICT,

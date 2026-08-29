@@ -732,6 +732,41 @@ export function runMigrations(db: DatabaseSync): void {
   }
 
 
+  /*
+   * Who decided a checklist item's status: a person, or a measurement.
+   *
+   * Spring rows are refreshed from the latest Phase-1 measurement every time
+   * the checklist is read, which is right when nobody has looked at the part
+   * and catastrophic when somebody has. A supervisor could condemn a spring
+   * by hand — "visible transverse crack near second coil" — and the next read
+   * would rewrite it to PASS and replace the note with "Auto-linked from
+   * spring measurement: 258.5mm". The condemnation and the evidence both
+   * vanished, with no audit entry, and the exit gate then counted the item as
+   * passed.
+   *
+   * Free height is one failure mode out of several. A cracked spring measures
+   * perfectly, so a passing measurement can only ever mean "the height is in
+   * band" — never "the part is good", and never enough to overturn somebody
+   * who has looked at it.
+   *
+   * `phase1_inspection_id` could not carry this: it stays set after a human
+   * edits a row that was previously auto-linked, which is exactly the case
+   * that went wrong. So the human verdict is marked explicitly.
+   *
+   * Existing rows default to NULL — unmarked — because there is no way to
+   * tell after the fact which of them a person set. They behave as before
+   * until somebody touches them again.
+   */
+  const chkCols = db.prepare("PRAGMA table_info(checklist_items)").all() as any[];
+  for (const [name, ddl] of [
+    ['manual_verdict_at', 'TEXT DEFAULT NULL'],
+    ['manual_verdict_by', 'TEXT DEFAULT NULL']
+  ] as [string, string][]) {
+    if (chkCols.length > 0 && !chkCols.some((c) => c.name === name)) {
+      db.exec(`ALTER TABLE checklist_items ADD COLUMN ${name} ${ddl};`);
+    }
+  }
+
   // Learned parameter history — see the table comment in schema.sql.
   db.exec(`
     CREATE TABLE IF NOT EXISTS learned_parameter_history (

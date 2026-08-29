@@ -1127,6 +1127,20 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                       {item.conditionNotes && (
                         <p className="text-xs text-slate-400 italic">“{item.conditionNotes}”</p>
                       )}
+                      {/* A measurement that condemns a part somebody recorded
+                          as serviceable. It is deliberately not applied — a
+                          person who looked at the part is not overruled by a
+                          number — but it blocks release, and this is the
+                          screen where it can actually be reconciled. */}
+                      {(item as any).measurementConflict && (
+                        <p
+                          data-testid="measurement-conflict"
+                          className="text-xs text-amber-300 bg-amber-950/40 border border-amber-800/60 rounded-md px-2 py-1.5 mt-1"
+                        >
+                          <b>{isHi ? 'मापन असहमत' : 'The measurement disagrees'}:</b>{' '}
+                          {(item as any).measurementConflict.reason}
+                        </p>
+                      )}
                       {item.repairAction && (
                         <p className="text-xs text-emerald-400">
                           🔧 Action: {item.repairAction} ({item.repairNotes})

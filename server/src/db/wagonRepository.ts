@@ -553,6 +553,45 @@ export class WagonRepository {
 
       row.phase1_inspection_id = matched.id;
 
+      /*
+       * A measurement never overturns a person.
+       *
+       * This used to rewrite every spring row from the latest measurement on
+       * every read, in both directions. A supervisor could condemn a spring
+       * by hand — "visible transverse crack near second coil" — and the next
+       * time anyone opened the checklist it read PASS again, with the note
+       * replaced by "Auto-linked from spring measurement: 258.5mm". No audit
+       * entry, and the exit gate reads this same method, so the wagon became
+       * releasable.
+       *
+       * Free height is one failure mode out of several and a cracked spring
+       * measures perfectly, so a passing measurement means "the height is in
+       * band", never "the part is good".
+       *
+       * The rule the sync route already applies to offline work applies here
+       * too: fill in what nobody has judged, escalate freely, never downgrade
+       * a human verdict. A more severe measurement is not discarded — it is
+       * carried as a conflict and blocks release.
+       */
+      if (row.manual_verdict_at) {
+        const held = String(row.status || '');
+        const measurementIsWorse =
+          matched.status === 'CONDEMNED' && held !== 'CONDEMNED' && held !== 'REPLACED';
+        if (measurementIsWorse) {
+          row.measurementConflict = {
+            measured: 'CONDEMNED',
+            held,
+            measuredHeight: matched.measured_height,
+            tableReference: matched.table_reference || 'RDSO G-95',
+            reason:
+              `Measured at ${matched.measured_height}mm, which condemns it under ` +
+              `${matched.table_reference || 'RDSO G-95'}, but this part is recorded as ${held} ` +
+              `by ${row.inspector_name || 'an inspector'}. Someone must reconcile the two before release.`
+          };
+        }
+        continue;
+      }
+
       let newStatus: string | null = null;
       let notes = row.condition_notes;
 
@@ -600,11 +639,22 @@ export class WagonRepository {
     const now = new Date().toISOString();
 
     if (existing) {
+      /*
+       * A status written here by a person is their verdict, and must not be
+       * silently replaced by a later measurement. PENDING is not a verdict —
+       * it is the absence of one — so it does not claim the row.
+       */
+      const isHumanVerdict = !!data.status && data.status !== 'PENDING';
+      const manualAt = isHumanVerdict ? now : existing.manual_verdict_at;
+      const manualBy = isHumanVerdict
+        ? (data.inspectorId || existing.manual_verdict_by)
+        : existing.manual_verdict_by;
+
       this.db.prepare(`
         UPDATE checklist_items
         SET status = ?, condition_notes = ?, repair_action = ?, repair_notes = ?,
             reinspected_status = ?, photo_id = ?, inspector_id = ?, inspector_name = ?,
-            updated_at = ?
+            updated_at = ?, manual_verdict_at = ?, manual_verdict_by = ?
         WHERE id = ?
       `).run(
         data.status || existing.status,
@@ -616,6 +666,8 @@ export class WagonRepository {
         data.inspectorId,
         data.inspectorName,
         now,
+        manualAt ?? null,
+        manualBy ?? null,
         existing.id
       );
 
@@ -676,12 +728,22 @@ export class WagonRepository {
     const conditionNotes = updates.conditionNotes !== undefined ? updates.conditionNotes : existing.conditionNotes;
     const photoId = updates.photoId !== undefined ? updates.photoId : existing.photoId;
 
+    // This route is only ever reached by a person acting on the part, so any
+    // status they set claims the row against later measurement updates.
+    const claimsRow = updates.status !== undefined && updates.status !== 'PENDING';
+
     this.db.prepare(`
       UPDATE checklist_items
       SET status = ?, repair_action = ?, repair_notes = ?, reinspected_status = ?,
-          condition_notes = ?, photo_id = ?, updated_at = ?
+          condition_notes = ?, photo_id = ?, updated_at = ?,
+          manual_verdict_at = ?, manual_verdict_by = ?
       WHERE id = ?
-    `).run(status, repairAction, repairNotes, reinspectedStatus, conditionNotes, photoId, now, itemId);
+    `).run(
+      status, repairAction, repairNotes, reinspectedStatus, conditionNotes, photoId, now,
+      claimsRow ? now : (existing.manualVerdictAt ?? null),
+      claimsRow ? (options?.userId || existing.manualVerdictBy || null) : (existing.manualVerdictBy ?? null),
+      itemId
+    );
 
     // Every verdict on every part goes into the chain.
     //
@@ -982,6 +1044,32 @@ export class WagonRepository {
     let unaddressedCondemned = 0;
 
     for (const item of items) {
+      /*
+       * A measurement that condemns a part somebody has recorded as
+       * serviceable blocks release, whether the part is mandatory or not.
+       *
+       * The measurement is deliberately not applied — a person who looked at
+       * the part is not overruled by a number — but it cannot be dropped
+       * either. Before this, the checklist row was simply overwritten by
+       * whichever ran last, and one of those two findings disappeared without
+       * anyone being told which.
+       */
+      if (item.measurementConflict) {
+        const msg =
+          `"${item.partName}" (${item.category}) — ${item.measurementConflict.reason}`;
+        blockers.push(msg);
+        blockerDetails.push({
+          id: item.id,
+          category: item.category,
+          partName: item.partName,
+          issueType: 'INSPECTION_FAILED',
+          description: msg,
+          severity: 'CRITICAL_BLOCKER',
+          remediationAction:
+            'Re-examine the part. Either record the condemnation, or re-measure and record why the reading stands.'
+        });
+      }
+
       if (item.isMandatory) {
         totalMandatory++;
         if (item.status === 'PASS' || (['REPAIRED', 'REPLACED'].includes(item.status) && item.reinspectedStatus === 'PASS')) {
@@ -1963,6 +2051,17 @@ export class WagonRepository {
       photoId: row.photo_id,
       photo_id: row.photo_id,
       phase1InspectionId: row.phase1_inspection_id,
+      manualVerdictAt: row.manual_verdict_at,
+      manual_verdict_at: row.manual_verdict_at,
+      manualVerdictBy: row.manual_verdict_by,
+      manual_verdict_by: row.manual_verdict_by,
+      /*
+       * Set when a measurement disagrees with a standing human verdict and is
+       * MORE severe. The measurement is not applied — a person's finding is
+       * not overwritten — but it cannot be dropped either, so it is carried
+       * here and blocks the exit gate.
+       */
+      measurementConflict: row.measurementConflict || null,
       phase1_inspection_id: row.phase1_inspection_id,
       createdAt: row.created_at,
       created_at: row.created_at,

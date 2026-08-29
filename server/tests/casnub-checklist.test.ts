@@ -210,6 +210,147 @@ describe('Phase 2 R2: CASNUB Bogie Parts Checklist & Phase 1 Integration', () =>
     assert.equal(outerSpringItem2.status, 'PASS');
   });
 
+  /*
+   * A measurement must never overturn a person.
+   *
+   * The spring rows are refreshed from the latest Phase-1 measurement on
+   * every read of the checklist, which is right while nobody has looked at
+   * the part and catastrophic once somebody has. A supervisor could condemn a
+   * spring by hand and the next read would rewrite it to PASS, replacing the
+   * reason with "Auto-linked from spring measurement". No audit entry, and
+   * the exit gate reads the same method, so the wagon became releasable.
+   *
+   * Free height is one failure mode out of several. A cracked spring measures
+   * perfectly.
+   */
+  test('TC-CHK-03b: a hand-written condemnation is not erased by a passing measurement', async () => {
+    const wagonNumber = 'NR/BOXNHL/88012';
+    await app.dispatch({
+      method: 'POST',
+      url: '/api/wagons/register',
+      headers: { authorization: `Bearer ${inspectorToken}`, 'content-type': 'application/json' },
+      body: { wagonNumber, wagonType: 'BOXNHL', owningRailway: 'NR' }
+    });
+
+    // The spring measures in band and is auto-linked as PASS.
+    await app.dispatch({
+      method: 'POST',
+      url: '/api/inspections',
+      headers: { authorization: `Bearer ${inspectorToken}`, 'content-type': 'application/json' },
+      body: {
+        wagonNumber, bogieType: 'CASNUB_22_NLB', condition: 'USED',
+        springPosition: 'OUTER', bogiePosition: 'BOGIE_1', measuredFreeHeight: 257.5
+      }
+    });
+
+    const readItem = async () => {
+      const res = await app.dispatch({
+        method: 'GET',
+        url: `/api/wagons/${wagonNumber}/checklist`,
+        headers: { authorization: `Bearer ${inspectorToken}` }
+      });
+      return res.body.data.allItems.find(
+        (i: any) => i.category === 'SPRINGS' && i.partName.includes('Outer Spring (Bogie 1)')
+      );
+    };
+
+    const linked = await readItem();
+    assert.equal(linked.status, 'PASS', 'the measurement fills in a row nobody has judged');
+
+    // A supervisor looks at the spring and sees a crack. The height is fine.
+    const put = await app.dispatch({
+      method: 'PUT',
+      url: `/api/wagons/${wagonNumber}/checklist/items/${linked.id}`,
+      headers: { authorization: `Bearer ${supervisorToken}`, 'content-type': 'application/json' },
+      body: { status: 'CONDEMNED', conditionNotes: 'Visible transverse crack near second coil' }
+    });
+    assert.equal(put.status, 200);
+
+    // Anyone opens the checklist again.
+    const after = await readItem();
+    assert.equal(after.status, 'CONDEMNED', 'a measurement must not overturn a person');
+    assert.match(
+      after.conditionNotes,
+      /transverse crack/,
+      'and must not overwrite the evidence they recorded'
+    );
+
+    // ...and the gate must not release it.
+    const gate = await app.dispatch({
+      method: 'GET',
+      url: `/api/wagons/${wagonNumber}/gate/status`,
+      headers: { authorization: `Bearer ${supervisorToken}` }
+    });
+    assert.equal(gate.body.data.canRelease, false);
+  });
+
+  test('TC-CHK-03c: a condemning measurement over a human PASS blocks release rather than vanishing', async () => {
+    /*
+     * The other direction. The person is still not overruled — their verdict
+     * stands on the row — but the measurement is not dropped either. It is
+     * carried as a disagreement and blocks release until somebody reconciles
+     * the two, because silently keeping either one loses a real finding.
+     */
+    const wagonNumber = 'NR/BOXNHL/88013';
+    await app.dispatch({
+      method: 'POST',
+      url: '/api/wagons/register',
+      headers: { authorization: `Bearer ${inspectorToken}`, 'content-type': 'application/json' },
+      body: { wagonNumber, wagonType: 'BOXNHL', owningRailway: 'NR' }
+    });
+
+    const before = await app.dispatch({
+      method: 'GET',
+      url: `/api/wagons/${wagonNumber}/checklist`,
+      headers: { authorization: `Bearer ${inspectorToken}` }
+    });
+    const target = before.body.data.allItems.find(
+      (i: any) => i.category === 'SPRINGS' && i.partName.includes('Outer Spring (Bogie 1)')
+    );
+
+    // Passed by eye, by a person.
+    await app.dispatch({
+      method: 'PUT',
+      url: `/api/wagons/${wagonNumber}/checklist/items/${target.id}`,
+      headers: { authorization: `Bearer ${inspectorToken}`, 'content-type': 'application/json' },
+      body: { status: 'PASS', conditionNotes: 'Looks fine' }
+    });
+
+    // Then measured, and the height condemns it.
+    await app.dispatch({
+      method: 'POST',
+      url: '/api/inspections',
+      headers: { authorization: `Bearer ${inspectorToken}`, 'content-type': 'application/json' },
+      body: {
+        wagonNumber, bogieType: 'CASNUB_22_NLB', condition: 'USED',
+        springPosition: 'OUTER', bogiePosition: 'BOGIE_1', measuredFreeHeight: 241.0
+      }
+    });
+
+    const res = await app.dispatch({
+      method: 'GET',
+      url: `/api/wagons/${wagonNumber}/checklist`,
+      headers: { authorization: `Bearer ${inspectorToken}` }
+    });
+    const item = res.body.data.allItems.find(
+      (i: any) => i.category === 'SPRINGS' && i.partName.includes('Outer Spring (Bogie 1)')
+    );
+    assert.equal(item.status, 'PASS', 'the person who looked at it is not overruled by a number');
+    assert.ok(item.measurementConflict, 'but the measurement is not thrown away either');
+    assert.match(item.measurementConflict.reason, /241/);
+
+    const gate = await app.dispatch({
+      method: 'GET',
+      url: `/api/wagons/${wagonNumber}/gate/status`,
+      headers: { authorization: `Bearer ${supervisorToken}` }
+    });
+    assert.equal(gate.body.data.canRelease, false);
+    assert.ok(
+      gate.body.data.blockers.some((b: string) => /Outer Spring \(Bogie 1\)/.test(b)),
+      'and the gate names the part rather than blocking for an unrelated reason'
+    );
+  });
+
   test('TC-CHK-04: Master Checklist Configuration endpoints (GET & POST /api/checklist/config)', async () => {
     // 1. Get default configs
     const getRes = await app.dispatch({
