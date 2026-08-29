@@ -20,7 +20,7 @@
  * amounts to.
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { api } from '../services/api.ts';
 import { getBandOptions } from '../../../shared/classification/bandEntry.ts';
 import {
@@ -34,6 +34,8 @@ import type { BogieType, SpringCondition, SpringPosition } from '../../../shared
 import { playPassChime, playCondemnedBuzz } from '../utils/audioFeedback.ts';
 import { readThroughput, DAILY_PILE } from '../../../shared/sorting/throughput.ts';
 import { offlineDb } from '../services/offlineDb.ts';
+import { SpringEvidenceCamera } from '../components/SpringEvidenceCamera.tsx';
+import type { SpringEvidenceHandle } from '../components/SpringEvidenceCamera.tsx';
 import type { PendingSortedSpring } from '../services/offlineDb.ts';
 
 const BAND_HEX: Record<string, string> = {
@@ -72,6 +74,26 @@ export function SpringSortingPage({ lang, onClose }: Props) {
    */
   const banded = isBandedBogie(bogieType);
   const [heightInput, setHeightInput] = useState('');
+
+  /*
+   * Photographing what is being sorted.
+   *
+   * Off unless the inspector turns it on, and it never gates a tap: the
+   * record is the work, the photograph is evidence attached to it. The frame
+   * is grabbed at the moment the band is tapped, so the workflow does not
+   * change and no spring costs an extra action.
+   */
+  const [capturePhotos, setCapturePhotos] = useState(false);
+  const cameraRef = useRef<SpringEvidenceHandle | null>(null);
+  /*
+   * How much labelled evidence exists so far.
+   *
+   * Shown to the person taking the photographs, because otherwise they are
+   * being asked to do something with no visible result. It is also the honest
+   * answer to "when will the camera be able to do this by itself" — that
+   * question is answered by the count in the thinnest band, not by an opinion.
+   */
+  const [dataset, setDataset] = useState<{ total: number; bands: number } | null>(null);
   const [condition, setCondition] = useState<SpringCondition>('USED');
   const [position, setPosition] = useState<SpringPosition>('OUTER');
   const [forWagon, setForWagon] = useState<string>('BOXN');
@@ -141,6 +163,21 @@ export function SpringSortingPage({ lang, onClose }: Props) {
   }, [batchId, bogieType, condition, forWagon]);
 
   useEffect(() => { refresh(); readPending(); }, [refresh, readPending]);
+
+  const readDataset = useCallback(async () => {
+    if (!capturePhotos) return;
+    try {
+      const res = await api.getSpringDataset();
+      setDataset({
+        total: res.data.total,
+        bands: new Set(res.data.byLabel.map((r) => `${r.springPosition}:${r.band ?? r.status}`)).size
+      });
+    } catch {
+      // A missing count never matters enough to interrupt sorting.
+    }
+  }, [capturePhotos]);
+
+  useEffect(() => { readDataset(); }, [readDataset, totals.total]);
 
   /*
    * Draining the queue.
@@ -250,6 +287,13 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         return;
       }
 
+      /*
+       * Grabbed BEFORE the request, so the frame is the spring the inspector
+       * was looking at when they decided — not whatever has drifted into
+       * view by the time the server answers.
+       */
+      const frame = capturePhotos ? cameraRef.current?.grab() ?? null : null;
+
       const res = await api.recordSortedSpring({
         batchId,
         bogieType,
@@ -270,6 +314,27 @@ export function SpringSortingPage({ lang, onClose }: Props) {
             ? `${res.data.band}`
             : (isHi ? `ठीक — ${height}mm` : `Serviceable — ${height}mm`)
       );
+
+      /*
+       * Deliberately not awaited and deliberately swallowed. The spring is
+       * already recorded; a failed photograph is not worth an error message
+       * to somebody holding the next one.
+       */
+      if (frame) {
+        api.attachSpringImage(res.data.id, {
+          batchId,
+          bogieType,
+          condition,
+          springPosition: position,
+          band: res.data.band ?? null,
+          status: res.data.status,
+          measuredFreeHeight: height,
+          imageData: frame.imageData,
+          width: frame.width,
+          height: frame.height
+        }).catch(() => undefined);
+      }
+
       await refresh();
     } catch {
       // The request failed rather than the device being flagged offline —
@@ -567,6 +632,48 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           </button>
         </div>
       )}
+
+      {/*
+        Photographing the pile.
+
+        Off by default and one tap to turn on for the whole session, not per
+        spring. At ~700 a shift, a feature costing one tap each costs 700 and
+        gets switched off by lunchtime.
+      */}
+      <div className="rounded-2xl border border-slate-700 bg-slate-900 p-4 space-y-3">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            data-testid="toggle-spring-photos"
+            checked={capturePhotos}
+            onChange={(e) => setCapturePhotos(e.target.checked)}
+            className="mt-0.5 w-5 h-5 accent-sky-500 shrink-0"
+          />
+          <span>
+            <span className="block text-sm font-bold text-white">
+              {isHi ? 'छँटाई के साथ फ़ोटो लें' : 'Photograph springs while sorting'}
+            </span>
+            <span className="block text-[11px] text-slate-400 mt-0.5 leading-snug">
+              {isHi
+                ? 'हर स्प्रिंग की फ़ोटो उसी बैंड के साथ सुरक्षित होगी जो आप दबाते हैं। कोई अतिरिक्त टैप नहीं। कैमरा बैंड तय नहीं करता — वह आप तय करते हैं।'
+                : 'Each photo is saved against the band you tap. No extra taps. The camera does not decide anything — you do.'}
+            </span>
+          </span>
+        </label>
+        <SpringEvidenceCamera
+          ref={cameraRef}
+          lang={lang}
+          active={capturePhotos}
+          onUnavailable={() => { /* sorting is unaffected; the component says so */ }}
+        />
+        {capturePhotos && dataset && (
+          <p data-testid="evidence-count" className="text-[11px] text-slate-400">
+            {isHi
+              ? `अब तक ${dataset.total.toLocaleString()} लेबल-युक्त फ़ोटो, ${dataset.bands} समूहों में।`
+              : `${dataset.total.toLocaleString()} labelled photographs so far, across ${dataset.bands} ${dataset.bands === 1 ? 'group' : 'groups'}.`}
+          </p>
+        )}
+      </div>
 
       {/* The work itself: one tap per spring */}
       <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-3">

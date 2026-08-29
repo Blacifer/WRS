@@ -767,6 +767,72 @@ export function runMigrations(db: DatabaseSync): void {
     }
   }
 
+  /*
+   * Photographs of sorted springs, each carrying the verdict a person gave it.
+   *
+   * WHY THIS TABLE AND NOT A CLASSIFIER
+   * -----------------------------------
+   * The ask is for a camera to name a spring's G-95 band. That cannot be done
+   * from a photograph of a spring on its own, and the reason is geometry
+   * rather than effort: a monocular image carries no scale. A small spring
+   * near the lens and a large one further away are the same picture. The
+   * bands are 2-3mm wide on a spring 245-290mm tall, so placing one correctly
+   * needs better than +/-0.4% absolute accuracy, and there is nothing in the
+   * frame to measure against.
+   *
+   * The two references that would fix it are the gauge post (excluded — the
+   * spring is to be shot on its own) and the spring's own wire diameter,
+   * which this system does not hold for any type. Inventing one would put a
+   * fabricated number underneath every verdict the camera gave.
+   *
+   * So no band is produced from an image. What is produced is the thing that
+   * would let one be built and, more importantly, MEASURED: every photograph
+   * stored here is labelled with the verdict the inspector gave the spring in
+   * front of them. The tap is the label. A few weeks of ordinary sorting
+   * yields a real dataset from this shop, this lighting and these springs,
+   * against which any future model can be scored before anybody trusts it.
+   *
+   * It earns its place before that day arrives: a photograph attached to a
+   * condemnation is evidence, which is the half of this system CRIS cares
+   * about.
+   */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS spring_images (
+      id TEXT PRIMARY KEY,
+      sorting_record_id TEXT DEFAULT NULL,
+      batch_id TEXT NOT NULL,
+      bogie_type TEXT NOT NULL,
+      spring_condition TEXT NOT NULL,
+      spring_position TEXT NOT NULL,
+      -- The verdict a person gave this spring. This is the label.
+      labelled_band TEXT DEFAULT NULL,
+      labelled_status TEXT NOT NULL,
+      measured_height REAL DEFAULT NULL,
+      mime_type TEXT NOT NULL DEFAULT 'image/jpeg',
+      image_data TEXT NOT NULL,
+      width INTEGER DEFAULT NULL,
+      height INTEGER DEFAULT NULL,
+      inspector_id TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      FOREIGN KEY (inspector_id) REFERENCES users(id) ON DELETE RESTRICT
+    );
+    CREATE INDEX IF NOT EXISTS idx_spring_images_batch ON spring_images(batch_id);
+    CREATE INDEX IF NOT EXISTS idx_spring_images_label
+      ON spring_images(bogie_type, spring_condition, spring_position, labelled_band);
+    CREATE INDEX IF NOT EXISTS idx_spring_images_record ON spring_images(sorting_record_id);
+    -- Evidence, so append-only like every other measurement in this system.
+    CREATE TRIGGER IF NOT EXISTS trg_prevent_spring_image_update
+    BEFORE UPDATE ON spring_images
+    BEGIN
+      SELECT RAISE(ABORT, 'Spring evidence images are immutable and cannot be updated.');
+    END;
+    CREATE TRIGGER IF NOT EXISTS trg_prevent_spring_image_delete
+    BEFORE DELETE ON spring_images
+    BEGIN
+      SELECT RAISE(ABORT, 'Spring evidence images are immutable and cannot be deleted.');
+    END;
+  `);
+
   // Learned parameter history — see the table comment in schema.sql.
   db.exec(`
     CREATE TABLE IF NOT EXISTS learned_parameter_history (

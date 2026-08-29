@@ -233,6 +233,99 @@ export class SortingRepository {
   }
 
   /**
+   * Stores a photograph of a spring alongside the verdict a person gave it.
+   *
+   * The verdict is the label. No band is ever derived FROM the image — see
+   * the table comment in migrations for why that is geometry rather than a
+   * missing feature — so this only ever records what a human decided while
+   * holding the spring.
+   *
+   * Returns null rather than throwing when there is no image: the caller is a
+   * camera that may not have a frame ready, and losing a spring because its
+   * photograph failed would be a bad trade.
+   */
+  public attachImage(input: {
+    sortingRecordId?: string | null;
+    batchId: string;
+    bogieType: string;
+    condition: SpringCondition;
+    springPosition: SpringPosition;
+    labelledBand?: string | null;
+    labelledStatus: 'PASS' | 'CONDEMNED';
+    measuredHeight?: number | null;
+    imageData: string;
+    mimeType?: string;
+    width?: number | null;
+    height?: number | null;
+    inspectorId: string;
+  }): { id: string } | null {
+    if (!input.imageData || input.imageData.length < 32) return null;
+
+    const signer = this.db
+      .prepare('SELECT id, is_active FROM users WHERE id = ?')
+      .get(input.inspectorId) as { id: string; is_active: number } | undefined;
+    if (!signer || !signer.is_active) {
+      throw new Error(`Inspector ${input.inspectorId} cannot attach spring evidence.`);
+    }
+
+    const id = `simg_${crypto.randomUUID()}`;
+    this.db.prepare(`
+      INSERT INTO spring_images (
+        id, sorting_record_id, batch_id, bogie_type, spring_condition,
+        spring_position, labelled_band, labelled_status, measured_height,
+        mime_type, image_data, width, height, inspector_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      input.sortingRecordId ?? null,
+      input.batchId,
+      input.bogieType,
+      input.condition,
+      input.springPosition,
+      input.labelledBand ?? null,
+      input.labelledStatus,
+      input.measuredHeight ?? null,
+      input.mimeType || 'image/jpeg',
+      input.imageData,
+      input.width ?? null,
+      input.height ?? null,
+      input.inspectorId
+    );
+    return { id };
+  }
+
+  /**
+   * What the collected evidence amounts to, per label.
+   *
+   * The point of the figure is honesty about readiness: a model cannot be
+   * built, and more importantly cannot be SCORED, until every band has enough
+   * examples from this shop. Showing the counts per band makes the thin ones
+   * obvious instead of letting an overall total hide them.
+   */
+  public imageDatasetSummary(): {
+    total: number;
+    byLabel: Array<{
+      bogieType: string;
+      condition: string;
+      springPosition: string;
+      band: string | null;
+      status: string;
+      count: number;
+    }>;
+  } {
+    const total = (this.db.prepare('SELECT COUNT(*) c FROM spring_images').get() as any)?.c || 0;
+    const byLabel = this.db.prepare(`
+      SELECT bogie_type AS bogieType, spring_condition AS condition,
+             spring_position AS springPosition, labelled_band AS band,
+             labelled_status AS status, COUNT(*) AS count
+      FROM spring_images
+      GROUP BY bogie_type, spring_condition, spring_position, labelled_band, labelled_status
+      ORDER BY count DESC
+    `).all() as any[];
+    return { total, byLabel: byLabel as any };
+  }
+
+  /**
    * Closes a sorting batch by writing one audit entry summarising it.
    *
    * Deliberately one entry per batch rather than per spring: 900 chained rows

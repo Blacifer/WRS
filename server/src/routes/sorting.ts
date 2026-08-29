@@ -200,6 +200,71 @@ sortingRouter.get('/batches/:batchId', authMiddleware, (req: AuthenticatedReques
 });
 
 // ---------------------------------------------------------------------------
+// POST /api/sorting/records/:id/image — a photograph, labelled by a person
+//
+// The verdict the inspector gave is the label. Nothing is ever inferred FROM
+// the image: a photograph of a spring on its own carries no scale, and the
+// G-95 bands are 2-3mm wide on a 260mm spring, so no band could be honestly
+// derived from one. What this builds is the labelled set from this shop that
+// any future model would have to be SCORED against before it was trusted —
+// and, before that day, evidence attached to a condemnation.
+// ---------------------------------------------------------------------------
+sortingRouter.post('/records/:id/image', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const b = req.body || {};
+    const sortingRecordId = req.params?.id;
+    if (!req.user?.id) return bad(res, 'Authenticated inspector required.', 'UNAUTHORIZED', 401);
+    if (!b.imageData) return bad(res, 'imageData is required.');
+    if (!b.batchId) return bad(res, 'batchId is required.');
+
+    const result = repo().attachImage({
+      sortingRecordId: sortingRecordId === 'unlinked' ? null : sortingRecordId,
+      batchId: String(b.batchId),
+      bogieType: String(b.bogieType || ''),
+      condition: (b.condition || 'USED') as SpringCondition,
+      springPosition: b.springPosition as SpringPosition,
+      labelledBand: b.band ?? null,
+      labelledStatus: b.status === 'CONDEMNED' ? 'CONDEMNED' : 'PASS',
+      measuredHeight: Number.isFinite(Number(b.measuredFreeHeight)) ? Number(b.measuredFreeHeight) : null,
+      imageData: String(b.imageData),
+      mimeType: b.mimeType || 'image/jpeg',
+      width: b.width ?? null,
+      height: b.height ?? null,
+      inspectorId: req.user.id
+    });
+
+    // No image is not an error. Losing the spring because its photograph
+    // failed would be a bad trade, so the sorting record stands either way.
+    res.status(result ? 201 : 200).json({
+      success: true,
+      data: { stored: !!result, id: result?.id ?? null },
+      timestamp: new Date().toISOString()
+    });
+  } catch (err: any) {
+    bad(res, err?.message || 'Could not store spring evidence', 'IMAGE_FAILED', 500);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/sorting/dataset — how much labelled evidence exists, per band
+//
+// Deliberately counts rather than images. The question it answers is "is
+// there enough of this to build or test anything yet", and the thin bands are
+// the answer — an overall total would hide them.
+// ---------------------------------------------------------------------------
+sortingRouter.get('/dataset', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    res.status(200).json({
+      success: true,
+      data: repo().imageDatasetSummary(),
+      timestamp: new Date().toISOString()
+    });
+  } catch (err: any) {
+    bad(res, err?.message || 'Could not read the evidence summary', 'SORTING_FAILED', 500);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/sorting/stock — what is on hand, grouped as the strip groups it
 //
 // ?forWagon=BOSTHS M2 additionally answers the question the tally cannot:

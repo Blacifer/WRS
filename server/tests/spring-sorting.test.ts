@@ -413,6 +413,87 @@ describe('Spring Sorting', () => {
     assert.strictEqual(summary.byBand.length, 0, 'no band rows, because there are no bands');
   });
 
+  /*
+   * Evidence, and the labelled set it accumulates into.
+   *
+   * No band is ever derived from an image — a photograph of a spring on its
+   * own carries no scale, and the bands are 2-3mm wide on a 260mm spring. The
+   * verdict a person gave is the label, and these check that the pairing is
+   * what gets stored.
+   */
+  it('TC-SRT-22: a photograph is stored against the verdict a person gave', () => {
+    const { id } = repo.record({
+      batchId: 'batch_img', bogieType: 'CASNUB_22_NLB', condition: 'USED',
+      springPosition: 'OUTER', measuredFreeHeight: 258.5,
+      classifiedBand: 'GREEN', status: 'PASS', inspectorId: 'usr_insp_001'
+    });
+
+    const stored = repo.attachImage({
+      sortingRecordId: id, batchId: 'batch_img', bogieType: 'CASNUB_22_NLB',
+      condition: 'USED', springPosition: 'OUTER',
+      labelledBand: 'GREEN', labelledStatus: 'PASS', measuredHeight: 258.5,
+      imageData: 'data:image/jpeg;base64,' + 'A'.repeat(64),
+      inspectorId: 'usr_insp_001'
+    });
+    assert.ok(stored?.id.startsWith('simg_'));
+
+    const row = db.prepare('SELECT * FROM spring_images WHERE id = ?').get(stored!.id) as any;
+    assert.strictEqual(row.labelled_band, 'GREEN', 'the human verdict is the label');
+    assert.strictEqual(row.sorting_record_id, id, 'and it points at the spring it photographs');
+  });
+
+  it('TC-SRT-23: a missing frame never costs the spring', () => {
+    // The record is the work; the photograph is attached to it. A camera that
+    // produced nothing must not turn a sorted spring into an error.
+    const stored = repo.attachImage({
+      batchId: 'batch_img2', bogieType: 'CASNUB_22_NLB', condition: 'USED',
+      springPosition: 'OUTER', labelledBand: 'GREEN', labelledStatus: 'PASS',
+      imageData: '', inspectorId: 'usr_insp_001'
+    });
+    assert.strictEqual(stored, null, 'no image is not an error');
+  });
+
+  it('TC-SRT-24: evidence is append-only like every other measurement', () => {
+    const stored = repo.attachImage({
+      batchId: 'batch_img3', bogieType: 'CASNUB_22_NLB', condition: 'USED',
+      springPosition: 'OUTER', labelledBand: 'RED', labelledStatus: 'CONDEMNED',
+      imageData: 'data:image/jpeg;base64,' + 'B'.repeat(64),
+      inspectorId: 'usr_insp_001'
+    })!;
+    assert.throws(
+      () => db.prepare('UPDATE spring_images SET labelled_band = ? WHERE id = ?').run('BLUE', stored.id),
+      /immutable/i,
+      'a condemnation photograph must not be relabelled after the fact'
+    );
+    assert.throws(
+      () => db.prepare('DELETE FROM spring_images WHERE id = ?').run(stored.id),
+      /immutable/i
+    );
+  });
+
+  it('TC-SRT-25: the dataset summary counts per band, so the thin ones show', () => {
+    /*
+     * An overall total would hide the bands with three examples in them. The
+     * question this answers is whether there is enough to build or score
+     * anything yet, and the answer lives in the smallest band.
+     */
+    for (const band of ['GREEN', 'GREEN', 'GREEN', 'RED']) {
+      repo.attachImage({
+        batchId: 'batch_img4', bogieType: 'CASNUB_22_NLB', condition: 'USED',
+        springPosition: 'OUTER', labelledBand: band,
+        labelledStatus: band === 'RED' ? 'CONDEMNED' : 'PASS',
+        imageData: 'data:image/jpeg;base64,' + 'C'.repeat(64),
+        inspectorId: 'usr_insp_001'
+      });
+    }
+    const summary = repo.imageDatasetSummary();
+    assert.ok(summary.total >= 4);
+    const green = summary.byLabel.find((r) => r.band === 'GREEN' && r.springPosition === 'OUTER');
+    const red = summary.byLabel.find((r) => r.band === 'RED' && r.springPosition === 'OUTER');
+    assert.strictEqual(green?.count, 3);
+    assert.strictEqual(red?.count, 1, 'the thin band is visible rather than averaged away');
+  });
+
   it('TC-SRT-16: a correction can be undone in its turn', () => {
     // Correct a spring, then take the whole thing back. The undo must land on
     // the correction — the newest live record — not on some earlier row.

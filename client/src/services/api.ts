@@ -875,6 +875,44 @@ export class ApiClient {
     return this.request(`/sorting/batches/${encodeURIComponent(batchId)}/undo`, { method: 'POST' });
   }
 
+  /**
+   * Stores a photograph of a spring against the verdict a person gave it.
+   *
+   * Never blocks the tap. Sorting is ~700 springs a shift and the record is
+   * the work; the photograph is evidence attached to it, so a camera failure
+   * must never cost a spring.
+   */
+  public async attachSpringImage(
+    sortingRecordId: string | null,
+    payload: {
+      batchId: string;
+      bogieType: string;
+      condition: string;
+      springPosition: string;
+      band?: string | null;
+      status: string;
+      measuredFreeHeight?: number;
+      imageData: string;
+      width?: number;
+      height?: number;
+    }
+  ): Promise<{ success: boolean; data: { stored: boolean; id: string | null } }> {
+    return this.request(`/sorting/records/${encodeURIComponent(sortingRecordId || 'unlinked')}/image`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  public async getSpringDataset(): Promise<{
+    success: boolean;
+    data: {
+      total: number;
+      byLabel: Array<{ bogieType: string; condition: string; springPosition: string; band: string | null; status: string; count: number }>;
+    };
+  }> {
+    return this.request('/sorting/dataset');
+  }
+
   public async getSortingThroughput(date?: string): Promise<{ success: boolean; data: { date: string; total: number; passed: number; condemned: number; firstAt: string | null; lastAt: string | null } }> {
     const params = date ? `?date=${encodeURIComponent(date)}` : '';
     return this.request(`/sorting/throughput${params}`);
