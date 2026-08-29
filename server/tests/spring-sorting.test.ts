@@ -364,6 +364,55 @@ describe('Spring Sorting', () => {
     assert.strictEqual(repo.batchSummary('batch_1').total, 6);
   });
 
+  /*
+   * Bogies with no band table.
+   *
+   * BOXNS rides LWLH25 and is 369 wagons a year at Raipur, the fifth busiest
+   * type in the shop. The §309C condemning limits that judge it were
+   * transcribed and tested months ago and then imported by nothing: the
+   * sorting screen offered three CASNUB bogies, `BogieType` listed only those
+   * three, and this route classified every spring through the G-95 band
+   * lookup — which has no table for LWLH25 and threw.
+   *
+   * So the springs could be counted and never judged, and a condemnation had
+   * nowhere to go.
+   */
+  it('TC-SRT-20: an LWLH25 spring can be recorded and judged', () => {
+    const { id } = repo.record({
+      batchId: 'batch_lw', bogieType: 'LWLH25' as any, condition: 'USED',
+      springPosition: 'OUTER', measuredFreeHeight: 260,
+      classifiedBand: null, bandRoman: null, status: 'PASS',
+      tableReference: 'WMM 2.0 §309C (LWLH25)', inspectorId: 'usr_insp_001'
+    });
+
+    const row = db.prepare('SELECT * FROM spring_sorting_records WHERE id = ?').get(id) as any;
+    assert.strictEqual(row.bogie_type, 'LWLH25');
+    assert.strictEqual(row.classified_band, null, 'no band is invented for a bogie with no table');
+    assert.strictEqual(row.status, 'PASS');
+    assert.strictEqual(repo.batchSummary('batch_lw').total, 1, 'and it counts in the session');
+  });
+
+  it('TC-SRT-21: unbanded springs count in the session even though no band tally can show them', () => {
+    /*
+     * The band breakdown groups by colour and these have none, so they are
+     * absent from it by definition. The session total must still include
+     * them: an inspector counts the pile in front of them, and a screen that
+     * showed four after they had sorted six would be the same lie the undo
+     * bug told.
+     */
+    for (let i = 0; i < 6; i++) {
+      repo.record({
+        batchId: 'batch_lw2', bogieType: 'LWLH25' as any, condition: 'USED',
+        springPosition: 'OUTER', measuredFreeHeight: 260,
+        classifiedBand: null, status: 'PASS', inspectorId: 'usr_insp_001'
+      });
+    }
+    const summary = repo.batchSummary('batch_lw2');
+    assert.strictEqual(summary.total, 6);
+    assert.strictEqual(summary.passed, 6);
+    assert.strictEqual(summary.byBand.length, 0, 'no band rows, because there are no bands');
+  });
+
   it('TC-SRT-16: a correction can be undone in its turn', () => {
     // Correct a spring, then take the whole thing back. The undo must land on
     // the correction — the newest live record — not on some earlier row.

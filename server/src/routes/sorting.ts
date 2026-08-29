@@ -14,7 +14,8 @@ import { SortingRepository } from '../db/sortingRepository.ts';
 import { authMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { getWagonSpringConfig } from '../../../shared/classification/wagonTypes.ts';
-import { classifySpring } from '../../../shared/classification/engine.ts';
+import { judgeSortedSpring, isSortingBogie } from '../../../shared/classification/springJudgement.ts';
+import type { SortingBogie } from '../../../shared/classification/springJudgement.ts';
 import type { BogieType, SpringCondition, SpringPosition } from '../../../shared/types.ts';
 
 export const sortingRouter = Router();
@@ -37,7 +38,7 @@ function bad(res: Response, message: string, code = 'VALIDATION_ERROR', status =
 sortingRouter.post('/record', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
   try {
     const b = req.body || {};
-    const bogieType = b.bogieType as BogieType;
+    const bogieType = b.bogieType as SortingBogie;
     const condition = (b.condition || 'USED') as SpringCondition;
     const springPosition = b.springPosition as SpringPosition;
     const measuredFreeHeight = Number(b.measuredFreeHeight);
@@ -46,15 +47,29 @@ sortingRouter.post('/record', authMiddleware, (req: AuthenticatedRequest, res: R
     if (!bogieType || !springPosition || !Number.isFinite(measuredFreeHeight)) {
       return bad(res, 'bogieType, springPosition and measuredFreeHeight are required.');
     }
+    /*
+     * Refuse a bogie no published rule covers rather than falling through to
+     * a band lookup that would throw a 500. LWLH25 and LCCF20 are judged by
+     * §309C condemning height instead of a G-95 band, and both are accepted
+     * here — that path existed and was reachable by nothing until now.
+     */
+    if (!isSortingBogie(bogieType)) {
+      return bad(
+        res,
+        `No published classification rule is held for bogie "${bogieType}". ` +
+        `Its springs must not be judged by guesswork.`,
+        'UNKNOWN_BOGIE'
+      );
+    }
     if (!req.user?.id) return bad(res, 'Authenticated inspector required.', 'UNAUTHORIZED', 401);
 
     // Classified server-side rather than trusting the band the client sends.
     // The client computes one for instant feedback; the stored verdict is the
     // server's, so a stale or altered client cannot file a wrong group.
-    const verdict = classifySpring({
+    const verdict = judgeSortedSpring({
       bogieType,
       condition,
-      position: springPosition as any,
+      position: springPosition,
       measuredHeight: measuredFreeHeight,
       damageType: b.damageType,
       damageNotes: b.damageNotes
@@ -62,7 +77,7 @@ sortingRouter.post('/record', authMiddleware, (req: AuthenticatedRequest, res: R
 
     const { id, alreadyRecorded } = repo().record({
       batchId: String(b.batchId),
-      bogieType,
+      bogieType: bogieType as BogieType,
       condition,
       springPosition,
       measuredFreeHeight,
@@ -89,7 +104,11 @@ sortingRouter.post('/record', authMiddleware, (req: AuthenticatedRequest, res: R
         bandRoman: verdict.bandRoman,
         status: verdict.status,
         tableReference: verdict.tableReference,
-        condemnationReason: verdict.condemnationReason ?? null
+        condemnationReason: verdict.condemnationReason ?? null,
+        // False for LWLH25 and LCCF20: the published data gives a verdict and
+        // no colour. The screen must not draw a band swatch for these.
+        bandingAvailable: verdict.bandingAvailable,
+        note: verdict.note ?? null
       },
       timestamp: new Date().toISOString()
     });

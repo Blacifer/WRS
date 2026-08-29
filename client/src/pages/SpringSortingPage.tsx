@@ -23,6 +23,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { api } from '../services/api.ts';
 import { getBandOptions } from '../../../shared/classification/bandEntry.ts';
+import {
+  SORTING_BOGIES,
+  isBandedBogie,
+  judgeSortedSpring
+} from '../../../shared/classification/springJudgement.ts';
+import type { SortingBogie } from '../../../shared/classification/springJudgement.ts';
 import { listWagonDesignations, getWagonSpringConfig } from '../../../shared/classification/wagonTypes.ts';
 import type { BogieType, SpringCondition, SpringPosition } from '../../../shared/types.ts';
 import { playPassChime, playCondemnedBuzz } from '../utils/audioFeedback.ts';
@@ -57,7 +63,15 @@ interface Capacity {
 export function SpringSortingPage({ lang, onClose }: Props) {
   const isHi = lang === 'hi';
 
-  const [bogieType, setBogieType] = useState<BogieType>('CASNUB_22_NLB');
+  const [bogieType, setBogieType] = useState<SortingBogie>('CASNUB_22_NLB');
+  /*
+   * LWLH25 and LCCF20 have no band table — WMM 2.0 §309C gives a nominal and
+   * a condemning height and nothing between — so there is no strip to read
+   * and nothing to tap. Those springs are measured, and the screen has to ask
+   * a different question. BOXNS rides LWLH25 and is 369 wagons a year here.
+   */
+  const banded = isBandedBogie(bogieType);
+  const [heightInput, setHeightInput] = useState('');
   const [condition, setCondition] = useState<SpringCondition>('USED');
   const [position, setPosition] = useState<SpringPosition>('OUTER');
   const [forWagon, setForWagon] = useState<string>('BOXN');
@@ -98,7 +112,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
   }, [batchId]);
 
   const bandOptions = useMemo(
-    () => getBandOptions(bogieType, condition, position),
+    () => (isBandedBogie(bogieType) ? getBandOptions(bogieType, condition, position) : []),
     [bogieType, condition, position]
   );
 
@@ -183,6 +197,34 @@ export function SpringSortingPage({ lang, onClose }: Props) {
     setBusy(true);
     setError(null);
 
+    /*
+     * What to say and play before the server answers.
+     *
+     * For a banded bogie the inspector tapped the band, so that IS the local
+     * answer. For a non-banded one they entered a height, and the verdict has
+     * to be computed — §309C is deterministic, so the local answer matches
+     * what the server will store. Without this the feedback for a BOXNS
+     * spring would be a chime with no verdict behind it.
+     */
+    const localVerdict = (() => {
+      if (banded || condemned) return null;
+      try {
+        return judgeSortedSpring({
+          bogieType, condition, position, measuredHeight: height
+        });
+      } catch {
+        return null;
+      }
+    })();
+    const localStatus = condemned ? 'CONDEMNED' : localVerdict?.status ?? 'PASS';
+    const localLabel = condemned
+      ? (isHi ? 'कंडम' : 'Condemned')
+      : banded
+        ? `${band}`
+        : localStatus === 'CONDEMNED'
+          ? (isHi ? `कंडम — ${height}mm` : `Condemned — ${height}mm`)
+          : (isHi ? `ठीक — ${height}mm` : `Serviceable — ${height}mm`);
+
     const queueIt = async (why: string | null) => {
       await offlineDb.enqueueSortedSpring({
         batchId,
@@ -192,14 +234,12 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         measuredFreeHeight: height,
         heightIsApproximate: true,
         tappedBand: band,
-        condemned
+        condemned: condemned || localStatus === 'CONDEMNED'
       });
       await readPending();
-      if (condemned) playCondemnedBuzz();
+      if (condemned || localStatus === 'CONDEMNED') playCondemnedBuzz();
       else playPassChime();
-      setLastRecorded(
-        condemned ? (isHi ? 'कंडम' : 'Condemned') : `${band}`
-      );
+      setLastRecorded(localLabel);
       if (why) setError(null);
     };
 
@@ -223,7 +263,12 @@ export function SpringSortingPage({ lang, onClose }: Props) {
       setLastRecorded(
         res.data.status === 'CONDEMNED'
           ? (isHi ? 'कंडम' : 'Condemned')
-          : `${res.data.band}`
+          // No band table means no colour to show. Printing the band here
+          // unconditionally would render the word "null" for every LWLH25
+          // spring an inspector records.
+          : res.data.band
+            ? `${res.data.band}`
+            : (isHi ? `ठीक — ${height}mm` : `Serviceable — ${height}mm`)
       );
       await refresh();
     } catch {
@@ -351,12 +396,14 @@ export function SpringSortingPage({ lang, onClose }: Props) {
             </span>
             <select
               value={bogieType}
-              onChange={(e) => setBogieType(e.target.value as BogieType)}
+              onChange={(e) => setBogieType(e.target.value as SortingBogie)}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
             >
-              <option value="CASNUB_22_NLB">CASNUB 22 NLB</option>
-              <option value="CASNUB_22_HS">CASNUB 22 HS</option>
-              <option value="CASNUB_22_RFT">CASNUB 22 RFT</option>
+              {SORTING_BOGIES.map((b) => (
+                <option key={b.value} value={b.value}>
+                  {b.label}
+                </option>
+              ))}
             </select>
           </label>
 
@@ -369,8 +416,16 @@ export function SpringSortingPage({ lang, onClose }: Props) {
               onChange={(e) => setCondition(e.target.value as SpringCondition)}
               className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
             >
-              <option value="USED">{isHi ? 'पुराना (6 बैंड)' : 'Used (6 bands)'}</option>
-              <option value="NEW">{isHi ? 'नया (3 बैंड)' : 'New (3 bands)'}</option>
+              {/* The band counts belong to the G-95 tables, not to the spring's
+                  age, so they are only mentioned for a bogie that has them.
+                  "Used (6 bands)" under an LWLH25 heading promised a
+                  classification the published data cannot support. */}
+              <option value="USED">
+                {banded ? (isHi ? 'पुराना (6 बैंड)' : 'Used (6 bands)') : (isHi ? 'पुराना' : 'Used')}
+              </option>
+              <option value="NEW">
+                {banded ? (isHi ? 'नया (3 बैंड)' : 'New (3 bands)') : (isHi ? 'नया' : 'New')}
+              </option>
             </select>
           </label>
 
@@ -516,10 +571,59 @@ export function SpringSortingPage({ lang, onClose }: Props) {
       {/* The work itself: one tap per spring */}
       <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-3">
         <p className="text-sm font-bold text-white">
-          {isHi
-            ? 'पट्टी पर कौन-सा बैंड दिखता है?'
-            : 'Which band does the strip show?'}
+          {banded
+            ? isHi
+              ? 'पट्टी पर कौन-सा बैंड दिखता है?'
+              : 'Which band does the strip show?'
+            : isHi
+              ? 'मुक्त ऊँचाई कितनी है? (मिमी)'
+              : 'What is the free height? (mm)'}
         </p>
+
+        {/*
+          No band table for this bogie, so no strip and nothing to tap.
+          WMM 2.0 §309C gives these a nominal and a condemning height and
+          nothing between, so the spring is measured and gets a verdict with
+          no colour. Six bands could be manufactured by dividing the range and
+          would look identical on screen to a real G-95 classification while
+          being invented, so they are not.
+        */}
+        {!banded && (
+          <div className="space-y-3">
+            <p className="text-xs text-amber-300/90 bg-amber-950/30 border border-amber-800/50 rounded-lg px-3 py-2">
+              {isHi
+                ? 'इस बोगी के लिए कोई बैंड तालिका प्रकाशित नहीं है — केवल ठीक / कंडम।'
+                : 'No colour band is published for this bogie — only serviceable or condemned.'}{' '}
+              <span className="text-amber-400/80">
+                {SORTING_BOGIES.find((b) => b.value === bogieType)?.source}
+              </span>
+            </p>
+            <div className="flex gap-2.5">
+              <input
+                data-testid="free-height-input"
+                type="number"
+                inputMode="decimal"
+                step="0.5"
+                value={heightInput}
+                onChange={(e) => setHeightInput(e.target.value)}
+                placeholder={isHi ? 'मिमी' : 'mm'}
+                className="flex-1 min-h-[68px] bg-slate-800 border-2 border-slate-700 rounded-xl px-4 text-2xl font-black text-white tabular-nums"
+              />
+              <button
+                data-testid="record-measured-spring"
+                disabled={busy || !Number.isFinite(Number(heightInput)) || heightInput.trim() === ''}
+                onClick={async () => {
+                  const h = Number(heightInput);
+                  await record(h, null, false);
+                  setHeightInput('');
+                }}
+                className="min-h-[68px] px-6 rounded-xl bg-white text-black font-extrabold text-sm disabled:opacity-40 active:scale-95 transition-transform"
+              >
+                {isHi ? 'दर्ज करें' : 'Record'}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
           {bandOptions.map((b) => (
@@ -545,7 +649,11 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           onClick={() => record(200, null, true)}
           className="w-full min-h-[52px] rounded-xl border-2 border-red-700 bg-red-950/50 text-red-200 font-bold text-sm disabled:opacity-40 active:scale-95 transition-transform"
         >
-          {isHi ? 'पट्टी से बाहर — कंडम' : 'Off the strip — condemn'}
+          {banded
+            ? isHi ? 'पट्टी से बाहर — कंडम' : 'Off the strip — condemn'
+            // No strip exists for these bogies, so "off the strip" would name
+            // a thing the inspector is not holding.
+            : isHi ? 'क्षतिग्रस्त — कंडम' : 'Damaged — condemn'}
         </button>
 
         {error && (
