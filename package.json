@@ -8,6 +8,8 @@
     "seed": "npm run seed --prefix server",
     "index-manual": "npm run index-manual --prefix server --",
     "start:live": "npm run seed && concurrently -n \"SERVER,CLIENT\" -c \"blue,cyan\" \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
+    "tunnel": "cloudflared tunnel --url http://localhost:5173",
+    "demo": "npm run seed && concurrently -n \"SERVER,CLIENT,TUNNEL\" -c \"blue,cyan,magenta\" \"npm run dev --prefix server\" \"npm run dev --prefix client\" \"cloudflared tunnel --url http://localhost:5173\"",
     "build": "npm run build --prefix server && npm run build --prefix client",
     "build:server": "npm run build --prefix server",
     "build:client": "npm run build --prefix client",
