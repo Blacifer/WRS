@@ -366,24 +366,54 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
         </div>
       )}
 
-      {/* Switching jobs, once one has been chosen. Deliberately small and at
-          the top of the actions: needed rarely, but never hidden. */}
+      {/*
+        Which job is on screen, and how to change it.
+
+        This was a 12px underlined text link reading "Switch to a wagon",
+        sitting on a page otherwise made of large colour cards — the faintest
+        thing on screen was the only control that changed what the whole
+        screen did. An inspector who had once chosen springs was reported as
+        unable to find wagon work at all, and they were right to look at the
+        top: the inspector's navigation bar carries no wagon entry, so the
+        home screen is the only route there is.
+
+        Both jobs are now always visible as a pair, so the choice explains
+        itself — you can see there IS a wagon side even while you are on the
+        spring side — and both are full touch targets for a gloved hand.
+      */}
       {workMode !== null && (
-        <div className="flex items-center justify-between px-1">
-          <span className="text-xs text-slate-400">
-            {workMode === 'SPRINGS'
-              ? (isHi ? 'स्प्रिंग कार्य' : 'Working on springs')
-              : (isHi ? 'वैगन कार्य' : 'Working on a wagon')}
+        <div className="space-y-2 px-1">
+          <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            {isHi ? 'आज का कार्य' : 'What you are working on'}
           </span>
-          <button
-            data-testid="switch-work-mode"
-            onClick={() => chooseWorkMode(workMode === 'SPRINGS' ? 'WAGON' : 'SPRINGS')}
-            className="text-xs font-bold text-slate-300 underline underline-offset-2 hover:text-white min-h-[32px] px-1"
+          <div
+            role="group"
+            aria-label={isHi ? 'आज का कार्य' : 'What you are working on'}
+            className="grid grid-cols-2 gap-2 max-w-md"
           >
-            {workMode === 'SPRINGS'
-              ? (isHi ? 'वैगन पर जाएँ' : 'Switch to a wagon')
-              : (isHi ? 'स्प्रिंग पर जाएँ' : 'Switch to springs')}
-          </button>
+            {([
+              { mode: 'SPRINGS' as const, icon: '⚖️', en: 'Springs', hi: 'स्प्रिंग' },
+              { mode: 'WAGON' as const, icon: '🚃', en: 'A wagon', hi: 'वैगन' }
+            ]).map((choice) => {
+              const current = workMode === choice.mode;
+              return (
+                <button
+                  key={choice.mode}
+                  data-testid={current ? 'work-mode-current' : 'switch-work-mode'}
+                  aria-pressed={current}
+                  onClick={() => chooseWorkMode(choice.mode)}
+                  className={`min-h-[52px] px-4 rounded-xl border-2 font-extrabold text-sm flex items-center justify-center gap-2 transition-all ${
+                    current
+                      ? 'border-sky-400 bg-sky-950/50 text-white'
+                      : 'border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-500 hover:text-slate-200'
+                  }`}
+                >
+                  <span aria-hidden="true">{choice.icon}</span>
+                  <span>{isHi ? choice.hi : choice.en}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 

@@ -139,29 +139,64 @@ export const RDSO_TOLERANCE_SPECS = {
   // The numbers below exist only so the shape is complete. PENDING_SIGNOFF is
   // what stopped them ever reaching an inspector while the question was open,
   // and it must stay: there is nothing to sign off.
+  /*
+   * ADAPTER LIMITS — A CITATION THE SHOP DOES NOT RECOGNISE
+   * -------------------------------------------------------
+   * These carry a WMM 2.0 §309B citation and are marked VERIFIED, which means
+   * an inspector gets a caliper button and a confident verdict against 4.0mm
+   * and 3.5mm.
+   *
+   * On 28 August 2026 WRS Raipur was asked where the adapter crown wear limit
+   * comes from, and answered: "All inspection requirement related to the
+   * adapter including dimension check and wear limits are covered under the
+   * latest RDSO G-95" — having said first that they could not find it in
+   * WMM 2.0 or RDSO G-81.
+   *
+   * That is a direct conflict with the citation printed on every verdict this
+   * spec produces. Either could be right: G-95 may simply restate §309B, or
+   * its latest revision may have moved the number, in which case the app is
+   * judging adapters against a superseded limit while displaying VERIFIED.
+   *
+   * The numbers are LEFT ALONE rather than guessed at in either direction —
+   * changing a wear limit on the strength of a message, or disabling a
+   * working check on the same basis, would both be decisions made without the
+   * document. What is recorded is the conflict, so the next person does not
+   * re-derive it, and so the citation shown to an auditor is not the only
+   * account of where these came from.
+   *
+   * One page of the latest G-95 settles it.
+   */
   ADAPTER_CROWN_LUGS: {
     componentType: 'ADAPTER_CROWN_LUGS',
     nameEn: 'Axle Box Adapter — Crown Lug Wear',
     nameHi: 'एक्सल बॉक्स एडाप्टर — क्राउन लग घिसाव',
-    rdsoStandard: 'WMM 2.0 §309B (Adapter Crown lugs)',
+    rdsoStandard: 'WMM 2.0 §309B (Adapter Crown lugs) — see CITATION CONFLICT above',
     nominalValue: 0.0,
     minPermissible: 0.0,
     maxPermissible: 4.0,
     diameterNominal: 0,
     unit: 'mm',
-    verificationStatus: 'VERIFIED'
+    verificationStatus: 'VERIFIED',
+    verificationNote:
+      'WRS Raipur (28 Aug 2026) states adapter dimension checks and wear limits are ' +
+      'governed by the latest RDSO G-95, not WMM 2.0. The 4.0mm limit is unchanged ' +
+      'pending sight of that clause; confirm before relying on it.'
   },
   ADAPTER_CROWN_SEAT: {
     componentType: 'ADAPTER_CROWN_SEAT',
     nameEn: 'Axle Box Adapter — Crown Seat Wear',
     nameHi: 'एक्सल बॉक्स एडाप्टर — क्राउन सीट घिसाव',
-    rdsoStandard: 'WMM 2.0 §309B (Adapter crown seat)',
+    rdsoStandard: 'WMM 2.0 §309B (Adapter crown seat) — see CITATION CONFLICT above',
     nominalValue: 0.0,
     minPermissible: 0.0,
     maxPermissible: 3.5,
     diameterNominal: 0,
     unit: 'mm',
-    verificationStatus: 'VERIFIED'
+    verificationStatus: 'VERIFIED',
+    verificationNote:
+      'WRS Raipur (28 Aug 2026) states adapter dimension checks and wear limits are ' +
+      'governed by the latest RDSO G-95, not WMM 2.0. The 3.5mm limit is unchanged ' +
+      'pending sight of that clause; confirm before relying on it.'
   },
   CTRB_END_CAP: {
     componentType: 'CTRB_END_CAP',
