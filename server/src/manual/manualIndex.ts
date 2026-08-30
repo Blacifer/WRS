@@ -323,7 +323,8 @@ export function searchManual(
 ): { query: string; hits: ManualSearchHit[] } {
   if (!isManualIndexed(db)) {
     const err: any = new Error(
-      'The maintenance manual has not been indexed on this server yet. Run "npm run index-manual".'
+      'The maintenance manual has not been indexed on this server yet. From the server ' +
+      'folder run: npm run index-manual -- "/path/to/Vol-I (System Documentation).pdf"'
     );
     err.name = 'ManualNotIndexed';
     throw err;

@@ -125,8 +125,12 @@ export const ManualSearchPage: React.FC<ManualSearchPageProps> = ({ lang }) => {
       {manualMissing && (
         <div className="p-4 bg-amber-950/30 border border-amber-800 rounded-xl text-xs text-amber-200 leading-relaxed">
           {isHi
-            ? 'इस सर्वर पर मैनुअल अभी अनुक्रमित नहीं है। व्यवस्थापक को "npm run index-manual" चलाना होगा।'
-            : 'The manual has not been indexed on this server yet. An administrator needs to run “npm run index-manual”.'}
+            ? 'इस सर्वर पर मैनुअल अभी अनुक्रमित नहीं है। व्यवस्थापक को server फ़ोल्डर में यह चलाना होगा: npm run index-manual -- "/path/to/Vol-I (System Documentation).pdf"'
+            /* The script lives in server/package.json and takes the manual's
+               path — the old wording named neither, so an administrator
+               following it from the repo root got "Missing script" and no
+               indication that a PDF was even needed. */
+            : 'The manual has not been indexed on this server yet. From the server folder, an administrator needs to run:  npm run index-manual -- "/path/to/Vol-I (System Documentation).pdf"'}
         </div>
       )}
 

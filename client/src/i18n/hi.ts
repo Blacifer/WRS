@@ -24,7 +24,7 @@ export const hi = {
     inspection: 'एक स्प्रिंग',
     history: 'इतिहास व लॉग्स',
     analytics: 'स्प्रिंग विश्लेषण',
-    admin: 'प्रशासक कंसोल',
+    admin: 'ऑडिट निर्यात',
     manual: 'मैनुअल से पूछें',
     learning: 'सिस्टम अधिगम',
     audit: 'ऑडिट श्रृंखला',

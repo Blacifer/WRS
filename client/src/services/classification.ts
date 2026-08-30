@@ -47,12 +47,12 @@ export const COMPONENT_TOLERANCE_SPECS: Record<Exclude<CVComponentTarget, 'OUTER
    * Max-only wear checks — min is zero because no wear is the good case.
    */
   /*
-   * All four adapter limits carry a WMM 2.0 §309B citation. WRS Raipur said on
-   * 28 August 2026 that adapter dimension checks and wear limits are governed
-   * by the LATEST RDSO G-95, and that they could not find them in WMM 2.0 or
-   * G-81 at all. The numbers are unchanged until that clause is seen — see the
-   * fuller note beside the same specs in server/src/routes/cv.ts, which is the
-   * registry these mirror.
+   * All four confirmed verbatim against WMM 2.0 §309B, page 73, which prints
+   * "Adapter Thrust shoulder 0.7 mm / Adapter Crown lugs 4.0 mm / Adapter
+   * crown seat 3.5 mm / Adapter sides 3.0 mm". The shop's statement that G-95
+   * governs the adapter is also right and not in conflict: p.165 defers the
+   * GAUGING method to G-95, while §309B gives the limit the reading is judged
+   * against. Fuller note beside the same specs in server/src/routes/cv.ts.
    */
   ADAPTER_CROWN_LUGS: { nominalValue: 0.0, minPermissible: 0.0, maxPermissible: 4.0, tableRef: 'WMM 2.0 §309B (Adapter Crown lugs)' },
   ADAPTER_CROWN_SEAT: { nominalValue: 0.0, minPermissible: 0.0, maxPermissible: 3.5, tableRef: 'WMM 2.0 §309B (Adapter crown seat)' },

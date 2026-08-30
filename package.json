@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "concurrently -n \"SERVER,CLIENT\" -c \"blue,cyan\" \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
     "seed": "npm run seed --prefix server",
+    "index-manual": "npm run index-manual --prefix server --",
     "start:live": "npm run seed && concurrently -n \"SERVER,CLIENT\" -c \"blue,cyan\" \"npm run dev --prefix server\" \"npm run dev --prefix client\"",
     "build": "npm run build --prefix server && npm run build --prefix client",
     "build:server": "npm run build --prefix server",

@@ -24,7 +24,11 @@ export const en = {
     passports: 'Component Passports',
     history: 'History & Logs',
     analytics: 'Spring Analytics',
-    admin: 'Admin Console',
+    // Not a page. This entry opens the audit-trail export dialog and leaves
+    // the current screen where it was — the only nav item that does not
+    // navigate — so it is named for what it does rather than promising a
+    // console that does not exist.
+    admin: 'Export Audit Trail',
     manual: 'Ask the Manual',
     learning: 'System Learning',
     audit: 'Audit Chain',
