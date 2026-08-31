@@ -153,10 +153,21 @@ npm run test:tier5    # Adversarial stress & immutability trigger validation
 | **Inspector** | `inspector1` … `inspector4` | `password123` | Ramesh Kumar, and others |
 | **Supervisor** | `supervisor1` | `password123` | S. K. Verma |
 | **Admin** | `admin1` | `password123` | A. K. Mishra |
+| **DRM** | `drm1` | `password123` | Divisional Railway Manager |
 
-> These are demo logins created by `npm run seed`. Replace them with the real
-> roster and deactivate these before any real wagon is recorded — an admin can
-> do both from the **User Accounts** screen.
+> These exist in development only. The server refuses to create them when
+> `NODE_ENV=production`, so a deployment cannot come up with a working
+> `admin1 / password123` on it — which is what used to happen, since seeding
+> ran on every start in every environment.
+>
+> On a fresh production deployment, create the first real administrator by
+> setting `BOOTSTRAP_ADMIN_USERNAME` and `BOOTSTRAP_ADMIN_PASSWORD` (at least
+> 12 characters) before the first start, then add the rest of the roster from
+> the **User Accounts** screen. The bootstrap account is a way in, not a
+> standing one: it is only created when the database has no accounts at all.
+>
+> `SEED_DEMO_USERS=true` puts the demo logins back on a production build. It
+> is there for a supervised demonstration and has to be typed on purpose.
 
 ---
 

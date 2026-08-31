@@ -1441,8 +1441,81 @@ const DEMO_COMPONENTS: DemoComponentSpec[] = [
 // Main Seed Function (Strictly Idempotent)
 // ---------------------------------------------------------------------------
 
+/**
+ * The first real administrator, from the environment.
+ *
+ * Only ever used on a production database that has no accounts at all —
+ * otherwise a deployment that correctly refuses the demo logins would have
+ * nobody who could sign in to create the real ones. It is a way in, not a
+ * standing account: it does nothing once even one real user exists.
+ */
+function bootstrapFirstAdmin(database: DatabaseSync): void {
+  const username = process.env.BOOTSTRAP_ADMIN_USERNAME;
+  const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
+
+  if (!username || !password) return;
+
+  if (password.length < 12) {
+    // Refused rather than weakened. A short password on the only
+    // administrator account is how a pilot becomes an incident.
+    console.error('[seed] BOOTSTRAP_ADMIN_PASSWORD must be at least 12 characters. No account created.');
+    return;
+  }
+
+  database.prepare(`
+    INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, employee_id, is_active)
+    VALUES (?, ?, ?, 'ADMIN', ?, ?, 1)
+  `).run(
+    'usr_bootstrap_admin',
+    username,
+    hashPassword(password),
+    process.env.BOOTSTRAP_ADMIN_NAME || 'System Administrator',
+    process.env.BOOTSTRAP_ADMIN_EMPLOYEE_ID || 'WRS-ADM-BOOTSTRAP'
+  );
+
+  console.warn(`[seed] Created the first administrator "${username}". Change this password after signing in.`);
+}
+
 export function seedUsers(db?: DatabaseSync): void {
   const database = db || getDatabase();
+
+  /*
+   * The demo accounts must not follow the app into production.
+   *
+   * This is called from createApp, so it ran on every start in every
+   * environment, and the four demo logins are documented in the README with
+   * the password 'password123'. A deployment would therefore have come up
+   * with a working admin1/password123 on the public internet, and nothing
+   * anywhere would have said so. The roster is deferred until after the DRM
+   * sees this, which makes it exactly the kind of step that gets missed.
+   *
+   * In production they are skipped. If that leaves nobody able to sign in,
+   * the operator is told plainly how to create the first real account rather
+   * than being left at a login screen that refuses everything.
+   *
+   * SEED_DEMO_USERS=true is the deliberate escape hatch for a supervised
+   * demonstration on a production build. It has to be typed on purpose.
+   */
+  const isProduction = process.env.NODE_ENV === 'production';
+  const demoSeedingAllowed = !isProduction || process.env.SEED_DEMO_USERS === 'true';
+
+  if (!demoSeedingAllowed) {
+    const existing = database.prepare(
+      `SELECT COUNT(*) AS n FROM users WHERE is_active = 1 AND username != 'system'`
+    ).get() as { n: number };
+
+    if (!existing || existing.n === 0) {
+      console.warn(
+        '[seed] Production start with no accounts. The demo logins are ' +
+        'deliberately not created here. Create the first administrator with ' +
+        'BOOTSTRAP_ADMIN_USERNAME and BOOTSTRAP_ADMIN_PASSWORD, then add the ' +
+        'roster from the User Accounts screen.'
+      );
+      bootstrapFirstAdmin(database);
+    }
+    return;
+  }
+
   const checkUserStmt = database.prepare('SELECT id FROM users WHERE id = ? OR username = ? OR employee_id = ?');
   const insertUserStmt = database.prepare(`
     INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, employee_id, is_active)
