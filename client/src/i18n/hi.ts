@@ -297,20 +297,20 @@ export const hi = {
     totalInspected: 'कुल निरीक्षण',
     wagonsCount: 'वैगन संख्या'
   },
-  roi: {
-    title: 'कार्यशाला एआई दक्षता एवं आरओआई प्रभाव',
-    badge: 'डीआरएम उच्च-प्रभाव आउटटर्न',
-    manualVsAi: 'मैन्युअल बनाम एआई-सहायता प्राप्त थ्रूपुट',
-    manualRate: 'मैन्युअल: 900 स्प्रिंग/दिन',
-    manualDetail: '12-15 मिनट/बोगी मैन्युअल निरीक्षण',
-    aiRate: 'एआई के साथ: 2,000+ स्प्रिंग/दिन',
-    aiDetail: '2-3 मिनट/बोगी स्वचालित ओसीआर व वर्गीकरण',
-    increase: '+122% थ्रूपुट वृद्धि',
-    speedMultiplier: '2.2x गति त्वरण',
-    accuracy: '99.8% आरडीएसओ जी-95 अनुपालन',
-    summaryText: 'मैन्युअल: 900 स्प्रिंग/दिन → एआई के साथ: 2,000+ स्प्रिंग/दिन (+122% आउटटर्न वृद्धि)'
-  },
-  loginTagline: 'भारतीय रेल हेतु एआई-संचालित गुणवत्ता नियंत्रण',
+  /*
+   * The roi block is gone.
+   *
+   * It held "+122% Throughput Gain", "2.2x Speed Acceleration", "99.8% RDSO
+   * G-95 Compliance" and "Manual: 900 springs/day → With AI: 2,000+
+   * springs/day". Every one was a hardcoded string, on the DRM's own
+   * dashboard. Nothing measured them, there is no AI classifying springs,
+   * and the shop's own SSE puts the daily pile at 700 rather than the 900
+   * the percentage was computed against.
+   *
+   * The dashboard shows what can be measured instead, with its source.
+   */
+
+  loginTagline: 'आरडीएसओ जी-95 वर्गीकरण एवं शून्य-दोष रिलीज़ नियंत्रण',
   inventory: {
     title: 'स्टोर्स डिपो इन्वेंट्री एवं सामग्री प्रबंधन',
     subtitle: 'डब्लूआरएस रायपुर कासनब पुर्जा स्टॉक, स्वचालित आरक्षण एवं शॉप फ्लोर निर्गमन',

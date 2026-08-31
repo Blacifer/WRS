@@ -301,20 +301,24 @@ export const en = {
     totalInspected: 'Total Inspected',
     wagonsCount: 'Wagons Count'
   },
-  roi: {
-    title: 'Workshop AI Efficiency & ROI Impact',
-    badge: 'DRM High-Impact Outturn',
-    manualVsAi: 'Manual vs AI-Assisted Throughput',
-    manualRate: 'Manual: 900 springs/day',
-    manualDetail: '12-15 min/bogie manual inspection',
-    aiRate: 'With AI: 2,000+ springs/day',
-    aiDetail: '2-3 min/bogie automated OCR & classification',
-    increase: '+122% Throughput Gain',
-    speedMultiplier: '2.2x Speed Acceleration',
-    accuracy: '99.8% RDSO G-95 Compliance',
-    summaryText: 'Manual: 900 springs/day → With AI: 2,000+ springs/day (+122% outturn increase)'
-  },
-  loginTagline: 'AI-Powered Quality Control for Indian Railways',
+  /*
+   * The roi block is gone.
+   *
+   * It held "+122% Throughput Gain", "2.2x Speed Acceleration", "99.8% RDSO
+   * G-95 Compliance" and "Manual: 900 springs/day → With AI: 2,000+
+   * springs/day". Every one was a hardcoded string, on the DRM's own
+   * dashboard. Nothing measured them, there is no AI classifying springs,
+   * and the shop's own SSE puts the daily pile at 700 rather than the 900
+   * the percentage was computed against.
+   *
+   * The dashboard shows what can be measured instead, with its source.
+   */
+
+  // Was "AI-Powered Quality Control for Indian Railways". The system's real
+  // strength is deterministic RDSO classification against a cited clause and
+  // a record that cannot be altered — not AI, which currently classifies
+  // nothing. The first screen should claim what the last screen can defend.
+  loginTagline: 'RDSO G-95 Classification & Zero-Defect Release Control',
   inventory: {
     title: 'Stores Depot Inventory & Material Management',
     subtitle: 'WRS Raipur CASNUB Parts Stock, Auto-Reservations & Shop Floor Issuing',

@@ -22,6 +22,8 @@ import {
 import { api } from '../services/api.ts';
 import { useI18n } from '../i18n/index.ts';
 import type { InspectionStats } from '../../../shared/types.ts';
+import { configuredCoverage } from '../../../shared/knowledge/raipurWorkload.ts';
+import { DAILY_PILE } from '../../../shared/sorting/throughput.ts';
 
 const RDSO_BAND_COLORS: Record<string, { en: string; hi: string; color: string }> = {
   BLUE: { en: 'Blue (Band I)', hi: 'नीला (बैंड I)', color: '#2563eb' },
@@ -53,6 +55,29 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export const DashboardPage: React.FC = () => {
   const { t, lang } = useI18n();
   const isHi = lang === 'hi';
+
+  /*
+   * Coverage against the shop's own out-turn return, as a range.
+   *
+   * A range rather than a figure because one line of that return reads
+   * "BRN/BFKN/BFNS" and is not broken down — two of those three are covered
+   * and one is not. A midpoint would be a number the data does not support
+   * presented as one that does, which is the habit this panel replaced.
+   */
+  const coverage = configuredCoverage();
+  const springCoverage = {
+    bandedLow: coverage.banded.lowPercent,
+    bandedHigh: coverage.banded.highPercent
+  };
+
+  /** What was actually sorted today. Nothing is shown if nothing was. */
+  const [today, setToday] = useState<{ total: number } | null>(null);
+  useEffect(() => {
+    api.getSortingThroughput()
+      .then((r) => setToday({ total: r.data.total }))
+      // A missing count is left blank rather than guessed at.
+      .catch(() => setToday(null));
+  }, []);
   const [pipeline, setPipeline] = useState<any>(null);
   const [tat, setTat] = useState<any>(null);
   const [throughput, setThroughput] = useState<any>(null);
@@ -195,85 +220,89 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* ROI Summary Card (R5) */}
-      <div className="bg-gradient-to-br from-slate-900 via-slate-900 to-blue-950/40 border border-blue-900/50 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-400 bg-blue-950/80 border border-blue-800/60 px-2.5 py-1 rounded-md">
-                ⚡ {t('roi.badge')}
-              </span>
-              <h3 className="text-lg font-black text-white mt-2 flex items-center gap-2">
-                {t('roi.title')}
-              </h3>
-            </div>
-            <div className="text-right">
-              <span className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">
-                {t('roi.increase')}
-              </span>
-              <p className="text-[11px] text-slate-400">{t('roi.speedMultiplier')}</p>
-            </div>
-          </div>
+      {/*
+        WHAT THIS PANEL USED TO SAY
+        ---------------------------
+        "+122% Throughput Gain", "2.2x Speed Acceleration", "99.8% RDSO G-95
+        Compliance", "Manual: 900 springs/day → With AI: 2,000+ springs/day",
+        and a Predictive AI Insight announcing a 22% rise in condemnations for
+        CASNUB 22 HS springs in the SECR zone.
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Manual Baseline */}
-            <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-xl space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-slate-400">{t('roi.manualRate')}</span>
-                <span className="text-xs font-bold text-slate-500">45% Outturn</span>
-              </div>
-              <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden">
-                <div className="h-full bg-slate-600 rounded-full" style={{ width: '45%' }} />
-              </div>
-              <p className="text-[11px] text-slate-400">{t('roi.manualDetail')}</p>
-            </div>
+        Not one of those was measured. They were hardcoded strings, on the
+        first screen the DRM opens, on the screen named after them. There is
+        no AI classifying springs, no predictive model, and nobody has timed
+        the manual process — and the shop's own SSE puts the daily pile at
+        700, not the 900 that figure was computed against.
 
-            {/* AI-Assisted */}
-            <div className="p-4 bg-blue-950/40 border border-blue-800/60 rounded-xl space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-blue-300">{t('roi.aiRate')}</span>
-                <span className="text-xs font-bold text-emerald-400">100% Outturn</span>
-              </div>
-              <div className="w-full h-3 bg-slate-950 rounded-full overflow-hidden border border-blue-900/50">
-                <div className="h-full bg-gradient-to-r from-blue-500 to-emerald-400 rounded-full" style={{ width: '100%' }} />
-              </div>
-              <p className="text-[11px] text-blue-300/80">{t('roi.aiDetail')}</p>
-            </div>
-          </div>
+        The real numbers sitting underneath them made it worse, not better: a
+        genuine turnaround time beside an invented throughput gain lends the
+        invention its credibility. And the first question a DRM asks about
+        "+122%" is where it came from, which has no answer.
 
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80 text-xs text-slate-400">
-            <span className="font-semibold text-slate-300">
-              🎯 {t('roi.accuracy')}
-            </span>
-            <span className="text-emerald-400 font-mono font-bold">
-              {t('roi.summaryText')}
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Predictive AI Agent Insight Panel */}
-      <div className="bg-gradient-to-r from-emerald-900/40 via-slate-900 to-emerald-950/20 border border-emerald-800/50 rounded-2xl p-5 shadow-2xl relative overflow-hidden flex items-start gap-4">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="shrink-0 p-3 bg-emerald-900/50 border border-emerald-500/30 rounded-2xl shadow-inner text-emerald-400 text-2xl">
-          🤖
-        </div>
-        <div className="relative z-10 flex-1 space-y-2">
-          <h3 className="text-sm font-black text-emerald-400 uppercase tracking-widest flex items-center gap-2">{isHi ? 'पूर्वानुमान अंतर्दृष्टि' : 'Predictive AI Insight'}<span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+        What replaces it is what the system can actually show, with its
+        source. It is a smaller claim and it survives being asked about.
+      */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg space-y-4">
+        <div>
+          <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-400 bg-blue-950/80 border border-blue-800/60 px-2.5 py-1 rounded-md">
+            {isHi ? 'यह प्रणाली क्या करती है' : 'What this system does'}
+          </span>
+          <h3 className="text-lg font-black text-white mt-2">
+            {isHi
+              ? 'मापा गया — अनुमान नहीं'
+              : 'Measured, not estimated'}
           </h3>
-          <p className="text-sm text-slate-300 font-medium leading-relaxed">
-            <strong className="text-white">Trend Alert:</strong> CASNUB 22 HS outer springs from the SECR zone are showing a <span className="text-rose-400 font-bold bg-rose-950/50 px-1 rounded">22% higher condemnation rate</span> due to physical damage this month compared to the historical average. 
-          </p>
-          <div className="pt-3 mt-1 border-t border-emerald-800/50 flex flex-wrap gap-3">
-             <button className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 shadow-lg text-white text-xs font-bold rounded-xl transition-all active:scale-95 flex items-center gap-2">
-               📝 Auto-Draft Restock Request (400 Units)
-             </button>
-             <button className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 text-xs font-bold rounded-xl transition-all active:scale-95 flex items-center gap-2">
-               📈 View Failure Analysis
-             </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4">
+            <p className="text-2xl font-black text-white tabular-nums">
+              {springCoverage.bandedLow}–{springCoverage.bandedHigh}%
+            </p>
+            <p className="text-xs font-bold text-slate-300 mt-1">
+              {isHi ? 'वैगनों के स्प्रिंग बैंड में वर्गीकृत' : 'of the year’s wagons can have springs banded'}
+            </p>
+            <p className="text-[11px] text-slate-500 mt-1.5 leading-snug">
+              {isHi
+                ? 'शॉप के 2025-26 आउटटर्न के आधार पर। एक श्रेणी का विभाजन अज्ञात है, इसलिए यह एक सीमा है।'
+                : 'Against the shop’s own 2025–26 out-turn. A range because one reported line covers three wagon types and is not broken down.'}
+            </p>
+          </div>
+
+          <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4">
+            <p className="text-2xl font-black text-white tabular-nums">
+              {(today?.total ?? 0).toLocaleString()}
+            </p>
+            <p className="text-xs font-bold text-slate-300 mt-1">
+              {isHi ? 'आज दर्ज स्प्रिंग' : 'springs recorded today'}
+            </p>
+            <p className="text-[11px] text-slate-500 mt-1.5 leading-snug">
+              {isHi
+                ? `शॉप का लक्ष्य लगभग ${DAILY_PILE} प्रतिदिन है (SSE, 27 अगस्त 2026)।`
+                : `The shop sorts about ${DAILY_PILE} a day — the figure its own SSE gave on 27 August 2026.`}
+            </p>
+          </div>
+
+          <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4">
+            <p className="text-2xl font-black text-white tabular-nums">
+              {(pipeline?.totalActive ?? 0) + (pipeline?.totalReleased ?? 0)}
+            </p>
+            <p className="text-xs font-bold text-slate-300 mt-1">
+              {isHi ? 'वैगन इस रिकॉर्ड में' : 'wagons in this record'}
+            </p>
+            <p className="text-[11px] text-slate-500 mt-1.5 leading-snug">
+              {isHi
+                ? 'हर निर्णय अपने आरडीएसओ खंड का हवाला देता है, और कोई भी रिकॉर्ड लिखे जाने के बाद बदला नहीं जा सकता।'
+                : 'Every verdict cites the RDSO clause it came from, and no record can be altered after it is written.'}
+            </p>
           </div>
         </div>
+
+        <p className="text-[11px] text-slate-500 leading-relaxed border-t border-slate-800 pt-3">
+          {isHi
+            ? 'यह प्रणाली स्प्रिंग नहीं मापती — वह अभी भी गेज से होता है। यह लिपिकीय कार्य हटाती है: बैंड देखना, कागज़ पर लिखना, पाली के अंत में गिनती, और यह हिसाब कि ढेर से कितने पूरे नेस्ट बन सकते हैं।'
+            : 'The system does not measure a spring — that is still done with the gauge. What it removes is the clerical half: looking the band up, writing it down, tallying at the end of a shift, and working out how many complete matched nests the pile can supply, which was never done by hand at all.'}
+        </p>
       </div>
 
       {/* KPI Overview Cards */}

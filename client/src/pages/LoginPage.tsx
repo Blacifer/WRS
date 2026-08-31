@@ -80,7 +80,10 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           <div className="pt-2 flex justify-center">
             <span className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-gradient-to-r from-blue-950 via-slate-900 to-blue-950 border border-blue-600/50 rounded-full text-xs font-bold text-blue-300 shadow-md">
               <span className="text-amber-400">⚡</span>
-              <span>{dict.loginTagline || (lang === 'hi' ? 'भारतीय रेल हेतु एआई-संचालित गुणवत्ता नियंत्रण' : 'AI-Powered Quality Control for Indian Railways')}</span>
+              {/* The fallback said "AI-Powered" too, so replacing the
+                  dictionary entry alone would have left the old claim showing
+                  whenever the dictionary failed to load. */}
+              <span>{dict.loginTagline || (lang === 'hi' ? 'आरडीएसओ जी-95 वर्गीकरण एवं शून्य-दोष रिलीज़ नियंत्रण' : 'RDSO G-95 Classification & Zero-Defect Release Control')}</span>
             </span>
           </div>
         </div>
