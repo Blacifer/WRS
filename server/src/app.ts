@@ -7,6 +7,7 @@ import { express, cors, ExpressApp } from './framework/index.ts';
 import type { Request, Response, NextFunction } from './framework/index.ts';
 import { apiRouter } from './routes/index.ts';
 import { requestLogger } from './middleware/requestLogger.ts';
+import { rateLimit } from './middleware/rateLimit.ts';
 import { errorHandler } from './middleware/errorHandler.ts';
 import { getDatabase } from './db/connection.ts';
 import { runMigrations } from './db/migrations.ts';
@@ -33,6 +34,15 @@ export function createApp(dbPath?: string): ExpressApp {
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(requestLogger);
+
+  /*
+   * Applied to /api only, and after the logger so a refusal is still logged.
+   *
+   * Static assets are deliberately outside it: a browser loading the app
+   * pulls dozens of files at once and would trip a limit meant for API
+   * traffic, which would look exactly like the app being broken.
+   */
+  app.use('/api', rateLimit());
 
   // Mount API Routes
   app.use('/api', apiRouter);
