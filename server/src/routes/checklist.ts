@@ -6,7 +6,7 @@
 import crypto from 'node:crypto';
 import { Router } from '../framework/index.ts';
 import type { Request, Response } from '../framework/index.ts';
-import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.ts';
+import { authMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { requireRole } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
@@ -30,7 +30,25 @@ function getRepo() {
 // 1. Get Master Checklist Configuration (by wagonType or all)
 // -------------------------------------------------------------------------
 
-checklistRouter.get('/config', optionalAuthMiddleware, async (req: Request, res: Response) => {
+/*
+ * Reading this system requires an account.
+ *
+ * These routes were mounted on optionalAuthMiddleware, which takes a token
+ * when one is offered and proceeds perfectly happily when none is. The effect
+ * was that everything readable here was readable by anyone who could reach
+ * the server: the wagon list, every checklist, every spring measurement with
+ * the inspector's name against it, the component ledger, the stores, and — the
+ * worst of them — /api/inspections/export, which handed over the entire
+ * inspection record as a CSV to a caller with no account.
+ *
+ * That last one also shows why "optional" auth is the wrong shape for a read
+ * gate. The export's protections (no inspectors, and a second factor for
+ * anyone enrolled) were all written inside `if (req.user)`, so sending no
+ * credentials at all skipped every one of them. A check that only runs for
+ * people who identified themselves is not a check.
+ */
+
+checklistRouter.get('/config', authMiddleware, async (req: Request, res: Response) => {
   const repo = getRepo();
   const wagonType = req.query?.wagonType || req.query?.wagon_type;
 

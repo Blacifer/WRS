@@ -7,13 +7,31 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import { createApp } from '../src/app.ts';
 import type { ExpressApp } from '../src/framework/index.ts';
+import { generateToken } from '../src/auth/jwt.ts';
+
+/*
+ * These cases check that a measurement produces the right RDSO verdict, not
+ * who is allowed to ask. They ran anonymously only because the route accepted
+ * anonymous callers; the helper signs in as an inspector, which is who takes
+ * a caliper reading. A case about authentication passes its own headers.
+ */
+const INSPECTOR_FOR_MEASUREMENTS = generateToken({
+  id: 'usr_insp_001',
+  username: 'inspector1',
+  role: 'INSPECTOR',
+  name: 'Ramesh Kumar',
+  employeeId: 'WRS-INSP-1042'
+});
 
 async function mockFetch(app: ExpressApp, method: string, path: string, body?: any, headers: Record<string, string> = {}) {
+  const withAuth = 'authorization' in headers || 'Authorization' in headers
+    ? headers
+    : { ...headers, authorization: `Bearer ${INSPECTOR_FOR_MEASUREMENTS}` };
   return app.dispatch({
     method,
     url: path,
     body,
-    headers
+    headers: withAuth
   });
 }
 

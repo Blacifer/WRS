@@ -34,6 +34,24 @@ function getRepos() {
 // 1. Wagon Intake & Registration (Stage 1)
 // -------------------------------------------------------------------------
 
+/*
+ * Reading this system requires an account.
+ *
+ * These routes were mounted on optionalAuthMiddleware, which takes a token
+ * when one is offered and proceeds perfectly happily when none is. The effect
+ * was that everything readable here was readable by anyone who could reach
+ * the server: the wagon list, every checklist, every spring measurement with
+ * the inspector's name against it, the component ledger, the stores, and — the
+ * worst of them — /api/inspections/export, which handed over the entire
+ * inspection record as a CSV to a caller with no account.
+ *
+ * That last one also shows why "optional" auth is the wrong shape for a read
+ * gate. The export's protections (no inspectors, and a second factor for
+ * anyone enrolled) were all written inside `if (req.user)`, so sending no
+ * credentials at all skipped every one of them. A check that only runs for
+ * people who identified themselves is not a check.
+ */
+
 wagonsRouter.post('/register', authMiddleware, async (req: Request, res: Response) => {
   const { wagonRepo } = getRepos();
   const { wagonNumber, wagonType, owningRailway, entryNotes, conditionNotes, entryDate } = req.body;
@@ -107,7 +125,7 @@ wagonsRouter.post('/register', authMiddleware, async (req: Request, res: Respons
 // 2. Query Wagons List
 // -------------------------------------------------------------------------
 
-wagonsRouter.get('/', optionalAuthMiddleware, async (req: Request, res: Response) => {
+wagonsRouter.get('/', authMiddleware, async (req: Request, res: Response) => {
   const { wagonRepo } = getRepos();
   const query = req.query || {};
 
@@ -152,7 +170,7 @@ wagonsRouter.get('/', optionalAuthMiddleware, async (req: Request, res: Response
 // 3. Wagon Timeline & Duration History
 // -------------------------------------------------------------------------
 
-wagonsRouter.get('/:wagonNumber/timeline', optionalAuthMiddleware, async (req: Request, res: Response) => {
+wagonsRouter.get('/:wagonNumber/timeline', authMiddleware, async (req: Request, res: Response) => {
   const { wagonRepo } = getRepos();
   const wagonNumber = req.params?.wagonNumber;
 
@@ -184,7 +202,7 @@ wagonsRouter.get('/:wagonNumber/timeline', optionalAuthMiddleware, async (req: R
 // 4. CASNUB Bogie Parts Checklist for Wagon
 // -------------------------------------------------------------------------
 
-wagonsRouter.get('/:wagonNumber/checklist', optionalAuthMiddleware, async (req: Request, res: Response) => {
+wagonsRouter.get('/:wagonNumber/checklist', authMiddleware, async (req: Request, res: Response) => {
   const { wagonRepo } = getRepos();
   const wagonNumber = req.params?.wagonNumber;
 
@@ -212,7 +230,7 @@ wagonsRouter.get('/:wagonNumber/checklist', optionalAuthMiddleware, async (req: 
 // 5. Zero-Defect Exit Gate Status & Blocker Diagnostics
 // -------------------------------------------------------------------------
 
-wagonsRouter.get('/:wagonNumber/gate/status', optionalAuthMiddleware, async (req: Request, res: Response) => {
+wagonsRouter.get('/:wagonNumber/gate/status', authMiddleware, async (req: Request, res: Response) => {
   const { wagonRepo } = getRepos();
   const wagonNumber = req.params?.wagonNumber;
 
@@ -384,7 +402,7 @@ wagonsRouter.get('/:wagonNumber/certificate', authMiddleware, async (req: Authen
 // 7. Wagon Master Detail with Timeline & Checklist
 // -------------------------------------------------------------------------
 
-wagonsRouter.get('/:wagonNumber', optionalAuthMiddleware, async (req: Request, res: Response) => {
+wagonsRouter.get('/:wagonNumber', authMiddleware, async (req: Request, res: Response) => {
   const { wagonRepo, inspectionRepo } = getRepos();
   const wagonNumber = req.params?.wagonNumber;
 

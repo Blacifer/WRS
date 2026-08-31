@@ -5,7 +5,7 @@
 
 import { Router } from '../framework/index.ts';
 import type { Request, Response } from '../framework/index.ts';
-import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.ts';
+import { authMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { requireRole } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
@@ -22,6 +22,24 @@ function getRepo() {
 // -------------------------------------------------------------------------
 // 1. Upload & Auto-tag Photo Evidence
 // -------------------------------------------------------------------------
+
+/*
+ * Reading this system requires an account.
+ *
+ * These routes were mounted on optionalAuthMiddleware, which takes a token
+ * when one is offered and proceeds perfectly happily when none is. The effect
+ * was that everything readable here was readable by anyone who could reach
+ * the server: the wagon list, every checklist, every spring measurement with
+ * the inspector's name against it, the component ledger, the stores, and — the
+ * worst of them — /api/inspections/export, which handed over the entire
+ * inspection record as a CSV to a caller with no account.
+ *
+ * That last one also shows why "optional" auth is the wrong shape for a read
+ * gate. The export's protections (no inspectors, and a second factor for
+ * anyone enrolled) were all written inside `if (req.user)`, so sending no
+ * credentials at all skipped every one of them. A check that only runs for
+ * people who identified themselves is not a check.
+ */
 
 photosRouter.post('/upload', authMiddleware, async (req: Request, res: Response) => {
   const repo = getRepo();
@@ -219,7 +237,7 @@ photosRouter.get(
   }
 );
 
-photosRouter.get('/:photoId', optionalAuthMiddleware, async (req: Request, res: Response) => {
+photosRouter.get('/:photoId', authMiddleware, async (req: Request, res: Response) => {
   const repo = getRepo();
   const photoId = req.params?.photoId;
 
@@ -257,7 +275,7 @@ photosRouter.get('/:photoId', optionalAuthMiddleware, async (req: Request, res: 
 // 3. Retrieve Photos for a Wagon
 // -------------------------------------------------------------------------
 
-photosRouter.get('/wagon/:wagonNumber', optionalAuthMiddleware, async (req: Request, res: Response) => {
+photosRouter.get('/wagon/:wagonNumber', authMiddleware, async (req: Request, res: Response) => {
   const repo = getRepo();
   const wagonNumber = req.params?.wagonNumber;
   const category = req.query?.category;

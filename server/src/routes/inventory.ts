@@ -5,7 +5,7 @@
 
 import { Router } from '../framework/index.ts';
 import type { Request, Response } from '../framework/index.ts';
-import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.ts';
+import { authMiddleware } from '../middleware/auth.ts';
 import { requireRole } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { InventoryRepository } from '../db/inventoryRepository.ts';
@@ -20,7 +20,25 @@ function getRepo() {
 // -------------------------------------------------------------------------
 // 1. List Inventory Parts Catalog & Stock Levels
 // -------------------------------------------------------------------------
-inventoryRouter.get('/', optionalAuthMiddleware, async (req: Request, res: Response) => {
+/*
+ * Reading this system requires an account.
+ *
+ * These routes were mounted on optionalAuthMiddleware, which takes a token
+ * when one is offered and proceeds perfectly happily when none is. The effect
+ * was that everything readable here was readable by anyone who could reach
+ * the server: the wagon list, every checklist, every spring measurement with
+ * the inspector's name against it, the component ledger, the stores, and — the
+ * worst of them — /api/inspections/export, which handed over the entire
+ * inspection record as a CSV to a caller with no account.
+ *
+ * That last one also shows why "optional" auth is the wrong shape for a read
+ * gate. The export's protections (no inspectors, and a second factor for
+ * anyone enrolled) were all written inside `if (req.user)`, so sending no
+ * credentials at all skipped every one of them. A check that only runs for
+ * people who identified themselves is not a check.
+ */
+
+inventoryRouter.get('/', authMiddleware, async (req: Request, res: Response) => {
   try {
     const repo = getRepo();
     const category = req.query?.category as string | undefined;
@@ -49,7 +67,7 @@ inventoryRouter.get('/', optionalAuthMiddleware, async (req: Request, res: Respo
 // -------------------------------------------------------------------------
 // 2. Aggregate Inventory KPIs & Metrics
 // -------------------------------------------------------------------------
-inventoryRouter.get('/stats', optionalAuthMiddleware, async (_req: Request, res: Response) => {
+inventoryRouter.get('/stats', authMiddleware, async (_req: Request, res: Response) => {
   try {
     const repo = getRepo();
     const stats = repo.getInventoryStats();
@@ -73,7 +91,7 @@ inventoryRouter.get('/stats', optionalAuthMiddleware, async (_req: Request, res:
 // -------------------------------------------------------------------------
 // 3. List Part Reservations (by wagonNumber and/or status)
 // -------------------------------------------------------------------------
-inventoryRouter.get('/reservations', optionalAuthMiddleware, async (req: Request, res: Response) => {
+inventoryRouter.get('/reservations', authMiddleware, async (req: Request, res: Response) => {
   try {
     const repo = getRepo();
     const wagonNumber = req.query?.wagonNumber as string | undefined;
@@ -104,7 +122,7 @@ inventoryRouter.get('/reservations', optionalAuthMiddleware, async (req: Request
 // -------------------------------------------------------------------------
 // 4. Get Single Part by Part Code
 // -------------------------------------------------------------------------
-inventoryRouter.get('/part/:partCode', optionalAuthMiddleware, async (req: Request, res: Response) => {
+inventoryRouter.get('/part/:partCode', authMiddleware, async (req: Request, res: Response) => {
   try {
     const repo = getRepo();
     const { partCode } = req.params;

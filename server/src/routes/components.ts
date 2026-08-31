@@ -5,7 +5,7 @@
 
 import { Router } from '../framework/index.ts';
 import type { Request, Response } from '../framework/index.ts';
-import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.ts';
+import { authMiddleware } from '../middleware/auth.ts';
 import { getDatabase } from '../db/connection.ts';
 import { ComponentRepository } from '../db/componentRepository.ts';
 
@@ -18,7 +18,25 @@ function getRepo(): ComponentRepository {
 // -------------------------------------------------------------------------
 // 1. List / Search Components with Filters and Pagination
 // -------------------------------------------------------------------------
-componentsRouter.get('/', optionalAuthMiddleware, async (req: Request, res: Response) => {
+/*
+ * Reading this system requires an account.
+ *
+ * These routes were mounted on optionalAuthMiddleware, which takes a token
+ * when one is offered and proceeds perfectly happily when none is. The effect
+ * was that everything readable here was readable by anyone who could reach
+ * the server: the wagon list, every checklist, every spring measurement with
+ * the inspector's name against it, the component ledger, the stores, and — the
+ * worst of them — /api/inspections/export, which handed over the entire
+ * inspection record as a CSV to a caller with no account.
+ *
+ * That last one also shows why "optional" auth is the wrong shape for a read
+ * gate. The export's protections (no inspectors, and a second factor for
+ * anyone enrolled) were all written inside `if (req.user)`, so sending no
+ * credentials at all skipped every one of them. A check that only runs for
+ * people who identified themselves is not a check.
+ */
+
+componentsRouter.get('/', authMiddleware, async (req: Request, res: Response) => {
   try {
     const repo = getRepo();
     const query = req.query || {};
@@ -58,7 +76,7 @@ componentsRouter.get('/', optionalAuthMiddleware, async (req: Request, res: Resp
 // -------------------------------------------------------------------------
 // 2. Summary Statistics & Health KPIs
 // -------------------------------------------------------------------------
-componentsRouter.get('/stats', optionalAuthMiddleware, async (_req: Request, res: Response) => {
+componentsRouter.get('/stats', authMiddleware, async (_req: Request, res: Response) => {
   try {
     const repo = getRepo();
     const stats = repo.getComponentStats();
@@ -82,7 +100,7 @@ componentsRouter.get('/stats', optionalAuthMiddleware, async (_req: Request, res
 // -------------------------------------------------------------------------
 // 3. QR Code Lookup
 // -------------------------------------------------------------------------
-componentsRouter.get('/qr/:qrCode', optionalAuthMiddleware, async (req: Request, res: Response) => {
+componentsRouter.get('/qr/:qrCode', authMiddleware, async (req: Request, res: Response) => {
   try {
     const repo = getRepo();
     const { qrCode } = req.params;
@@ -119,7 +137,7 @@ componentsRouter.get('/qr/:qrCode', optionalAuthMiddleware, async (req: Request,
 // -------------------------------------------------------------------------
 // 3b. QR Code Scan Payload Verification
 // -------------------------------------------------------------------------
-componentsRouter.post('/scan-qr', optionalAuthMiddleware, async (req: Request, res: Response) => {
+componentsRouter.post('/scan-qr', authMiddleware, async (req: Request, res: Response) => {
   try {
     const repo = getRepo();
     const { qrPayload, qrCode } = req.body || {};
@@ -167,7 +185,7 @@ componentsRouter.post('/scan-qr', optionalAuthMiddleware, async (req: Request, r
 // -------------------------------------------------------------------------
 // 4. Query All Components Mounted on a Specified Wagon
 // -------------------------------------------------------------------------
-componentsRouter.get('/wagon/:wagonNumber', optionalAuthMiddleware, async (req: Request, res: Response) => {
+componentsRouter.get('/wagon/:wagonNumber', authMiddleware, async (req: Request, res: Response) => {
   try {
     const repo = getRepo();
     const { wagonNumber } = req.params;
@@ -196,7 +214,7 @@ componentsRouter.get('/wagon/:wagonNumber', optionalAuthMiddleware, async (req: 
 // -------------------------------------------------------------------------
 // 5a. Component History Lookup
 // -------------------------------------------------------------------------
-componentsRouter.get('/:serialNumber/history', optionalAuthMiddleware, async (req: Request, res: Response) => {
+componentsRouter.get('/:serialNumber/history', authMiddleware, async (req: Request, res: Response) => {
   try {
     const repo = getRepo();
     const { serialNumber } = req.params;
@@ -232,7 +250,7 @@ componentsRouter.get('/:serialNumber/history', optionalAuthMiddleware, async (re
 // -------------------------------------------------------------------------
 // 5. Serial Number Lookup with Complete Lifecycle History
 // -------------------------------------------------------------------------
-componentsRouter.get('/:serialNumber', optionalAuthMiddleware, async (req: Request, res: Response) => {
+componentsRouter.get('/:serialNumber', authMiddleware, async (req: Request, res: Response) => {
   try {
     const repo = getRepo();
     const { serialNumber } = req.params;

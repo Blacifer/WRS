@@ -160,6 +160,7 @@ describe('Phase 3 M1: /api/components REST API Integration Tests (R4 Serializati
 
     const res = await app.dispatch({
       method: 'GET',
+      headers: { authorization: `Bearer ${supervisorToken}` },
       url: '/api/components?page=1&limit=10'
     });
 
@@ -174,6 +175,7 @@ describe('Phase 3 M1: /api/components REST API Integration Tests (R4 Serializati
   it('TC-COMP-API-06: GET /api/components filters by componentType and search query', async () => {
     const res = await app.dispatch({
       method: 'GET',
+      headers: { authorization: `Bearer ${supervisorToken}` },
       url: '/api/components?type=BEARING'
     });
 
@@ -183,6 +185,7 @@ describe('Phase 3 M1: /api/components REST API Integration Tests (R4 Serializati
 
     const searchRes = await app.dispatch({
       method: 'GET',
+      headers: { authorization: `Bearer ${supervisorToken}` },
       url: '/api/components?search=Westinghouse'
     });
 
@@ -197,6 +200,7 @@ describe('Phase 3 M1: /api/components REST API Integration Tests (R4 Serializati
   it('TC-COMP-API-07: GET /api/components/:serialNumber returns component with complete history', async () => {
     const res = await app.dispatch({
       method: 'GET',
+      headers: { authorization: `Bearer ${supervisorToken}` },
       url: '/api/components/WHL-RWF-2024-8841'
     });
 
@@ -210,6 +214,7 @@ describe('Phase 3 M1: /api/components REST API Integration Tests (R4 Serializati
   it('TC-COMP-API-08: GET /api/components/:serialNumber returns 404 for unknown serial number', async () => {
     const res = await app.dispatch({
       method: 'GET',
+      headers: { authorization: `Bearer ${supervisorToken}` },
       url: '/api/components/NON-EXISTENT-SERIAL-999'
     });
 
@@ -220,12 +225,14 @@ describe('Phase 3 M1: /api/components REST API Integration Tests (R4 Serializati
   it('TC-COMP-API-09: GET /api/components/qr/:qrCode performs QR code lookup', async () => {
     const compRes = await app.dispatch({
       method: 'GET',
+      headers: { authorization: `Bearer ${supervisorToken}` },
       url: '/api/components/WHL-RWF-2024-8841'
     });
     const qrCode = compRes.body.data.qrCode;
 
     const res = await app.dispatch({
       method: 'GET',
+      headers: { authorization: `Bearer ${supervisorToken}` },
       url: `/api/components/qr/${encodeURIComponent(qrCode)}`
     });
 
@@ -263,6 +270,7 @@ describe('Phase 3 M1: /api/components REST API Integration Tests (R4 Serializati
   it('TC-COMP-API-11: GET /api/components/wagon/:wagonNumber returns all components on the wagon', async () => {
     const res = await app.dispatch({
       method: 'GET',
+      headers: { authorization: `Bearer ${supervisorToken}` },
       url: '/api/components/wagon/SECR/BOXNHL/10492'
     });
 
@@ -320,6 +328,7 @@ describe('Phase 3 M1: /api/components REST API Integration Tests (R4 Serializati
   it('TC-COMP-API-14: GET /api/components/stats returns aggregated workshop metrics', async () => {
     const res = await app.dispatch({
       method: 'GET',
+      headers: { authorization: `Bearer ${supervisorToken}` },
       url: '/api/components/stats'
     });
 

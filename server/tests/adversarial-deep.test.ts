@@ -13,9 +13,29 @@ import { runMigrations } from '../src/db/migrations.ts';
 import { seedUsers } from '../src/db/seed.ts';
 import { InspectionRepository } from '../src/db/repository.ts';
 import type { ExpressApp } from '../src/framework/index.ts';
+import { generateToken } from '../src/auth/jwt.ts';
+
+/*
+ * These cases exercise query behaviour — filters, pagination, injection
+ * safety — not authentication. They ran anonymously because the read routes
+ * accepted anonymous callers, which was the bug rather than the intent, so
+ * the helper now signs in as a supervisor by default. A case that is about
+ * authentication passes its own headers and still gets exactly what it asks
+ * for, including nothing.
+ */
+const SUPERVISOR_FOR_READS = generateToken({
+  id: 'usr_sup_001',
+  username: 'supervisor1',
+  role: 'SUPERVISOR',
+  name: 'S. K. Verma',
+  employeeId: 'WRS-SUP-2019'
+});
 
 async function mockFetch(app: ExpressApp, method: string, path: string, body: any = { _dummy: true }, headers: Record<string, string> = {}) {
-  return app.dispatch({ method, url: path, body, headers });
+  const withAuth = 'authorization' in headers || 'Authorization' in headers
+    ? headers
+    : { ...headers, authorization: `Bearer ${SUPERVISOR_FOR_READS}` };
+  return app.dispatch({ method, url: path, body, headers: withAuth });
 }
 
 describe('Deep Adversarial Stress: SQLite Invariants, Foreign Keys & Boundary Attack Vectors', () => {

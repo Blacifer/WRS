@@ -21,12 +21,29 @@ const INSPECTOR_AUTH = {
 };
 
 // Helper for sending simulated HTTP requests to the Express app
+/*
+ * These cases check the endpoints' own behaviour — filters, aggregates — not
+ * who may call them. They ran anonymously because the read routes accepted
+ * anonymous callers, which was the bug; the helper now signs in as an
+ * inspector. A case about authentication passes its own headers.
+ */
+const INSPECTOR_FOR_READS = generateToken({
+  id: 'usr_insp_001',
+  username: 'inspector1',
+  role: 'INSPECTOR',
+  name: 'Ramesh Kumar',
+  employeeId: 'WRS-INSP-1042'
+});
+
 async function mockFetch(app: ExpressApp, method: string, path: string, body?: any, headers: Record<string, string> = {}) {
+  const withAuth = 'authorization' in headers || 'Authorization' in headers
+    ? headers
+    : { ...headers, authorization: `Bearer ${INSPECTOR_FOR_READS}` };
   return app.dispatch({
     method,
     url: path,
     body,
-    headers
+    headers: withAuth
   });
 }
 

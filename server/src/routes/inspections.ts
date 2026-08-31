@@ -38,6 +38,24 @@ export const inspectionsRouter = Router();
  * ever, is the worst output this system can produce. The chain faithfully
  * protects whatever it is given.
  */
+/*
+ * Reading this system requires an account.
+ *
+ * These routes were mounted on optionalAuthMiddleware, which takes a token
+ * when one is offered and proceeds perfectly happily when none is. The effect
+ * was that everything readable here was readable by anyone who could reach
+ * the server: the wagon list, every checklist, every spring measurement with
+ * the inspector's name against it, the component ledger, the stores, and — the
+ * worst of them — /api/inspections/export, which handed over the entire
+ * inspection record as a CSV to a caller with no account.
+ *
+ * That last one also shows why "optional" auth is the wrong shape for a read
+ * gate. The export's protections (no inspectors, and a second factor for
+ * anyone enrolled) were all written inside `if (req.user)`, so sending no
+ * credentials at all skipped every one of them. A check that only runs for
+ * people who identified themselves is not a check.
+ */
+
 inspectionsRouter.post('/', authMiddleware, (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   try {
     const body = req.body as any;
@@ -226,7 +244,7 @@ inspectionsRouter.post('/batch', authMiddleware, handleBatchSync);
 /**
  * GET /api/inspections/stats (Analytics & Throughput)
  */
-inspectionsRouter.get('/stats', optionalAuthMiddleware, (req: Request, res: Response, next: NextFunction): void => {
+inspectionsRouter.get('/stats', authMiddleware, (req: Request, res: Response, next: NextFunction): void => {
   try {
     const { startDate, endDate, wagonNumber } = req.query as Record<string, string>;
     const db = getDatabase();
@@ -246,7 +264,7 @@ inspectionsRouter.get('/stats', optionalAuthMiddleware, (req: Request, res: Resp
 /**
  * GET /api/inspections/export (CSV / JSON Export)
  */
-inspectionsRouter.get('/export', optionalAuthMiddleware, (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+inspectionsRouter.get('/export', authMiddleware, (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   try {
     const { format = 'csv', startDate, endDate, wagonNumber, otpToken: queryOtpToken } = req.query as Record<string, string>;
     const headerOtpToken = req.headers['x-otp-token'] as string;
@@ -389,7 +407,7 @@ inspectionsRouter.get('/export', optionalAuthMiddleware, (req: AuthenticatedRequ
 /**
  * GET /api/inspections (Multi-Criteria Search & Filter)
  */
-inspectionsRouter.get('/', optionalAuthMiddleware, (req: Request, res: Response, next: NextFunction): void => {
+inspectionsRouter.get('/', authMiddleware, (req: Request, res: Response, next: NextFunction): void => {
   try {
     const query = req.query as Record<string, string>;
     const filter: InspectionFilter = {
@@ -438,7 +456,7 @@ inspectionsRouter.get('/', optionalAuthMiddleware, (req: Request, res: Response,
 /**
  * GET /api/inspections/:id (Single Inspection Record)
  */
-inspectionsRouter.get('/:id', optionalAuthMiddleware, (req: Request, res: Response, next: NextFunction): void => {
+inspectionsRouter.get('/:id', authMiddleware, (req: Request, res: Response, next: NextFunction): void => {
   try {
     const db = getDatabase();
     const repo = new InspectionRepository(db);

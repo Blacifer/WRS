@@ -10,7 +10,7 @@ import { getDatabase } from '../db/connection.ts';
 import { InspectionRepository } from '../db/repository.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
 import { classifySpring } from '../../../shared/classification/engine.ts';
-import { optionalAuthMiddleware } from '../middleware/auth.ts';
+import { authMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import type {
   CVMeasureRequest,
@@ -367,7 +367,25 @@ const DG_RANGE_TARGETS = ['DG_CENTRE_WEDGE_LOCATION', 'DG_MOVABLE_PLATE_LOCATION
 // -------------------------------------------------------------------------
 // POST /api/cv/measure — Direct CV Measurement Telemetry & Verification
 // -------------------------------------------------------------------------
-cvRouter.post('/measure', optionalAuthMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+/*
+ * Reading this system requires an account.
+ *
+ * These routes were mounted on optionalAuthMiddleware, which takes a token
+ * when one is offered and proceeds perfectly happily when none is. The effect
+ * was that everything readable here was readable by anyone who could reach
+ * the server: the wagon list, every checklist, every spring measurement with
+ * the inspector's name against it, the component ledger, the stores, and — the
+ * worst of them — /api/inspections/export, which handed over the entire
+ * inspection record as a CSV to a caller with no account.
+ *
+ * That last one also shows why "optional" auth is the wrong shape for a read
+ * gate. The export's protections (no inspectors, and a second factor for
+ * anyone enrolled) were all written inside `if (req.user)`, so sending no
+ * credentials at all skipped every one of them. A check that only runs for
+ * people who identified themselves is not a check.
+ */
+
+cvRouter.post('/measure', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { db, inspectionRepo, wagonRepo } = getRepos();
     const body = req.body as CVMeasureRequest;
@@ -857,7 +875,7 @@ cvRouter.post('/measure', optionalAuthMiddleware, async (req: AuthenticatedReque
 // -------------------------------------------------------------------------
 // GET /api/cv/tolerances — Master Reference Limits & Nominal Specifications
 // -------------------------------------------------------------------------
-cvRouter.get('/tolerances', optionalAuthMiddleware, (_req: Request, res: Response) => {
+cvRouter.get('/tolerances', authMiddleware, (_req: Request, res: Response) => {
   res.status(200).json({
     success: true,
     data: RDSO_TOLERANCE_SPECS,
