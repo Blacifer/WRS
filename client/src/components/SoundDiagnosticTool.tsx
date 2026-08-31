@@ -34,7 +34,15 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
   // Engine state
   const [isActive, setIsActive] = useState<boolean>(false);
   const [mode, setMode] = useState<'MIC' | 'SIM_LEAK' | 'SIM_BEARING' | 'SIM_NORMAL' | 'IDLE'>('IDLE');
-  const [isAudible, setIsAudible] = useState<boolean>(true);
+  /*
+   * Silent by default.
+   *
+   * The simulations exist to give the analyser a spectrum to work on, not to
+   * play a noise out loud. Starting audible meant a supervisor opening this
+   * tab filled the room with a synthetic air-leak hiss and — with no stop
+   * control anywhere — had no way to end it but to leave the page.
+   */
+  const [isAudible, setIsAudible] = useState<boolean>(false);
 
   // Live DSP metrics
   const [dominantFreq, setDominantFreq] = useState<number>(0);
@@ -398,8 +406,11 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
             <h3 className="text-lg font-black text-white tracking-wide">
               {t('acoustic.title')}
             </h3>
+            {/* Was "Web Audio DSP" — the name of the browser API this happens
+                to use, which tells a supervisor nothing about what the panel
+                does or whether to trust it. Named for the method instead. */}
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 uppercase">
-              Web Audio DSP
+              {isHi ? 'ध्वनि विश्लेषण' : 'Listens for a sound'}
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-1">
@@ -410,6 +421,34 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
         {/* Audio Output Mute / Audible Toggle */}
         
       </div>
+
+      {/*
+        Stopping.
+        handleStop was written and never wired to anything, so once the
+        microphone or a simulation started there was no way to end it short of
+        navigating away. Shown only while something is actually running, so it
+        is never a dead control.
+      */}
+      {isActive && (
+        <div className="flex flex-wrap items-center gap-3 mb-3">
+          <button
+            data-testid="acoustic-stop"
+            onClick={handleStop}
+            className="min-h-[48px] px-5 rounded-xl bg-rose-950/70 border-2 border-rose-700 text-rose-200 text-sm font-extrabold hover:bg-rose-900/70 transition"
+          >
+            ■ {isHi ? 'सुनना बंद करें' : 'Stop listening'}
+          </button>
+          <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={isAudible}
+              onChange={(e) => setIsAudible(e.target.checked)}
+              className="w-4 h-4 accent-cyan-500"
+            />
+            {isHi ? 'नमूना ध्वनि सुनाएँ' : 'Play the sample out loud'}
+          </label>
+        </div>
+      )}
 
       {/* Control Buttons / Presets */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">

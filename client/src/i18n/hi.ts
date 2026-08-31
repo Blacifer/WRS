@@ -113,7 +113,7 @@ export const hi = {
     takePhoto: 'फोटो साक्ष्य लें',
     comparePhotos: 'फोटो तुलना करें',
     printCertificate: 'प्रमाणपत्र प्रिंट करें',
-    smartVision: 'स्प्रिंग बैच',
+    smartVision: 'मापें',
     openArCaliper: 'एआर कैलीपर स्कैन',
     freezeReading: 'रीडिंग फ़्रीज़ करें',
     autoPopulate: 'चेकलिस्ट स्वतः भरें'

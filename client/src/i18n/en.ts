@@ -117,7 +117,10 @@ export const en = {
     takePhoto: 'Capture Photo Evidence',
     comparePhotos: 'Compare Photos',
     printCertificate: 'Print Certificate',
-    smartVision: 'Spring Batch',
+    // Labels the caliper button on a checklist item. It read "Spring Batch",
+    // which is the name of a different screen entirely — so a wheel gauge, a
+    // brake block and a coupler all carried a button offering to sort springs.
+    smartVision: 'Measure',
     openArCaliper: 'Launch Smart Vision AR',
     freezeReading: 'Freeze Reading',
     autoPopulate: 'Auto-Populate Checklist'

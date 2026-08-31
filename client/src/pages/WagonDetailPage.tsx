@@ -314,6 +314,45 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
     }
   };
 
+  /*
+   * The reason a part was condemned.
+   *
+   * There was nowhere to type one. The status went to the server on its own,
+   * so a condemnation carried a verdict and no evidence — while the database,
+   * the API and the offline sync had all carried a notes field the whole
+   * time, and the sync-conflict message quotes it back at people ("was
+   * condemned by ... "). A supervisor could read the reason in a refusal they
+   * had never been able to write.
+   *
+   * The verdict is saved first and the note second, so a spring is never held
+   * hostage to somebody finishing a sentence — which on a shop floor is how
+   * notes stop being written at all.
+   */
+  const [noteDraft, setNoteDraft] = useState<{ itemId: string; text: string } | null>(null);
+
+  const saveNote = async (item: ChecklistItem, text: string) => {
+    const trimmed = text.trim();
+    setNoteDraft(null);
+    if (!trimmed) return;
+    try {
+      if (navigator.onLine) {
+        await api.updateChecklistItem(wagonNumber, item.id, { conditionNotes: trimmed });
+      } else {
+        await offlineDb.enqueueChecklistItem({
+          wagonNumber,
+          category: item.category,
+          partName: item.partName,
+          bogiePosition: item.bogiePosition,
+          status: item.status,
+          conditionNotes: trimmed
+        });
+      }
+      loadWagonData();
+    } catch {
+      // The verdict is already recorded; a failed note must not undo it.
+    }
+  };
+
   const handleStatusChange = async (item: ChecklistItem, newStatus: string) => {
     try {
       if (navigator.onLine) {
@@ -331,6 +370,11 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
         });
       }
       loadWagonData();
+      // A verdict against the part needs a reason with it. Asked for only on
+      // the verdicts where "why" is the whole point.
+      if (newStatus === 'CONDEMNED' || newStatus === 'FAIL') {
+        setNoteDraft({ itemId: item.id, text: '' });
+      }
     } catch (err: any) {
       alert(`Update failed: ${err.message}`);
     }
@@ -1132,6 +1176,35 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                       {item.conditionNotes && (
                         <p className="text-xs text-slate-400 italic">“{item.conditionNotes}”</p>
                       )}
+                      {/* Appears the moment something is condemned or failed.
+                          Not a modal: the verdict is already saved, so this can
+                          be ignored without losing anything, and typing here
+                          never blocks the next part. */}
+                      {noteDraft?.itemId === item.id && (
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                          <input
+                            autoFocus
+                            data-testid="condemn-note"
+                            value={noteDraft.text}
+                            onChange={(e) => setNoteDraft({ itemId: item.id, text: e.target.value })}
+                            onKeyDown={(e) => { if (e.key === 'Enter') saveNote(item, noteDraft.text); }}
+                            placeholder={isHi ? 'क्या दिखा? जैसे “दूसरे कॉइल पर दरार”' : 'What did you see? e.g. “crack near second coil”'}
+                            className="flex-1 min-w-[240px] min-h-[44px] bg-slate-800 border border-amber-700/60 rounded-lg px-3 text-sm text-white"
+                          />
+                          <button
+                            onClick={() => saveNote(item, noteDraft.text)}
+                            className="min-h-[44px] px-4 rounded-lg bg-white text-black text-xs font-extrabold"
+                          >
+                            {isHi ? 'सहेजें' : 'Save reason'}
+                          </button>
+                          <button
+                            onClick={() => setNoteDraft(null)}
+                            className="min-h-[44px] px-3 rounded-lg border border-slate-700 text-slate-400 text-xs font-bold"
+                          >
+                            {isHi ? 'छोड़ें' : 'Skip'}
+                          </button>
+                        </div>
+                      )}
                       {/* A measurement that condemns a part somebody recorded
                           as serviceable. It is deliberately not applied — a
                           person who looked at the part is not overruled by a
@@ -1195,7 +1268,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                           title="Measure with Smart Vision AR Caliper"
                         >
                           <span>🤖</span>
-                          <span className="hidden sm:inline">{t('actions.smartVision') || 'AR Caliper'}</span>
+                          <span className="hidden sm:inline">{t('actions.smartVision') || 'Measure'}</span>
                         </button>
                       )}
 
