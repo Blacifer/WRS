@@ -172,7 +172,6 @@ export class InventoryRepository {
       eventType: 'INVENTORY_RESERVED' as any,
       userId: 'usr_adm_001',
       userRole: 'SYSTEM',
-      ipAddress: '127.0.0.1',
       payload: {
         reservationId,
         wagonNumber,
@@ -245,7 +244,6 @@ export class InventoryRepository {
       eventType: 'INVENTORY_ISSUED' as any,
       userId: 'usr_adm_001',
       userRole: 'SUPERVISOR',
-      ipAddress: '127.0.0.1',
       payload: {
         reservationId: reservation.id,
         wagonNumber: reservation.wagonNumber,
@@ -301,7 +299,6 @@ export class InventoryRepository {
       eventType: 'INVENTORY_RESTOCKED' as any,
       userId: 'usr_adm_001',
       userRole: 'SUPERVISOR',
-      ipAddress: '127.0.0.1',
       payload: {
         partCode: cleanCode,
         restockedQuantity: qty,

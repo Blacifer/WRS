@@ -31,6 +31,7 @@
 
 import type { Request, Response, NextFunction } from '../framework/index.ts';
 import crypto from 'node:crypto';
+import { clientIpOf } from './requestContext.ts';
 
 /** Quiet during tests, so 988 test cases do not print 988 log lines. */
 const SILENT = process.env.NODE_ENV === 'test' || process.env.WRS_LOG_SILENT === '1';
@@ -61,6 +62,8 @@ export interface RequestLogLine {
   /** Who made it, when the request was authenticated. Never the token. */
   actor?: string;
   actorRole?: string;
+  /** The client address, when the deployment can determine one honestly. */
+  ip?: string;
 }
 
 export function requestLogger(req: Request, res: Response, next: NextFunction): void {
@@ -87,6 +90,9 @@ export function requestLogger(req: Request, res: Response, next: NextFunction): 
       status,
       durationMs: Date.now() - start
     };
+
+    const ip = clientIpOf(req);
+    if (ip) line.ip = ip;
 
     if (user?.id) {
       line.actor = user.id;

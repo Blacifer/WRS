@@ -10,6 +10,7 @@ import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { requireRole } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
+import { logAuditEvent } from '../db/auditLog.ts';
 
 export const photosRouter = Router();
 
@@ -92,6 +93,26 @@ photosRouter.post('/upload', authMiddleware, async (req: Request, res: Response)
     if (checklistItemId) {
       repo.updateChecklistItem(checklistItemId, { photoId: photo.id });
     }
+
+    /*
+     * A photograph is evidence about a wagon that is about to leave, so who
+     * took it and when belongs in the same ledger as everything else. The
+     * image itself stays where it is — the audit entry records that it exists,
+     * not a second copy of it.
+     */
+    logAuditEvent(getDatabase(), {
+      eventType: 'PHOTO_UPLOADED',
+      userId: inspectorId,
+      userRole: req.user?.role || 'INSPECTOR',
+      payload: {
+        wagonNumber,
+        photoId: photo.id,
+        category: effectiveCategory,
+        partName: partName || 'Component Inspection',
+        checklistItemId: checklistItemId || null,
+        evidenceStage: evidenceStage || null
+      }
+    });
 
     res.status(201).json({
       success: true,

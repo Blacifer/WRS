@@ -572,6 +572,55 @@ export class ApiClient {
     return this.request('/audit/verify');
   }
 
+  /**
+   * The activity ledger — every recorded action, not only springs.
+   *
+   * History & Logs used to query the inspections table alone, so a supervisor
+   * looking for "who moved this wagon to Painting" found nothing at all. This
+   * reads the audit log itself, which has held those events all along.
+   */
+  public async getActivityLog(options?: {
+    limit?: number;
+    offset?: number;
+    eventType?: string;
+    actor?: string;
+    role?: string;
+    since?: string;
+    until?: string;
+    search?: string;
+  }): Promise<{
+    success: boolean;
+    data: {
+      entries: Array<{
+        id: string;
+        eventType: string;
+        inspectionId: string | null;
+        actorId: string;
+        actorName: string;
+        actorEmployeeId: string | null;
+        actorRole: string;
+        ipAddress: string | null;
+        occurredAt: string;
+        detail: Record<string, any>;
+      }>;
+      total: number;
+      limit: number;
+      offset: number;
+    };
+  }> {
+    const p = new URLSearchParams();
+    if (options?.limit) p.set('limit', String(options.limit));
+    if (options?.offset) p.set('offset', String(options.offset));
+    if (options?.eventType) p.set('eventType', options.eventType);
+    if (options?.actor) p.set('actor', options.actor);
+    if (options?.role) p.set('role', options.role);
+    if (options?.since) p.set('since', options.since);
+    if (options?.until) p.set('until', options.until);
+    if (options?.search) p.set('search', options.search);
+    const qs = p.toString();
+    return this.request(`/audit/activity${qs ? `?${qs}` : ''}`);
+  }
+
   // =========================================================================
   // Phase 3 (M1): Stores Depot Inventory & Pre-Arrival OMRS AI Triage APIs
   // =========================================================================

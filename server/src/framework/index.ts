@@ -472,6 +472,19 @@ function parseByteLimit(limit: string | undefined, fallbackBytes: number): numbe
   return Math.floor(value * mult);
 }
 
+/*
+ * Body-stream callbacks have to carry the request's context with them.
+ *
+ * AsyncLocalStorage follows the code that *emits* an event, not the code that
+ * registered the listener. The socket emits 'data' and 'end' from its own read
+ * callback, so a listener registered inside a per-request context still runs
+ * outside it — and everything downstream of body parsing loses the context
+ * silently. That is why a GET carried the client's address into the audit log
+ * and a POST, which is to say every action worth auditing, recorded null.
+ *
+ * AsyncResource.bind captures the context at registration and restores it when
+ * the listener fires, which is the behaviour the rest of the code assumes.
+ */
 express.json = (options?: { limit?: string }) => {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     // A body that is already present has nothing to parse.
@@ -504,7 +517,7 @@ express.json = (options?: { limit?: string }) => {
     let received = 0;
     let aborted = false;
 
-    req.on('data', chunk => {
+    req.on('data', AsyncResource.bind((chunk: Buffer) => {
       if (aborted) return;
       received += chunk.length;
       if (received > maxBytes) {
@@ -520,9 +533,9 @@ express.json = (options?: { limit?: string }) => {
         return;
       }
       chunks.push(chunk);
-    });
+    }));
 
-    req.on('end', () => {
+    req.on('end', AsyncResource.bind(() => {
       if (aborted) return;
       if (chunks.length === 0) {
         req.body = {};
@@ -541,7 +554,7 @@ express.json = (options?: { limit?: string }) => {
           timestamp: new Date().toISOString()
         });
       }
-    });
+    }));
 
     req.on('error', err => next(err));
   };
@@ -564,15 +577,15 @@ express.urlencoded = (options?: { extended?: boolean; limit?: string }) => {
     }
 
     const chunks: Buffer[] = [];
-    req.on('data', chunk => chunks.push(chunk));
-    req.on('end', () => {
+    req.on('data', AsyncResource.bind((chunk: Buffer) => { chunks.push(chunk); }));
+    req.on('end', AsyncResource.bind(() => {
       const raw = Buffer.concat(chunks).toString('utf8');
       const params = new URLSearchParams(raw);
       const body: Record<string, string> = {};
       params.forEach((v, k) => { body[k] = v; });
       req.body = body;
       next();
-    });
+    }));
     req.on('error', err => next(err));
   };
 };
@@ -595,6 +608,7 @@ export function cors(options?: any) {
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { AsyncResource } from 'node:async_hooks';
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',

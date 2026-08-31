@@ -7,6 +7,7 @@ import { express, cors, ExpressApp } from './framework/index.ts';
 import type { Request, Response, NextFunction } from './framework/index.ts';
 import { apiRouter } from './routes/index.ts';
 import { requestLogger } from './middleware/requestLogger.ts';
+import { requestContext } from './middleware/requestContext.ts';
 import { rateLimit } from './middleware/rateLimit.ts';
 import { errorHandler } from './middleware/errorHandler.ts';
 import { getDatabase } from './db/connection.ts';
@@ -30,6 +31,9 @@ export function createApp(dbPath?: string): ExpressApp {
   seedUsers(db);
 
   // Core Middleware
+  // Opened first, so every later handler — and every audit write beneath it —
+  // can see who the request came from.
+  app.use(requestContext);
   app.use(cors());
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));

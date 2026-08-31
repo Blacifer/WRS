@@ -58,7 +58,26 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
   const [photos, setPhotos] = useState<WagonPhotoRecord[]>([]);
   const [gateStatus, setGateStatus] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<'CHECKLIST' | 'GATE' | 'PHOTOS' | 'TIMELINE' | 'ACOUSTIC' | 'COMPONENTS' | 'SWT'>('CHECKLIST');
+  /*
+   * Which tab of THIS wagon, kept across a reload.
+   *
+   * The previous fix remembered the screen and the wagon and stopped there,
+   * so opening Timeline, refreshing, and landing back on the checklist was
+   * still exactly what happened — reported a second time, correctly. The tab
+   * within the wagon is the part somebody is actually looking at.
+   */
+  const [activeTab, setActiveTab] = useState<'CHECKLIST' | 'GATE' | 'PHOTOS' | 'TIMELINE' | 'ACOUSTIC' | 'COMPONENTS' | 'SWT'>(() => {
+    try {
+      const saved = sessionStorage.getItem('wrs-wagon-tab');
+      const known = ['CHECKLIST', 'GATE', 'PHOTOS', 'TIMELINE', 'ACOUSTIC', 'COMPONENTS', 'SWT'];
+      if (saved && known.includes(saved)) return saved as any;
+    } catch { /* private windows fall through to the checklist */ }
+    return 'CHECKLIST';
+  });
+
+  useEffect(() => {
+    try { sessionStorage.setItem('wrs-wagon-tab', activeTab); } catch { /* not worth an error */ }
+  }, [activeTab]);
 
   // Selected Checklist Category
   const [selectedCategory, setSelectedCategory] = useState<string>('SPRINGS');

@@ -13,6 +13,7 @@ import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { requireRole } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { InspectionRepository } from '../db/repository.ts';
+import { logAuditEvent } from '../db/auditLog.ts';
 import type { UserRole, OtpAction } from '../../../shared/types.ts';
 import { config } from '../config/index.ts';
 import { TotpService } from '../auth/totpService.ts';
@@ -106,6 +107,25 @@ authRouter.post('/login', (req: Request, res: Response, next: NextFunction): voi
 
     if (!userRow || !verifyPassword(password, userRow.password_hash)) {
       recordFailure(attemptKey);
+
+      /*
+       * A refused sign-in is worth more to whoever reads this log than a
+       * successful one. It is attributed to the system principal because the
+       * audit table's foreign key needs a real user and, by definition, we do
+       * not have one — the attempted username goes in the payload instead.
+       * Never the password, including when someone types it in the wrong box.
+       */
+      logAuditEvent(db, {
+        eventType: 'AUTH_LOGIN',
+        userId: 'usr_system',
+        userRole: 'SYSTEM',
+        payload: {
+          outcome: 'REFUSED',
+          attemptedUsername: String(username).slice(0, 64),
+          reason: userRow ? 'WRONG_PASSWORD' : 'NO_SUCH_USER'
+        }
+      });
+
       res.status(401).json({
         success: false,
         error: 'INVALID_CREDENTIALS',
@@ -129,6 +149,21 @@ authRouter.post('/login', (req: Request, res: Response, next: NextFunction): voi
     };
 
     const token = signToken(user, 86400);
+
+    /*
+     * Every sign-in, recorded with its address.
+     *
+     * AUTH_LOGIN has been a permitted event type since the first schema and
+     * had never once been written, so the log could show what someone did but
+     * never that they had arrived. Asked for directly: everything logged, with
+     * the date and where possible the address, from inspector to supervisor.
+     */
+    logAuditEvent(db, {
+      eventType: 'AUTH_LOGIN',
+      userId: user.id,
+      userRole: user.role,
+      payload: { outcome: 'SUCCESS', username: user.username, employeeId: user.employeeId }
+    });
 
     res.status(200).json({
       success: true,
@@ -311,7 +346,9 @@ authRouter.post('/users', authMiddleware, requireRole('ADMIN'), (req: Authentica
   if (!requireUserMgmtToken(req, res)) return;
   try {
     const { username, password, role, fullName, employeeId } = req.body || {};
-    const validRoles = ['INSPECTOR', 'SUPERVISOR', 'ADMIN'];
+    // DRM was missing here as well as in the form, so the only divisional
+    // officer account that could ever exist was the seeded one.
+    const validRoles = ['INSPECTOR', 'SUPERVISOR', 'ADMIN', 'DRM'];
 
     if (!username || !password || !role || !fullName || !employeeId) {
       res.status(400).json({

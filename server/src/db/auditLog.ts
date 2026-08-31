@@ -22,6 +22,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import crypto from 'node:crypto';
 import type { AuditLogEntry } from '../../../shared/types.ts';
+import { currentClientIp } from '../middleware/requestContext.ts';
 
 /** Seed for the first entry, so the chain has a fixed, known starting point. */
 export const GENESIS_HASH = 'GENESIS_BLOCK';
@@ -71,7 +72,10 @@ export function logAuditEvent(db: DatabaseSync, event: Partial<AuditLogEntry>): 
   const eventType = event.eventType || 'INSPECTION_CREATED';
   const userId = event.userId || 'system';
   const userRole = event.userRole || 'SYSTEM';
-  const ipAddress = event.ipAddress || null;
+  // An address the caller knows beats one inferred; otherwise fall back to
+  // the request being served. Work with no request behind it logs no address
+  // rather than a plausible-looking invention.
+  const ipAddress = event.ipAddress || currentClientIp();
   const payloadJson = JSON.stringify(event.payload || {});
   const createdAt = event.createdAt || new Date().toISOString();
 

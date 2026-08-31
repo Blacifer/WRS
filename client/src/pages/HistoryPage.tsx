@@ -11,6 +11,8 @@ import { ClassificationBadge } from '../components/ClassificationBadge.tsx';
 import { api } from '../services/api.ts';
 import { offlineDb } from '../services/offlineDb.ts';
 import { HistoryIcon, RefreshCwIcon, ShieldIcon } from '../components/Icons.tsx';
+import { ActivityLog } from '../components/ActivityLog.tsx';
+import { can } from '../../../shared/auth/permissions.ts';
 
 interface HistoryPageProps {
   lang: LanguageCode;
@@ -31,6 +33,20 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [filterBogie, setFilterBogie] = useState<string>('');
   const [selectedRecord, setSelectedRecord] = useState<InspectionRecord | null>(null);
+
+  /*
+   * Two ledgers, one screen.
+   *
+   * This page only ever queried the inspections table, so it could only ever
+   * show springs — reported twice as "history and logs just talks about the
+   * springs". Everything else the workshop does was being recorded faithfully
+   * and shown to nobody. Springs stay the default view because that is what
+   * an inspector opens this for; the whole record is one tap away for anyone
+   * whose role is allowed to read it.
+   */
+  const viewerRole = api.getUser()?.role || '';
+  const mayReadLedger = can(viewerRole, 'audit.read');
+  const [view, setView] = useState<'SPRINGS' | 'ACTIVITY'>('SPRINGS');
 
   const loadRecords = async () => {
     setIsLoading(true);
@@ -85,6 +101,29 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
           </p>
         </div>
 
+        {mayReadLedger && (
+          <div className="flex rounded-xl border border-slate-700 overflow-hidden self-start" data-testid="history-view-switch">
+            <button
+              onClick={() => setView('SPRINGS')}
+              className={`min-h-[44px] px-4 text-xs font-bold transition-colors ${
+                view === 'SPRINGS' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+              data-testid="view-springs"
+            >
+              Spring inspections
+            </button>
+            <button
+              onClick={() => setView('ACTIVITY')}
+              className={`min-h-[44px] px-4 text-xs font-bold transition-colors ${
+                view === 'ACTIVITY' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+              data-testid="view-activity"
+            >
+              Everything else
+            </button>
+          </div>
+        )}
+
         <button
           onClick={loadRecords}
           disabled={isLoading}
@@ -95,6 +134,8 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
         </button>
       </div>
 
+      {view === 'ACTIVITY' ? <ActivityLog /> : (
+      <>
       {/* Multi-Criteria Filters (Glove-Friendly Touch Inputs) */}
       <form onSubmit={handleSearchSubmit} className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -320,6 +361,8 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
             </div>
           </div>
         </div>
+      )}
+      </>
       )}
     </div>
   );

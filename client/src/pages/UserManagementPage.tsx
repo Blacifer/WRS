@@ -35,10 +35,18 @@ function suggestUsername(fullName: string): string {
     .join('.');
 }
 
+/*
+ * ADMIN and DRM are two different people doing two different jobs — the
+ * administrator runs the system and signs nothing; the DRM reads the division
+ * and touches no shop floor. One label reading "Admin / DRM Officer" over both
+ * was left over from when they were the same row in the table. Reported as
+ * "admin1 and drm1 shows the same thing visually".
+ */
 const ROLE_LABELS: Record<string, string> = {
   INSPECTOR: 'Inspector',
   SUPERVISOR: 'Supervisor',
-  ADMIN: 'Admin / DRM Officer'
+  ADMIN: 'Administrator',
+  DRM: 'DRM — Divisional Officer'
 };
 
 interface UserManagementPageProps {
@@ -337,7 +345,10 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
               >
                 <option value="INSPECTOR">{isHi ? 'निरीक्षक' : 'Inspector'}</option>
                 <option value="SUPERVISOR">{isHi ? 'पर्यवेक्षक' : 'Supervisor'}</option>
-                <option value="ADMIN">Admin / DRM Officer</option>
+                <option value="ADMIN">{isHi ? 'प्रशासक' : 'Administrator'}</option>
+                {/* DRM was missing entirely, so a divisional officer's account
+                    could not be created from this screen at all. */}
+                <option value="DRM">{isHi ? 'मंडल रेल प्रबंधक' : 'DRM — Divisional Officer'}</option>
               </select>
             </div>
             <div>

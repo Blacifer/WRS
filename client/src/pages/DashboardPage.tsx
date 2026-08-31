@@ -609,6 +609,96 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/*
+        * Who did what, on the officer's own screen.
+        *
+        * Asked for directly: everything logged with the date and, where the
+        * deployment can tell honestly, the address — from inspector through
+        * supervisor — readable from the DRM's and the administrator's
+        * dashboards. The full ledger with its filters lives under History &
+        * Logs; this is the last twenty-five actions without leaving the page.
+        */}
+      <RecentActivityPanel />
     </div>
   );
+};
+
+/**
+ * The most recent actions, compact.
+ *
+ * Deliberately not a second implementation of the ledger — it renders the
+ * same ActivityLog rows the History screen does, capped, with a line pointing
+ * at the full view for anything more than a glance.
+ */
+const RecentActivityPanel: React.FC = () => {
+  const [entries, setEntries] = React.useState<any[]>([]);
+  const [total, setTotal] = React.useState(0);
+  const [failed, setFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    let live = true;
+    api.getActivityLog({ limit: 25 })
+      .then(res => { if (live) { setEntries(res.data.entries); setTotal(res.data.total); } })
+      .catch(() => { if (live) setFailed(true); });
+    return () => { live = false; };
+  }, []);
+
+  if (failed) return null;
+
+  return (
+    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5" data-testid="dashboard-activity">
+      <div className="flex items-baseline justify-between mb-1">
+        <h3 className="text-sm font-black text-white">Who did what</h3>
+        <span className="text-[11px] text-slate-500 tabular-nums">
+          {total} actions recorded in all
+        </span>
+      </div>
+      <p className="text-[11px] text-slate-500 mb-4">
+        The last 25 actions across the workshop. Open History &amp; Logs to search the whole record.
+      </p>
+
+      <div className="divide-y divide-slate-800">
+        {entries.length === 0 && (
+          <p className="text-xs text-slate-500 py-3">Nothing recorded yet.</p>
+        )}
+        {entries.map(e => (
+          <div key={e.id} className="py-2.5 flex flex-col sm:flex-row sm:items-baseline gap-x-3 gap-y-0.5">
+            <span className="text-xs font-bold text-slate-200 min-w-[10rem]">
+              {ACTIVITY_LABEL[e.eventType] || e.eventType}
+            </span>
+            <span className="text-xs text-slate-400 flex-1 truncate">
+              {e.detail?.wagonNumber || e.detail?.partName || e.detail?.username || ''}
+            </span>
+            <span className="text-[11px] text-slate-500 whitespace-nowrap">
+              {e.actorName}
+            </span>
+            <span className="text-[11px] text-slate-600 tabular-nums whitespace-nowrap">
+              {new Date(e.occurredAt).toLocaleString('en-IN', {
+                day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true
+              })}
+              {e.ipAddress ? ` · ${e.ipAddress}` : ''}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/* Kept short here on purpose — the full wording lives in ActivityLog. */
+const ACTIVITY_LABEL: Record<string, string> = {
+  AUTH_LOGIN: 'Signed in',
+  INSPECTION_CREATED: 'Spring measured',
+  WAGON_REGISTERED: 'Wagon registered',
+  WAGON_STAGE_TRANSITION: 'Wagon moved stage',
+  CHECKLIST_ITEM_INSPECTED: 'Checklist item',
+  CHECKLIST_ITEM_UPDATED: 'Checklist changed',
+  GATE_SIGNOFF_COMPLETED: 'Released at gate',
+  SUPERVISOR_OVERRIDE_RECORDED: 'Supervisor override',
+  CERTIFICATE_GENERATED: 'Certificate issued',
+  BATCH_EXPORTED: 'Records exported',
+  PHOTO_UPLOADED: 'Photograph taken',
+  OTP_VERIFIED: 'One-time code accepted',
+  SECURITY_ALERT: 'Security alert'
 };

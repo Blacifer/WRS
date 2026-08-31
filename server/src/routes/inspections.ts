@@ -17,6 +17,7 @@ import type {
   InspectionFilter,
   BandColor
 } from '../../../shared/types.ts';
+import { logAuditEvent } from '../db/auditLog.ts';
 
 export const inspectionsRouter = Router();
 
@@ -314,6 +315,25 @@ inspectionsRouter.get('/export', optionalAuthMiddleware, (req: AuthenticatedRequ
     const db = getDatabase();
     const repo = new InspectionRepository(db);
     const { records } = repo.queryInspections({ startDate, endDate, wagonNumber, limit: 10000 });
+
+    /*
+     * An export leaves the building — it is exactly the event an audit log
+     * exists to record, and BATCH_EXPORTED had never been written once. Now
+     * whoever pulled the data, when, how much, and from where is in the
+     * ledger alongside everything else.
+     */
+    logAuditEvent(db, {
+      eventType: 'BATCH_EXPORTED',
+      userId: req.user?.id || 'usr_system',
+      userRole: req.user?.role || 'SYSTEM',
+      payload: {
+        format,
+        recordCount: records.length,
+        startDate: startDate || null,
+        endDate: endDate || null,
+        wagonNumber: wagonNumber || null
+      }
+    });
 
     if (format === 'json') {
       res.setHeader('Content-Type', 'application/json');

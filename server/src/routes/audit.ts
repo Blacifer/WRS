@@ -20,7 +20,7 @@ import {
 } from '../reports/certificateSigning.ts';
 import { authMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
-import { requireRole } from '../middleware/rbac.ts';
+import { requireRole, requireCapability } from '../middleware/rbac.ts';
 
 export const auditRouter = Router();
 
@@ -64,6 +64,129 @@ auditRouter.get(
     }
   }
 );
+
+// ---------------------------------------------------------------------------
+// GET /api/audit/activity
+//
+// The ledger, readable.
+//
+// Everything this system does has been written to inspection_audit_log since
+// the beginning — wagon registrations, stage moves, every checklist item
+// touched, gate sign-offs, logins, overrides, exports. None of it was ever
+// readable from inside the app. "History & Logs" queried the inspections
+// table alone, so it could only ever show springs, which is precisely what
+// was reported: "history and logs just talks about the springs."
+//
+// Requires audit.read — supervisors, administrators and the DRM. An inspector
+// cannot read the record of who did what, which is the same boundary the
+// chain-verification endpoint above draws and for the same reason.
+// ---------------------------------------------------------------------------
+auditRouter.get(
+  '/activity',
+  authMiddleware,
+  requireCapability('audit.read'),
+  (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const db = getDatabase();
+      const q = req.query || {};
+
+      // Bounded so that a wide date range cannot pull the whole ledger into
+      // one response on a shop-floor tablet.
+      const limit = Math.min(Math.max(parseInt(String(q.limit || '100'), 10) || 100, 1), 500);
+      const offset = Math.max(parseInt(String(q.offset || '0'), 10) || 0, 0);
+
+      const where: string[] = [];
+      const params: any[] = [];
+
+      if (q.eventType) {
+        where.push('a.event_type = ?');
+        params.push(String(q.eventType));
+      }
+      if (q.actor) {
+        where.push('a.user_id = ?');
+        params.push(String(q.actor));
+      }
+      if (q.role) {
+        where.push('a.user_role = ?');
+        params.push(String(q.role).toUpperCase());
+      }
+      if (q.since) {
+        where.push('a.created_at >= ?');
+        params.push(String(q.since));
+      }
+      if (q.until) {
+        where.push('a.created_at <= ?');
+        params.push(String(q.until));
+      }
+      if (q.search) {
+        // Across the payload, so searching a wagon number finds every event
+        // that touched it regardless of which field the writer put it in.
+        where.push('(a.payload_json LIKE ? OR a.user_id LIKE ?)');
+        const like = `%${String(q.search)}%`;
+        params.push(like, like);
+      }
+
+      const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+      const rows = db.prepare(`
+        SELECT
+          a.id, a.inspection_id, a.event_type, a.user_id, a.user_role,
+          a.ip_address, a.payload_json, a.created_at,
+          u.full_name AS actor_name, u.employee_id AS actor_employee_id
+        FROM inspection_audit_log a
+        LEFT JOIN users u ON u.id = a.user_id
+        ${whereSql}
+        ORDER BY a.created_at DESC, a.rowid DESC
+        LIMIT ? OFFSET ?
+      `).all(...params, limit, offset) as any[];
+
+      const totalRow = db.prepare(`
+        SELECT COUNT(*) AS n FROM inspection_audit_log a ${whereSql}
+      `).get(...params) as { n: number };
+
+      res.status(200).json({
+        success: true,
+        data: {
+          entries: rows.map(r => ({
+            id: r.id,
+            eventType: r.event_type,
+            inspectionId: r.inspection_id,
+            actorId: r.user_id,
+            actorName: r.actor_name || r.user_id,
+            actorEmployeeId: r.actor_employee_id || null,
+            actorRole: r.user_role,
+            // Null where the deployment genuinely could not determine one.
+            // Shown as "not recorded" rather than filled in with a guess.
+            ipAddress: r.ip_address || null,
+            occurredAt: r.created_at,
+            detail: safeParse(r.payload_json)
+          })),
+          total: totalRow?.n ?? 0,
+          limit,
+          offset
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error: any) {
+      res.status(500).json({
+        success: false,
+        error: 'AUDIT_ACTIVITY_FAILED',
+        message: error?.message || 'Activity log could not be read',
+        statusCode: 500,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+);
+
+function safeParse(json: string): any {
+  try {
+    return JSON.parse(json || '{}');
+  } catch {
+    // A payload that will not parse is itself worth seeing, not swallowed.
+    return { unparsed: json };
+  }
+}
 
 // ---------------------------------------------------------------------------
 // GET /api/audit/certificate-key

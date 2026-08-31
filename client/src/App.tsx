@@ -30,6 +30,27 @@ import { AuditVerificationPage } from './pages/AuditVerificationPage.tsx';
 
 export { isUserInspector, isUserSupervisorOrAdmin, canAccessTab };
 
+/**
+ * The screen a role opens on.
+ *
+ * This decision was written out separately in four places — the initial state,
+ * the route guard, the login handler and the forbidden-tab fallback — and they
+ * did not agree. Fixing only the first one meant the DRM still landed on the
+ * wagons pipeline after signing in, because signing in went through a
+ * different branch. One function now, so there is one answer.
+ *
+ * An inspector starts at their own home screen; a supervisor starts at the
+ * pipeline, which is their work; an administrator and the DRM start at the
+ * divisional dashboard rather than having to go and find the screen named
+ * after them.
+ */
+export function landingTabFor(role: string | undefined | null): NavigationTab {
+  if (isUserInspector(role)) return 'inspector_home';
+  const r = String(role || '').trim().toUpperCase();
+  if (r === 'DRM' || r === 'ADMIN') return 'dashboard';
+  return 'wagons';
+}
+
 export const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(() => api.getUser());
   const [currentLang, setCurrentLang] = useState<LanguageCode>(() => {
@@ -61,10 +82,7 @@ export const App: React.FC = () => {
         return saved as NavigationTab;
       }
     } catch { /* private windows and blocked storage fall through */ }
-    if (initialUser && isUserInspector(initialUser.role)) {
-      return 'inspector_home';
-    }
-    return 'wagons';
+    return landingTabFor(initialUser?.role);
   });
 
   const [selectedWagonNumber, setSelectedWagonNumber] = useState<string | null>(() => {
@@ -91,7 +109,7 @@ export const App: React.FC = () => {
   // Route Guard: enforce strict role-based tab access
   useEffect(() => {
     if (user && !canAccessTab(user.role, activeTab, !!selectedWagonNumber)) {
-      setActiveTab(isInspector ? 'inspector_home' : 'wagons');
+      setActiveTab(landingTabFor(user.role));
     }
   }, [user, activeTab, selectedWagonNumber, isInspector]);
 
@@ -105,11 +123,7 @@ export const App: React.FC = () => {
 
   const handleLoginSuccess = (loggedInUser: User) => {
     setUser(loggedInUser);
-    if (isUserInspector(loggedInUser.role)) {
-      setActiveTab('inspector_home');
-    } else {
-      setActiveTab('wagons');
-    }
+    setActiveTab(landingTabFor(loggedInUser.role));
   };
 
   const handleLogout = () => {
@@ -129,7 +143,7 @@ export const App: React.FC = () => {
     }
 
     if (!canAccessTab(user?.role, tab, false)) {
-      setActiveTab(isInspector ? 'inspector_home' : 'wagons');
+      setActiveTab(landingTabFor(user?.role));
       return;
     }
 
