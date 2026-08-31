@@ -229,7 +229,26 @@ export class SortingRepository {
       voided: replacement === null
     } as SortingRecordInput);
 
-    return { correctedId: last.id, newId: replacement ? newId : null };
+    /*
+     * What was taken back, not just that something was.
+     *
+     * The caller is a person who has just tapped undo and needs to see the
+     * band they withdrew to know the right one came off — asked for as "it
+     * will be a good thing that it shows as to what it has undone". Read from
+     * the row that was superseded, so it describes the spring that actually
+     * left the count rather than what the screen happened to be showing.
+     */
+    return {
+      correctedId: last.id,
+      newId: replacement ? newId : null,
+      withdrew: {
+        band: base.classified_band ?? null,
+        bandRoman: base.band_roman ?? null,
+        measuredHeight: base.measured_height ?? null,
+        springPosition: base.spring_position ?? null,
+        status: base.status ?? null
+      }
+    };
   }
 
   /**

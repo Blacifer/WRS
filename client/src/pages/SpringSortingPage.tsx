@@ -451,14 +451,34 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         setError(res.data.message || (isHi ? 'पूर्ववत करने के लिए कुछ नहीं है' : 'Nothing to undo yet.'));
       } else {
         const left = (res.data.summary?.total ?? Math.max(0, totals.total - 1));
+
+        /*
+         * Name the spring that came off, not just the new total.
+         *
+         * The count alone left the question "did it take the right one back?"
+         * unanswered, which is the whole reason somebody taps undo. Asked for
+         * as "it will be a good thing that it shows as to what it has undone".
+         * Falls back to the plain count if an older server does not send it.
+         */
+        const w = (res.data as any).withdrew;
+        /*
+         * The colour is what the inspector actually tapped, so it leads. The
+         * roman numeral is stored already prefixed ("Band II"), so it is used
+         * as it stands rather than prefixed again.
+         */
+        const describe = w
+          ? [w.band, w.bandRoman, w.measuredHeight ? `${w.measuredHeight} mm` : null]
+              .filter(Boolean).join(' · ')
+          : null;
+
         setUndoNotice(
           left === 0
             ? (isHi
-                ? 'आखिरी स्प्रिंग वापस ले ली — इस सत्र में अब कुछ नहीं बचा।'
-                : 'Took back the last spring — nothing left in this session.')
+                ? `वापस ली${describe ? ` — ${describe}` : ''}। इस सत्र में अब कुछ नहीं बचा।`
+                : `Took back${describe ? ` ${describe}` : ' the last spring'} — nothing left in this session.`)
             : (isHi
-                ? `एक स्प्रिंग वापस ले ली। अब ${left} बची हैं।`
-                : `Took one spring back. ${left} left in this session.`)
+                ? `वापस ली${describe ? ` — ${describe}` : ''}। अब ${left} बची हैं।`
+                : `Took back${describe ? ` ${describe}` : ' one spring'}. ${left} left in this session.`)
         );
       }
       await refresh();

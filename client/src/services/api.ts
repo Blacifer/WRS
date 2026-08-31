@@ -919,7 +919,20 @@ export class ApiClient {
    */
   public async undoLastSortedSpring(batchId: string): Promise<{
     success: boolean;
-    data: { corrected: boolean; message?: string; correctedId?: string; summary?: any };
+    data: {
+      corrected: boolean;
+      message?: string;
+      correctedId?: string;
+      summary?: any;
+      /** The spring that was taken out of the count, so the screen can name it. */
+      withdrew?: {
+        band: string | null;
+        bandRoman: string | null;
+        measuredHeight: number | null;
+        springPosition: string | null;
+        status: string | null;
+      };
+    };
   }> {
     return this.request(`/sorting/batches/${encodeURIComponent(batchId)}/undo`, { method: 'POST' });
   }
