@@ -630,6 +630,33 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
                   : t('acoustic.statusNominal')}
               </h4>
               <p className="text-xs text-slate-300 mt-0.5">{details}</p>
+
+              {/*
+                * Say on the verdict itself that a rehearsal is a rehearsal.
+                *
+                * A simulated signal has never been loggable as a real defect —
+                * that guard is real — but it only spoke up at the moment
+                * someone tried to log one. Until then the screen showed a
+                * confident verdict, a frequency and a percentage with nothing
+                * to distinguish it from a measurement, and the question came
+                * back exactly as you would expect: "is that real information
+                * or is it totally fake?" It should not take an attempted
+                * write to find out.
+                *
+                * The number beside it is not measured either: a simulation
+                * reports the frequency it was told to play, not one found in
+                * the signal.
+                */}
+              {signalSource === 'SYNTHETIC' && (
+                <p
+                  className="text-[11px] text-amber-300/90 mt-1.5 font-semibold"
+                  data-testid="synthetic-warning"
+                >
+                  {isHi
+                    ? 'यह एक अभ्यास संकेत है, इस वैगन की रिकॉर्डिंग नहीं। दिखाई गई आवृत्ति वही है जो बजाई गई — मापी नहीं गई।'
+                    : 'This is a rehearsal signal, not a recording of this wagon. The frequency shown is the one being played, not one measured from it.'}
+                </p>
+              )}
             </div>
           </div>
 

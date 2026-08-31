@@ -6,6 +6,7 @@
 import { Router } from '../framework/index.ts';
 import type { Request, Response } from '../framework/index.ts';
 import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.ts';
+import { requireCapability } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
 
@@ -16,11 +17,33 @@ function getRepo() {
   return new WagonRepository(db);
 }
 
+/*
+ * These endpoints were all optionalAuthMiddleware, which accepts a token if
+ * one is offered and proceeds happily when none is. On a workshop LAN that
+ * looked harmless. It means anyone who can reach the server — with no account
+ * at all — could read /analytics/inspectors and get back named railway
+ * employees with their inspection counts and how many parts each had
+ * condemned. That is personnel data about identifiable people, and the moment
+ * this is served over a tunnel or hosted anywhere it is simply public.
+ *
+ * Two different gates, because these are two different kinds of information:
+ *
+ *   /pipeline    how many wagons sit at each stage. The supervisor's own
+ *                wagon list draws its stage counts from this, so it is gated
+ *                on wagon.view — the same capability that lets someone open
+ *                the pipeline screen and count the rows by hand.
+ *
+ *   everything   turnaround times, throughput, parts, per-inspector figures,
+ *   else         blockers and the export. Divisional reading, gated on
+ *                analytics.read, which is deliberately held by the DRM and an
+ *                administrator and not by a supervisor.
+ */
+
 // -------------------------------------------------------------------------
 // 1. 7-Stage Workshop Pipeline Metrics
 // -------------------------------------------------------------------------
 
-analyticsRouter.get('/pipeline', optionalAuthMiddleware, async (req: Request, res: Response) => {
+analyticsRouter.get('/pipeline', authMiddleware, requireCapability('wagon.view'), async (req: Request, res: Response) => {
   const repo = getRepo();
   const pipeline = repo.getAnalyticsPipeline();
 
@@ -35,7 +58,7 @@ analyticsRouter.get('/pipeline', optionalAuthMiddleware, async (req: Request, re
 // 2. Turnaround Time (TAT) Statistical Distributions & Trends
 // -------------------------------------------------------------------------
 
-analyticsRouter.get('/tat', optionalAuthMiddleware, async (req: Request, res: Response) => {
+analyticsRouter.get('/tat', authMiddleware, requireCapability('analytics.read'), async (req: Request, res: Response) => {
   const repo = getRepo();
   const tat = repo.getAnalyticsTAT();
 
@@ -50,7 +73,7 @@ analyticsRouter.get('/tat', optionalAuthMiddleware, async (req: Request, res: Re
 // 3. Workshop Throughput Analytics (Daily/Weekly/Monthly)
 // -------------------------------------------------------------------------
 
-analyticsRouter.get('/throughput', optionalAuthMiddleware, async (req: Request, res: Response) => {
+analyticsRouter.get('/throughput', authMiddleware, requireCapability('analytics.read'), async (req: Request, res: Response) => {
   const repo = getRepo();
   const throughput = repo.getAnalyticsThroughput();
 
@@ -65,7 +88,7 @@ analyticsRouter.get('/throughput', optionalAuthMiddleware, async (req: Request, 
 // 4. CASNUB Bogie Parts Health & Condemnation Statistics
 // -------------------------------------------------------------------------
 
-analyticsRouter.get('/parts', optionalAuthMiddleware, async (req: Request, res: Response) => {
+analyticsRouter.get('/parts', authMiddleware, requireCapability('analytics.read'), async (req: Request, res: Response) => {
   const repo = getRepo();
   const parts = repo.getAnalyticsParts();
 
@@ -80,7 +103,7 @@ analyticsRouter.get('/parts', optionalAuthMiddleware, async (req: Request, res: 
 // 5. Inspector Productivity & Quality Metrics
 // -------------------------------------------------------------------------
 
-analyticsRouter.get('/inspectors', optionalAuthMiddleware, async (req: Request, res: Response) => {
+analyticsRouter.get('/inspectors', authMiddleware, requireCapability('analytics.read'), async (req: Request, res: Response) => {
   const repo = getRepo();
   const inspectors = repo.getAnalyticsInspectors();
 
@@ -95,7 +118,7 @@ analyticsRouter.get('/inspectors', optionalAuthMiddleware, async (req: Request, 
 // 6. Active QC Blockers Diagnostics
 // -------------------------------------------------------------------------
 
-analyticsRouter.get('/blockers', optionalAuthMiddleware, async (req: Request, res: Response) => {
+analyticsRouter.get('/blockers', authMiddleware, requireCapability('analytics.read'), async (req: Request, res: Response) => {
   const repo = getRepo();
   const blockers = repo.getAnalyticsBlockers();
 
@@ -110,7 +133,7 @@ analyticsRouter.get('/blockers', optionalAuthMiddleware, async (req: Request, re
 // 7. Audit Data Export (CSV & Executive PDF/HTML Report)
 // -------------------------------------------------------------------------
 
-analyticsRouter.get('/export', optionalAuthMiddleware, async (req: Request, res: Response) => {
+analyticsRouter.get('/export', authMiddleware, requireCapability('analytics.read'), async (req: Request, res: Response) => {
   const repo = getRepo();
   const format = (req.query?.format || 'csv').toLowerCase();
 

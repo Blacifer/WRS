@@ -13,6 +13,14 @@ describe('Phase 2 R4, R5, R6: DRM Analytics, Photo Evidence & Batch Sync', () =>
   let app: ExpressApp;
   let inspectorToken: string;
   let supervisorToken: string;
+  /*
+   * The analytics cases below used to read the divisional figures with an
+   * inspector's token, which passed because every analytics endpoint was
+   * mounted on optionalAuthMiddleware and checked nothing. That was the bug,
+   * not the intent: one inspector could read every other inspector's
+   * condemn counts. They now use the account each endpoint is actually for.
+   */
+  let drmToken: string;
 
   before(() => {
     app = createApp(':memory:');
@@ -30,13 +38,20 @@ describe('Phase 2 R4, R5, R6: DRM Analytics, Photo Evidence & Batch Sync', () =>
       name: 'S. K. Verma',
       employeeId: 'WRS-SUP-2019'
     });
+    drmToken = generateToken({
+      id: 'usr_drm_001',
+      username: 'drm1',
+      role: 'DRM',
+      name: 'DRM (Divisional Railway Manager)',
+      employeeId: 'SECR-DRM-0001'
+    });
   });
 
   test('TC-ANL-01: GET /api/analytics/pipeline returns 7-stage distribution', async () => {
     const res = await app.dispatch({
       method: 'GET',
       url: '/api/analytics/pipeline',
-      headers: { authorization: `Bearer ${inspectorToken}` }
+      headers: { authorization: `Bearer ${supervisorToken}` }
     });
 
     assert.equal(res.status, 200);
@@ -53,7 +68,7 @@ describe('Phase 2 R4, R5, R6: DRM Analytics, Photo Evidence & Batch Sync', () =>
     const res = await app.dispatch({
       method: 'GET',
       url: '/api/analytics/tat',
-      headers: { authorization: `Bearer ${inspectorToken}` }
+      headers: { authorization: `Bearer ${drmToken}` }
     });
 
     assert.equal(res.status, 200);
@@ -67,7 +82,7 @@ describe('Phase 2 R4, R5, R6: DRM Analytics, Photo Evidence & Batch Sync', () =>
     const res = await app.dispatch({
       method: 'GET',
       url: '/api/analytics/throughput',
-      headers: { authorization: `Bearer ${inspectorToken}` }
+      headers: { authorization: `Bearer ${drmToken}` }
     });
 
     assert.equal(res.status, 200);
@@ -79,7 +94,7 @@ describe('Phase 2 R4, R5, R6: DRM Analytics, Photo Evidence & Batch Sync', () =>
     const res = await app.dispatch({
       method: 'GET',
       url: '/api/analytics/parts',
-      headers: { authorization: `Bearer ${inspectorToken}` }
+      headers: { authorization: `Bearer ${drmToken}` }
     });
 
     assert.equal(res.status, 200);
@@ -94,7 +109,7 @@ describe('Phase 2 R4, R5, R6: DRM Analytics, Photo Evidence & Batch Sync', () =>
     const res = await app.dispatch({
       method: 'GET',
       url: '/api/analytics/inspectors',
-      headers: { authorization: `Bearer ${supervisorToken}` }
+      headers: { authorization: `Bearer ${drmToken}` }
     });
 
     assert.equal(res.status, 200);
@@ -106,7 +121,7 @@ describe('Phase 2 R4, R5, R6: DRM Analytics, Photo Evidence & Batch Sync', () =>
     const res = await app.dispatch({
       method: 'GET',
       url: '/api/analytics/blockers',
-      headers: { authorization: `Bearer ${inspectorToken}` }
+      headers: { authorization: `Bearer ${drmToken}` }
     });
 
     assert.equal(res.status, 200);
@@ -118,7 +133,7 @@ describe('Phase 2 R4, R5, R6: DRM Analytics, Photo Evidence & Batch Sync', () =>
     const res = await app.dispatch({
       method: 'GET',
       url: '/api/analytics/export?format=csv',
-      headers: { authorization: `Bearer ${supervisorToken}` }
+      headers: { authorization: `Bearer ${drmToken}` }
     });
 
     assert.equal(res.status, 200);
