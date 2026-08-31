@@ -37,13 +37,20 @@ export const en = {
     sync: 'Sync Data',
     shiftTarget: 'Shift Target: 1,800 - 2,000'
   },
+  /*
+   * One label per role, and the DRM has its own.
+   *
+   * ADMIN read "Admin / DRM Officer" — a label from before the two were
+   * separated — so an administrator's badge told them they were the
+   * divisional officer, and the only visible difference between the two
+   * accounts was two navigation entries. Reported as "admin1 and drm1 shows
+   * the same thing visually".
+   */
   roles: {
-    Inspector: 'Inspector',
-    Supervisor: 'Supervisor',
-    Admin: 'Admin / DRM Officer',
     INSPECTOR: 'Inspector',
     SUPERVISOR: 'Supervisor',
-    ADMIN: 'Admin / DRM Officer'
+    ADMIN: 'Administrator',
+    DRM: 'DRM — Divisional Officer'
   },
   bogieTypes: {
     CASNUB_22_NLB: 'CASNUB 22 NLB / NLB(M)',
@@ -109,7 +116,10 @@ export const en = {
     login: 'Log In',
     registerWagon: 'Register New Wagon',
     advanceStage: 'Advance Stage',
-    overrideStage: 'Supervisor Stage Override',
+    // Was "Supervisor Stage Override" — which does not say that this is how
+    // a wagon goes BACK a stage. A supervisor reported there was no way to
+    // return a wagon; there was, behind this word.
+    overrideStage: 'Move Stage (incl. back)',
     viewChecklist: 'CASNUB Checklist',
     viewGate: 'Zero-Defect Exit Gate',
     signoffRelease: 'Digital Sign-off & Release',

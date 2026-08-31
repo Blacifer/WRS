@@ -39,15 +39,50 @@ export const App: React.FC = () => {
     return 'en';
   });
 
+  /*
+   * Where you were, kept across a reload.
+   *
+   * A refresh dropped you on the home screen, so a supervisor halfway through
+   * a forty-item checklist had to find their wagon and their category again —
+   * and a refresh is exactly what somebody does when a screen looks stuck.
+   * Reported as "when refreshed it took me to the homepage and had to come
+   * back to the same page".
+   *
+   * sessionStorage rather than localStorage: it should survive a reload, not
+   * a shift. Coming back tomorrow to yesterday's wagon would be its own kind
+   * of wrong. The route guard still runs afterwards, so a restored tab a role
+   * may not open is bounced exactly as a freshly chosen one would be.
+   */
   const [activeTab, setActiveTab] = useState<NavigationTab>(() => {
     const initialUser = api.getUser();
+    try {
+      const saved = sessionStorage.getItem('wrs-active-tab');
+      if (saved && initialUser && canAccessTab(initialUser.role, saved as NavigationTab, true)) {
+        return saved as NavigationTab;
+      }
+    } catch { /* private windows and blocked storage fall through */ }
     if (initialUser && isUserInspector(initialUser.role)) {
       return 'inspector_home';
     }
     return 'wagons';
   });
 
-  const [selectedWagonNumber, setSelectedWagonNumber] = useState<string | null>(null);
+  const [selectedWagonNumber, setSelectedWagonNumber] = useState<string | null>(() => {
+    try {
+      return sessionStorage.getItem('wrs-active-wagon');
+    } catch {
+      return null;
+    }
+  });
+
+  // Remember both as they change, so the next reload lands where this one was.
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('wrs-active-tab', activeTab);
+      if (selectedWagonNumber) sessionStorage.setItem('wrs-active-wagon', selectedWagonNumber);
+      else sessionStorage.removeItem('wrs-active-wagon');
+    } catch { /* nothing here is worth an error on the shop floor */ }
+  }, [activeTab, selectedWagonNumber]);
   const [isAdminExportOpen, setIsAdminExportOpen] = useState<boolean>(false);
   const [isQRScannerModalOpen, setIsQRScannerModalOpen] = useState<boolean>(false);
 

@@ -34,12 +34,10 @@ export const hi = {
     shiftTarget: 'शिफ्ट लक्ष्य: 1,800 - 2,000'
   },
   roles: {
-    Inspector: 'निरीक्षक (इंस्पेक्टर)',
-    Supervisor: 'पर्यवेक्षक (सुपरवाइजर)',
-    Admin: 'प्रशासक / मंडल रेल प्रबंधक (DRM)',
     INSPECTOR: 'निरीक्षक (इंस्पेक्टर)',
     SUPERVISOR: 'पर्यवेक्षक (सुपरवाइजर)',
-    ADMIN: 'प्रशासक / मंडल रेल प्रबंधक (DRM)'
+    ADMIN: 'प्रशासक',
+    DRM: 'मंडल रेल प्रबंधक (DRM)'
   },
   bogieTypes: {
     CASNUB_22_NLB: 'कासनब 22 एनएलबी / एनएलबी(एम)',
@@ -105,7 +103,7 @@ export const hi = {
     login: 'लॉग इन करें',
     registerWagon: 'नया वैगन पंजीकृत करें',
     advanceStage: 'अगला चरण बढ़ाएं',
-    overrideStage: 'पर्यवेक्षक चरण ओवरराइड',
+    overrideStage: 'चरण बदलें (पीछे भी)',
     viewChecklist: 'कासनब चेकलिस्ट',
     viewGate: 'शून्य-दोष निकास द्वार',
     signoffRelease: 'डिजिटल हस्ताक्षर एवं विमुक्ति',

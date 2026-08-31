@@ -2147,6 +2147,14 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">{isHi ? 'लक्ष्य चरण' : 'Target Stage'}</label>
+                {/* Says so explicitly. Every stage is listed, earlier ones
+                    included, but nothing on this screen said a wagon could go
+                    back — so a supervisor concluded it could not. */}
+                <p className="text-[11px] text-slate-400 mb-2 leading-snug">
+                  {isHi
+                    ? 'कोई भी चरण चुना जा सकता है — पिछला भी, यदि वैगन को वापस भेजना हो। कारण के साथ यह स्थायी रूप से दर्ज होता है।'
+                    : 'Any stage, including an earlier one if the wagon has to go back. The move and your reason are recorded permanently against this wagon.'}
+                </p>
                 <select
                   value={overrideTargetStage}
                   onChange={(e) => setOverrideTargetStage(e.target.value as LifecycleStage)}

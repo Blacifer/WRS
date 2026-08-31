@@ -496,6 +496,20 @@ export function SpringSortingPage({ lang, onClose }: Props) {
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
+      {/*
+        ORDER ON THIS PAGE
+        ------------------
+        The work comes first. It used to be sixth: an inspector tapping seven
+        hundred times a shift scrolled past the settings, the running totals,
+        the pace readout, the undo button and a camera panel before reaching
+        the band buttons, which on a laptop sat at the bottom of the screen.
+        It was reported simply as confusing, and it was — the page was
+        arranged as a dashboard when it is a tool.
+
+        So: what you are sorting, then the bands, then undo directly beneath
+        where the mistake was made. Everything that is watched rather than
+        used — pace, photographs, stock, finishing — sits below that.
+      */}
       <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -644,175 +658,6 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         )}
       </div>
 
-      {/* Pace.
-          The shop gets through around 900 springs a day and has never had a
-          way to see how that is going while it happens. This is the one
-          number the DRM asked about, so it is worth showing — and worth
-          refusing to show when there is not yet enough to support it. The
-          rules for that live in shared/sorting/throughput.ts, tested, rather
-          than in this component. */}
-      {today && (() => {
-        const pace = readThroughput(today);
-        return (
-          <div className="rounded-2xl border border-slate-700 bg-slate-900 px-5 py-4">
-            {pace.canQuoteRate ? (
-              <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2">
-                <div>
-                  <span className="text-3xl font-extrabold text-white tabular-nums">
-                    {pace.springsPerHour!.toLocaleString()}
-                  </span>
-                  <span className="text-sm text-slate-400 ml-2">
-                    {isHi ? 'स्प्रिंग / घंटा' : 'springs per hour'}
-                  </span>
-                </div>
-
-                {pace.hoursForDailyPile !== undefined && (
-                  <div className="text-sm text-slate-300">
-                    {isHi
-                      ? `इस रफ़्तार से ${DAILY_PILE.toLocaleString()} स्प्रिंग में `
-                      : `At this rate, ${DAILY_PILE.toLocaleString()} springs takes `}
-                    <b className="text-white tabular-nums">{pace.hoursForDailyPile}</b>
-                    {isHi ? ' घंटे' : ' hours'}
-                  </div>
-                )}
-
-                <div className="text-xs text-slate-500">
-                  {isHi
-                    ? `${pace.activeMinutes} मिनट में ${today.total.toLocaleString()} स्प्रिंग`
-                    : `measured over ${pace.activeMinutes} min of sorting, ${today.total.toLocaleString()} springs`}
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-baseline gap-3">
-                <span className="text-sm text-slate-400">{pace.reason}</span>
-                {pace.activeMinutes > 0 && (
-                  <span className="text-xs text-slate-500">
-                    {isHi ? `${pace.activeMinutes} मिनट से` : `${pace.activeMinutes} min so far`}
-                  </span>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })()}
-
-      {/* Correcting the last tap. Placed with the work rather than in a menu:
-          it is needed in the second after a mistake, not later. */}
-      {undoNotice && (
-        <div
-          data-testid="undo-notice"
-          className="rounded-xl border border-sky-800/60 bg-sky-950/40 px-4 py-2.5 text-sm text-sky-200 flex items-center justify-between gap-3"
-        >
-          <span>↩ {undoNotice}</span>
-          <button
-            onClick={() => setUndoNotice(null)}
-            className="text-xs font-bold text-sky-400 hover:text-white px-2 min-h-[32px]"
-          >
-            {isHi ? 'ठीक है' : 'OK'}
-          </button>
-        </div>
-      )}
-
-      {sessionTotal > 0 && (
-        <div className="flex justify-end">
-          <button
-            data-testid="undo-last-spring"
-            onClick={undoLast}
-            disabled={busy}
-            className="min-h-[44px] px-4 rounded-xl border border-slate-600 text-slate-300 hover:bg-slate-800 text-sm font-bold disabled:opacity-40"
-          >
-            ↩ {isHi ? 'पिछला हटाएँ' : 'Undo last spring'}
-          </button>
-        </div>
-      )}
-
-      {/*
-        Photographing the pile.
-
-        Off by default and one tap to turn on for the whole session, not per
-        spring. At ~700 a shift, a feature costing one tap each costs 700 and
-        gets switched off by lunchtime.
-      */}
-      <div className="rounded-2xl border border-slate-700 bg-slate-900 p-4 space-y-3">
-        <label className="flex items-start gap-3 cursor-pointer">
-          <input
-            type="checkbox"
-            data-testid="toggle-spring-photos"
-            checked={capturePhotos}
-            onChange={(e) => setCapturePhotos(e.target.checked)}
-            className="mt-0.5 w-5 h-5 accent-sky-500 shrink-0"
-          />
-          <span>
-            <span className="block text-sm font-bold text-white">
-              {isHi ? 'छँटाई के साथ फ़ोटो लें' : 'Photograph springs while sorting'}
-            </span>
-            <span className="block text-[11px] text-slate-400 mt-0.5 leading-snug">
-              {isHi
-                ? 'हर स्प्रिंग की फ़ोटो उसी बैंड के साथ सुरक्षित होगी जो आप दबाते हैं। कोई अतिरिक्त टैप नहीं। कैमरा बैंड तय नहीं करता — वह आप तय करते हैं।'
-                : 'Each photo is saved against the band you tap. No extra taps. The camera does not decide anything — you do.'}
-            </span>
-          </span>
-        </label>
-        <SpringEvidenceCamera
-          ref={cameraRef}
-          lang={lang}
-          active={capturePhotos}
-          onUnavailable={() => { /* sorting is unaffected; the component says so */ }}
-        />
-        {dataset && dataset.total > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p data-testid="evidence-count" className="text-[11px] text-slate-400">
-              {isHi
-                ? `अब तक ${dataset.total.toLocaleString()} लेबल-युक्त फ़ोटो, ${dataset.bands} समूहों में।`
-                : `${dataset.total.toLocaleString()} labelled photographs so far, across ${dataset.bands} ${dataset.bands === 1 ? 'group' : 'groups'}.`}
-            </p>
-            <button
-              data-testid="view-photographs"
-              onClick={() => (gallery ? setGallery(null) : openGallery())}
-              disabled={galleryBusy}
-              className="min-h-[36px] px-3 rounded-lg border border-slate-600 text-slate-300 text-xs font-bold hover:bg-slate-800 disabled:opacity-40"
-            >
-              {gallery
-                ? (isHi ? 'फ़ोटो छिपाएँ' : 'Hide photographs')
-                : (isHi ? 'फ़ोटो देखें' : 'View photographs')}
-            </button>
-          </div>
-        )}
-
-        {gallery && (
-          <div className="space-y-2">
-            {gallery.length === 0 ? (
-              <p className="text-[11px] text-slate-500">
-                {isHi ? 'अभी कोई फ़ोटो नहीं।' : 'No photographs yet.'}
-              </p>
-            ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {gallery.map((g) => (
-                  <figure key={g.id} className="rounded-lg overflow-hidden border border-slate-700 bg-slate-950">
-                    <img src={g.imageData} alt="" className="w-full h-24 object-cover" />
-                    <figcaption className="px-2 py-1.5 text-[10px] leading-tight">
-                      <span
-                        className={`font-black ${g.status === 'CONDEMNED' ? 'text-red-400' : 'text-emerald-400'}`}
-                      >
-                        {g.band || (g.status === 'CONDEMNED' ? (isHi ? 'कंडम' : 'Condemned') : (isHi ? 'ठीक' : 'Serviceable'))}
-                      </span>
-                      <span className="block text-slate-500">
-                        {g.springPosition}{g.measuredHeight ? ` · ${g.measuredHeight}mm` : ''}
-                      </span>
-                    </figcaption>
-                  </figure>
-                ))}
-              </div>
-            )}
-            <p className="text-[10px] text-slate-500">
-              {isHi
-                ? 'लेबल वही है जो निरीक्षक ने दबाया था — कैमरा कुछ तय नहीं करता।'
-                : 'The label under each photograph is what the inspector tapped. The camera decided none of it.'}
-            </p>
-          </div>
-        )}
-      </div>
-
       {/* The work itself: one tap per spring */}
       <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-3">
         <p className="text-sm font-bold text-white">
@@ -905,6 +750,175 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           <p className="text-xs font-semibold text-red-300 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">
             {error}
           </p>
+        )}
+      </div>
+
+      {/* Correcting the last tap. Placed with the work rather than in a menu:
+          it is needed in the second after a mistake, not later. */}
+      {undoNotice && (
+        <div
+          data-testid="undo-notice"
+          className="rounded-xl border border-sky-800/60 bg-sky-950/40 px-4 py-2.5 text-sm text-sky-200 flex items-center justify-between gap-3"
+        >
+          <span>↩ {undoNotice}</span>
+          <button
+            onClick={() => setUndoNotice(null)}
+            className="text-xs font-bold text-sky-400 hover:text-white px-2 min-h-[32px]"
+          >
+            {isHi ? 'ठीक है' : 'OK'}
+          </button>
+        </div>
+      )}
+
+      {sessionTotal > 0 && (
+        <div className="flex justify-end">
+          <button
+            data-testid="undo-last-spring"
+            onClick={undoLast}
+            disabled={busy}
+            className="min-h-[44px] px-4 rounded-xl border border-slate-600 text-slate-300 hover:bg-slate-800 text-sm font-bold disabled:opacity-40"
+          >
+            ↩ {isHi ? 'पिछला हटाएँ' : 'Undo last spring'}
+          </button>
+        </div>
+      )}
+
+      {/* Pace.
+          The shop gets through around 900 springs a day and has never had a
+          way to see how that is going while it happens. This is the one
+          number the DRM asked about, so it is worth showing — and worth
+          refusing to show when there is not yet enough to support it. The
+          rules for that live in shared/sorting/throughput.ts, tested, rather
+          than in this component. */}
+      {today && (() => {
+        const pace = readThroughput(today);
+        return (
+          <div className="rounded-2xl border border-slate-700 bg-slate-900 px-5 py-4">
+            {pace.canQuoteRate ? (
+              <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2">
+                <div>
+                  <span className="text-3xl font-extrabold text-white tabular-nums">
+                    {pace.springsPerHour!.toLocaleString()}
+                  </span>
+                  <span className="text-sm text-slate-400 ml-2">
+                    {isHi ? 'स्प्रिंग / घंटा' : 'springs per hour'}
+                  </span>
+                </div>
+
+                {pace.hoursForDailyPile !== undefined && (
+                  <div className="text-sm text-slate-300">
+                    {isHi
+                      ? `इस रफ़्तार से ${DAILY_PILE.toLocaleString()} स्प्रिंग में `
+                      : `At this rate, ${DAILY_PILE.toLocaleString()} springs takes `}
+                    <b className="text-white tabular-nums">{pace.hoursForDailyPile}</b>
+                    {isHi ? ' घंटे' : ' hours'}
+                  </div>
+                )}
+
+                <div className="text-xs text-slate-500">
+                  {isHi
+                    ? `${pace.activeMinutes} मिनट में ${today.total.toLocaleString()} स्प्रिंग`
+                    : `measured over ${pace.activeMinutes} min of sorting, ${today.total.toLocaleString()} springs`}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-baseline gap-3">
+                <span className="text-sm text-slate-400">{pace.reason}</span>
+                {pace.activeMinutes > 0 && (
+                  <span className="text-xs text-slate-500">
+                    {isHi ? `${pace.activeMinutes} मिनट से` : `${pace.activeMinutes} min so far`}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/*
+        Photographing the pile.
+
+        Off by default and one tap to turn on for the whole session, not per
+        spring. At ~700 a shift, a feature costing one tap each costs 700 and
+        gets switched off by lunchtime.
+      */}
+      <div className="rounded-2xl border border-slate-700 bg-slate-900 p-4 space-y-3">
+        <label className="flex items-start gap-3 cursor-pointer">
+          <input
+            type="checkbox"
+            data-testid="toggle-spring-photos"
+            checked={capturePhotos}
+            onChange={(e) => setCapturePhotos(e.target.checked)}
+            className="mt-0.5 w-5 h-5 accent-sky-500 shrink-0"
+          />
+          <span>
+            <span className="block text-sm font-bold text-white">
+              {isHi ? 'छँटाई के साथ फ़ोटो लें' : 'Photograph springs while sorting'}
+            </span>
+            <span className="block text-[11px] text-slate-400 mt-0.5 leading-snug">
+              {isHi
+                ? 'हर स्प्रिंग की फ़ोटो उसी बैंड के साथ सुरक्षित होगी जो आप दबाते हैं। कोई अतिरिक्त टैप नहीं। कैमरा बैंड तय नहीं करता — वह आप तय करते हैं।'
+                : 'Each photo is saved against the band you tap. No extra taps. The camera does not decide anything — you do.'}
+            </span>
+          </span>
+        </label>
+        <SpringEvidenceCamera
+          ref={cameraRef}
+          lang={lang}
+          active={capturePhotos}
+          onUnavailable={() => { /* sorting is unaffected; the component says so */ }}
+        />
+        {dataset && dataset.total > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p data-testid="evidence-count" className="text-[11px] text-slate-400">
+              {isHi
+                ? `अब तक ${dataset.total.toLocaleString()} लेबल-युक्त फ़ोटो, ${dataset.bands} समूहों में।`
+                : `${dataset.total.toLocaleString()} labelled photographs so far, across ${dataset.bands} ${dataset.bands === 1 ? 'group' : 'groups'}.`}
+            </p>
+            <button
+              data-testid="view-photographs"
+              onClick={() => (gallery ? setGallery(null) : openGallery())}
+              disabled={galleryBusy}
+              className="min-h-[36px] px-3 rounded-lg border border-slate-600 text-slate-300 text-xs font-bold hover:bg-slate-800 disabled:opacity-40"
+            >
+              {gallery
+                ? (isHi ? 'फ़ोटो छिपाएँ' : 'Hide photographs')
+                : (isHi ? 'फ़ोटो देखें' : 'View photographs')}
+            </button>
+          </div>
+        )}
+
+        {gallery && (
+          <div className="space-y-2">
+            {gallery.length === 0 ? (
+              <p className="text-[11px] text-slate-500">
+                {isHi ? 'अभी कोई फ़ोटो नहीं।' : 'No photographs yet.'}
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {gallery.map((g) => (
+                  <figure key={g.id} className="rounded-lg overflow-hidden border border-slate-700 bg-slate-950">
+                    <img src={g.imageData} alt="" className="w-full h-24 object-cover" />
+                    <figcaption className="px-2 py-1.5 text-[10px] leading-tight">
+                      <span
+                        className={`font-black ${g.status === 'CONDEMNED' ? 'text-red-400' : 'text-emerald-400'}`}
+                      >
+                        {g.band || (g.status === 'CONDEMNED' ? (isHi ? 'कंडम' : 'Condemned') : (isHi ? 'ठीक' : 'Serviceable'))}
+                      </span>
+                      <span className="block text-slate-500">
+                        {g.springPosition}{g.measuredHeight ? ` · ${g.measuredHeight}mm` : ''}
+                      </span>
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            )}
+            <p className="text-[10px] text-slate-500">
+              {isHi
+                ? 'लेबल वही है जो निरीक्षक ने दबाया था — कैमरा कुछ तय नहीं करता।'
+                : 'The label under each photograph is what the inspector tapped. The camera decided none of it.'}
+            </p>
+          </div>
         )}
       </div>
 
