@@ -18,6 +18,7 @@ import { ExitGateValidator } from '../gate/validator.ts';
 import { CertificateGenerator } from '../reports/certificate.ts';
 import { otpService } from '../auth/otpService.ts';
 import { TotpService } from '../auth/totpService.ts';
+import { verifySecondFactor } from '../auth/secondFactor.ts';
 import type { LifecycleStage } from '../../../shared/types.ts';
 
 export const wagonsRouter = Router();
@@ -475,6 +476,34 @@ wagonsRouter.post('/:wagonNumber/transition', authMiddleware, async (req: Reques
   const userName = req.user?.name || 'Inspector';
 
   // State Machine Validation
+  /*
+   * A supervisor override moves a wagon past the rules, so it is guarded by
+   * the same factor as releasing one. It was not: this route accepted the
+   * inline confirmation code even from a supervisor with an authenticator
+   * enrolled, because the TOTP-if-enrolled rule lived only in the signoff
+   * handler. Overriding a stage and certifying a wagon are the same order of
+   * consequence and should not have different doors.
+   */
+  if (supervisorOverride) {
+    const factor = verifySecondFactor(getDatabase(), {
+      userId: req.user?.id,
+      action: 'OVERRIDE',
+      totpCode: (req.body as any)?.totpCode,
+      otpToken: otpToken || otp,
+      describeAction: 'a supervisor stage override'
+    });
+    if (!factor.ok) {
+      res.status(factor.statusCode || 401).json({
+        success: false,
+        error: factor.error,
+        message: factor.message,
+        statusCode: factor.statusCode || 401,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+  }
+
   const validation = LifecycleEngine.validateTransition({
     currentStage,
     targetStage: targetStage as LifecycleStage,

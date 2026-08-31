@@ -10,6 +10,7 @@ import { InspectionRepository } from '../db/repository.ts';
 import { classifySpring } from '../../../shared/classification/engine.ts';
 import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
+import { verifySecondFactor } from '../auth/secondFactor.ts';
 import { otpService } from '../auth/otpService.ts';
 import type {
   InspectionCreateRequest,
@@ -262,22 +263,42 @@ inspectionsRouter.get('/export', optionalAuthMiddleware, (req: AuthenticatedRequ
         return;
       }
 
+      /*
+       * Two checks, in the right order.
+       *
+       * The bypass strings are gone: otpService.consumeActionToken already
+       * honours 'test_token_*' and 'valid_otp_token' for the suites and — the
+       * part that matters — only outside production. This route repeated
+       * those strings inline WITHOUT that guard, so the gate could be cleared
+       * on a live deployment by anyone who had read this file.
+       *
+       * And an admin with an authenticator enrolled must use it, by the same
+       * rule that governs releasing a wagon. verifySecondFactor raises that
+       * bar and never lowers it — for anyone not enrolled it defers, and the
+       * inline check below is what stands.
+       */
       if (otpToken) {
-        /*
-         * The bypass strings are gone from here.
-         *
-         * otpService.consumeActionToken already honours 'test_token_*' and
-         * 'valid_otp_token' for the automated suites, and — importantly —
-         * only outside production. This second check repeated those strings
-         * WITHOUT that guard, so the audit-export gate could be cleared on a
-         * live deployment by anyone who had read this file, which is public.
-         *
-         * Delegating to the service means the environment rule is written
-         * once and cannot be forgotten at a second site, which is exactly how
-         * this one survived the first hardening.
-         */
-        const isValidOtp = otpService.consumeActionToken(otpToken, 'EXPORT');
-        if (!isValidOtp) {
+        const factor = verifySecondFactor(getDatabase(), {
+          userId: req.user?.id,
+          action: 'EXPORT',
+          totpCode: (req.body as any)?.totpCode || (req.query as any)?.totpCode,
+          otpToken,
+          describeAction: 'exporting the audit trail'
+        });
+
+        if (!factor.ok) {
+          res.status(factor.statusCode || 401).json({
+            success: false,
+            error: factor.error,
+            message: factor.message,
+            statusCode: factor.statusCode || 401,
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
+        // Not enrolled: the inline confirmation code is what authorises this.
+        if (factor.deferredToCaller && !otpService.consumeActionToken(otpToken, 'EXPORT')) {
           res.status(403).json({
             success: false,
             error: 'FORBIDDEN',
