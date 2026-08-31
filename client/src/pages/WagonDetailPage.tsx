@@ -136,7 +136,12 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
   const [signoffSubmitting, setSignoffSubmitting] = useState<boolean>(false);
 
   const user = api.getUser();
-  const isSupervisor = user?.role === 'SUPERVISOR' || user?.role === 'ADMIN';
+  // Compared after normalising, like everywhere else. This line alone checked
+  // only the uppercase spellings while AnalyticsPage and InspectionPage
+  // checked both, so a user stored as "Supervisor" lost their supervisor
+  // controls on this page and kept them on the other two.
+  const normalisedRole = (user?.role || '').trim().toUpperCase();
+  const isSupervisor = normalisedRole === 'SUPERVISOR' || normalisedRole === 'ADMIN';
 
   const stageList: LifecycleStage[] = [
     'ENTRY_REGISTRATION',
