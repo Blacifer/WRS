@@ -57,7 +57,10 @@ describe('Applying the rule the bogie is published under', () => {
 
   it('holds the boundary for both non-banded bogies, every position', () => {
     for (const bogie of ['LWLH25', 'LCCF20'] as const) {
-      for (const position of ['OUTER', 'INNER', 'SNUBBER'] as const) {
+      const positions = bogie === 'LWLH25'
+        ? (['OUTER', 'INNER', 'SNUBBER_OUTER', 'SNUBBER_INNER'] as const)
+        : (['OUTER', 'INNER', 'SNUBBER'] as const);
+      for (const position of positions) {
         const at = judgeSortedSpring({ bogieType: bogie, condition: 'USED', position, measuredHeight: 999 });
         expect(at.status, `${bogie} ${position} well above`).toBe('PASS');
         const below = judgeSortedSpring({ bogieType: bogie, condition: 'USED', position, measuredHeight: 1 });
@@ -82,11 +85,18 @@ describe('Applying the rule the bogie is published under', () => {
     expect(v.band).toBeNull();
   });
 
-  it('carries the manual’s own unexplained notation rather than dropping it', () => {
-    const v = judgeSortedSpring({
-      bogieType: 'LWLH25', condition: 'USED', position: 'SNUBBER', measuredHeight: 270
+  it('routes each LWLH25 snubber to its own limit', () => {
+    // RDSO G-112 Table 27: Snubber Outer condemns below 266, Snubber Inner
+    // below 274. 270mm is the height that separates them.
+    const outer = judgeSortedSpring({
+      bogieType: 'LWLH25', condition: 'USED', position: 'SNUBBER_OUTER', measuredHeight: 270
     });
-    expect(v.note).toMatch(/SO/);
+    const inner = judgeSortedSpring({
+      bogieType: 'LWLH25', condition: 'USED', position: 'SNUBBER_INNER', measuredHeight: 270
+    });
+    expect(outer.status).toBe('PASS');
+    expect(inner.status).toBe('CONDEMNED');
+    expect(inner.condemnationReason).toMatch(/274/);
   });
 });
 

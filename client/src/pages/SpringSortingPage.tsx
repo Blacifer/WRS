@@ -75,6 +75,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
   const banded = isBandedBogie(bogieType);
   const [heightInput, setHeightInput] = useState('');
 
+
   /*
    * Photographing what is being sorted.
    *
@@ -96,6 +97,20 @@ export function SpringSortingPage({ lang, onClose }: Props) {
   const [dataset, setDataset] = useState<{ total: number; bands: number } | null>(null);
   const [condition, setCondition] = useState<SpringCondition>('USED');
   const [position, setPosition] = useState<SpringPosition>('OUTER');
+  /*
+   * Keep the chosen position possible for the chosen bogie.
+   *
+   * Only LWLH25 splits the snubber, so switching away from it with
+   * "Snubber — Inner" selected would leave a position no table covers, and
+   * the next tap would be refused with an error the inspector did not cause.
+   */
+  useEffect(() => {
+    if (bogieType === 'LWLH25' && position === 'SNUBBER') {
+      setPosition('SNUBBER_OUTER');
+    } else if (bogieType !== 'LWLH25' && (position === 'SNUBBER_OUTER' || position === 'SNUBBER_INNER')) {
+      setPosition('SNUBBER');
+    }
+  }, [bogieType, position]);
   const [forWagon, setForWagon] = useState<string>('BOXN');
 
   // The batch is created on the device, so a session survives a dropped
@@ -505,7 +520,22 @@ export function SpringSortingPage({ lang, onClose }: Props) {
             >
               <option value="OUTER">{isHi ? 'बाहरी' : 'Outer'}</option>
               <option value="INNER">{isHi ? 'भीतरी' : 'Inner'}</option>
-              <option value="SNUBBER">{isHi ? 'स्नबर' : 'Snubber'}</option>
+              {/*
+                LWLH25 carries two different snubbers — RDSO G-112 Table 26
+                gives its group as "4 (2SO & 2SI)" — and they condemn at
+                different heights, 266mm for the outer and 274mm for the
+                inner. Offering one undifferentiated "Snubber" here would mean
+                judging half of them against the wrong number, which is what
+                this app did until the pamphlet arrived.
+              */}
+              {bogieType === 'LWLH25' ? (
+                <>
+                  <option value="SNUBBER_OUTER">{isHi ? 'स्नबर — बाहरी (SO)' : 'Snubber — Outer (SO)'}</option>
+                  <option value="SNUBBER_INNER">{isHi ? 'स्नबर — भीतरी (SI)' : 'Snubber — Inner (SI)'}</option>
+                </>
+              ) : (
+                <option value="SNUBBER">{isHi ? 'स्नबर' : 'Snubber'}</option>
+              )}
             </select>
           </label>
         </div>

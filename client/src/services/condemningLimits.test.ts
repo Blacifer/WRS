@@ -18,6 +18,8 @@ import {
   isNonBandedBogie,
   CONDEMNING_LIMITS
 } from '../../../shared/classification/condemningLimits.ts';
+import { getWagonSpringConfig } from '../../../shared/classification/wagonTypes.ts';
+import { MAX_NEST_HEIGHT_VARIATION_MM } from '../../../shared/classification/nestGrouping.ts';
 
 describe('The boundary', () => {
   it('passes a spring exactly at the condemning height', () => {
@@ -33,8 +35,14 @@ describe('The boundary', () => {
   });
 
   it('holds the boundary for every position of every bogie', () => {
+    const positionsFor = (bogie: 'LWLH25' | 'LCCF20') =>
+      // LWLH25 splits its snubber; LCCF20 does not.
+      (bogie === 'LWLH25'
+        ? (['OUTER', 'INNER', 'SNUBBER_OUTER', 'SNUBBER_INNER'] as const)
+        : (['OUTER', 'INNER', 'SNUBBER'] as const));
+
     for (const bogie of ['LWLH25', 'LCCF20'] as const) {
-      for (const position of ['OUTER', 'INNER', 'SNUBBER'] as const) {
+      for (const position of positionsFor(bogie)) {
         const limit = CONDEMNING_LIMITS[bogie][position]!.condemning;
         expect(
           judgeAgainstCondemningLimit(bogie, position, limit).status,
@@ -58,7 +66,10 @@ describe('Never inventing a band', () => {
      * while being fabricated.
      */
     for (const bogie of ['LWLH25', 'LCCF20'] as const) {
-      for (const position of ['OUTER', 'INNER', 'SNUBBER'] as const) {
+      const positions = bogie === 'LWLH25'
+        ? (['OUTER', 'INNER', 'SNUBBER_OUTER', 'SNUBBER_INNER'] as const)
+        : (['OUTER', 'INNER', 'SNUBBER'] as const);
+      for (const position of positions) {
         expect(judgeAgainstCondemningLimit(bogie, position, 260).band).toBeNull();
       }
     }
@@ -76,11 +87,52 @@ describe('Never inventing a band', () => {
     expect(CONDEMNING_LIMITS.LWLH25.OUTER!.nominal).toBe('264±3');
   });
 
-  it('carries the unexplained notation rather than interpreting it', () => {
-    // The manual prints the LWLH25 snubber limit as "266(SO)" and does not
-    // say what (SO) means. Guessing would be worse than passing it along.
-    expect(CONDEMNING_LIMITS.LWLH25.SNUBBER!.note).toMatch(/SO/);
-    expect(judgeAgainstCondemningLimit('LWLH25', 'SNUBBER', 270).note).toBeDefined();
+  it('knows the LWLH25 snubber is two springs with two limits', () => {
+    /*
+     * WMM 2.0 §309C prints "266(SO)" and never says what (SO) means, so this
+     * file held one snubber limit of 266 and a note recording the mystery.
+     * RDSO Technical Pamphlet G-112 (page 89) resolves it: SO is Snubber
+     * Outer, SI is Snubber Inner, the LWLH25 group is "4 (2SO & 2SI)", and
+     * the two condemn at different heights.
+     *
+     * This is the assertion that matters: a Snubber Inner at 270mm is
+     * CONDEMNED. It was called serviceable, because it was being judged
+     * against the outer spring's limit.
+     */
+    expect(judgeAgainstCondemningLimit('LWLH25', 'SNUBBER_INNER', 270).status).toBe('CONDEMNED');
+    expect(judgeAgainstCondemningLimit('LWLH25', 'SNUBBER_OUTER', 270).status).toBe('PASS');
+
+    expect(CONDEMNING_LIMITS.LWLH25.SNUBBER_OUTER!.condemning).toBe(266);
+    expect(CONDEMNING_LIMITS.LWLH25.SNUBBER_INNER!.condemning).toBe(274);
+    expect(CONDEMNING_LIMITS.LWLH25.SNUBBER_OUTER!.nominal).toBe('281±3');
+    expect(CONDEMNING_LIMITS.LWLH25.SNUBBER_INNER!.nominal).toBe('289±3');
+  });
+
+  it('refuses to judge an unspecified LWLH25 snubber', () => {
+    // On this bogie the question is incomplete. Answering it would mean
+    // silently picking one of the two limits, which is how the eight
+    // millimetre window opened in the first place.
+    expect(() => judgeAgainstCondemningLimit('LWLH25', 'SNUBBER', 270)).toThrow();
+    // LCCF20 has one undifferentiated snubber, so there it is a fair question.
+    expect(judgeAgainstCondemningLimit('LCCF20', 'SNUBBER', 275).status).toBe('PASS');
+  });
+
+  it('condemns every height in the window that used to pass', () => {
+    /*
+     * The whole defect, stated as a range. Between the outer limit and the
+     * inner one, a Snubber Inner spring was serviceable according to this
+     * app and condemned according to RDSO.
+     */
+    for (let h = 266; h < 274; h++) {
+      expect(
+        judgeAgainstCondemningLimit('LWLH25', 'SNUBBER_INNER', h).status,
+        `Snubber Inner at ${h}mm`
+      ).toBe('CONDEMNED');
+      expect(
+        judgeAgainstCondemningLimit('LWLH25', 'SNUBBER_OUTER', h).status,
+        `Snubber Outer at ${h}mm`
+      ).toBe('PASS');
+    }
   });
 });
 
@@ -99,5 +151,44 @@ describe('Refusing what it cannot judge', () => {
     // CASNUB has real band tables and must never be routed here.
     expect(isNonBandedBogie('CASNUB_22_NLB')).toBe(false);
     expect(isNonBandedBogie('CASNUB_22_HS')).toBe(false);
+  });
+});
+
+/*
+ * RDSO Technical Pamphlet G-112, page 89, as a second source.
+ *
+ * The spring counts and the grouping rule in this app came from elsewhere.
+ * The pamphlet states them independently, so these pin our numbers to it —
+ * a second document agreeing is worth more than either one alone, and a
+ * silent drift away from both is worth catching.
+ */
+describe('Agreeing with RDSO G-112', () => {
+  it('matches Table 26 on how many springs a group carries', () => {
+    // Per GROUP in the pamphlet; the app stores per BOGIE, which is two groups.
+    const perGroup = (d: string) => {
+      const c = getWagonSpringConfig(d)!;
+      return { outer: c.counts.outer / 2, inner: c.counts.inner / 2, snubber: c.counts.snubber / 2 };
+    };
+
+    // LWLH25 at 25t: Outer 6, Inner 6, Snubber 4 (2SO & 2SI)
+    expect(perGroup('BOXNS')).toEqual({ outer: 6, inner: 6, snubber: 4 });
+    // LCCF20(C) at 20.3t: Outer 7, Inner 6, Snubber 2
+    expect(perGroup('BLCA')).toEqual({ outer: 7, inner: 6, snubber: 2 });
+  });
+
+  it('matches Table 27 on every condemning height', () => {
+    expect(CONDEMNING_LIMITS.LWLH25.OUTER!.condemning).toBe(249);
+    expect(CONDEMNING_LIMITS.LWLH25.INNER!.condemning).toBe(231);
+    expect(CONDEMNING_LIMITS.LWLH25.SNUBBER_OUTER!.condemning).toBe(266);
+    expect(CONDEMNING_LIMITS.LWLH25.SNUBBER_INNER!.condemning).toBe(274);
+    expect(CONDEMNING_LIMITS.LCCF20.OUTER!.condemning).toBe(245);
+    expect(CONDEMNING_LIMITS.LCCF20.INNER!.condemning).toBe(228);
+    expect(CONDEMNING_LIMITS.LCCF20.SNUBBER!.condemning).toBe(273);
+  });
+
+  it('keeps §5.10.3’s three millimetres as the grouping rule', () => {
+    // "springs having not more than 3 mm free height variation should be
+    // assembled in the same group" — the same figure the G-95 bands step in.
+    expect(MAX_NEST_HEIGHT_VARIATION_MM).toBe(3.0);
   });
 });

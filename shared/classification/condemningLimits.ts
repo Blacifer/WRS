@@ -49,29 +49,56 @@ export interface CondemningLimit {
  * would quietly discard information an inspector may need.
  */
 /*
- * Partial by design. §309C tabulates Outer, Inner and Snubber for these
- * bogies and says nothing about SNUBBER_OUTER or SNUBBER_INNER, which the
- * spring-position type carries for the CASNUB split-snubber arrangements.
+ * Partial by design: a lookup for a position no published table covers fails
+ * loudly in judgeAgainstCondemningLimit rather than quietly inheriting a
+ * limit meant for something else.
  *
- * Typed as partial rather than filled in, so a lookup for a position the
- * manual does not cover fails loudly in judgeAgainstCondemningLimit instead
- * of quietly inheriting a limit meant for something else.
+ * THE LWLH25 SNUBBER IS TWO SPRINGS, NOT ONE
+ * ------------------------------------------
+ * WMM 2.0 §309C prints the LWLH25 snubber condemning height as "266(SO)" and
+ * never expands the parenthetical, so this file carried a single snubber
+ * limit of 266 and a note saying the (SO) was unexplained.
+ *
+ * RDSO Technical Pamphlet G-112 (Wagon Directorate, page 89) explains it.
+ * Table 26 gives the LWLH25 group as "4 (2SO & 2SI)" and Table 27 splits the
+ * snubber row in two:
+ *
+ *     Snubber Outer (SO)   281±3 nominal   condemn below 266
+ *     Snubber Inner (SI)   289±3 nominal   condemn below 274
+ *
+ * SO is Snubber Outer and SI is Snubber Inner. Half the snubbers on every
+ * LWLH25 bogie are the inner type, and this file was judging them against the
+ * outer figure — so a Snubber Inner measuring anywhere from 266 to 273mm was
+ * called serviceable when the pamphlet condemns it. An eight millimetre
+ * window in which a condemned spring passed.
+ *
+ * Plain SNUBBER is therefore no longer held for LWLH25. Asking for it now
+ * throws, because on this bogie the question is incomplete — the caller has
+ * to say which snubber they are holding. LCCF20 keeps a single SNUBBER
+ * because Table 26 gives it two undifferentiated snubbers per group.
  */
 export const CONDEMNING_LIMITS: Record<NonBandedBogie, Partial<Record<SpringPosition, CondemningLimit>>> = {
   LWLH25: {
     OUTER: { nominal: '264±3', condemning: 249 },
     INNER: { nominal: '246±3', condemning: 231 },
-    SNUBBER: {
+    // No plain SNUBBER. See the note above: this bogie carries two different
+    // snubbers and answering for "a snubber" would mean picking one of them.
+    SNUBBER_OUTER: {
       nominal: '281±3',
       condemning: 266,
-      // The manual prints "266(SO)". The parenthetical is not expanded
-      // anywhere we can find, so it is carried rather than interpreted.
-      note: 'Printed as 266(SO) in §309C; the (SO) is not explained in the manual.'
+      note: 'Snubber Outer. WMM 2.0 §309C prints this as "266(SO)"; RDSO G-112 Table 27 confirms SO is the outer snubber.'
+    },
+    SNUBBER_INNER: {
+      nominal: '289±3',
+      condemning: 274,
+      note: 'Snubber Inner. Absent from §309C, which is why this spring was previously judged against the outer limit of 266mm.'
     }
   },
   LCCF20: {
     OUTER: { nominal: '260±2', condemning: 245 },
     INNER: { nominal: '243+0/-3', condemning: 228 },
+    // One snubber type on this bogie: G-112 Table 26 gives 2 per group,
+    // undifferentiated, and Table 27 gives them a single row.
     SNUBBER: { nominal: '288±3', condemning: 273 }
   }
 };
@@ -117,7 +144,7 @@ export function judgeAgainstCondemningLimit(
     nominal: limit.nominal,
     measuredHeight,
     margin: Number((measuredHeight - limit.condemning).toFixed(1)),
-    source: `WMM 2.0 §309C (${bogie})`,
+    source: `WMM 2.0 §309C / RDSO G-112 Table 27 (${bogie} ${position})`,
     note: limit.note
   };
 }
