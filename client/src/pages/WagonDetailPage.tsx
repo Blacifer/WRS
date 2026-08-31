@@ -113,6 +113,9 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
   // Gate Signoff Modal State
   const [showSignoffModal, setShowSignoffModal] = useState<boolean>(false);
   const [signoffOtp, setSignoffOtp] = useState<string>('');
+  // Shown to the signer, never written into the field for them — releasing a
+  // wagon should take a deliberate act.
+  const [shownSignoffOtp, setShownSignoffOtp] = useState<string | null>(null);
   const [signoffNotes, setSignoffNotes] = useState<string>('Zero-defect quality clearance certified per RDSO specifications.');
   const [signoffError, setSignoffError] = useState<string | null>(null);
   // Advisory findings the supervisor has explicitly accepted. The server
@@ -305,7 +308,16 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
         targetStage: overrideTargetStage,
         supervisorOverride: true,
         overrideJustification,
-        otpToken: overrideOtp || 'test_token_override'
+        /*
+         * Sent as typed, with no fallback.
+         *
+         * This read `overrideOtp || 'test_token_override'`, so leaving the
+         * field blank quietly submitted a bypass token meant for the test
+         * suite — clearing the supervisor gate on the one action that exists
+         * to move a wagon past the rules. The same fallback was removed from
+         * the release-signoff path already; this second copy was missed.
+         */
+        otpToken: overrideOtp || ''
       });
       setShowOverrideModal(false);
       loadWagonData();
@@ -525,7 +537,9 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
       setSignoffOtpId(res.otpId);
       // Autofilled on a workshop kiosk in development, exactly as the override
       // modal does; in production the supervisor reads it from their device.
-      if (res.devOtpCode) setSignoffOtp(res.devOtpCode);
+      // Shown, never filled in. Releasing a wagon should take a deliberate
+      // act, and a pre-filled box is not one.
+      if (res.devOtpCode) setShownSignoffOtp(res.devOtpCode);
     } catch (err: any) {
       setSignoffError(err.message || 'Could not request an OTP');
     } finally {
@@ -2283,10 +2297,21 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                   ) : (
                     <div className="space-y-1.5">
                       <div className="flex gap-2">
+                        {shownSignoffOtp && (
+                          <p className="w-full text-xs text-amber-300 bg-amber-950/40 border border-amber-800/60 rounded-lg px-3 py-2 mb-2 leading-snug">
+                            {isHi ? 'पुष्टि कोड' : 'Confirmation code'}:{' '}
+                            <strong className="font-mono tracking-widest text-amber-200">{shownSignoffOtp}</strong>
+                            <span className="block text-amber-400/80 mt-1">
+                              {isHi
+                                ? 'इसे नीचे टाइप करें। यह कहीं भेजा नहीं गया — यह एक सोच-समझकर लिया गया दूसरा कदम है, दूसरा कारक नहीं।'
+                                : 'Type it below. It is shown here rather than sent anywhere — a deliberate second step on releasing a wagon, not a second factor.'}
+                            </span>
+                          </p>
+                        )}
                         <input
                           type="text"
                           inputMode="numeric"
-                          placeholder={isHi ? '6-अंकीय ओटीपी दर्ज करें' : 'Enter 6-digit OTP'}
+                          placeholder={isHi ? '6-अंकीय कोड दर्ज करें' : 'Type the 6-digit code'}
                           value={signoffOtp}
                           onChange={(e) => setSignoffOtp(e.target.value)}
                           disabled={!signoffOtpId}

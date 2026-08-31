@@ -42,7 +42,7 @@ export const AdminExportModal: React.FC<AdminExportModalProps> = ({
       setOtpId(res.otpId);
       if (res.devOtpCode) {
         setDevOtpCode(res.devOtpCode);
-        setOtpCode(res.devOtpCode);
+        // Not auto-filled — the typing is the confirmation.
       }
     } catch (err: any) {
       setError(err.message || 'Failed to request OTP');

@@ -252,7 +252,7 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
           <div>
             <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">{isHi ? 'उपयोगकर्ता खाते' : 'User Accounts'}</h1>
             <p className="text-xs text-slate-400 mt-0.5">
-              Create and manage real login accounts for inspectors, supervisors, and admins. Accounts are never deleted, only deactivated — every inspection/audit record stays attributable.
+              Create and manage real login accounts for inspectors, supervisors, the DRM and administrators.
             </p>
           </div>
         </div>
@@ -388,6 +388,24 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
 
       {/* Users Table */}
       <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-xl overflow-hidden">
+        {/*
+          Why there is no delete.
+          A supervisor looked for one and reported "no place to remove". There
+          is none by design, and the reason was buried in a subtitle above the
+          add-user button where nobody reading the table would find it. Said
+          here instead, next to the buttons that exist.
+        */}
+        <div className="px-4 pt-4">
+          <p className="text-[11px] text-slate-400 bg-slate-950/60 border border-slate-800 rounded-lg px-3 py-2 leading-snug">
+            <strong className="text-slate-300">There is no delete, deliberately.</strong>{' '}
+            Deactivating stops someone signing in immediately and keeps their name on
+            everything they inspected. Removing the account would leave inspections and
+            audit entries pointing at somebody who no longer exists, and a record that
+            cannot say who made it is not a record. Deactivation is reversible; a
+            deletion would not be.
+          </p>
+        </div>
+
         <div className="p-4 border-b border-slate-800 flex items-center justify-between">
           <h3 className="text-sm font-black text-white">All Accounts ({users.length})</h3>
         </div>

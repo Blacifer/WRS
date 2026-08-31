@@ -60,7 +60,8 @@ export const SupervisorOverrideModal: React.FC<SupervisorOverrideModalProps> = (
       setOtpId(res.otpId);
       if (res.devOtpCode) {
         setDevOtpCode(res.devOtpCode);
-        setOtpCode(res.devOtpCode); // Autofill in development/workshop kiosk mode
+        // Not auto-filled: see the note beside the code below. Filling it
+        // in turned a confirmation into a single click.
       }
     } catch (err: any) {
       setError(err.message || 'Failed to request OTP');

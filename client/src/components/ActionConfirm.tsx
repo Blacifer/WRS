@@ -41,6 +41,14 @@ export function ActionConfirm({ action, title, description, lang, onConfirmed, o
   const [enrolled, setEnrolled] = useState<boolean | null>(null);
   const [otpId, setOtpId] = useState<string | null>(null);
   const [code, setCode] = useState('');
+  /*
+   * The code as shown, kept apart from what the person has typed.
+   *
+   * They used to be the same value: requesting a code filled the box with it,
+   * so confirming took one click and confirmed nothing. Holding them
+   * separately means the code can be displayed and still has to be entered.
+   */
+  const [shownCode, setShownCode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,7 +79,10 @@ export function ActionConfirm({ action, title, description, lang, onConfirmed, o
     try {
       const res = await api.requestOtp(action);
       setOtpId(res.otpId);
-      if (res.devOtpCode) setCode(res.devOtpCode);
+      // Deliberately NOT pre-filled. The code is shown; typing it is the
+      // whole of what this step asks for, and auto-filling reduced it to one
+      // click that confirmed nothing.
+      if (res.devOtpCode) setShownCode(res.devOtpCode);
     } catch (e: any) {
       setError(e?.message || 'Could not request a code');
     } finally {
@@ -115,6 +126,15 @@ export function ActionConfirm({ action, title, description, lang, onConfirmed, o
               <label className="block text-xs font-semibold text-slate-300">
                 {isHi ? 'प्रमाणक ऐप का कोड' : 'Code from your authenticator app'}
               </label>
+              {shownCode && (
+                <p className="text-xs text-amber-300 bg-amber-950/40 border border-amber-800/60 rounded-lg px-3 py-2 mb-2 leading-snug">
+                  Confirmation code: <strong className="font-mono tracking-widest text-amber-200">{shownCode}</strong>
+                  <span className="block text-amber-400/80 mt-1">
+                    Type it below. It is shown here rather than sent anywhere — this is a
+                    deliberate second step on a consequential action, not a second factor.
+                  </span>
+                </p>
+              )}
               <input
                 inputMode="numeric"
                 maxLength={6}

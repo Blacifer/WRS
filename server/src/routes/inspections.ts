@@ -263,8 +263,21 @@ inspectionsRouter.get('/export', optionalAuthMiddleware, (req: AuthenticatedRequ
       }
 
       if (otpToken) {
+        /*
+         * The bypass strings are gone from here.
+         *
+         * otpService.consumeActionToken already honours 'test_token_*' and
+         * 'valid_otp_token' for the automated suites, and — importantly —
+         * only outside production. This second check repeated those strings
+         * WITHOUT that guard, so the audit-export gate could be cleared on a
+         * live deployment by anyone who had read this file, which is public.
+         *
+         * Delegating to the service means the environment rule is written
+         * once and cannot be forgotten at a second site, which is exactly how
+         * this one survived the first hardening.
+         */
         const isValidOtp = otpService.consumeActionToken(otpToken, 'EXPORT');
-        if (!isValidOtp && !otpToken.startsWith('test_token_') && otpToken !== 'valid_otp_token') {
+        if (!isValidOtp) {
           res.status(403).json({
             success: false,
             error: 'FORBIDDEN',

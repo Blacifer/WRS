@@ -161,7 +161,14 @@ authRouter.post('/request-otp', authMiddleware, (req: AuthenticatedRequest, res:
       otpId: otpResult.otpId,
       action,
       expiresInSeconds: otpResult.expiresInSeconds,
-      message: 'OTP has been generated and sent to supervisor channel',
+      // Said "sent to supervisor channel". Nothing was sent anywhere — the
+      // code is in this response, which is the honest design for a workshop
+      // with no mail or SMS on the shop floor, but the message described a
+      // delivery that never happened and made this look like a second factor.
+      message:
+        'Confirmation code issued. It is returned here rather than sent — this is a ' +
+        'deliberate second step on a consequential action, not a second factor. ' +
+        'An enrolled authenticator app is the second factor.',
       // Returned because OTP_DELIVERY is INLINE — see config/index.ts. This is
       // an audited two-step confirmation, not a second factor: the code goes
       // back to whoever asked for it.
