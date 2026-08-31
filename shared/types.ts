@@ -52,13 +52,23 @@ export type DamageType =
   | 'DEFORMATION' 
   | 'OTHER';
 
-export type UserRole = 
-  | 'INSPECTOR' 
-  | 'SUPERVISOR' 
-  | 'ADMIN' 
-  | 'Inspector' 
-  | 'Supervisor' 
-  | 'Admin';
+/*
+ * One spelling per role.
+ *
+ * This listed six values for three roles — INSPECTOR and Inspector and so on
+ * — which invited every guard to be a case-sensitive comparison and made a
+ * user stored as "admin" unrecognisable to all of them. Input is normalised
+ * at the boundary now (see shared/auth/permissions.ts), so the type says what
+ * is stored rather than every way it might have been typed.
+ *
+ * DRM is a role in its own right rather than a label on ADMIN: the officer
+ * sees everything and signs nothing, and holds no power over user accounts.
+ */
+export type UserRole =
+  | 'INSPECTOR'
+  | 'SUPERVISOR'
+  | 'ADMIN'
+  | 'DRM';
 
 export type OtpAction = 
   | 'OVERRIDE' 

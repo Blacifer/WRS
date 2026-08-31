@@ -184,29 +184,34 @@ describe('Release Sign-off Integrity', () => {
   });
 
   test('TC-SGN-05: the employee ID is the signer’s real one, not a fallback constant', async () => {
-    // Signed here by the ADMIN, whose employee ID is WRS-ADM-0001. The JWT
-    // carries no employeeId at all, so the old code resolved this to the
-    // hardcoded 'WRS-SUP-2019' — the certificate would have named the demo
-    // supervisor's ID for a release the admin performed. Using the seeded
-    // supervisor for this test would prove nothing, since their real ID
+    // Signed here by the SECOND supervisor, whose employee ID is
+    // WRS-SUP-2044. The JWT carries no employeeId at all, so the old code
+    // resolved this to the hardcoded 'WRS-SUP-2019' — the certificate would
+    // have named the first supervisor's ID for a release somebody else
+    // performed. Using supervisor1 would prove nothing, since their real ID
     // happens to equal the constant.
+    //
+    // This used the ADMIN until releasing became a capability rather than a
+    // rank. An administrator can no longer certify a wagon, which is the
+    // point of that change, so the test needed a second person who genuinely
+    // can.
     const db = getDatabase();
     const wagonNumber = 'SECR/BOXNHL/SGN007';
     await driveToReleasable(wagonNumber);
 
-    const adminToken = generateToken({
-      id: 'usr_adm_001', username: 'admin1', role: 'ADMIN', name: 'A. K. Mishra'
+    const secondSupervisorToken = generateToken({
+      id: 'usr_sup_002', username: 'supervisor2', role: 'SUPERVISOR', name: 'R. N. Tiwari'
     } as any);
 
-    const res = await signoff(wagonNumber, adminToken, { otpToken: 'test_token_override' });
+    const res = await signoff(wagonNumber, secondSupervisorToken, { otpToken: 'test_token_override' });
     assert.equal(res.status, 200);
 
     const stored = db
       .prepare('SELECT supervisor_id, supervisor_employee_id FROM gate_signoffs WHERE wagon_number = ?')
       .get(wagonNumber) as any;
 
-    assert.equal(stored.supervisor_id, 'usr_adm_001');
-    assert.equal(stored.supervisor_employee_id, 'WRS-ADM-0001', 'must be the signer’s own employee ID');
+    assert.equal(stored.supervisor_id, 'usr_sup_002');
+    assert.equal(stored.supervisor_employee_id, 'WRS-SUP-2044', 'must be the signer’s own employee ID');
     assert.notEqual(stored.supervisor_employee_id, 'WRS-SUP-2019', 'must not be the old hardcoded fallback');
   });
 

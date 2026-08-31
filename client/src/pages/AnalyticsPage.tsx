@@ -18,6 +18,7 @@ import type { LanguageCode } from '../i18n/index.ts';
 import { api } from '../services/api.ts';
 import { AdminExportModal } from '../components/AdminExportModal.tsx';
 import { BarChartIcon, DownloadIcon, AlertTriangleIcon, CheckCircleIcon, RefreshCwIcon, ShieldIcon } from '../components/Icons.tsx';
+import { can } from '../../../shared/auth/permissions.ts';
 
 interface AnalyticsPageProps {
   lang: LanguageCode;
@@ -76,7 +77,10 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
   const targetShiftMax = 2000;
   const shiftProgressPercent = Math.min(100, Math.round((totalInspected / targetShiftMin) * 100));
 
-  const isAdmin = user?.role === 'ADMIN' || user?.role === 'Admin' || user?.role === 'SUPERVISOR' || user?.role === 'Supervisor';
+  // Gates the audit-trail export button. Asked as a capability rather than a
+  // list of role spellings, so the DRM — whose whole job is oversight —
+  // gets it too, and so adding a role does not mean hunting for comparisons.
+  const canExport = can(user?.role, 'certificate.export');
 
   const bandChartData = Object.entries(BAND_COLORS).map(([bandKey, cfg]) => ({
     name: lang === 'hi' ? cfg.hi : cfg.en,
@@ -109,7 +113,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
             <span>{lang === 'hi' ? 'ताज़ा करें' : 'Refresh'}</span>
           </button>
 
-          {isAdmin && (
+          {canExport && (
             <button
               onClick={() => setIsExportModalOpen(true)}
               className="min-h-[44px] px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs rounded-xl shadow flex items-center gap-2"

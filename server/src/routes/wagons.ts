@@ -8,7 +8,7 @@ import { Router } from '../framework/index.ts';
 import type { Request, Response } from '../framework/index.ts';
 import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
-import { requireRole } from '../middleware/rbac.ts';
+import { requireRole, requireCapability } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { logAuditEvent } from '../db/auditLog.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
@@ -706,7 +706,16 @@ wagonsRouter.post('/:wagonNumber/checklist/items', authMiddleware, async (req: R
 // 11. Supervisor Digital Sign-off & Release Certification
 // -------------------------------------------------------------------------
 
-wagonsRouter.post('/:wagonNumber/gate/signoff', authMiddleware, requireRole('SUPERVISOR'), async (req: Request, res: Response) => {
+/*
+ * Certifying a wagon is guarded by the ACT, not by rank.
+ *
+ * This read requireRole('SUPERVISOR'), and because access was a seniority
+ * ladder an ADMIN cleared it too — so whoever administers the system could
+ * sign a wagon fit to leave the workshop. Releasing a wagon is a
+ * professional act with a name attached; administering accounts is not a
+ * qualification to perform it, and the DRM signs nothing at all.
+ */
+wagonsRouter.post('/:wagonNumber/gate/signoff', authMiddleware, requireCapability('wagon.release'), async (req: Request, res: Response) => {
   const { wagonRepo } = getRepos();
   const wagonNumber = req.params?.wagonNumber;
   // supervisorId and digitalSignature are deliberately NOT read from the body.

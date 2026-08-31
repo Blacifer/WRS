@@ -27,6 +27,7 @@ import { offlineDb } from '../services/offlineDb.ts';
 import { ShieldIcon, CheckCircleIcon, AlertTriangleIcon, RefreshCwIcon, Volume2Icon, VolumeXIcon } from '../components/Icons.tsx';
 import { playPassChime, playCondemnedBuzz } from '../utils/audioFeedback.ts';
 import type { VoiceParseResult } from '../../../shared/types.ts';
+import { can } from '../../../shared/auth/permissions.ts';
 
 
 interface InspectionPageProps {
@@ -236,7 +237,10 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
     }
   };
 
-  const isSupervisorOrAdmin = user?.role === 'SUPERVISOR' || user?.role === 'ADMIN' || user?.role === 'Supervisor' || user?.role === 'Admin';
+  // Gates the supervisor override. An override is an act of authority over a
+  // classification, so it is asked for by name — an administrator no longer
+  // qualifies simply by outranking a supervisor.
+  const canOverride = can(user?.role, 'wagon.override');
 
   const handleVoiceCommand = (result: VoiceParseResult) => {
     if (result.actionType === 'CLASSIFY_SPRING' && result.springParams) {
@@ -591,7 +595,7 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
       </div>
 
       <div className="pt-6 flex flex-col sm:flex-row items-center gap-4 justify-end border-t border-white/10 mt-8">
-        {isSupervisorOrAdmin && (
+        {canOverride && (
           <button
             type="button"
             onClick={() => setIsOverrideModalOpen(true)}

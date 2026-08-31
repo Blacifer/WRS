@@ -111,6 +111,20 @@ export const DEMO_USERS = [
     full_name: 'S. K. Verma',
     employee_id: 'WRS-SUP-2019'
   },
+  /*
+   * A second supervisor, because a shop has more than one and because the
+   * first one's employee ID happens to equal a constant the certificate code
+   * used to fall back to — which made it useless for proving the ID on a
+   * certificate is the signer's own.
+   */
+  {
+    id: 'usr_sup_002',
+    username: 'supervisor2',
+    password: 'password123',
+    role: 'SUPERVISOR',
+    full_name: 'R. N. Tiwari',
+    employee_id: 'WRS-SUP-2044'
+  },
   {
     id: 'usr_adm_001',
     username: 'admin1',
@@ -118,6 +132,19 @@ export const DEMO_USERS = [
     role: 'ADMIN',
     full_name: 'A. K. Mishra',
     employee_id: 'WRS-ADM-0001'
+  },
+  /*
+   * The divisional officer. A separate role from ADMIN on purpose: this
+   * account sees everything and signs nothing, and holds no power over user
+   * accounts. Oversight and system administration are different jobs.
+   */
+  {
+    id: 'usr_drm_001',
+    username: 'drm1',
+    password: 'password123',
+    role: 'DRM',
+    full_name: 'DRM (Divisional Railway Manager)',
+    employee_id: 'SECR-DRM-0001'
   }
 ];
 
