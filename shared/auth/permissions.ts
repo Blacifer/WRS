@@ -41,6 +41,7 @@ export type Capability =
   | 'spring.correct'         // withdraw a mistapped spring
   | 'wagon.inspect'          // record checklist verdicts
   | 'wagon.photograph'       // attach photographic evidence
+  | 'wagon.view'             // look at wagons and their history without touching them
   // Supervisory
   | 'wagon.release'          // certify a wagon fit to leave — the consequential one
   | 'wagon.override'         // move a wagon past a stage against the rules, with justification
@@ -49,7 +50,8 @@ export type Capability =
   | 'learning.approve'       // accept a proposed parameter change
   // Oversight — reading, never signing
   | 'audit.read'
-  | 'analytics.read'
+  | 'analytics.read'         // the strategic dashboards — deliberately not a supervisor's
+  | 'learning.view'
   | 'certificate.export'
   // System administration
   | 'users.manage'
@@ -60,6 +62,13 @@ const INSPECTOR: Capability[] = [
   'spring.correct',
   'wagon.inspect',
   'wagon.photograph'
+  /*
+   * Deliberately no wagon.view. An inspector reaches a wagon only through one
+   * they have actually selected, which canAccessTab handles as an explicit
+   * exception. Granting the capability instead would have opened the wagon
+   * pipeline and the component passports to them, which is a widening nobody
+   * asked for.
+   */
 ];
 
 /*
@@ -69,13 +78,20 @@ const INSPECTOR: Capability[] = [
  */
 const SUPERVISOR: Capability[] = [
   ...INSPECTOR,
+  'wagon.view',
   'wagon.release',
   'wagon.override',
   'stores.manage',
   'learning.approve',
+  'learning.view',
   'audit.read',
-  'analytics.read',
   'certificate.export'
+  /*
+   * No analytics.read. The DRM dashboard and the spring analytics are the
+   * divisional view, and that separation predates this matrix — a supervisor
+   * runs the shop and reads its history, an officer reads the division. Kept
+   * because it was a decision, not an oversight.
+   */
 ];
 
 /*
@@ -87,8 +103,10 @@ const SUPERVISOR: Capability[] = [
  * name on a record is the person who was holding the part.
  */
 const DRM: Capability[] = [
+  'wagon.view',
   'audit.read',
   'analytics.read',
+  'learning.view',
   'certificate.export'
 ];
 
@@ -100,6 +118,7 @@ const DRM: Capability[] = [
  * shop-floor capabilities for the same reason as the DRM.
  */
 const ADMIN: Capability[] = [
+  'wagon.view',
   'users.manage',
   'system.configure',
   'checklist.configure',
@@ -107,7 +126,8 @@ const ADMIN: Capability[] = [
   'analytics.read',
   'certificate.export',
   'stores.manage',
-  'learning.approve'
+  'learning.approve',
+  'learning.view'
 ];
 
 export const ROLE_CAPABILITIES: Record<Role, readonly Capability[]> = {

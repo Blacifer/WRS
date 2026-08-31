@@ -1455,6 +1455,26 @@ export function seedUsers(db?: DatabaseSync): void {
       insertUserStmt.run(u.id, u.username, hashed, u.role, u.full_name, u.employee_id);
     }
   }
+
+  /*
+   * Say so when an account did not land.
+   *
+   * INSERT OR IGNORE is what makes re-seeding safe, and it is also what hid a
+   * real failure: users.role carried a CHECK constraint that did not include
+   * DRM, so the divisional officer's row was refused by the database and
+   * ignored without a word. The account was simply absent, and the first
+   * anybody knew of it was a login that would not work.
+   */
+  const missing = DEMO_USERS
+    .filter((u) => !database.prepare('SELECT 1 FROM users WHERE id = ?').get(u.id))
+    .map((u) => `${u.username} (${u.role})`);
+
+  if (missing.length > 0) {
+    console.error(
+      `[Seed] ${missing.length} account(s) could not be created: ${missing.join(', ')}. ` +
+      `Most likely a CHECK constraint on users.role that does not know this role yet.`
+    );
+  }
 }
 
 export function seedDemoData(db?: DatabaseSync): void {

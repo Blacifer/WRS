@@ -5,6 +5,9 @@
  * Single source of truth for domain models, enums, tables, and API contracts.
  */
 
+import { can, isKnownRole } from './auth/permissions.ts';
+import type { Capability } from './auth/permissions.ts';
+
 // -------------------------------------------------------------------------
 // Domain Enums & Literals
 // -------------------------------------------------------------------------
@@ -1458,30 +1461,66 @@ export function isUserSupervisorOrAdmin(role?: string | null): boolean {
   return r === 'SUPERVISOR' || r === 'ADMIN';
 }
 
+/**
+ * Which screens a role may open.
+ *
+ * Expressed as capabilities rather than as a list of role names, because the
+ * list of role names was the problem: a DRM fell through every branch to the
+ * final `return false` and could open no screen at all. Adding a fifth role
+ * later should not mean hunting for every place a role was spelled out.
+ *
+ * Reading is separated from doing throughout. The DRM sees wagons, the audit
+ * chain and the analytics and can open none of the screens that change
+ * anything — which is the whole shape of an oversight account.
+ */
+const TAB_CAPABILITY: Record<string, Capability> = {
+  // Shop floor — recording work
+  inspector_home: 'spring.record',
+  inspection: 'spring.record',
+  spring_sorting: 'spring.record',
+  smart_vision: 'spring.record',
+  // Wagons and their record
+  wagons: 'wagon.view',
+  passports: 'wagon.view',
+  timeline: 'wagon.view',
+  // Operational record — the shop's own history, which a supervisor reads.
+  history: 'wagon.view',
+  // Oversight
+  audit: 'audit.read',
+  // The divisional dashboards. Separate from history on purpose: a supervisor
+  // runs the shop, an officer reads the division.
+  analytics: 'analytics.read',
+  dashboard: 'analytics.read',
+  learning: 'learning.view',
+  // The audit-trail export dialog, which is not a page — see App.tsx.
+  admin: 'certificate.export',
+  // Administration
+  users: 'users.manage',
+  inventory: 'stores.manage'
+};
+
 export function canAccessTab(role: string | undefined, tab: NavigationTab, hasSelectedWagon: boolean = false): boolean {
-  const roleUpper = role?.toUpperCase();
-  if (roleUpper === 'INSPECTOR') {
-    // Sorting loose springs is core inspector work — it is the ~900/day job.
-    if (tab === 'inspector_home' || tab === 'inspection' || tab === 'smart_vision') return true;
-    if (tab === 'spring_sorting') return true;
-    // The manual is for the person holding the component — inspectors included.
-    if (tab === 'manual') return true;
-    // An inspector can access 'wagons' ONLY when a specific wagon is active/selected (WagonDetailPage)
-    if (tab === 'wagons' && hasSelectedWagon) return true;
-    return false;
-  }
-  if (roleUpper === 'SUPERVISOR') {
-    if (tab === 'dashboard' || tab === 'analytics' || tab === 'users') return false;
-    // Audit verification is deliberately supervisor-visible, matching the
-    // endpoint's own RBAC. The supervisor is the one who signs releases, so
-    // the supervisor is the one who needs to be able to ask whether the
-    // record behind those signatures is still intact.
-    if (tab === 'audit') return true;
-    // Supervisors may VIEW learning data; only admins can approve changes.
-    return true;
-  }
-  if (roleUpper === 'ADMIN') {
-    return true;
-  }
-  return false;
+  const roleUpper = (role || '').trim().toUpperCase();
+
+  /*
+   * The manual is reference material for whoever is holding the component.
+   * Every role that can log in may read it, including the DRM — refusing an
+   * officer the published standard would be strange, and it changes nothing.
+   */
+  if (tab === 'manual') return isKnownRole(roleUpper);
+
+  /*
+   * An inspector reaches a wagon only through a wagon they have actually
+   * selected, never the pipeline list. Kept as an explicit exception because
+   * it is about how they navigate rather than what they may see.
+   */
+  if (roleUpper === 'INSPECTOR' && tab === 'wagons') return hasSelectedWagon;
+
+  const required = TAB_CAPABILITY[tab];
+  // A tab nobody has mapped is closed rather than open. The previous shape
+  // ended in `return false` for unknown roles and `return true` for admins,
+  // so a new screen was invisible to everyone except an admin by accident.
+  if (!required) return false;
+
+  return can(roleUpper, required);
 }

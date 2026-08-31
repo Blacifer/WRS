@@ -68,6 +68,16 @@ export const PILOT_SCOPE = {
  */
 export function isInPilotNav(tab: string, role: string | undefined): boolean {
   if (!PILOT_SCOPE.enabled) return true;
-  if (role?.toUpperCase() === 'ADMIN') return true;
+  /*
+   * The narrowing exists to keep the SHOP FLOOR uncluttered during the pilot,
+   * so the roles that are not on the shop floor are not narrowed.
+   *
+   * DRM was missing from this line, which would have left an oversight
+   * account holding the dashboard and the analytics capabilities and no way
+   * to reach either — the two screens that are the entire reason the role
+   * exists.
+   */
+  const r = role?.toUpperCase();
+  if (r === 'ADMIN' || r === 'DRM') return true;
   return (PILOT_SCOPE.shopFloorTabs as readonly string[]).includes(tab);
 }

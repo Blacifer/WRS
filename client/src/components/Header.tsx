@@ -11,6 +11,8 @@ import type { LanguageCode } from '../i18n/index.ts';
 import { offlineDb } from '../services/offlineDb.ts';
 import { GlobeIcon, RefreshCwIcon, LogOutIcon, ShieldIcon } from './Icons.tsx';
 import { isInPilotNav } from '../config/pilotScope.ts';
+import { canAccessTab } from '../../../shared/types.ts';
+import { can } from '../../../shared/auth/permissions.ts';
 
 export type { NavigationTab };
 
@@ -86,8 +88,20 @@ export const Header: React.FC<HeaderProps> = ({
 
   const roleUpper = user?.role?.toUpperCase();
   const isInspector = roleUpper === 'INSPECTOR';
-  const isSupervisorOrAdmin = roleUpper === 'SUPERVISOR' || roleUpper === 'ADMIN';
-  const isAdmin = roleUpper === 'ADMIN';
+
+  /*
+   * Nav visibility is asked as a capability, not as a list of role names.
+   *
+   * The list of names was the bug: a DRM matched none of these branches and
+   * fell through to a screen with almost nothing on it, because every entry
+   * was gated on being a supervisor or an admin. Adding an oversight role
+   * should not mean auditing every conditional in a nav bar.
+   *
+   * `shows` also defers to canAccessTab, so what the bar offers and what the
+   * app will actually open cannot drift apart — a nav item leading to a screen
+   * that bounces you is worse than no nav item.
+   */
+  const shows = (tab: NavigationTab) => canAccessTab(user?.role, tab, false);
 
   return (
     <header className="sticky top-0 z-40 bg-[#0a0a0a]/80 backdrop-blur-md border-b border-white/10 text-white select-none">
@@ -267,12 +281,11 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
 
 
-              {isSupervisorOrAdmin && (
-                <>
-
-                </>
-              )}
-
+              {/* Recording a spring is shop-floor work. An administrator and
+                  the DRM hold no spring.record capability, so the entries that
+                  lead there are not offered to them — they were, and they led
+                  to a screen the app would have bounced them off. */}
+              {shows('inspection') && (
               <button
                 data-testid="nav-inspection"
                 onClick={() => onSelectTab('inspection')}
@@ -284,7 +297,9 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 🌀 {dict.nav.inspection}
               </button>
+              )}
 
+              {shows('smart_vision') && (
               <button
                 data-testid="nav-smart-vision"
                 onClick={() => onSelectTab('smart_vision')}
@@ -296,6 +311,7 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 🔬 {currentLang === 'hi' ? 'स्प्रिंग बैच' : 'Spring Batch'}
               </button>
+              )}
 
               {/* The two things the DRM actually asked for come first: the
                   wagon pipeline and the spring flows. What follows the rule is
@@ -304,7 +320,7 @@ export const Header: React.FC<HeaderProps> = ({
                   software rather than as a QC tool. */}
               <span aria-hidden="true" className="hidden sm:inline-block w-px h-5 bg-slate-700 mx-1 self-center"></span>
 
-              {isAdmin && isInPilotNav('dashboard', user?.role) && (
+              {shows('dashboard') && isInPilotNav('dashboard', user?.role) && (
                 <button
                   data-testid="nav-dashboard"
                   onClick={() => onSelectTab('dashboard')}
@@ -317,7 +333,7 @@ export const Header: React.FC<HeaderProps> = ({
                   📊 {dict.nav.dashboard || 'DRM Dashboard'}
                 </button>
               )}
-                  {isInPilotNav('inventory', user?.role) && (
+                  {shows('inventory') && isInPilotNav('inventory', user?.role) && (
                   <button
                     data-testid="nav-inventory"
                     onClick={() => onSelectTab('inventory')}
@@ -330,7 +346,7 @@ export const Header: React.FC<HeaderProps> = ({
                     📦 {dict.nav.inventory || 'Stores & Inventory'}
                   </button>
                   )}
-                  {isInPilotNav('passports', user?.role) && (
+                  {shows('passports') && isInPilotNav('passports', user?.role) && (
                   <button
                     data-testid="nav-passports"
                     onClick={() => onSelectTab('passports')}
@@ -344,7 +360,7 @@ export const Header: React.FC<HeaderProps> = ({
                   </button>
                   )}
 
-              {isSupervisorOrAdmin && isInPilotNav('history', user?.role) && (
+              {shows('history') && isInPilotNav('history', user?.role) && (
                 <button
                   data-testid="nav-history"
                   onClick={() => onSelectTab('history')}
@@ -358,7 +374,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               )}
 
-              {isAdmin && isInPilotNav('analytics', user?.role) && (
+              {shows('analytics') && isInPilotNav('analytics', user?.role) && (
                 <button
                   data-testid="nav-analytics"
                   onClick={() => onSelectTab('analytics')}
@@ -372,7 +388,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               )}
 
-              {isSupervisorOrAdmin && isInPilotNav('admin', user?.role) && (
+              {can(user?.role, 'certificate.export') && isInPilotNav('admin', user?.role) && (
                 <button
                   data-testid="nav-admin"
                   onClick={() => onSelectTab('admin')}
@@ -399,7 +415,7 @@ export const Header: React.FC<HeaderProps> = ({
                 📖 {dict.nav.manual || 'Ask the Manual'}
               </button>
 
-              {isSupervisorOrAdmin && isInPilotNav('learning', user?.role) && (
+              {shows('learning') && isInPilotNav('learning', user?.role) && (
                 <button
                   data-testid="nav-learning"
                   onClick={() => onSelectTab('learning')}
@@ -413,7 +429,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               )}
 
-              {isSupervisorOrAdmin && (
+              {shows('audit') && (
                 <button
                   data-testid="nav-audit"
                   onClick={() => onSelectTab('audit')}
@@ -427,7 +443,7 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               )}
 
-              {isAdmin && isInPilotNav('users', user?.role) && (
+              {shows('users') && isInPilotNav('users', user?.role) && (
                 <button
                   data-testid="nav-users"
                   onClick={() => onSelectTab('users')}

@@ -733,6 +733,51 @@ export function runMigrations(db: DatabaseSync): void {
 
 
   /*
+   * Widening the role constraint to include DRM.
+   *
+   * users.role carried CHECK(role IN ('INSPECTOR','SUPERVISOR','ADMIN',
+   * 'Inspector','Supervisor','Admin')) — every role twice, and no DRM. The
+   * divisional officer could therefore not be stored at all: the insert was
+   * refused by the database and swallowed by INSERT OR IGNORE, so the account
+   * was missing and nothing reported it.
+   *
+   * SQLite cannot alter a CHECK in place, so the table is rebuilt. There are
+   * no indexes or triggers on users, which makes this the simple form of that
+   * operation; foreign keys are suspended for the swap because many tables
+   * reference users(id), and the ids are carried across unchanged.
+   */
+  const userTableSql = (db
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'")
+    .get() as { sql?: string } | undefined)?.sql || '';
+
+  if (userTableSql && !userTableSql.includes("'DRM'")) {
+    const cols = (db.prepare('PRAGMA table_info(users)').all() as any[]).map((c) => c.name);
+    const columnList = cols.join(', ');
+    const rebuilt = userTableSql
+      .replace(/CREATE TABLE\s+(IF NOT EXISTS\s+)?["'`]?users["'`]?/i, 'CREATE TABLE users_rolefix')
+      .replace(
+        /CHECK\s*\(\s*role\s+IN\s*\([^)]*\)\s*\)/i,
+        "CHECK(role IN ('INSPECTOR', 'SUPERVISOR', 'ADMIN', 'DRM'))"
+      );
+
+    db.exec('PRAGMA foreign_keys = OFF;');
+    try {
+      db.exec(rebuilt);
+      // Roles are normalised on the way across, so a row stored as "Admin"
+      // under the old constraint survives the move to the new one.
+      db.exec(`
+        INSERT INTO users_rolefix (${columnList})
+        SELECT ${cols.map((c) => (c === 'role' ? 'UPPER(TRIM(role)) AS role' : c)).join(', ')}
+        FROM users;
+      `);
+      db.exec('DROP TABLE users;');
+      db.exec('ALTER TABLE users_rolefix RENAME TO users;');
+    } finally {
+      db.exec('PRAGMA foreign_keys = ON;');
+    }
+  }
+
+  /*
    * Who decided a checklist item's status: a person, or a measurement.
    *
    * Spring rows are refreshed from the latest Phase-1 measurement every time

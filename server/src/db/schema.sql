@@ -16,7 +16,13 @@ CREATE TABLE IF NOT EXISTS users (
   -- Highest TOTP counter already accepted, so a code cannot be replayed
   -- inside its ~90 second validity window.
   totp_last_counter INTEGER DEFAULT NULL,
-  role TEXT NOT NULL CHECK(role IN ('INSPECTOR', 'SUPERVISOR', 'ADMIN', 'Inspector', 'Supervisor', 'Admin')),
+  -- One spelling per role, and DRM is one of them.
+  --
+  -- This listed each role twice, once capitalised, and did not list DRM at
+  -- all — so seeding the divisional officer was rejected by the database and
+  -- swallowed by INSERT OR IGNORE. The account simply was not there, and
+  -- nothing said so.
+  role TEXT NOT NULL CHECK(role IN ('INSPECTOR', 'SUPERVISOR', 'ADMIN', 'DRM')),
   full_name TEXT NOT NULL,
   employee_id TEXT NOT NULL UNIQUE,
   is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
