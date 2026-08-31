@@ -265,6 +265,31 @@ sortingRouter.get('/dataset', authMiddleware, (req: AuthenticatedRequest, res: R
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/sorting/images — the photographs themselves, newest first
+//
+// There was no way to retrieve one. Frames were captured, stored and counted,
+// and every screen could show was the total — so nobody could check the
+// photographs were landing, and nobody could look at the evidence behind a
+// condemnation. Images nobody can open are storage, not evidence.
+// ---------------------------------------------------------------------------
+sortingRouter.get('/images', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const q = (req.query || {}) as Record<string, string>;
+    res.status(200).json({
+      success: true,
+      data: repo().recentImages({
+        limit: q.limit ? Number(q.limit) : undefined,
+        batchId: q.batchId,
+        condemnedOnly: q.condemnedOnly === 'true'
+      }),
+      timestamp: new Date().toISOString()
+    });
+  } catch (err: any) {
+    bad(res, err?.message || 'Could not read spring evidence', 'SORTING_FAILED', 500);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/sorting/stock — what is on hand, grouped as the strip groups it
 //
 // ?forWagon=BOSTHS M2 additionally answers the question the tally cannot:

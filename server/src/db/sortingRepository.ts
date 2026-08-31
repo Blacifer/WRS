@@ -326,6 +326,51 @@ export class SortingRepository {
   }
 
   /**
+   * The most recent evidence photographs, newest first.
+   *
+   * Added because there was no way to see them. Frames were captured, stored
+   * and counted, and the only thing any screen could show was the total —
+   * so an inspector had no way to check their photographs were landing, and
+   * a supervisor had no way to look at the evidence behind a condemnation.
+   * Collecting images nobody can open is not evidence, it is storage.
+   *
+   * Capped and newest-first because the images are base64 in the row: a whole
+   * shift of them is megabytes, and nobody reviewing evidence starts at the
+   * beginning of the year.
+   */
+  public recentImages(options?: { limit?: number; batchId?: string; condemnedOnly?: boolean }): Array<{
+    id: string;
+    sortingRecordId: string | null;
+    bogieType: string;
+    springPosition: string;
+    band: string | null;
+    status: string;
+    measuredHeight: number | null;
+    imageData: string;
+    inspectorId: string;
+    createdAt: string;
+  }> {
+    const limit = Math.min(Math.max(options?.limit ?? 24, 1), 60);
+    const clauses: string[] = [];
+    const params: any[] = [];
+    if (options?.batchId) { clauses.push('batch_id = ?'); params.push(options.batchId); }
+    if (options?.condemnedOnly) clauses.push("labelled_status = 'CONDEMNED'");
+    const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+
+    return this.db.prepare(`
+      SELECT id, sorting_record_id AS sortingRecordId, bogie_type AS bogieType,
+             spring_position AS springPosition, labelled_band AS band,
+             labelled_status AS status, measured_height AS measuredHeight,
+             image_data AS imageData, inspector_id AS inspectorId,
+             created_at AS createdAt
+      FROM spring_images
+      ${where}
+      ORDER BY created_at DESC, rowid DESC
+      LIMIT ?
+    `).all(...params, limit) as any[];
+  }
+
+  /**
    * Closes a sorting batch by writing one audit entry summarising it.
    *
    * Deliberately one entry per batch rather than per spring: 900 chained rows

@@ -903,6 +903,23 @@ export class ApiClient {
     });
   }
 
+  /** The evidence photographs themselves, newest first. */
+  public async getSpringImages(options?: { limit?: number; batchId?: string; condemnedOnly?: boolean }): Promise<{
+    success: boolean;
+    data: Array<{
+      id: string; sortingRecordId: string | null; bogieType: string; springPosition: string;
+      band: string | null; status: string; measuredHeight: number | null;
+      imageData: string; inspectorId: string; createdAt: string;
+    }>;
+  }> {
+    const p = new URLSearchParams();
+    if (options?.limit) p.set('limit', String(options.limit));
+    if (options?.batchId) p.set('batchId', options.batchId);
+    if (options?.condemnedOnly) p.set('condemnedOnly', 'true');
+    const qs = p.toString();
+    return this.request(`/sorting/images${qs ? '?' + qs : ''}`);
+  }
+
   public async getSpringDataset(): Promise<{
     success: boolean;
     data: {

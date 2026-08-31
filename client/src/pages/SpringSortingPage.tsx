@@ -95,6 +95,31 @@ export function SpringSortingPage({ lang, onClose }: Props) {
    * question is answered by the count in the thinnest band, not by an opinion.
    */
   const [dataset, setDataset] = useState<{ total: number; bands: number } | null>(null);
+  /*
+   * The photographs, so they can actually be looked at.
+   *
+   * They were captured, stored and counted, and no screen could open one — so
+   * an inspector had no way to check their photographs were landing and a
+   * supervisor had no way to see the evidence behind a condemnation. The
+   * count is now the way in rather than the whole story.
+   */
+  const [gallery, setGallery] = useState<Array<{
+    id: string; band: string | null; status: string; springPosition: string;
+    measuredHeight: number | null; imageData: string; createdAt: string;
+  }> | null>(null);
+  const [galleryBusy, setGalleryBusy] = useState(false);
+
+  const openGallery = async () => {
+    setGalleryBusy(true);
+    try {
+      const res = await api.getSpringImages({ limit: 24 });
+      setGallery(res.data);
+    } catch {
+      setError(isHi ? 'फ़ोटो नहीं खुल सकीं' : 'Could not open the photographs.');
+    } finally {
+      setGalleryBusy(false);
+    }
+  };
   const [condition, setCondition] = useState<SpringCondition>('USED');
   const [position, setPosition] = useState<SpringPosition>('OUTER');
   /*
@@ -128,6 +153,15 @@ export function SpringSortingPage({ lang, onClose }: Props) {
     { total: number; passed: number; condemned: number; firstAt: string | null; lastAt: string | null } | null
   >(null);
   const [lastRecorded, setLastRecorded] = useState<string | null>(null);
+  /*
+   * What the last undo actually did.
+   *
+   * Undo worked; nothing said so. Pressing it emptied the session, which
+   * removed the button, and the only feedback was the word "Removed" tucked
+   * into the totals row — so it read as the button having failed and then
+   * vanished. It was reported as "undo only happening once".
+   */
+  const [undoNotice, setUndoNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -180,7 +214,6 @@ export function SpringSortingPage({ lang, onClose }: Props) {
   useEffect(() => { refresh(); readPending(); }, [refresh, readPending]);
 
   const readDataset = useCallback(async () => {
-    if (!capturePhotos) return;
     try {
       const res = await api.getSpringDataset();
       setDataset({
@@ -190,7 +223,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
     } catch {
       // A missing count never matters enough to interrupt sorting.
     }
-  }, [capturePhotos]);
+  }, []);
 
   useEffect(() => { readDataset(); }, [readDataset, totals.total]);
 
@@ -248,6 +281,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
   const record = async (height: number, band: string | null, condemned: boolean) => {
     setBusy(true);
     setError(null);
+    setUndoNotice(null);
 
     /*
      * What to say and play before the server answers.
@@ -392,9 +426,14 @@ export function SpringSortingPage({ lang, onClose }: Props) {
        */
       const queued = await offlineDb.getPendingSorting(batchId);
       if (queued.length > 0) {
-        await offlineDb.removePendingSorting(queued[queued.length - 1].clientTempId);
+        const taken = queued[queued.length - 1];
+        await offlineDb.removePendingSorting(taken.clientTempId);
         await readPending();
-        setLastRecorded(isHi ? 'हटाया गया' : 'Removed');
+        setUndoNotice(
+          isHi
+            ? `वापस लिया: ${taken.tappedBand || taken.measuredFreeHeight + 'mm'}`
+            : `Took back: ${taken.tappedBand || taken.measuredFreeHeight + 'mm'}`
+        );
         return;
       }
 
@@ -411,7 +450,16 @@ export function SpringSortingPage({ lang, onClose }: Props) {
       if (!res.data.corrected) {
         setError(res.data.message || (isHi ? 'पूर्ववत करने के लिए कुछ नहीं है' : 'Nothing to undo yet.'));
       } else {
-        setLastRecorded(isHi ? 'हटाया गया' : 'Removed');
+        const left = (res.data.summary?.total ?? Math.max(0, totals.total - 1));
+        setUndoNotice(
+          left === 0
+            ? (isHi
+                ? 'आखिरी स्प्रिंग वापस ले ली — इस सत्र में अब कुछ नहीं बचा।'
+                : 'Took back the last spring — nothing left in this session.')
+            : (isHi
+                ? `एक स्प्रिंग वापस ले ली। अब ${left} बची हैं।`
+                : `Took one spring back. ${left} left in this session.`)
+        );
       }
       await refresh();
     } catch (e: any) {
@@ -650,6 +698,21 @@ export function SpringSortingPage({ lang, onClose }: Props) {
 
       {/* Correcting the last tap. Placed with the work rather than in a menu:
           it is needed in the second after a mistake, not later. */}
+      {undoNotice && (
+        <div
+          data-testid="undo-notice"
+          className="rounded-xl border border-sky-800/60 bg-sky-950/40 px-4 py-2.5 text-sm text-sky-200 flex items-center justify-between gap-3"
+        >
+          <span>↩ {undoNotice}</span>
+          <button
+            onClick={() => setUndoNotice(null)}
+            className="text-xs font-bold text-sky-400 hover:text-white px-2 min-h-[32px]"
+          >
+            {isHi ? 'ठीक है' : 'OK'}
+          </button>
+        </div>
+      )}
+
       {sessionTotal > 0 && (
         <div className="flex justify-end">
           <button
@@ -696,12 +759,57 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           active={capturePhotos}
           onUnavailable={() => { /* sorting is unaffected; the component says so */ }}
         />
-        {capturePhotos && dataset && (
-          <p data-testid="evidence-count" className="text-[11px] text-slate-400">
-            {isHi
-              ? `अब तक ${dataset.total.toLocaleString()} लेबल-युक्त फ़ोटो, ${dataset.bands} समूहों में।`
-              : `${dataset.total.toLocaleString()} labelled photographs so far, across ${dataset.bands} ${dataset.bands === 1 ? 'group' : 'groups'}.`}
-          </p>
+        {dataset && dataset.total > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p data-testid="evidence-count" className="text-[11px] text-slate-400">
+              {isHi
+                ? `अब तक ${dataset.total.toLocaleString()} लेबल-युक्त फ़ोटो, ${dataset.bands} समूहों में।`
+                : `${dataset.total.toLocaleString()} labelled photographs so far, across ${dataset.bands} ${dataset.bands === 1 ? 'group' : 'groups'}.`}
+            </p>
+            <button
+              data-testid="view-photographs"
+              onClick={() => (gallery ? setGallery(null) : openGallery())}
+              disabled={galleryBusy}
+              className="min-h-[36px] px-3 rounded-lg border border-slate-600 text-slate-300 text-xs font-bold hover:bg-slate-800 disabled:opacity-40"
+            >
+              {gallery
+                ? (isHi ? 'फ़ोटो छिपाएँ' : 'Hide photographs')
+                : (isHi ? 'फ़ोटो देखें' : 'View photographs')}
+            </button>
+          </div>
+        )}
+
+        {gallery && (
+          <div className="space-y-2">
+            {gallery.length === 0 ? (
+              <p className="text-[11px] text-slate-500">
+                {isHi ? 'अभी कोई फ़ोटो नहीं।' : 'No photographs yet.'}
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {gallery.map((g) => (
+                  <figure key={g.id} className="rounded-lg overflow-hidden border border-slate-700 bg-slate-950">
+                    <img src={g.imageData} alt="" className="w-full h-24 object-cover" />
+                    <figcaption className="px-2 py-1.5 text-[10px] leading-tight">
+                      <span
+                        className={`font-black ${g.status === 'CONDEMNED' ? 'text-red-400' : 'text-emerald-400'}`}
+                      >
+                        {g.band || (g.status === 'CONDEMNED' ? (isHi ? 'कंडम' : 'Condemned') : (isHi ? 'ठीक' : 'Serviceable'))}
+                      </span>
+                      <span className="block text-slate-500">
+                        {g.springPosition}{g.measuredHeight ? ` · ${g.measuredHeight}mm` : ''}
+                      </span>
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            )}
+            <p className="text-[10px] text-slate-500">
+              {isHi
+                ? 'लेबल वही है जो निरीक्षक ने दबाया था — कैमरा कुछ तय नहीं करता।'
+                : 'The label under each photograph is what the inspector tapped. The camera decided none of it.'}
+            </p>
+          </div>
         )}
       </div>
 
