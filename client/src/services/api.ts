@@ -829,6 +829,52 @@ export class ApiClient {
   // Authenticator (TOTP) — a real second factor
   // =========================================================================
 
+  /**
+   * The gauges in the register, and whether their calibration still stands.
+   *
+   * A reading is only worth its instrument's calibration record, and until
+   * now nothing recorded which instrument produced a measurement at all.
+   */
+  public async getGauges(appliesTo?: string): Promise<{
+    success: boolean;
+    data: {
+      gauges: Array<{
+        id: string; gaugeCode: string; description: string; appliesTo: string | null;
+        certificateNumber: string | null; issuedTo: string | null;
+        calibratedOn: string | null; validUpto: string | null; isActive: boolean;
+        notes: string | null;
+        calibrationState: 'VALID' | 'EXPIRED' | 'UNRECORDED' | 'NO_GAUGE_NAMED';
+        calibrationSummary: string;
+      }>;
+    };
+  }> {
+    return this.request(`/gauges${appliesTo ? `?appliesTo=${encodeURIComponent(appliesTo)}` : ''}`);
+  }
+
+  /** How much recorded work rests on an instrument nobody has verified. */
+  public async getGaugeExposure(): Promise<{
+    success: boolean;
+    data: { unrecorded: number; expired: number; noGauge: number; total: number; summary: string };
+  }> {
+    return this.request('/gauges/exposure');
+  }
+
+  /** Record or amend a gauge, including its calibration. Administrators only. */
+  public async saveGauge(gaugeCode: string, gauge: {
+    description: string;
+    appliesTo?: string | null;
+    certificateNumber?: string | null;
+    issuedTo?: string | null;
+    calibratedOn?: string | null;
+    validUpto?: string | null;
+    notes?: string | null;
+  }): Promise<{ success: boolean; data: { gauge: any } }> {
+    return this.request(`/gauges/${encodeURIComponent(gaugeCode)}`, {
+      method: 'PUT',
+      body: JSON.stringify(gauge)
+    });
+  }
+
   public async getTotpStatus(): Promise<{ success: boolean; data: { enrolled: boolean; username: string } }> {
     return this.request('/auth/totp/status');
   }
@@ -893,6 +939,8 @@ export class ApiClient {
     heightIsApproximate?: boolean;
     damageType?: string;
     syncId?: string;
+    /** The gauge the reading was taken with, when one is named. */
+    gaugeCode?: string | null;
   }): Promise<{ success: boolean; data: { id: string; band: string | null; bandRoman: string | null; status: string; tableReference: string | null; condemnationReason: string | null } }> {
     return this.request('/sorting/record', { method: 'POST', body: JSON.stringify(payload) });
   }

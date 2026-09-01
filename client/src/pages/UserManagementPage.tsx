@@ -15,6 +15,7 @@ import type { AdminUserRecord } from '../../../shared/types.ts';
 import type { LanguageCode } from '../i18n/index.ts';
 import { AppAccessQr } from '../components/AppAccessQr.tsx';
 import { TotpEnrolment } from '../components/TotpEnrolment.tsx';
+import { GaugeRegister } from '../components/GaugeRegister.tsx';
 import { ActionConfirm } from '../components/ActionConfirm.tsx';
 
 function generateStrongPassword(length = 14): string {
@@ -250,6 +251,12 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
           <TotpEnrolment lang={lang} onClose={() => { /* inline panel, nothing to close to */ }} />
         </div>
       </div>
+
+      {/* The instruments. Here rather than on the shop floor because recording
+          a calibration asserts that somebody checked the gauge, which is an
+          administrator's act — while naming the gauge in your hand, which is
+          an inspector's, sits with the sorting itself. */}
+      <GaugeRegister lang={lang} />
 
       {/* Header */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-5 bg-gradient-to-r from-slate-900 via-slate-900 to-amber-950/30 border border-amber-500/30 rounded-2xl shadow-xl">

@@ -107,6 +107,15 @@ export interface PendingSortedSpring {
    *  stored verdict is always the server's, computed from the height. */
   tappedBand: string | null;
   condemned: boolean;
+  /**
+   * The gauge the reading was taken with.
+   *
+   * Carried through the queue so a spring sorted with the network down still
+   * names its instrument when it eventually reaches the server. Losing it in
+   * the queue would mean offline work — which is most of a shift on the shop
+   * floor — was the only work with no instrument traceability.
+   */
+  gaugeCode?: string | null;
   createdAt: string;
 }
 
@@ -409,7 +418,10 @@ class MultiEntityOfflineDbManager {
             measuredFreeHeight: spring.measuredFreeHeight,
             heightIsApproximate: spring.heightIsApproximate,
             damageType: spring.damageType,
-            syncId: spring.syncId
+            syncId: spring.syncId,
+            // Sent on the drain too, so offline work — most of a shift — is
+            // not the only work that arrives without naming its instrument.
+            gaugeCode: spring.gaugeCode ?? null
           })
         });
 

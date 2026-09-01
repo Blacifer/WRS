@@ -122,6 +122,48 @@ export function SpringSortingPage({ lang, onClose }: Props) {
   };
   const [condition, setCondition] = useState<SpringCondition>('USED');
   const [position, setPosition] = useState<SpringPosition>('OUTER');
+
+  /*
+   * Which gauge is in the inspector's hand.
+   *
+   * Every reading named the person and the wagon and no instrument at all,
+   * which is the one thing an auditor asks about a measurement. The register
+   * carries the shop's own gauges — SSG-02 among them, whose calibration
+   * label has both date fields blank — and the reading is stamped with
+   * whatever that gauge's calibration was worth at the moment it was taken.
+   */
+  const [gauges, setGauges] = useState<Array<{
+    gaugeCode: string; description: string;
+    calibrationState: 'VALID' | 'EXPIRED' | 'UNRECORDED' | 'NO_GAUGE_NAMED';
+    calibrationSummary: string;
+  }>>([]);
+  const [gaugeCode, setGaugeCode] = useState<string>(() => {
+    try { return sessionStorage.getItem('wrs-gauge') || ''; } catch { return ''; }
+  });
+
+  useEffect(() => {
+    let live = true;
+    api.getGauges()
+      .then(r => {
+        if (!live) return;
+        const list = r.data.gauges;
+        setGauges(list);
+        // One gauge on the bench is the common case; pre-select it rather
+        // than making somebody choose from a list of one every session.
+        setGaugeCode(prev => prev || (list.length === 1 ? list[0].gaugeCode : ''));
+      })
+      .catch(() => { /* the picker is degradable; sorting must not stop for it */ });
+    return () => { live = false; };
+  }, []);
+
+  useEffect(() => {
+    try {
+      if (gaugeCode) sessionStorage.setItem('wrs-gauge', gaugeCode);
+      else sessionStorage.removeItem('wrs-gauge');
+    } catch { /* not worth an error on the shop floor */ }
+  }, [gaugeCode]);
+
+  const selectedGauge = gauges.find(g => g.gaugeCode === gaugeCode) || null;
   /*
    * Keep the chosen position possible for the chosen bogie.
    *
@@ -320,7 +362,8 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         measuredFreeHeight: height,
         heightIsApproximate: true,
         tappedBand: band,
-        condemned: condemned || localStatus === 'CONDEMNED'
+        condemned: condemned || localStatus === 'CONDEMNED',
+        gaugeCode: gaugeCode || null
       });
       await readPending();
       if (condemned || localStatus === 'CONDEMNED') playCondemnedBuzz();
@@ -349,7 +392,8 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         condition,
         springPosition: position,
         measuredFreeHeight: height,
-        heightIsApproximate: true
+        heightIsApproximate: true,
+        gaugeCode: gaugeCode || null
       });
       if (res.data.status === 'CONDEMNED') playCondemnedBuzz();
       else playPassChime();
@@ -765,6 +809,53 @@ export function SpringSortingPage({ lang, onClose }: Props) {
             // a thing the inspector is not holding.
             : isHi ? 'क्षतिग्रस्त — कंडम' : 'Damaged — condemn'}
         </button>
+
+        {/*
+          * The gauge, with the work rather than in a settings screen.
+          *
+          * An inspector picks it up once at the start of a session and it
+          * stays picked for the rest of it, so this is small and quiet — but
+          * it is here, next to the bands, because that is where somebody
+          * would notice they had grabbed the wrong instrument. A gauge whose
+          * calibration is not established says so plainly rather than being
+          * silently accepted: the reading is still recorded, and recorded as
+          * having been taken with an unverified gauge.
+          */}
+        {gauges.length > 0 && (
+          <div className="rounded-xl border border-slate-700 bg-slate-900/60 px-3 py-2.5" data-testid="gauge-picker">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <label className="text-[11px] font-bold uppercase tracking-wide text-slate-400 sm:min-w-[5.5rem]">
+                {isHi ? 'गेज' : 'Gauge'}
+              </label>
+              <select
+                value={gaugeCode}
+                onChange={e => setGaugeCode(e.target.value)}
+                className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-sm text-white"
+                data-testid="gauge-select"
+              >
+                <option value="">{isHi ? 'कोई गेज नहीं चुना' : 'No gauge named'}</option>
+                {gauges.map(g => (
+                  <option key={g.gaugeCode} value={g.gaugeCode}>
+                    {g.gaugeCode} — {g.description}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {selectedGauge && selectedGauge.calibrationState !== 'VALID' && (
+              <p className="text-[11px] text-amber-300/90 mt-1.5 font-semibold" data-testid="gauge-calibration-warning">
+                {selectedGauge.calibrationSummary}
+              </p>
+            )}
+            {!gaugeCode && (
+              <p className="text-[11px] text-slate-400 mt-1.5" data-testid="gauge-none-note">
+                {isHi
+                  ? 'बिना गेज के दर्ज की गई रीडिंग रिकॉर्ड में ऐसी ही दिखेगी।'
+                  : 'Readings recorded without naming a gauge are marked that way in the record.'}
+              </p>
+            )}
+          </div>
+        )}
 
         {error && (
           <p className="text-xs font-semibold text-red-300 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">

@@ -18,6 +18,7 @@ import { DatabaseSync } from 'node:sqlite';
 import crypto from 'node:crypto';
 import { logAuditEvent } from './auditLog.ts';
 import type { BogieType, SpringCondition, SpringPosition, BandColor } from '../../../shared/types.ts';
+import { GaugeRepository } from './gaugeRepository.ts';
 
 export interface SortingRecordInput {
   batchId: string;
@@ -35,6 +36,15 @@ export interface SortingRecordInput {
   inspectorId: string;
   inspectorName?: string | null;
   syncId?: string | null;
+  /**
+   * Which gauge produced the reading.
+   *
+   * Optional, because a record written before the gauge register existed
+   * genuinely does not know and guessing would be worse than admitting it.
+   * When it is absent the record is stamped NO_GAUGE_NAMED rather than left
+   * looking as though it had been verified.
+   */
+  gaugeCode?: string | null;
   /**
    * The record this one replaces, when correcting a mistap.
    *
@@ -133,8 +143,9 @@ export class SortingRepository {
         id, batch_id, bogie_type, spring_condition, spring_position,
         measured_height, height_is_approximate, classified_band, band_roman,
         status, damage_type, condemnation_reason, table_reference,
-        inspector_id, inspector_name, sync_id, supersedes, voided
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        inspector_id, inspector_name, sync_id, supersedes, voided,
+        gauge_code, gauge_calibration_state
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       input.batchId,
@@ -153,7 +164,15 @@ export class SortingRepository {
       input.inspectorName ?? null,
       input.syncId ?? null,
       input.supersedes ?? null,
-      input.voided ? 1 : 0
+      input.voided ? 1 : 0,
+      input.gaugeCode ?? null,
+      /*
+       * Resolved now and stored, not looked up later. The gauge's calibration
+       * will change; this record has to keep saying what was true when the
+       * spring was judged, so that recalibrating an instrument next month
+       * cannot retrospectively make today's unverified readings look sound.
+       */
+      new GaugeRepository(this.db).stateForReading(input.gaugeCode)
     );
 
     return { id, alreadyRecorded: false };
@@ -180,7 +199,18 @@ export class SortingRepository {
     batchId: string,
     replacement: Omit<SortingRecordInput, 'batchId' | 'supersedes'> | null,
     actorId: string
-  ): { correctedId: string; newId: string | null } | null {
+  ): {
+    correctedId: string;
+    newId: string | null;
+    /** The spring taken out of the count, so the screen can name it. */
+    withdrew: {
+      band: string | null;
+      bandRoman: string | null;
+      measuredHeight: number | null;
+      springPosition: string | null;
+      status: string | null;
+    };
+  } | null {
     const last = this.db.prepare(`
       SELECT id FROM spring_sorting_records
       WHERE batch_id = ?

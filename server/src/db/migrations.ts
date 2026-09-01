@@ -621,6 +621,84 @@ export function runMigrations(db: DatabaseSync): void {
   `);
 
 
+  /*
+   * The gauges themselves, and whether anyone can still trust them.
+   *
+   * A record that says "260.5 mm, PASS" is worth a great deal less if nobody
+   * can say which instrument produced the reading or whether that instrument
+   * was in calibration on the day. Every measurement here was traceable to a
+   * person and to a wagon, and to no instrument at all.
+   *
+   * The photograph from the shop floor makes the point better than the theory
+   * does: the snubber gauge in daily use, SSG-02, carries a calibration label
+   * whose "Calibrated on" and "Calibration valid upto" fields are both blank.
+   * That is a finding whether or not the gauge is sound, because nothing on
+   * the instrument or in the record says when it was last checked.
+   *
+   * calibrated_on and valid_upto are deliberately nullable, and the seeded
+   * gauge deliberately leaves them null. Inventing a plausible date to make
+   * the screen look finished would be exactly the fabrication we removed from
+   * everywhere else.
+   */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS gauges (
+      id TEXT PRIMARY KEY,
+      gauge_code TEXT NOT NULL UNIQUE,
+      description TEXT NOT NULL,
+      -- Which springs this gauge is for. A snubber gauge cannot judge an
+      -- outer spring, and reading one against the other is how a condemned
+      -- spring passes.
+      applies_to TEXT DEFAULT NULL,
+      certificate_number TEXT DEFAULT NULL,
+      issued_to TEXT DEFAULT NULL,
+      calibrated_on TEXT DEFAULT NULL,
+      valid_upto TEXT DEFAULT NULL,
+      is_active INTEGER NOT NULL DEFAULT 1 CHECK(is_active IN (0, 1)),
+      notes TEXT DEFAULT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_gauges_active ON gauges(is_active);
+  `);
+
+  /*
+   * The real gauge from the shop floor, exactly as its label reads.
+   *
+   * Transcribed from the photograph and nothing more: the two calibration
+   * dates stay empty because they are empty on the instrument.
+   */
+  db.prepare(`
+    INSERT OR IGNORE INTO gauges
+      (id, gauge_code, description, applies_to, certificate_number, issued_to,
+       calibrated_on, valid_upto, is_active, notes)
+    VALUES
+      ('gauge_ssg_02', 'SSG-02', 'Snubber spring gauge (HS)', 'SNUBBER',
+       '1251122-04-125', 'SSE/CWM RWSS Raipur SECR',
+       NULL, NULL, 1,
+       'Transcribed from the instrument label. Both calibration dates are blank on the label itself.')
+  `).run();
+
+  // Which gauge took the reading. Nullable, because records written before
+  // this existed genuinely do not know, and guessing would be worse.
+  const sortingCols = db.prepare("PRAGMA table_info(spring_sorting_records)").all() as any[];
+  if (sortingCols.length > 0 && !sortingCols.some((c) => c.name === 'gauge_code')) {
+    db.exec("ALTER TABLE spring_sorting_records ADD COLUMN gauge_code TEXT DEFAULT NULL;");
+  }
+  /*
+   * What the gauge's calibration looked like at the moment of the reading.
+   *
+   * Stored on the record rather than looked up later, because the gauge's
+   * calibration will change and the record must keep saying what was true
+   * when the spring was judged. A gauge recalibrated next month must not
+   * retrospectively make today's uncalibrated readings look sound.
+   */
+  if (sortingCols.length > 0 && !sortingCols.some((c) => c.name === 'gauge_calibration_state')) {
+    db.exec(
+      "ALTER TABLE spring_sorting_records ADD COLUMN gauge_calibration_state TEXT DEFAULT NULL " +
+      "CHECK(gauge_calibration_state IS NULL OR gauge_calibration_state IN ('VALID', 'EXPIRED', 'UNRECORDED', 'NO_GAUGE_NAMED'));"
+    );
+  }
+
+
   // Photo evidence stage — see the column comment in schema.sql.
   const photoCols = db.prepare("PRAGMA table_info(wagon_photos)").all() as any[];
   if (photoCols.length > 0 && !photoCols.some((c) => c.name === 'evidence_stage')) {

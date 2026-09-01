@@ -90,7 +90,10 @@ sortingRouter.post('/record', authMiddleware, (req: AuthenticatedRequest, res: R
       tableReference: verdict.tableReference ?? null,
       inspectorId: req.user.id,
       inspectorName: req.user.name ?? null,
-      syncId: b.syncId ?? b.sync_id ?? null
+      syncId: b.syncId ?? b.sync_id ?? null,
+      // Which instrument produced the reading. Absent is recorded as absent,
+      // never quietly attributed to whichever gauge happens to be on file.
+      gaugeCode: b.gaugeCode ?? b.gauge_code ?? null
     });
 
     // 200 rather than 201 when this tap has been seen before: the device is
