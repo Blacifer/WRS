@@ -164,6 +164,23 @@ export function SpringSortingPage({ lang, onClose }: Props) {
   }, [gaugeCode]);
 
   const selectedGauge = gauges.find(g => g.gaugeCode === gaugeCode) || null;
+
+  /*
+   * Why a spring was condemned, not merely that it was.
+   *
+   * Two independent things condemn a spring on this floor: the height is off
+   * the strip, or somebody sees a crack. The screen had one button for both,
+   * and on a banded bogie it was labelled "Off the strip" — so a spring that
+   * measured perfectly well and was thrown out for a crack went into the
+   * record as a height failure. The reason was wrong in the one place anybody
+   * would later go looking for it.
+   *
+   * A pass stays one tap. A condemnation costs a second tap, which is the
+   * right trade at roughly nine hundred springs a shift: passes are the
+   * common case and stay instant, and the rare rejection is the one worth
+   * describing.
+   */
+  const [condemnReasonOpen, setCondemnReasonOpen] = useState(false);
   /*
    * Keep the chosen position possible for the chosen bogie.
    *
@@ -320,7 +337,12 @@ export function SpringSortingPage({ lang, onClose }: Props) {
    * classification is always the server's, computed from the height, online
    * or on replay.
    */
-  const record = async (height: number, band: string | null, condemned: boolean) => {
+  const record = async (
+    height: number,
+    band: string | null,
+    condemned: boolean,
+    damageType: string | null = null
+  ) => {
     setBusy(true);
     setError(null);
     setUndoNotice(null);
@@ -363,6 +385,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         heightIsApproximate: true,
         tappedBand: band,
         condemned: condemned || localStatus === 'CONDEMNED',
+        damageType: damageType ?? undefined,
         gaugeCode: gaugeCode || null
       });
       await readPending();
@@ -393,6 +416,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         springPosition: position,
         measuredFreeHeight: height,
         heightIsApproximate: true,
+        damageType: damageType ?? undefined,
         gaugeCode: gaugeCode || null
       });
       if (res.data.status === 'CONDEMNED') playCondemnedBuzz();
@@ -798,17 +822,62 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           ))}
         </div>
 
-        <button
-          disabled={busy}
-          onClick={() => record(200, null, true)}
-          className="w-full min-h-[52px] rounded-xl border-2 border-red-700 bg-red-950/50 text-red-200 font-bold text-sm disabled:opacity-40 active:scale-95 transition-transform"
-        >
-          {banded
-            ? isHi ? 'पट्टी से बाहर — कंडम' : 'Off the strip — condemn'
-            // No strip exists for these bogies, so "off the strip" would name
-            // a thing the inspector is not holding.
-            : isHi ? 'क्षतिग्रस्त — कंडम' : 'Damaged — condemn'}
-        </button>
+        {!condemnReasonOpen ? (
+          <button
+            disabled={busy}
+            onClick={() => setCondemnReasonOpen(true)}
+            className="w-full min-h-[52px] rounded-xl border-2 border-red-700 bg-red-950/50 text-red-200 font-bold text-sm disabled:opacity-40 active:scale-95 transition-transform"
+            data-testid="condemn-open"
+          >
+            {isHi ? 'कंडम करें' : 'Condemn this spring'}
+          </button>
+        ) : (
+          <div
+            className="rounded-xl border-2 border-red-700 bg-red-950/40 p-3 space-y-2"
+            data-testid="condemn-reasons"
+          >
+            <p className="text-xs font-bold text-red-200">
+              {isHi ? 'क्या देखा गया?' : 'What did you see?'}
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {/* Height first: on a banded bogie it is much the commonest
+                  reason, so it sits where the thumb already is. */}
+              {banded && (
+                <button
+                  disabled={busy}
+                  onClick={() => { setCondemnReasonOpen(false); record(200, null, true, 'NONE'); }}
+                  className="min-h-[52px] rounded-lg border border-red-600 bg-red-900/50 text-red-100 font-bold text-xs active:scale-95 transition-transform disabled:opacity-40"
+                  data-testid="condemn-height"
+                >
+                  {isHi ? 'पट्टी से बाहर (ऊँचाई)' : 'Off the strip (height)'}
+                </button>
+              )}
+              {([
+                ['CRACK', isHi ? 'दरार' : 'Crack'],
+                ['CORROSION', isHi ? 'जंग' : 'Corrosion'],
+                ['DEFORMATION', isHi ? 'विकृति' : 'Deformation'],
+                ['OTHER', isHi ? 'अन्य' : 'Something else']
+              ] as const).map(([code, label]) => (
+                <button
+                  key={code}
+                  disabled={busy}
+                  onClick={() => { setCondemnReasonOpen(false); record(200, null, true, code); }}
+                  className="min-h-[52px] rounded-lg border border-red-600 bg-red-900/50 text-red-100 font-bold text-xs active:scale-95 transition-transform disabled:opacity-40"
+                  data-testid={`condemn-${code.toLowerCase()}`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setCondemnReasonOpen(false)}
+              className="w-full min-h-[40px] rounded-lg bg-slate-800 text-slate-300 text-xs font-bold"
+              data-testid="condemn-cancel"
+            >
+              {isHi ? 'वापस' : 'Back'}
+            </button>
+          </div>
+        )}
 
         {/*
           * The gauge, with the work rather than in a settings screen.
