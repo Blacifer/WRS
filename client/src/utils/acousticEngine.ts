@@ -77,7 +77,6 @@ export class AcousticDiagnosticEngine {
 
   // Active simulation mode
   private simulatedAnomaly: AcousticAnomalyType | null = null;
-  private simulatedDominantFreq: number = 0;
 
   /** False when getUserMedia failed — there is no audio to analyse. */
   private micAvailable: boolean = false;
@@ -217,8 +216,20 @@ export class AcousticDiagnosticEngine {
       this.analyser.getByteTimeDomainData(this.timeData);
       this.analyser.getFloatTimeDomainData(this.floatTimeData);
     } else {
-      // Mocked frame if Web Audio API not instantiated
-      this.generateMockWaveformBuffers();
+      /*
+       * No analyser means nothing was heard, and that is what gets reported.
+       *
+       * This used to call generateMockWaveformBuffers(), which drew a
+       * spectrum from the answer it already had — a leak was "detected"
+       * because the function put energy in the 4.5-8.5 kHz bins on purpose.
+       * It produced a convincing picture of a measurement that never
+       * happened. The buffers stay empty; signalSource below reports
+       * NO_SIGNAL and the screen says nothing was recorded.
+       */
+      this.freqData.fill(0);
+      this.floatFreqData.fill(-140);
+      this.timeData.fill(128);
+      this.floatTimeData.fill(0);
     }
 
     // 1. Calculate Peak SPL & Dominant Frequency
@@ -281,22 +292,27 @@ export class AcousticDiagnosticEngine {
       confidence = 0;
       details = 'No microphone signal — nothing was recorded, so no acoustic assessment can be made.';
       recommendedAction = 'Grant microphone access and run the check again.';
-    } else if (this.simulatedAnomaly) {
-      // A synthetic training signal, not the wagon. The frame is tagged
-      // SYNTHETIC so this can never be filed as a real defect.
-      detectedAnomaly = this.simulatedAnomaly;
-      dominantFrequencyHz = this.simulatedDominantFreq || dominantFrequencyHz;
-      if (detectedAnomaly === 'AIR_LEAK') {
-        confidence = 0.96;
-        details = `High-frequency pneumatic hiss detected at ${dominantFrequencyHz} Hz (>4.5 kHz band energy ratio: ${highFreqPowerRatio.toFixed(2)}).`;
-        recommendedAction = 'Inspect air hose coupling, angle cocks, and distributor valve seals for pneumatic leakage.';
-      } else if (detectedAnomaly === 'BEARING_DEFECT') {
-        confidence = 0.94;
-        details = `CTRB bearing periodic impact pulse detected at ${dominantFrequencyHz} Hz (Crest factor: ${crestFactor.toFixed(2)}).`;
-        recommendedAction = 'Perform CTRB bearing rotation check and replace defective cartridge bearing.';
-      }
     } else {
-      // Live microphone DSP detection:
+      /*
+       * One detection path, for whatever is actually in the buffer.
+       *
+       * A synthetic signal used to skip all of this: pressing Simulate Air
+       * Leak set a flag, and the code below simply reported the flag back
+       * along with a stored frequency and a fixed confidence. Nothing was
+       * measured, so the screen could not tell you anything you had not
+       * already told it.
+       *
+       * The synthetic source is connected to the same analyser node as the
+       * microphone, so its spectrum is a real spectrum. It now goes through
+       * the same FFT, the same high-band power ratio, the same crest factor
+       * and the same thresholds — the frequency shown is measured, the
+       * confidence is computed, and if the detector cannot hear a leak tone
+       * it is playing itself, that is a finding rather than something hidden
+       * behind a flag.
+       *
+       * The frame stays tagged SYNTHETIC, so a rehearsal still cannot be
+       * filed as a defect against a real wagon.
+       */
       // Path A: Air leak hiss (>4.5 kHz sustained power ratio > 0.35)
       const isHighFreqHiss = (highFreqPowerRatio > 0.35 && dominantFrequencyHz >= 4500) || (dominantFrequencyHz >= 4800 && maxBinVal > 60);
       if (isHighFreqHiss) {
@@ -413,7 +429,6 @@ export class AcousticDiagnosticEngine {
     await this.initAudioContext();
     this.stopSyntheticGenerator();
     this.simulatedAnomaly = 'AIR_LEAK';
-    this.simulatedDominantFreq = 6480;
 
     if (!this.audioCtx || !this.analyser) return;
 
@@ -466,7 +481,6 @@ export class AcousticDiagnosticEngine {
     await this.initAudioContext();
     this.stopSyntheticGenerator();
     this.simulatedAnomaly = 'BEARING_DEFECT';
-    this.simulatedDominantFreq = 1200;
 
     if (!this.audioCtx || !this.analyser) return;
 
@@ -475,14 +489,30 @@ export class AcousticDiagnosticEngine {
     carrier.type = 'sine';
     carrier.frequency.setValueAtTime(1200, this.audioCtx.currentTime);
 
-    // Modulation Oscillator at 24 Hz (Impulse train)
+    /*
+     * Amplitude modulation, which is what this was meant to be.
+     *
+     * The base gain was 0 and the 24 Hz sawtooth was connected straight to it.
+     * A sawtooth swings between -1 and +1, so the gain swung symmetrically
+     * about zero and averaged to nothing: pressing "Simulate Bearing Knock"
+     * produced near-silence, the dominant bin fell to the bottom of the
+     * spectrum, and the panel reported CLEAR / NOMINAL. Nobody noticed,
+     * because the verdict was being read from a flag rather than from the
+     * signal — which is precisely what that shortcut was hiding.
+     *
+     * A base of 0.5 with a depth of 0.5 gives a gain that swings between 0
+     * and 1: real amplitude modulation, with the sawtooth's sharp edge giving
+     * the impulse character a knocking bearing actually has.
+     */
     const modGain = this.audioCtx.createGain();
-    modGain.gain.setValueAtTime(0.0, this.audioCtx.currentTime);
+    modGain.gain.setValueAtTime(0.5, this.audioCtx.currentTime);
 
-    // Pulse generator using Periodic Wave or Script/LFO
     const pulseOsc = this.audioCtx.createOscillator();
     pulseOsc.type = 'sawtooth';
     pulseOsc.frequency.setValueAtTime(24, this.audioCtx.currentTime);
+
+    const pulseDepth = this.audioCtx.createGain();
+    pulseDepth.gain.setValueAtTime(0.5, this.audioCtx.currentTime);
 
     // Filter to add mechanical resonance
     const resFilter = this.audioCtx.createBiquadFilter();
@@ -494,7 +524,8 @@ export class AcousticDiagnosticEngine {
     masterGain.gain.setValueAtTime(0.5, this.audioCtx.currentTime);
 
     carrier.connect(modGain);
-    pulseOsc.connect(modGain.gain);
+    pulseOsc.connect(pulseDepth);
+    pulseDepth.connect(modGain.gain);
     modGain.connect(resFilter);
     resFilter.connect(masterGain);
     masterGain.connect(this.analyser);
@@ -505,7 +536,7 @@ export class AcousticDiagnosticEngine {
 
     carrier.start();
     pulseOsc.start();
-    this.synthSourceNodes = [carrier, pulseOsc, modGain, resFilter, masterGain];
+    this.synthSourceNodes = [carrier, pulseOsc, pulseDepth, modGain, resFilter, masterGain];
     this.isRunning = true;
     this.startAnalysisLoop();
   }
@@ -517,7 +548,6 @@ export class AcousticDiagnosticEngine {
     await this.initAudioContext();
     this.stopSyntheticGenerator();
     this.simulatedAnomaly = 'NONE';
-    this.simulatedDominantFreq = 420;
 
     if (!this.audioCtx || !this.analyser) return;
 
@@ -571,13 +601,10 @@ export class AcousticDiagnosticEngine {
   public injectSimulatedSignal(type: AcousticAnomalyType, dominantFreqHz?: number): AcousticAnalysisFrame {
     this.simulatedAnomaly = type;
     if (type === 'AIR_LEAK') {
-      this.simulatedDominantFreq = dominantFreqHz || 6500;
       this.simulateAirLeakHiss(false);
     } else if (type === 'BEARING_DEFECT') {
-      this.simulatedDominantFreq = dominantFreqHz || 1200;
       this.simulateBearingKnock(false);
     } else {
-      this.simulatedDominantFreq = dominantFreqHz || 350;
       this.simulateNormalSound(false);
     }
 
@@ -599,6 +626,31 @@ export class AcousticDiagnosticEngine {
       }
     }
     this.synthSourceNodes = [];
+
+    /*
+     * A previous check must not colour the next one.
+     *
+     * The two detectors decide by accumulating frames — five consecutive
+     * hiss frames raise an air leak, four knock frames raise a bearing — and
+     * those counters were never cleared when the source changed. They only
+     * decay by one per frame, so after listening to a genuine leak the count
+     * stands in the hundreds and takes as long to unwind as it took to build.
+     *
+     * On a shop floor that means checking wagon A with a leaking hose and
+     * then moving to wagon B, and being shown A's verdict on B. Clearing the
+     * counters here makes every check start from nothing, which is what
+     * anybody would assume it already did.
+     */
+    this.resetDetectionCounters();
+  }
+
+  /** Forget what the last check heard. */
+  private resetDetectionCounters(): void {
+    this.hissFrameCounter = 0;
+    this.knockFrameCounter = 0;
+    this.smoothedPeakDb = 40.0;  // the constructor's resting value, not zero
+    this.currentAnomaly = 'NONE';
+    this.currentConfidence = 0;
   }
 
   /**
@@ -626,47 +678,6 @@ export class AcousticDiagnosticEngine {
     }
 
     this.simulatedAnomaly = null;
-  }
-
-  /**
-   * Mock waveform generation for environments without AudioContext
-   */
-  private generateMockWaveformBuffers(): void {
-    const t = Date.now() / 1000;
-    const isLeak = this.simulatedAnomaly === 'AIR_LEAK';
-    const isBearing = this.simulatedAnomaly === 'BEARING_DEFECT';
-
-    for (let i = 0; i < 1024; i++) {
-      const f = i * 21.5;
-      let amp = Math.random() * 20;
-
-      if (isLeak && f >= 4500 && f <= 8500) {
-        amp = 160 + Math.random() * 80;
-      } else if (isBearing && f >= 1000 && f <= 1400) {
-        amp = 180 + Math.sin(t * 50) * 60;
-      } else if (!isLeak && !isBearing && f < 1000) {
-        amp = 60 + Math.random() * 30;
-      }
-
-      this.freqData[i] = Math.min(255, Math.floor(amp));
-      this.floatFreqData[i] = -90 + (this.freqData[i] / 255) * 80;
-    }
-
-    for (let i = 0; i < 2048; i++) {
-      const phase = (i / 2048) * Math.PI * 2;
-      let val = 0;
-
-      if (isLeak) {
-        val = (Math.random() * 2 - 1) * 0.4;
-      } else if (isBearing) {
-        val = Math.sin(phase * 30) * Math.exp(-((i % 256) / 40)) * 0.8;
-      } else {
-        val = Math.sin(phase * 4) * 0.2 + (Math.random() * 2 - 1) * 0.05;
-      }
-
-      this.floatTimeData[i] = val;
-      this.timeData[i] = Math.floor(128 + val * 127);
-    }
   }
 }
 

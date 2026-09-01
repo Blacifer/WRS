@@ -405,7 +405,28 @@ export const en = {
     stopAnalysis: 'Stop Analysis',
     dominantFreq: 'Peak Dominant Frequency',
     splGauge: 'Sound Pressure Level (SPL)',
-    statusNominal: 'CLEAR / NOMINAL — Zero Acoustic Anomalies',
+    /*
+     * "Zero acoustic anomalies" is a clean bill of health, and this tool
+     * cannot issue one.
+     *
+     * It listens for two specific things with two fixed thresholds. Anything
+     * it was not built to hear, and anything below those thresholds, produces
+     * exactly the same screen as a healthy bogie. Measured against its own
+     * bearing test signal the knock detector does not fire at all — so a
+     * supervisor reading "zero anomalies" would have been told something
+     * stronger than the system had any way of knowing.
+     *
+     * It now reports what it did, not what it concluded.
+     */
+    statusNominal: 'Nothing detected in this recording',
+    statusNominalNote:
+      'This listens for a high-frequency air leak and for a knocking bearing. ' +
+      'It is not a clearance — anything quieter than its thresholds, and anything ' +
+      'it was not built to hear, looks exactly like this.',
+    bearingUnvalidated:
+      'Bearing detection has not yet been checked against a recording of a genuinely ' +
+      'defective CTRB, and does not fire on its own test signal. Do not rely on it to ' +
+      'pass a bearing.',
     statusAirLeak: 'WARNING: AIR LEAK DETECTED (>4.5 kHz High-Frequency Hiss)',
     statusBearingDefect: 'CRITICAL: CTRB BEARING DEFECT (1.2 kHz Periodic Knock / Spall)',
     simTitle: 'Acoustic Signal Simulation Presets',

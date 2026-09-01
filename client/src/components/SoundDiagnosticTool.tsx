@@ -632,6 +632,28 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
               <p className="text-xs text-slate-300 mt-0.5">{details}</p>
 
               {/*
+                * What "nothing detected" is worth, said next to it.
+                *
+                * This screen used to read "CLEAR / NOMINAL — Zero Acoustic
+                * Anomalies", which is a clean bill of health the tool has no
+                * way to issue: it listens for two things against two fixed
+                * thresholds, and everything else it cannot hear looks exactly
+                * like a healthy bogie. Measured against its own bearing test
+                * signal the knock detector does not fire at all, so that
+                * caveat is stated rather than left for someone to discover.
+                */}
+              {anomalyType === 'NONE' && signalSource !== 'NO_SIGNAL' && (
+                <>
+                  <p className="text-[11px] text-slate-400 mt-1.5" data-testid="nominal-note">
+                    {t('acoustic.statusNominalNote')}
+                  </p>
+                  <p className="text-[11px] text-amber-300/90 mt-1 font-semibold" data-testid="bearing-caveat">
+                    {t('acoustic.bearingUnvalidated')}
+                  </p>
+                </>
+              )}
+
+              {/*
                 * Say on the verdict itself that a rehearsal is a rehearsal.
                 *
                 * A simulated signal has never been loggable as a real defect —
@@ -662,7 +684,16 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
 
           <div className="flex items-center gap-2 self-end sm:self-auto">
             <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-900/80 text-slate-300 border border-slate-700">
-              Confidence: {(confidence * 100).toFixed(0)}%
+              {/*
+                * A percentage belongs to a detection, not to its absence.
+                * "Nothing detected — Confidence: 95%" reads as ninety-five
+                * per cent sure the bogie is sound, which is a claim about
+                * everything the tool cannot hear. The figure is how strongly
+                * a detection fired, so it is shown only when one did.
+                */}
+              {anomalyType === 'NONE'
+                ? 'No detection'
+                : `Confidence: ${(confidence * 100).toFixed(0)}%`}
               {belowThreshold && (
                 <span className="block text-[11px] text-amber-400 font-semibold mt-1">
                   {isHi
