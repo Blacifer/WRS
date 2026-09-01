@@ -619,7 +619,45 @@ export const DashboardPage: React.FC = () => {
         * dashboards. The full ledger with its filters lives under History &
         * Logs; this is the last twenty-five actions without leaving the page.
         */}
+      <GaugeExposurePanel />
       <RecentActivityPanel />
+    </div>
+  );
+};
+
+/**
+ * How much of the signed work rests on an instrument nobody has verified.
+ *
+ * The register lives on the administrator's screen because recording a
+ * calibration is an administrator's act. But the question it answers — can
+ * these verdicts be defended — is the officer's question, and asking it should
+ * not require opening a settings page. Silent when everything is in order,
+ * because a row saying "nothing wrong" every day is a row people stop reading.
+ */
+const GaugeExposurePanel: React.FC = () => {
+  const [exposure, setExposure] = React.useState<{ total: number; summary: string } | null>(null);
+
+  React.useEffect(() => {
+    let live = true;
+    api.getGaugeExposure()
+      .then(r => { if (live) setExposure(r.data); })
+      .catch(() => { /* an oversight panel must not break the dashboard */ });
+    return () => { live = false; };
+  }, []);
+
+  if (!exposure || exposure.total === 0) return null;
+
+  return (
+    <div
+      className="rounded-2xl border border-amber-700/50 bg-amber-950/20 p-5"
+      data-testid="dashboard-gauge-exposure"
+    >
+      <h3 className="text-sm font-black text-amber-200 mb-1">Measurements on unverified instruments</h3>
+      <p className="text-xs text-amber-100/80">{exposure.summary}</p>
+      <p className="text-[11px] text-slate-400 mt-2">
+        A reading is only worth its gauge&rsquo;s calibration record. Recording a calibration
+        does not change readings already taken — they keep the state they had.
+      </p>
     </div>
   );
 };
