@@ -9,7 +9,9 @@ import type { SyncConflict } from '../services/offlineDb.ts';
 import { getDictionary } from '../i18n/index.ts';
 import type { LanguageCode } from '../i18n/index.ts';
 import { offlineDb } from '../services/offlineDb.ts';
+import { api } from '../services/api.ts';
 import { GlobeIcon, RefreshCwIcon, LogOutIcon, ShieldIcon } from './Icons.tsx';
+import { TotpEnrolment } from './TotpEnrolment.tsx';
 import { isInPilotNav } from '../config/pilotScope.ts';
 import { canAccessTab } from '../../../shared/types.ts';
 import { can } from '../../../shared/auth/permissions.ts';
@@ -49,6 +51,19 @@ export const Header: React.FC<HeaderProps> = ({
    * disappeared quietly.
    */
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
+
+  /* Whether this person already has an authenticator, for the header marker. */
+  const [isTotpOpen, setIsTotpOpen] = useState(false);
+  const [enrolled, setEnrolled] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    let live = true;
+    api.getTotpStatus()
+      .then(r => { if (live) setEnrolled(Boolean(r.data?.enrolled)); })
+      .catch(() => { /* the marker is a convenience; its absence is not an error */ });
+    return () => { live = false; };
+  }, [user, isTotpOpen]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -187,6 +202,31 @@ export const Header: React.FC<HeaderProps> = ({
                   {dict.roles[user.role as keyof typeof dict.roles] || user.role}
                 </span>
               </div>
+              {/*
+                * The authenticator, reachable by the people who need it.
+                *
+                * Enrolment was built, tested and working, and rendered in
+                * exactly one place: the User Accounts screen, which only an
+                * administrator can open. Since it enrols whoever is signed
+                * in, that meant an administrator could set up their own
+                * authenticator and nobody else could set up anything — least
+                * of all a supervisor, who is the one signing wagons onto the
+                * line and the whole reason a second factor matters here.
+                */}
+              <button
+                onClick={() => setIsTotpOpen(true)}
+                title={enrolled
+                  ? 'Authenticator app — enrolled'
+                  : 'Set up an authenticator app'}
+                data-testid="header-totp"
+                className={`min-w-[44px] min-h-[44px] p-2 rounded-lg transition-colors flex items-center justify-center ${
+                  enrolled
+                    ? 'text-emerald-400 hover:bg-emerald-950/40'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`}
+              >
+                <ShieldIcon size={18} />
+              </button>
               <button
                 onClick={onLogout}
                 title={dict.nav.logout}
@@ -198,6 +238,17 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
       </div>
+
+      {isTotpOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 flex items-start justify-center p-4 overflow-y-auto"
+          onClick={() => setIsTotpOpen(false)}
+        >
+          <div className="mt-16 w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <TotpEnrolment lang={currentLang} onClose={() => setIsTotpOpen(false)} />
+          </div>
+        </div>
+      )}
 
       {/* Navigation Tabs Bar (Touch Targets >= 48px) */}
       <nav className="bg-transparent px-4">
