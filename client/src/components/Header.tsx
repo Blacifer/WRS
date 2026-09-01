@@ -65,12 +65,46 @@ export const Header: React.FC<HeaderProps> = ({
     return () => { live = false; };
   }, [user, isTotpOpen]);
 
+  /*
+   * Draining belongs here, because the header is the one thing always on screen.
+   *
+   * The sorting queue used to drain only from inside the sorting page's own
+   * effect. That is fine while somebody is standing on that screen, and wrong
+   * everywhere else: sort a dozen springs with the network down, let the
+   * tablet sleep or the tab reload, come back into signal on the home screen,
+   * and nothing ever tried to send them. The queue survived perfectly and was
+   * simply never drained — the count sat at twelve through a reconnect, and
+   * nothing said so.
+   *
+   * Both queues, on mount, when the network returns, and on a slow poll —
+   * because navigator.onLine flips the moment the wifi associates, which in a
+   * shed is well before anything is actually reachable. Sending is idempotent
+   * (the server dedupes on the device's own sync id), so the sorting page
+   * draining at the same time cannot double-count a spring.
+   */
   useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
+    let cancelled = false;
+
+    const drainAll = async () => {
+      if (cancelled || !offlineDb.isOnline()) return;
+      const token = localStorage.getItem('wrs_token') || undefined;
+      if (!token) return;
+      try {
+        await offlineDb.syncPendingBatch('/api', token);
+        await offlineDb.syncPendingSorting('/api', token);
+      } catch {
+        // A failed drain is not an error to show anybody; the next tick tries
+        // again and the work stays queued in the meantime.
+      }
+    };
+
+    const handleOnline = () => { setIsOnline(true); drainAll(); };
     const handleOffline = () => setIsOnline(false);
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    const drainTimer = window.setInterval(drainAll, 15000);
+    drainAll();
 
     const unsubscribe = offlineDb.onPendingCountChange(setPendingCount);
     // Refusals arrive from whichever sync found them — including the
@@ -81,6 +115,8 @@ export const Header: React.FC<HeaderProps> = ({
     );
 
     return () => {
+      cancelled = true;
+      window.clearInterval(drainTimer);
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
       unsubscribe();
@@ -93,7 +129,10 @@ export const Header: React.FC<HeaderProps> = ({
     setIsSyncing(true);
     try {
       const token = localStorage.getItem('wrs_token') || undefined;
+      // Both queues, so the button means what it says. It used to send the
+      // inspections queue only, and leave sorted springs sitting there.
       await offlineDb.syncPendingBatch('/api', token);
+      await offlineDb.syncPendingSorting('/api', token);
       // Conflicts arrive through the subscription above, so a manual sync and
       // an automatic one behave identically.
     } finally {

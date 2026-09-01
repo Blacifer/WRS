@@ -197,12 +197,25 @@ export function SpringSortingPage({ lang, onClose }: Props) {
   }, [bogieType, position]);
   const [forWagon, setForWagon] = useState<string>('BOXN');
 
-  // The batch is created on the device, so a session survives a dropped
-  // connection and still reconciles as one batch when it syncs.
-  const [batchId] = useState<string>(
-    () => `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-  );
-
+  /*
+   * The batch is created on the device, so a session survives a dropped
+   * connection and still reconciles as one batch when it syncs.
+   *
+   * Held in sessionStorage as well, because a refresh used to mint a new one
+   * and quietly split a shift's sorting into two batches — the tally reset to
+   * zero and the springs already queued belonged to a batch the screen no
+   * longer knew about. It survives a reload and not a shift, which is the
+   * same rule the active screen and the chosen gauge follow.
+   */
+  const [batchId] = useState<string>(() => {
+    try {
+      const saved = sessionStorage.getItem('wrs-sorting-batch');
+      if (saved) return saved;
+    } catch { /* private windows fall through to a fresh batch */ }
+    const fresh = `batch_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    try { sessionStorage.setItem('wrs-sorting-batch', fresh); } catch { }
+    return fresh;
+  });
   const [tallies, setTallies] = useState<Tally[]>([]);
   const [capacity, setCapacity] = useState<Capacity[]>([]);
   const [totals, setTotals] = useState({ total: 0, passed: 0, condemned: 0 });
@@ -299,7 +312,21 @@ export function SpringSortingPage({ lang, onClose }: Props) {
 
     const drain = async () => {
       if (cancelled || !offlineDb.isOnline()) return;
-      const queued = await offlineDb.getPendingSorting(batchId);
+      /*
+       * Everything queued, not merely this session's share of it.
+       *
+       * This asked getPendingSorting(batchId), and the batch id is minted
+       * fresh on every mount. So the sequence the shop floor will actually
+       * produce — sort offline, the tablet sleeps or the tab reloads, come
+       * back into signal — found an empty queue for the new batch, returned
+       * here, and left the previous session's springs in IndexedDB for good.
+       * Twelve springs sorted offline stayed at "12 pending" through a
+       * reconnect, and nothing said so.
+       *
+       * syncPendingSorting drains the whole store regardless, so scoping the
+       * question to one batch only ever gated the answer wrongly.
+       */
+      const queued = await offlineDb.getPendingSorting();
       if (queued.length === 0) return;
       const token = localStorage.getItem('wrs_token') || undefined;
       const result = await offlineDb.syncPendingSorting('/api', token);

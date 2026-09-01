@@ -212,6 +212,18 @@ and the condemned one still says crack. None duplicated, none missing.
 If any number disagrees with your paper note, that is the most important bug
 you can find and I want to know immediately.
 
+**This drill already found two.** Running it here, twelve springs sorted
+offline sat at "12 pending" through a reconnect and never sent. Two separate
+faults stacked on each other: the drain asked "is anything pending for *this*
+batch" while the batch id was minted fresh on every page load, so a reload
+orphaned the previous session's work — and underneath that, the drain only
+ran while the Spring Sorting screen was open, so coming back into signal on
+any other screen never tried at all. Both fixed; the drill now ends at zero
+pending with exactly twelve records and no duplicates.
+
+There is a scripted version of this at `scripts/offline-drill.mjs` if you want
+it run automatically rather than by hand.
+
 ---
 
 ## What I still need from the floor
