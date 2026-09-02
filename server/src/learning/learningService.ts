@@ -34,12 +34,48 @@
 import crypto from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 
-export type LearningSubsystem =
-  | 'OCR_CALIPER'
-  | 'SPRING_CLASSIFICATION'
-  | 'VOICE_COMMAND'
-  | 'ACOUSTIC_DIAGNOSTIC'
-  | 'DEFECT_SUGGESTION';
+/**
+ * Every subsystem the ledger records, in one place.
+ *
+ * This was a bare union, and the same five strings were then written out again
+ * by hand in getMemory(), getDashboard() and the routes' validator. Adding a
+ * sixth updated the union and none of the copies, so MEASUREMENT_ANOMALY rows
+ * were written to the database and then omitted from every screen that reads
+ * it — recorded, and invisible.
+ *
+ * That is the third time this codebase has been bitten by a hand-maintained
+ * list drifting from its source: the E2E runner's SUITES skipped a whole test
+ * file, and AuditEventType fell to a third of the audit log's own CHECK. So
+ * the list is the declaration now and the type is derived from it, which makes
+ * the copies impossible rather than merely discouraged.
+ *
+ * The database CHECK on machine_learning_events.subsystem remains the outer
+ * authority; this array must match it, and a migration is what changes it.
+ */
+export const ALL_LEARNING_SUBSYSTEMS = [
+  'OCR_CALIPER',
+  'SPRING_CLASSIFICATION',
+  'VOICE_COMMAND',
+  'ACOUSTIC_DIAGNOSTIC',
+  'DEFECT_SUGGESTION',
+  /*
+   * Readings the anomaly check questioned, and what the inspector did next.
+   *
+   * This subsystem is the one whose ledger matters most, because every free
+   * height in this system is hand-entered and always will be — so this is the
+   * only running measure of how often that goes wrong.
+   *
+   * An "acceptance" here reads backwards from the others. Elsewhere the
+   * machine proposes and the human accepts or corrects it, so acceptance is
+   * the machine being right. Here the machine only ever asks a question, and
+   * the human answering "no, the reading stands" means the question was
+   * unnecessary. wasCorrected is therefore true when the inspector re-measured
+   * and changed the value — which is the flag having done its job.
+   */
+  'MEASUREMENT_ANOMALY'
+] as const;
+
+export type LearningSubsystem = (typeof ALL_LEARNING_SUBSYSTEMS)[number];
 
 export interface RecordOutcomeInput {
   subsystem: LearningSubsystem;
@@ -568,13 +604,7 @@ export class LearningService {
     pendingProposals: any[];
     summary: string;
   } {
-    const subsystems: LearningSubsystem[] = [
-      'OCR_CALIPER',
-      'SPRING_CLASSIFICATION',
-      'VOICE_COMMAND',
-      'ACOUSTIC_DIAGNOSTIC',
-      'DEFECT_SUGGESTION'
-    ];
+    const subsystems: readonly LearningSubsystem[] = ALL_LEARNING_SUBSYSTEMS;
 
     const observations = subsystems.map((subsystem) => {
       const row = this.db.prepare(`
@@ -648,13 +678,7 @@ export class LearningService {
 
   /** Everything the "what has the system learned" view needs, in one call. */
   public getDashboard(): Record<string, unknown> {
-    const subsystems: LearningSubsystem[] = [
-      'OCR_CALIPER',
-      'SPRING_CLASSIFICATION',
-      'VOICE_COMMAND',
-      'ACOUSTIC_DIAGNOSTIC',
-      'DEFECT_SUGGESTION'
-    ];
+    const subsystems: readonly LearningSubsystem[] = ALL_LEARNING_SUBSYSTEMS;
 
     return {
       accuracy: subsystems.map((s) => this.getAccuracy(s)),

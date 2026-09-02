@@ -11,6 +11,7 @@ import type { Response } from '../framework/index.ts';
 import { getDatabase } from '../db/connection.ts';
 import { LearningService } from '../learning/learningService.ts';
 import type { LearningSubsystem } from '../learning/learningService.ts';
+import { ALL_LEARNING_SUBSYSTEMS } from '../learning/learningService.ts';
 import { authMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { requireCapability } from '../middleware/rbac.ts';
@@ -21,13 +22,9 @@ function service(): LearningService {
   return new LearningService(getDatabase());
 }
 
-const VALID_SUBSYSTEMS: LearningSubsystem[] = [
-  'OCR_CALIPER',
-  'SPRING_CLASSIFICATION',
-  'VOICE_COMMAND',
-  'ACOUSTIC_DIAGNOSTIC',
-  'DEFECT_SUGGESTION'
-];
+// Derived, not restated — see ALL_LEARNING_SUBSYSTEMS in learningService.ts
+// for why this list is no longer written out by hand.
+const VALID_SUBSYSTEMS: readonly LearningSubsystem[] = ALL_LEARNING_SUBSYSTEMS;
 
 // ---------------------------------------------------------------------------
 // POST /api/learning/outcome

@@ -986,6 +986,88 @@ export function runMigrations(db: DatabaseSync): void {
     END;
   `);
 
+  /*
+   * Admit MEASUREMENT_ANOMALY to the learning ledger.
+   *
+   * The subsystem CHECK listed five values and the anomaly check is a sixth,
+   * so every attempt to record a flagged reading was refused by the database.
+   * The sorting route catches and swallows that failure deliberately — a
+   * ledger write must never cost an inspector their tap — with the result that
+   * the writes failed silently and the ledger simply stayed empty. This is the
+   * same drift that had already occurred once between AuditEventType and the
+   * audit log's own CHECK, and it is worth naming as a pattern: the constraint
+   * is the authority, and a widened TypeScript union without a matching
+   * migration is not a change, it is a silent no-op.
+   *
+   * SQLite cannot alter a CHECK in place, so the table is rebuilt. Dropping a
+   * table takes its indexes and triggers with it, and this one carries the two
+   * append-only triggers that make the ledger evidence rather than notes — so
+   * all five objects are recreated explicitly after the swap. Losing them
+   * silently would leave a ledger that looks intact and can be rewritten.
+   */
+  const mlTableSql = (db
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='machine_learning_events'")
+    .get() as { sql?: string } | undefined)?.sql || '';
+
+  if (mlTableSql && !mlTableSql.includes("'MEASUREMENT_ANOMALY'")) {
+    const cols = (db.prepare('PRAGMA table_info(machine_learning_events)').all() as any[]).map(
+      (c) => c.name
+    );
+    const columnList = cols.join(', ');
+    const rebuilt = mlTableSql
+      .replace(
+        /CREATE TABLE\s+(IF NOT EXISTS\s+)?["'`]?machine_learning_events["'`]?/i,
+        'CREATE TABLE machine_learning_events_subsysfix'
+      )
+      .replace(
+        /CHECK\s*\(\s*subsystem\s+IN\s*\([^)]*\)\s*\)/i,
+        "CHECK(subsystem IN ('OCR_CALIPER', 'SPRING_CLASSIFICATION', 'VOICE_COMMAND', " +
+          "'ACOUSTIC_DIAGNOSTIC', 'DEFECT_SUGGESTION', 'MEASUREMENT_ANOMALY'))"
+      );
+
+    db.exec('PRAGMA foreign_keys = OFF;');
+    try {
+      // Must go before the table they guard, or the swap is refused.
+      db.exec('DROP TRIGGER IF EXISTS trg_mle_no_update;');
+      db.exec('DROP TRIGGER IF EXISTS trg_mle_no_delete;');
+
+      db.exec(rebuilt);
+      db.exec(`
+        INSERT INTO machine_learning_events_subsysfix (${columnList})
+        SELECT ${columnList} FROM machine_learning_events;
+      `);
+      db.exec('DROP TABLE machine_learning_events;');
+      db.exec('ALTER TABLE machine_learning_events_subsysfix RENAME TO machine_learning_events;');
+
+      db.exec(
+        'CREATE INDEX IF NOT EXISTS idx_mle_subsystem ON machine_learning_events(subsystem, created_at DESC);'
+      );
+      db.exec(
+        'CREATE INDEX IF NOT EXISTS idx_mle_corrected ON machine_learning_events(subsystem, was_corrected);'
+      );
+      db.exec(
+        'CREATE INDEX IF NOT EXISTS idx_mle_created ON machine_learning_events(created_at DESC);'
+      );
+
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS trg_mle_no_update
+        BEFORE UPDATE ON machine_learning_events
+        BEGIN
+          SELECT RAISE(ABORT, 'Machine learning event ledger is strictly append-only.');
+        END;
+      `);
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS trg_mle_no_delete
+        BEFORE DELETE ON machine_learning_events
+        BEGIN
+          SELECT RAISE(ABORT, 'Machine learning event ledger is strictly append-only.');
+        END;
+      `);
+    } finally {
+      db.exec('PRAGMA foreign_keys = ON;');
+    }
+  }
+
   // A declared principal for actions the system performs itself.
   //
   // Audit rows carry a foreign key to users, so an event with no human actor

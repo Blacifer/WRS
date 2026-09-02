@@ -907,7 +907,11 @@ CREATE TABLE IF NOT EXISTS machine_learning_events (
     'SPRING_CLASSIFICATION',
     'VOICE_COMMAND',
     'ACOUSTIC_DIAGNOSTIC',
-    'DEFECT_SUGGESTION'
+    'DEFECT_SUGGESTION',
+    -- Readings the anomaly check questioned, and what the inspector did.
+    -- Kept in step with LearningSubsystem in learningService.ts; this
+    -- constraint is the authority and the union follows it, not the reverse.
+    'MEASUREMENT_ANOMALY'
   )),
   wagon_number TEXT DEFAULT NULL,
   inspection_id TEXT DEFAULT NULL,
