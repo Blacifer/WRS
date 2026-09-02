@@ -556,7 +556,7 @@ cvRouter.post('/measure', authMiddleware, async (req: AuthenticatedRequest, res:
           };
           if (verdict === 'PASS') {
             verdict = 'CONDEMNED';
-            condemnationReason = wireDiameterCheck.message;
+            condemnationReason = wireDiameterCheck.message ?? null;
             colorHex = '#ef4444';
           }
         } else {
@@ -736,7 +736,7 @@ cvRouter.post('/measure', authMiddleware, async (req: AuthenticatedRequest, res:
       inspectionRepo.logAuditEvent({
         id: auditLogId,
         inspectionId: null,
-        eventType: 'CV_MEASUREMENT_LOGGED' as any,
+        eventType: 'CV_MEASUREMENT_LOGGED',
         userId: inspectorId,
         userRole: req.user?.role || 'INSPECTOR',
         payload: {
@@ -771,7 +771,11 @@ cvRouter.post('/measure', authMiddleware, async (req: AuthenticatedRequest, res:
 
     if (wagonNumber) {
       try {
-        const wagon = wagonRepo.findWagonByNumber(wagonNumber);
+        // WagonRepository exposes getWagonByNumber; there is no
+        // findWagonByNumber. The call threw on every request and the catch
+        // below turned it into a console warning, so the measurement still
+        // returned 200 with checklistUpdated:false and no photo saved.
+        const wagon = wagonRepo.getWagonByNumber(wagonNumber);
         if (wagon) {
           // Resolve checklist category
           let category: any = 'SPRINGS';
@@ -780,8 +784,16 @@ cvRouter.post('/measure', authMiddleware, async (req: AuthenticatedRequest, res:
           else if (normalizedTarget.includes('WHEEL')) category = 'WHEELS_AXLES';
           else if (normalizedTarget.includes('BRAKE')) category = 'BRAKE_SYSTEM';
 
-          const catItems = wagonRepo.getChecklistItems(wagonNumber, category);
-          if (catItems && catItems.length > 0) {
+          // getChecklistItems takes the wagon number ALONE and returns
+          // { wagonNumber, categories, allItems } — not an array. This was
+          // called as (wagonNumber, category) and then tested for `.length`,
+          // which on that object is undefined, so `undefined > 0` was false
+          // and this whole branch never ran. That is why the signature fix
+          // recorded below it never took effect: nothing ever reached it.
+          // The category filter it was reaching for is `categories[category]`.
+          const checklistData = wagonRepo.getChecklistItems(wagonNumber);
+          const catItems: any[] = checklistData?.categories?.[category] ?? [];
+          if (catItems.length > 0) {
             // Find best matching item
             let targetItem = catItems.find((i) => {
               const pName = i.partName.toLowerCase();
