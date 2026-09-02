@@ -9,6 +9,8 @@ import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.ts';
 import { requireCapability } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
+import { getObservedCondemnationRates } from '../db/wagonAnalytics.ts';
+import { forecastConsumption } from '../../../shared/knowledge/consumptionForecast.ts';
 
 export const analyticsRouter = Router();
 
@@ -192,5 +194,43 @@ analyticsRouter.get('/export', authMiddleware, requireCapability('analytics.read
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
     res.status(200).send(html);
+  }
+});
+
+// -------------------------------------------------------------------------
+// GET /api/analytics/forecast?days=14
+//
+// What Stores should expect to issue over the coming period.
+//
+// Gated on analytics.read alongside the rest of the divisional reporting: it
+// is built from the same inspection record and it is a planning figure, not
+// something an inspector acts on at the bench.
+//
+// Three inputs of different kinds — the shop's own out-turn return, RDSO's
+// spring counts, and the condemnation rate observed here. Only the last is
+// learned, and the endpoint reports how many observations it rests on so the
+// figure can be argued with rather than merely believed.
+// -------------------------------------------------------------------------
+analyticsRouter.get('/forecast', authMiddleware, requireCapability('analytics.read'), async (req: Request, res: Response) => {
+  try {
+    const raw = Number((req.query || {}).days);
+    const days = Number.isFinite(raw) && raw > 0 ? Math.min(Math.round(raw), 297) : 14;
+
+    const rates = getObservedCondemnationRates(getDatabase(), (req.query || {}).since);
+    const forecast = forecastConsumption(days, rates);
+
+    res.status(200).json({
+      success: true,
+      data: forecast,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: 'FORECAST_FAILED',
+      message: error?.message || 'Could not produce a consumption forecast',
+      statusCode: 500,
+      timestamp: new Date().toISOString()
+    });
   }
 });

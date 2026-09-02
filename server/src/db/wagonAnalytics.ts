@@ -15,6 +15,7 @@
 
 import type { DatabaseSync } from 'node:sqlite';
 import type { LifecycleStage, CASNUBCategory } from '../../../shared/types.ts';
+import type { ObservedRate } from '../../../shared/knowledge/consumptionForecast.ts';
 
 // -------------------------------------------------------------------------
 // Analytics & DRM Dashboards
@@ -309,3 +310,43 @@ export function getAnalyticsBlockers(repo: {
   return { blockedWagons };
 }
 
+/**
+ * How often each kind of spring is actually condemned, from this shop's own
+ * inspection record.
+ *
+ * This is the only learned input to the consumption forecast — the wagon mix
+ * comes from the out-turn return and the spring counts from RDSO WMM 2.0
+ * §601, both of which are fixed. Everything the forecast claims about the
+ * future rests on this rate, so it is computed from real recorded outcomes
+ * rather than an assumed failure percentage.
+ *
+ * The window is deliberately a parameter with no default beyond a year:
+ * spring condemnation is seasonal in a way a fortnight cannot see, and a rate
+ * taken from too short a window would swing with one bad batch.
+ */
+export function getObservedCondemnationRates(
+  db: DatabaseSync,
+  sinceIso?: string
+): ObservedRate[] {
+  const since = sinceIso || new Date(Date.now() - 365 * 24 * 3600 * 1000).toISOString();
+
+  const rows = db
+    .prepare(
+      `SELECT bogie_type   AS bogieType,
+              spring_position AS springPosition,
+              COUNT(*)     AS inspected,
+              SUM(CASE WHEN status = 'CONDEMNED' THEN 1 ELSE 0 END) AS condemned
+         FROM inspections
+        WHERE created_at >= ?
+        GROUP BY bogie_type, spring_position
+        ORDER BY inspected DESC`
+    )
+    .all(since) as Array<Record<string, unknown>>;
+
+  return rows.map((r) => ({
+    bogieType: r.bogieType as ObservedRate['bogieType'],
+    springPosition: r.springPosition as ObservedRate['springPosition'],
+    inspected: Number(r.inspected ?? 0),
+    condemned: Number(r.condemned ?? 0)
+  }));
+}
