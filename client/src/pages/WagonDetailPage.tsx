@@ -97,7 +97,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
   // Photo Capture Modal State
   const [photoModalTarget, setPhotoModalTarget] = useState<{ category: string; partName: string; itemId?: string } | null>(null);
 
-  // Smart Vision AR Modal State
+  // Camera-and-caliper modal state
   const [smartVisionModalTarget, setSmartVisionModalTarget] = useState<{
     category: string;
     partName: string;
@@ -686,7 +686,18 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
           measuredHeight: measurement.measuredValue,
           measuredFreeHeight: measurement.measuredValue,
           damageType: (measurement.status === 'CONDEMNED' ? 'OTHER' : 'NONE') as any,
-          damageNotes: measurement.status === 'CONDEMNED' ? 'Out of tolerance via Smart Vision AR' : undefined,
+          /*
+             * What the record says happened.
+             *
+             * This wrote "Out of tolerance via Smart Vision AR" into the
+             * stored note — a marketing name, for a camera reading four
+             * digits off a caliper's own display, in an append-only record
+             * somebody may have to defend to an auditor. The person still
+             * took the measurement; the camera only read it.
+             */
+            damageNotes: measurement.status === 'CONDEMNED'
+              ? 'Out of tolerance — caliper reading captured by camera'
+              : undefined,
           measurementSource: 'OCR' as const,
           ocrConfidence: measurement.confidence,
           clientTimestamp: now,
@@ -726,7 +737,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
             wagonNumber,
             checklistItemId: itemId,
             partCategory: category as any,
-            partName: `${partName} (Smart Vision AR)`,
+            partName: `${partName} (caliper read by camera)`,
             stage: wagon.currentStage,
             imageBase64: measurement.snapshotBase64,
             tags: ['SmartVision', 'AR_Caliper', measurement.status, measurement.componentType]
@@ -735,7 +746,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
           await offlineDb.enqueuePhoto({
             wagonNumber,
             category: category as any,
-            partName: `${partName} (Smart Vision AR)`,
+            partName: `${partName} (caliper read by camera)`,
             stage: wagon.currentStage,
             imageBase64: measurement.snapshotBase64,
             tags: ['SmartVision', 'AR_Caliper', measurement.status, measurement.componentType]
@@ -1163,7 +1174,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                 }
                 className="min-h-[44px] px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shrink-0 shadow-md"
               >
-                <span>🔬</span> {t('actions.openArCaliper') || 'Launch Smart Vision AR'}
+                <span>🔬</span> {t('actions.openArCaliper') || 'Read the caliper'}
               </button>
             </div>
           )}
@@ -1282,7 +1293,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                         );
                       })}
 
-                      {/* Smart Vision AR Caliper Button — only for items with a real digital tolerance spec */}
+                      {/* Camera-reads-the-caliper button — only for items with a real digital tolerance spec */}
                       {resolveComponentTarget(item.partName, item.category) && (
                         <button
                           type="button"
@@ -1298,7 +1309,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                             });
                           }}
                           className="min-h-[48px] px-3 py-2 bg-blue-950/60 hover:bg-blue-900 border border-blue-700/60 rounded-xl text-xs text-blue-300 font-bold transition flex items-center gap-1.5 shadow-sm"
-                          title="Measure with Smart Vision AR Caliper"
+                          title="Read the caliper with the camera"
                         >
                           <span>🤖</span>
                           <span className="hidden sm:inline">{t('actions.smartVision') || 'Measure'}</span>
@@ -2108,7 +2119,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
         />
       )}
 
-      {/* Smart Vision AR & Caliper OCR Viewfinder Modal */}
+      {/* Caliper viewfinder */}
       {smartVisionModalTarget && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4">
           {/* Backdrop */}

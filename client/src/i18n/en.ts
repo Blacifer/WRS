@@ -131,7 +131,7 @@ export const en = {
     // which is the name of a different screen entirely — so a wheel gauge, a
     // brake block and a coupler all carried a button offering to sort springs.
     smartVision: 'Measure',
-    openArCaliper: 'Launch Smart Vision AR',
+    openArCaliper: 'Read the caliper',
     freezeReading: 'Freeze Reading',
     autoPopulate: 'Auto-Populate Checklist'
   },
@@ -180,7 +180,22 @@ export const en = {
     signoffSuccess: 'Wagon certified and released successfully with official certificate'
   },
   lifecycle: {
-    title: '7-Stage Wagon Lifecycle Tracking',
+  /*
+   * Named for what it is, not for what it would claim.
+   *
+   * These read like a pitch deck rather than a control panel — "Smart Vision
+   * AR Caliper" for a camera pointed at a caliper's display, "Real-Time
+   * Computer Vision & AR Tolerance Gauge" for Tesseract reading four digits,
+   * "7-Stage Wagon Lifecycle Tracking" for a list of wagons. The fake AI
+   * behind the Smart Vision name was removed two sessions ago and the name
+   * outlived it.
+   *
+   * A person using this every day needs a label that says what will happen
+   * when they press it. Somebody being shown it for the first time reads a
+   * capability boast and starts wondering what else is being oversold — which
+   * is the opposite of what the honest parts of this system have earned.
+   */
+    title: 'Wagons in the workshop',
     currentStage: 'Current Stage',
     entryDate: 'Intake Date',
     releaseDate: 'Release Date',
@@ -222,7 +237,7 @@ export const en = {
     }
   },
   exitGate: {
-    title: 'Zero-Defect Exit Gate & Release Certification',
+    title: 'Release checks',
     clearanceStatus: 'Clearance Status',
     readyForRelease: 'Ready for Certified Release',
     blocked: 'Release Blocked by Quality Discrepancies',
@@ -237,7 +252,7 @@ export const en = {
   photos: {
     title: 'Photo Evidence & QC Gallery',
     takePhoto: 'Take Photo',
-    smartVisionScan: 'Smart Vision AR Scan',
+    smartVisionScan: 'Read the caliper',
     filterCategory: 'Filter by Subsystem',
     allCategories: 'All Categories',
     beforeAfter: 'Before / After Comparison',
@@ -245,8 +260,8 @@ export const en = {
     watermarkNotice: 'All photos automatically watermarked with WRS Raipur QC stamp, wagon number, inspector, and timestamp.'
   },
   smartVision: {
-    title: 'Smart Vision AR Caliper',
-    subtitle: 'Real-Time Computer Vision & AR Tolerance Gauge',
+    title: 'Read the caliper with the camera',
+    subtitle: 'Point the camera at the caliper display — you still take the measurement',
     targetComponent: 'Target Component',
     selectComponent: 'Select Component Target',
     trackingComponent: 'TRACKING COMPONENT...',
@@ -277,7 +292,7 @@ export const en = {
     }
   },
   dashboard: {
-    title: 'DRM Officer Management Dashboard & Analytics',
+    title: 'Divisional dashboard',
     pipelineTitle: '7-Stage Workshop Pipeline Load',
     tatTitle: 'Turnaround Time (TAT) Analytics',
     throughputTitle: 'Workshop Monthly Throughput & Outturn',
@@ -335,7 +350,7 @@ export const en = {
   // nothing. The first screen should claim what the last screen can defend.
   loginTagline: 'RDSO G-95 Classification & Zero-Defect Release Control',
   inventory: {
-    title: 'Stores Depot Inventory & Material Management',
+    title: 'Stores',
     subtitle: 'WRS Raipur CASNUB Parts Stock, Auto-Reservations & Shop Floor Issuing',
     totalParts: 'Total Catalog Parts',
     lowStock: 'Low Stock Alerts',
@@ -400,8 +415,8 @@ export const en = {
     noScanData: 'No trackside OMRS telemetry recorded for this wagon yet.'
   },
   acoustic: {
-    title: 'Smart Acoustic Bearing & Pneumatic Leak Detection',
-    subtitle: 'Real-Time Web Audio FFT Spectrum & Oscilloscope Waveform Analysis',
+    title: 'Listen for a leak or a knock',
+    subtitle: 'Records a few seconds and looks for a high-frequency hiss or a periodic knock',
     liveAnalysis: 'Live Microphone Diagnostic',
     startMic: 'Start Live Microphone',
     stopAnalysis: 'Stop Analysis',

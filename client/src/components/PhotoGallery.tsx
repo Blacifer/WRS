@@ -65,7 +65,7 @@ export const PhotoGallery: React.FC<PhotoGalleryProps> = ({ photos, onAddPhotoCl
               onClick={onSmartVisionClick}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 shadow-sm min-h-[40px]"
             >
-              <span>🤖</span> {t('photos.smartVisionScan') || 'Smart Vision AR Scan'}
+              <span>🤖</span> {t('photos.smartVisionScan') || 'Read the caliper'}
             </button>
           )}
 
