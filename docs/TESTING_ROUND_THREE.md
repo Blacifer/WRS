@@ -191,6 +191,69 @@ anyone who asked, with no account.
 
 ---
 
+## 7b. Signing in as the DRM — two screens that used to refuse him
+
+This is the one worth doing before any demo, because it fails in front of the
+person the system is named for.
+
+Sign in as `drm1` and open **Audit Chain**, then **System Learning**.
+
+Both are in his menu. Until this round both refused him: Audit Chain said
+"Insufficient permissions. Requires minimum role: SUPERVISOR", and System
+Learning silently rendered its empty state — telling the DRM "Nothing has been
+recorded yet, so the system has learned nothing", which is a claim about the
+system when what actually happened is that he was not allowed to ask.
+
+The cause was that the menu is built from capabilities and those two endpoints
+were guarded by rank, against a ladder that does not contain DRM at all. Both
+now check the capability. Everything else still guarded by rank is correctly
+refusing him — he should not restock stores, approve a learning proposal, or
+manage accounts.
+
+**While you are signed in as `drm1`, walk every entry in his menu.** All nine
+should open. If any shows a permissions message, that is the same bug in a
+place I have not found.
+
+---
+
+## 7c. Spring Analytics — it was reporting on the wrong table
+
+Sign in as `drm1` → **Spring Analytics**.
+
+The page now opens with a **Spring sorting** panel: sorted today, the last
+seven days, the condemnation rate over that week, a measured per-hour rate, a
+seven-day bar trend, and what is on the floor by band with the colours.
+
+It used to read only the `inspections` table — the one-at-a-time and batch
+flows, forty-one records — and never touched sorted springs, of which there
+are ninety-odd. A screen called Spring Analytics was reporting on everything
+except the work.
+
+**Check the panel below it too.** It used to say *"Target: 1,800 – 2,000
+springs/shift"* and show the floor at 2% of it. Those numbers were left over
+from the ROI block we deleted from your dashboard two sessions ago — "Manual:
+900 springs/day → With AI: 2,000+" — a claim about an AI that classifies
+nothing. It now reads "About 700 a day — the figure the shop's own SSE gave on
+27 August 2026. Not a target set by this system."
+
+If you see 1,800 anywhere, tell me.
+
+---
+
+## 7d. The naming
+
+Nothing behavioural, but worth a look since it changes how the whole thing
+reads. "Smart Vision AR Caliper" is now **"Read the caliper with the camera"**.
+The exit gate tab is **"Release checks"**. The acoustic tab is **"Listen for a
+leak or a knock"**. The wagons screen is **"Wagons in the workshop"**.
+
+Three of those were not labels at all — the old name was being written into
+the stored record, so `damageNotes` said "Out of tolerance via Smart Vision
+AR". A marketing phrase in an append-only record is the sort of thing an
+auditor asks about. It now says the caliper reading was captured by camera.
+
+---
+
 ## 8. Offline — still the least tested part
 
 This is the one area nothing has properly exercised, and it is where losing
