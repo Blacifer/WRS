@@ -1,0 +1,197 @@
+# Continuous integration for the WRS Raipur wagon QC system.
+#
+# Why this exists, stated plainly, because the reason is easy to forget once
+# the badge is green: every serious defect found in the September 2026 review
+# was one that failed silently.
+#
+#   - The server had never been type-checked. `rootDir` was set to ./src while
+#     the code imports ../../shared, so tsc aborted before checking a line and
+#     49 real errors accumulated behind that failure — including a route that
+#     called a method which does not exist.
+#   - `tests/runner.ts` printed "ALL TESTS PASSED" over a suite it had never
+#     opened, because SUITES is hand-maintained and one file was never added.
+#   - /api/cv/measure threw on every request into a catch that downgraded the
+#     throw to a console warning, and answered 200 regardless.
+#
+# None of those were caught by anyone running anything. They were caught by
+# someone happening to look. This workflow is what "someone happening to look"
+# looks like when it is not left to chance.
+#
+# The jobs deliberately do NOT use `continue-on-error` and nothing here is
+# advisory. A red run means do not merge.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Lets a maintainer re-run the suite from the Actions tab without a push,
+  # which is useful when a failure is suspected to be flaky rather than real.
+  workflow_dispatch:
+
+# A second push to the same branch cancels the first: the older run's result
+# is about to be irrelevant, and these suites are not cheap.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Keep CI on the version the project declares (package.json engines: >=22,
+  # .nvmrc: 22) rather than whatever the runner image happens to ship. The
+  # server depends on Node 22+ for node:sqlite and --experimental-strip-types.
+  NODE_VERSION: '22'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Types first: it is the fastest job and the one most likely to catch a
+  # regression, because the server strips types at runtime without checking
+  # them. If this fails there is no point running twelve minutes of tests.
+  # ---------------------------------------------------------------------------
+  typecheck:
+    name: Type check (server + client)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+            client/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix server
+          npm ci --prefix client
+
+      - name: Type check
+        run: npm run typecheck
+
+  # ---------------------------------------------------------------------------
+  # The suite that exercises the real server: 646 tests across 113 suites.
+  # This is the one that would have caught the /api/cv/measure regression.
+  # ---------------------------------------------------------------------------
+  server-tests:
+    name: Server tests (646)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix server
+
+      - name: Run server suite
+        run: npm test --prefix server
+
+  client-tests:
+    name: Client tests (173)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            client/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix client
+
+      - name: Run client suite
+        run: npm test --prefix client
+
+  # ---------------------------------------------------------------------------
+  # The E2E tiers. The runner refuses to start when a .test.ts under tests/e2e
+  # belongs to no tier of SUITES, so this job also fails on an unregistered
+  # suite rather than quietly skipping it — which is the whole point.
+  #
+  # WRS_PERF_ASSERT is deliberately NOT set. Two Tier 5 tests can assert
+  # wall-clock deadlines (2,400 springs under 5s, 500 records under 2s), and a
+  # shared CI runner is exactly the loaded machine those assertions
+  # misdiagnose. They failed locally at 27.6s purely from a parallel build and
+  # passed 8/8 on an idle machine minutes later. The timings are still printed
+  # in the log; enforcing them here would produce red runs that say nothing
+  # about correctness, and a suite people learn to ignore protects nobody.
+  # Run them on purpose with WRS_PERF_ASSERT=1 on a quiet machine instead.
+  # ---------------------------------------------------------------------------
+  e2e-tests:
+    name: E2E suites (39)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix server
+
+      - name: Run E2E tiers
+        run: npm test
+
+  # ---------------------------------------------------------------------------
+  # Proves the thing that actually ships still builds. `npm run build` runs the
+  # type check first by design, so this also guards the root build wiring.
+  # ---------------------------------------------------------------------------
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+            client/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix server
+          npm ci --prefix client
+
+      - name: Build server and client
+        run: npm run build
+
+      - name: Confirm the client bundle was produced
+        run: |
+          test -f client/dist/index.html
+          echo "Bundle contents:"
+          ls -lh client/dist/assets/
