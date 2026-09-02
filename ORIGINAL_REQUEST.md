@@ -1,5 +1,14 @@
 # Original User Request
 
+> **Historical record — do not read as current specification.**
+> This is the verbatim brief that started Phase 3, kept for provenance. The
+> system has moved on from it in places: `/api/omrs` was never built, and R2's
+> "TensorFlow.js or OpenCV.js" object detection was deliberately not
+> implemented — `README.md` explains under "What it deliberately does not do"
+> why free height cannot be recovered from an image without a scale. For what
+> the system actually does today, read `README.md`; for how to run it, `docs/`.
+
+
 ## Initial Request — 2026-08-17T17:26:27+05:30
 
 # Teamwork Project Prompt — Draft

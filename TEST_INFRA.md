@@ -18,13 +18,35 @@
 ## Test Architecture
 - **Master Test Runner**: `tests/runner.ts` / `tests/run_e2e.sh`
 - **Backend Unit/Integration**: `npm test --prefix server` (Node.js 22 native test runner)
-- **Directory Layout**:
-  - `tests/e2e/tier1-features/` — Tier 1 Feature functional tests (R1 to R5)
-  - `tests/e2e/tier2-boundaries/` — Tier 2 Boundary & edge case tests
-  - `tests/e2e/tier3-pairwise/` — Tier 3 Cross-feature combinatorial tests
-  - `tests/e2e/tier4-workloads/` — Tier 4 Full workshop multi-bay shift simulations
-  - `tests/e2e/tier5-adversarial/` — Tier 5 Adversarial stress & security penetration tests
+- **Frontend**: `npm test --prefix client` (Vitest)
+- **Directory Layout** (as on disk — earlier drafts of this file named three of
+  these directories incorrectly, so check here rather than guessing):
+  - `tests/e2e/tier1-features/` — Tier 1 Feature functional tests (16 suites)
+  - `tests/e2e/tier2-boundary/` — Tier 2 Boundary & edge case tests (6 suites)
+  - `tests/e2e/tier3-cross-feature/` — Tier 3 Cross-feature integration flows (5 suites)
+  - `tests/e2e/tier4-scenarios/` — Tier 4 Full workshop multi-bay shift simulations (5 suites)
+  - `tests/e2e/tier5-adversarial/` — Tier 5 Adversarial stress & security penetration tests (7 suites)
+
+  39 suites in total, all registered and executed.
   - `tests/harness/` — Hardware simulation layer (`speech_mock.ts`, `audio_mock.ts`, `camera_mock.ts`, `qr_mock.ts`, `audit_db.ts`, `test_app.ts`)
+
+## Adding a suite — read this before writing one
+
+`tests/runner.ts` does **not** discover suites from the filesystem. It runs a
+hardcoded `SUITES` list, so **register a new file in `tests/runner.ts` in the
+same commit that creates it**.
+
+Forgetting used to be silent, and that is the worst failure mode a test runner
+has: `phase3_challenger2_concurrency_immutability.test.ts` sat on disk passing
+12/12 while the runner printed `✅ ALL TESTS PASSED` over the other 38 and
+never opened it. It is registered now, and `assertNoUnregisteredSuites()` runs
+before any suite does — a `.test.ts` under `tests/e2e/` that belongs to no tier
+is a hard error (exit 1) naming the file, rather than a pass over work nobody
+checked.
+
+Note also that the runner's per-test counters are not wired up: the summary
+always reports `Total Test Cases: 0`. Suite pass/fail is accurate; the test
+case numbers in that block are not.
 
 ## Coverage Thresholds
 - **Tier 1**: ≥5 test cases per feature (5 × 5 = 25+ cases)

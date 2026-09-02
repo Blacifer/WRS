@@ -21,13 +21,18 @@ The application is a full-stack, offline-first PWA for Indian Railways Wagon Rep
 | F9 | Adversarial Coverage Hardening (Tier 5) | White-box stress testing, tamper resistance, SQLite trigger immutability, and forensic integrity audit | M5 | Integrity Forensics |
 
 ## Milestones
+
+All five milestones are delivered and in the build. This table is kept as the
+record of how the work was broken up, not as a plan of outstanding work — see
+`README.md` for what the system does now, and `docs/` for how to run it.
+
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M1 | R4 Component Health Passports (Backend/DB) & Harness Fix | Schema DDL, append-only triggers, `componentRepository.ts`, `/api/components` router, seed data, certificate manifest, and `audit_db.ts` search fix | none | PLANNED |
-| M2 | R4 Component Health Passports (Frontend UI) | `ComponentPassportsPage.tsx`, `PassportQRScannerModal.tsx`, wagon assignment UI in `WagonDetailPage.tsx`, header navigation | M1 | PLANNED |
-| M3 | R1-R5 Full Feature Integration & Polish | Verification of Voice UI, CV AR Vision, Acoustic Diagnostics, Passports, and OMRS Stores Inventory across all 7 stages | M2 | PLANNED |
-| M4 | E2E Test Suite 100% Pass (Tiers 1-4) | Requirement-driven opaque-box testing across all 5 features (Tiers 1 to 4) with 100% passing tests | M3 | PLANNED |
-| M5 | Adversarial Hardening (Tier 5) & Victory Audit | White-box adversarial testing, forensic integrity audit verification, zero-regression certification | M4 | PLANNED |
+| M1 | R4 Component Health Passports (Backend/DB) & Harness Fix | Schema DDL, append-only triggers, `componentRepository.ts`, `/api/components` router, seed data, certificate manifest, and `audit_db.ts` search fix | none | DELIVERED |
+| M2 | R4 Component Health Passports (Frontend UI) | `ComponentPassportsPage.tsx`, `PassportQRScannerModal.tsx`, wagon assignment UI in `WagonDetailPage.tsx`, header navigation | M1 | DELIVERED |
+| M3 | R1-R5 Full Feature Integration & Polish | Verification of Voice UI, CV AR Vision, Acoustic Diagnostics, Passports, and OMRS Stores Inventory across all 7 stages | M2 | DELIVERED |
+| M4 | E2E Test Suite 100% Pass (Tiers 1-4) | Requirement-driven opaque-box testing across all 5 features (Tiers 1 to 4) with 100% passing tests | M3 | DELIVERED |
+| M5 | Adversarial Hardening (Tier 5) & Victory Audit | White-box adversarial testing, forensic integrity audit verification, zero-regression certification | M4 | DELIVERED |
 
 ## Interface Contracts
 ### Client ↔ Server: `/api/components`
@@ -45,13 +50,32 @@ The application is a full-stack, offline-first PWA for Indian Railways Wagon Rep
 ### Client ↔ Server: `/api/cv/measure`
 - `POST /api/cv/measure`: body `{ wagonId?, wagonNumber?, componentType, measuredValue, wireDiameter?, nominalValue?, bogieType?, condition?, bogiePosition?, damageType?, damageNotes?, imageSnapshot?, metadata? }` -> returns `{ success: true, verdict, componentType, measuredValue, delta, toleranceRange, band, bandRoman, colorHex, rdsoTable, wireDiameterCheck?, condemnationReason?, auditLogId, auditHash, checklistUpdated, photoRecorded, timestamp }`
 
+> **Known defect (2 Sep 2026):** `checklistUpdated` is always returned as
+> `false`. In `server/src/routes/cv.ts` the guard reads
+> `getChecklistItems(wagonNumber, category)` and then tests `catItems.length`,
+> but that method takes one argument and returns `{ categories, allItems }` —
+> an object with no `length` — so the branch never runs and an AR-caliper
+> reading is never written to the checklist. Verified against a live wagon
+> holding 6 SPRINGS items.
+
 ### Client ↔ Server: `/api/acoustic/diagnose`
 - `POST /api/acoustic/diagnose`: body `{ wagonNumber, dominantFrequencyHz, peakDb, anomalyType, confidence?, details?, targetCategory?, targetPartName?, inspectorId? }` -> returns `{ success: true, data: { diagnosticResult, diagnosticRecord, checklistItem, gateBlocked, blockers } }`
 
-### Client ↔ Server: `/api/omrs` & `/api/inventory`
-- `POST /api/omrs/triage/:wagonNumber`: returns `{ success: true, data: AITriageResult }`
+### Client ↔ Server: `/api/inventory`
+
+There is no `/api/omrs` router. An earlier draft of this file specified
+`POST /api/omrs/triage/:wagonNumber`; no such route is mounted in
+`server/src/routes/index.ts` and no client code calls one. OMRS remains as
+schema, seed and audit vocabulary only. Do not treat the triage endpoint as an
+available contract.
+
 - `GET /api/inventory`: returns `{ success: true, data: StoresPart[] }`
+- `GET /api/inventory/stats`
+- `GET /api/inventory/reservations`
+- `GET /api/inventory/part/:partCode`
 - `POST /api/inventory/reserve`: body `{ wagonNumber, partCode, quantity, source?, predictedDefect?, confidenceScore? }` -> returns `{ success: true, data: InventoryReservation }`
+- `POST /api/inventory/issue`
+- `POST /api/inventory/restock` (requires the `stores.manage` capability)
 
 ## Code Layout
 - `client/src/` — React 18 UI components, pages, hooks, services, and utilities.

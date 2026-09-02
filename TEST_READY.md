@@ -8,11 +8,26 @@
 
 The complete opaque-box E2E test suite for **Phase 1** (Spring Classification & Inspection System) and **Phase 2** (Wagon Lifecycle, CASNUB Bogie Parts Checklist, Zero-Defect Exit Gate, & DRM Analytics) has been designed, implemented, and verified.
 
-- **Total Test Suites**: 31
+Figures below were re-measured on 2 September 2026. The previous version of
+this file attested to "31/31 suites"; the suite count had since grown and the
+number was never updated, so treat any figure here as good only as of the date
+above and re-run the commands in §3 before relying on it.
+
+- **E2E suites**: 39 on disk, all 39 registered and executed, **39 passing** (~81s).
+- **Server unit/integration**: 646 tests across 113 suites (54 files) — **0 failing**.
+- **Client**: 173 tests across 15 files — **0 failing**.
 - **Total Verification Tiers**: 5 Tiers (Tier 1: Feature Coverage, Tier 2: Boundary & Corner Cases, Tier 3: Cross-Feature Flows, Tier 4: Real-World Scenarios, Tier 5: Adversarial Stress)
-- **Phase 2 Test Suites**: 9 dedicated suites covering 100% of Phase 2 scope requirements (R1–R6)
-- **Pass Rate**: 100% (31/31 Suites Passing)
 - **Harness Framework**: Native Node.js 22 test runner (`node:test`, `node:assert`, `node:sqlite`) with zero runtime mock facades.
+
+### One caveat on the E2E result
+
+Two Tier 5 suites assert wall-clock deadlines rather than correctness —
+`TC-ADV-LOAD-01` (2,400 springs under 5000ms) and `TC-ADV-SYNC-06` (500 records
+under 2000ms). Both fail on a loaded machine and pass on an idle one; they were
+observed failing at 27.6s and 2.7s respectively while a client build and the
+server suite ran alongside, then passing 8/8 immediately afterwards. A failure
+in either measures the machine, not the build. (`TC-ADV-SYNC-06`'s title also
+says "under 500ms" while it asserts 2000ms.)
 
 ---
 
@@ -46,13 +61,26 @@ npm run test:all
 npm run test:phase2
 ```
 
-### Individual Tier Execution
+### Server and client suites
+
+The `npm test` commands above cover the E2E tier suites only. The server and
+client suites are separate, and both must pass:
+
 ```bash
-npm run test:tier1   # Tier 1: Feature Coverage (12 suites)
-npm run test:tier2   # Tier 2: Boundary & Corner Cases (5 suites)
+npm test --prefix server   # 646 tests / 113 suites — takes ~7 minutes
+npm test --prefix client   # 173 tests / 15 files — takes ~8 seconds
+```
+
+### Individual Tier Execution
+
+Counts are registered suites, which is what these commands actually run:
+
+```bash
+npm run test:tier1   # Tier 1: Feature Coverage (16 suites)
+npm run test:tier2   # Tier 2: Boundary & Corner Cases (6 suites)
 npm run test:tier3   # Tier 3: Cross-Feature Integration Flows (5 suites)
 npm run test:tier4   # Tier 4: Real-World Workshop Scenarios (5 suites)
-npm run test:tier5   # Tier 5: Adversarial Stress & Dynamic Sweeps (4 suites)
+npm run test:tier5   # Tier 5: Adversarial Stress & Dynamic Sweeps (6 suites)
 ```
 
 ---

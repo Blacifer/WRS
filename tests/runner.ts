@@ -7,12 +7,41 @@
  */
 
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
+
+function assertNoUnregisteredSuites(): void {
+  const e2eRoot = path.join(PROJECT_ROOT, 'tests', 'e2e');
+  if (!fs.existsSync(e2eRoot)) return;
+
+  const onDisk: string[] = [];
+  for (const tier of fs.readdirSync(e2eRoot, { withFileTypes: true })) {
+    if (!tier.isDirectory()) continue;
+    for (const f of fs.readdirSync(path.join(e2eRoot, tier.name))) {
+      if (f.endsWith('.test.ts')) {
+        onDisk.push(`tests/e2e/${tier.name}/${f}`);
+      }
+    }
+  }
+
+  const registered = new Set<string>([
+    ...SUITES.tier1, ...SUITES.tier2, ...SUITES.tier3, ...SUITES.tier4, ...SUITES.tier5
+  ]);
+
+  const orphans = onDisk.filter(f => !registered.has(f)).sort();
+  if (orphans.length > 0) {
+    console.error('\n  ✖ These suites exist but are registered in no tier of SUITES:\n');
+    for (const o of orphans) console.error(`      ${o}`);
+    console.error('\n  Add each to the appropriate tier in tests/runner.ts, or delete it.');
+    console.error('  Refusing to report a pass over a suite that was never opened.\n');
+    process.exit(1);
+  }
+}
 
 export const SUITES = {
   tier1: [
@@ -70,7 +99,8 @@ export const SUITES = {
     'tests/e2e/tier5-adversarial/rdso_dynamic_boundary_sweeps.test.ts',
     'tests/e2e/tier5-adversarial/phase2_challenger2_empirical.test.ts',
     'tests/e2e/tier5-adversarial/phase2_adversarial_stress.test.ts',
-    'tests/e2e/tier5-adversarial/phase3_component_passports_adversarial.test.ts'
+    'tests/e2e/tier5-adversarial/phase3_component_passports_adversarial.test.ts',
+    'tests/e2e/tier5-adversarial/phase3_challenger2_concurrency_immutability.test.ts'
   ],
   phase2: [
     'tests/e2e/tier1-features/phase2_r1_lifecycle.test.ts',
@@ -230,6 +260,17 @@ async function main() {
     console.log('  E2E Test Harness — Spring System, Wagon QC & Phase 3 AI Systems');
     console.log('========================================================================\n');
   }
+
+  /*
+   * SUITES is a hand-maintained list, so a new .test.ts file is invisible to
+   * this runner until someone remembers to add it. That already happened once:
+   * phase3_challenger2_concurrency_immutability.test.ts sat on disk passing
+   * 12/12 while the summary below printed ALL TESTS PASSED over 38 suites and
+   * never opened it. Silence is the worst possible failure mode for a test
+   * runner, so an unregistered suite is now a hard error rather than a file
+   * nobody notices.
+   */
+  assertNoUnregisteredSuites();
 
   let filesToRun: string[] = [];
   if (target === 'all' || target === '--all') {
