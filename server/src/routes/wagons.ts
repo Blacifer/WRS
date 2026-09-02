@@ -352,7 +352,7 @@ wagonsRouter.get('/:wagonNumber/certificate', authMiddleware, async (req: Authen
     logAuditEvent(getDatabase(), {
       id: `audit_cert_${crypto.randomUUID()}`,
       inspectionId: null,
-      eventType: 'CERTIFICATE_GENERATED' as any,
+      eventType: 'CERTIFICATE_GENERATED',
       userId: req.user?.id,
       userRole: req.user?.role,
       payload: {

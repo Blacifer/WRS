@@ -17,7 +17,7 @@ import type {
   VoiceActionResponse,
   PartInspectionStatus,
   CASNUBCategory
-} from '../../shared/types.ts';
+} from '../../../shared/types.ts';
 
 export const checklistRouter = Router();
 
@@ -285,7 +285,7 @@ checklistRouter.post('/voice-action', authMiddleware, async (req: Request, res: 
     logAuditEvent(db, {
       id: auditId,
       inspectionId: inspectionId || null,
-      eventType: 'CHECKLIST_ITEM_INSPECTED' as any,
+      eventType: 'CHECKLIST_ITEM_INSPECTED',
       userId: inspectorId,
       userRole,
       payload: auditPayload,
@@ -293,6 +293,7 @@ checklistRouter.post('/voice-action', authMiddleware, async (req: Request, res: 
     });
 
     const statusMapEn: Record<PartInspectionStatus, string> = {
+      PENDING: 'PENDING',
       PASS: 'PASS',
       CONDEMNED: 'CONDEMNED',
       REPAIRED: 'REPAIRED',
@@ -301,6 +302,7 @@ checklistRouter.post('/voice-action', authMiddleware, async (req: Request, res: 
     };
 
     const statusMapHi: Record<PartInspectionStatus, string> = {
+      PENDING: 'लंबित',
       PASS: 'पास',
       CONDEMNED: 'कंडम',
       REPAIRED: 'मरम्मत किया',

@@ -169,7 +169,7 @@ export class InventoryRepository {
     // for automated events; a fake unseeded id here would silently violate
     // the users FK and drop the audit entry.
     logAuditEvent(this.db, {
-      eventType: 'INVENTORY_RESERVED' as any,
+      eventType: 'INVENTORY_RESERVED',
       userId: 'usr_adm_001',
       userRole: 'SYSTEM',
       payload: {
@@ -241,7 +241,7 @@ export class InventoryRepository {
 
     // Log audit event
     logAuditEvent(this.db, {
-      eventType: 'INVENTORY_ISSUED' as any,
+      eventType: 'INVENTORY_ISSUED',
       userId: 'usr_adm_001',
       userRole: 'SUPERVISOR',
       payload: {
@@ -296,7 +296,7 @@ export class InventoryRepository {
 
     // Log audit event
     logAuditEvent(this.db, {
-      eventType: 'INVENTORY_RESTOCKED' as any,
+      eventType: 'INVENTORY_RESTOCKED',
       userId: 'usr_adm_001',
       userRole: 'SUPERVISOR',
       payload: {

@@ -431,12 +431,14 @@ export class SortingRepository {
   public closeBatch(batchId: string, userId: string, userRole: string): void {
     const summary = this.batchSummary(batchId);
     logAuditEvent(this.db, {
-      eventType: 'INSPECTION_CREATED' as any,
+      eventType: 'INSPECTION_CREATED',
       userId,
       userRole,
       payload: {
         action: 'SPRING_SORTING_BATCH',
-        batchId,
+        // batchSummary() already carries batchId; listing it before the spread
+        // meant the literal was silently discarded. Same value either way, but
+        // only one of them is doing anything.
         ...summary
       }
     });
@@ -511,7 +513,7 @@ export class SortingRepository {
       WHERE ${clauses.join(' AND ')}
       GROUP BY classified_band, spring_position
       ORDER BY spring_position, classified_band
-    `).all(...params) as BandTally[];
+    `).all(...params) as unknown as BandTally[];
   }
 
   /**

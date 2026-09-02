@@ -14,7 +14,7 @@
  */
 
 import type { DatabaseSync } from 'node:sqlite';
-import type { LifecycleStage } from '../../../shared/types.ts';
+import type { LifecycleStage, CASNUBCategory } from '../../../shared/types.ts';
 
 // -------------------------------------------------------------------------
 // Analytics & DRM Dashboards

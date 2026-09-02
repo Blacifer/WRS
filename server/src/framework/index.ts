@@ -15,12 +15,20 @@ export type RequestHandler = (req: Request, res: Response, next: NextFunction) =
 export type ErrorRequestHandler = (err: any, req: Request, res: Response, next: NextFunction) => void | Promise<void>;
 export type Handler = RequestHandler | ErrorRequestHandler;
 
+/**
+ * `query`, `params`, `path` and `originalUrl` are declared required because
+ * the server assigns all four unconditionally before dispatching (see
+ * `listen`'s request handler), so no handler can observe them unset. They were
+ * declared optional, which forced every `req.params.id` read in the route
+ * layer to be a type error — around fifteen of them, none ever surfaced
+ * because the server runs under type stripping rather than a compiler.
+ */
 export interface Request extends http.IncomingMessage {
   body?: any;
-  query?: Record<string, string>;
-  params?: Record<string, string>;
-  path?: string;
-  originalUrl?: string;
+  query: Record<string, string>;
+  params: Record<string, string>;
+  path: string;
+  originalUrl: string;
   user?: any;
 }
 
@@ -76,7 +84,7 @@ export class RouterInstance {
             prefix,
             isSubRouter: true,
             subRouter: h,
-            handler: (req, res, next) => next()
+            handler: (_req: Request, _res: Response, next: NextFunction) => next()
           });
         } else {
           this.layers.push({
@@ -90,7 +98,7 @@ export class RouterInstance {
         prefix: '',
         isSubRouter: true,
         subRouter: pathOrHandler,
-        handler: (req, res, next) => next()
+        handler: (_req: Request, _res: Response, next: NextFunction) => next()
       });
     } else {
       this.layers.push({
@@ -103,7 +111,7 @@ export class RouterInstance {
             prefix: '',
             isSubRouter: true,
             subRouter: h,
-            handler: (req, res, next) => next()
+            handler: (_req: Request, _res: Response, next: NextFunction) => next()
           });
         } else {
           this.layers.push({

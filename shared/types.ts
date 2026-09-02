@@ -257,7 +257,23 @@ export interface InspectionRecord {
   ocr_image_ref?: string | null;
   syncStatus?: 'LOCAL' | 'SYNCED';
   sync_id?: string | null;
+  /**
+   * The camelCase form the sync route sends. `repository.ts` reads
+   * `data.syncId ?? data.sync_id`, so both spellings genuinely arrive; only
+   * the snake_case one was declared, which made the read a type error that
+   * type-stripping never surfaced.
+   */
+  syncId?: string | null;
   synced_at?: string | null;
+  /**
+   * Set when a reading was taken without a scale reference and so cannot be
+   * treated as an exact free height. Written by the inspections route and
+   * read back by the repository; both spellings occur on the wire.
+   */
+  heightIsApproximate?: boolean;
+  height_is_approximate?: boolean | number;
+  /** Device-local creation time carried through an offline sync batch. */
+  localCreatedAt?: string | null;
   auditHash?: string;
 }
 
@@ -335,14 +351,37 @@ export interface InspectionStats {
 // -------------------------------------------------------------------------
 
 export type AuditEventType = 
-  | 'INSPECTION_CREATED' 
-  | 'SUPERVISOR_OVERRIDE_RECORDED' 
-  | 'INSPECTION_SYNCED' 
-  | 'BATCH_EXPORTED' 
+  // Kept in step with the CHECK(event_type IN (...)) constraint on
+  // inspection_audit_log in schema.sql — that constraint is the authority, and
+  // this union had drifted to about a third of it. Anything missing here had
+  // to be written as `'X' as any` at the call site or would simply not
+  // typecheck, which is how the drift went unnoticed.
+  // (Component lifecycle events — MANUFACTURED, ASSIGNED_TO_WAGON and the
+  // rest — are a separate vocabulary on component_history; not these.)
+  | 'INSPECTION_CREATED'
+  | 'SUPERVISOR_OVERRIDE_RECORDED'
+  | 'INSPECTION_SYNCED'
+  | 'BATCH_EXPORTED'
   | 'SECURITY_ALERT'
   | 'AUTH_LOGIN'
   | 'OTP_GENERATED'
-  | 'OTP_VERIFIED';
+  | 'OTP_VERIFIED'
+  | 'WAGON_REGISTERED'
+  | 'WAGON_STAGE_TRANSITION'
+  | 'CHECKLIST_ITEM_INSPECTED'
+  | 'CHECKLIST_ITEM_UPDATED'
+  | 'GATE_SIGNOFF_COMPLETED'
+  | 'CERTIFICATE_GENERATED'
+  | 'PHOTO_UPLOADED'
+  | 'OMRS_TRIAGE_RUN'
+  | 'INVENTORY_RESERVED'
+  | 'INVENTORY_ISSUED'
+  | 'INVENTORY_RESTOCKED'
+  | 'COMPONENT_ASSIGNED'
+  | 'COMPONENT_UNASSIGNED'
+  | 'VOICE_COMMAND_LOGGED'
+  | 'CV_MEASUREMENT_LOGGED'
+  | 'ACOUSTIC_DEFECT_LOGGED';
 
 export interface AuditLogEntry {
   id: string;
@@ -1134,6 +1173,9 @@ export interface SerializedComponent {
   manufacturer: string;
   totalKmTravelled: number;
   overhaulCount: number;
+  /** ROH cycles completed since the last POH — what the yellow paint on the
+   *  end cap screws encodes, and what WMM 2.0 Ch.6 (f) matching compares. */
+  rohCyclesSincePoh?: number;
   lastPohDate?: string;
   nextPohDue?: string;
   healthScore: number;

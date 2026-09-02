@@ -81,13 +81,40 @@ export interface ChecklistItemData {
   phase1InspectionId?: string | null;
 }
 
+/**
+ * These unions were narrower than the values the gate actually emits, and
+ * because the server is run with --experimental-strip-types (which strips
+ * types without checking them) nothing ever complained. They are widened here
+ * to the real vocabulary rather than the aspirational one.
+ *
+ * Note the two spellings of the same idea: `CRITICAL_BLOCKER` and `CRITICAL`
+ * are both emitted. Nothing decides anything from them — release is gated on
+ * `blockers.length === 0`, i.e. on which array a detail was pushed into, not
+ * on this label — so the inconsistency is cosmetic. Worth normalising to one
+ * spelling, but that changes the API payload, so it is left alone here.
+ */
 export interface ExitGateBlockerDetail {
   id: string;
   category: string;
   partName: string;
-  issueType: 'MISSING_INSPECTION' | 'INSPECTION_FAILED' | 'CONDEMNED_UNRESOLVED' | 'REINSPECTION_REQUIRED' | 'SPRING_CONDEMNED' | 'MISSING_SPRINGS' | 'STAGE_INVALID';
+  issueType:
+    | 'MISSING_INSPECTION'
+    | 'INSPECTION_FAILED'
+    | 'CONDEMNED_UNRESOLVED'
+    | 'REINSPECTION_REQUIRED'
+    | 'SPRING_CONDEMNED'
+    | 'MISSING_SPRINGS'
+    | 'STAGE_INVALID'
+    | 'SPRINGS_NOT_FULLY_MEASURED'
+    | 'CTRB_CYCLE_MISMATCH'
+    | 'SWT_NOT_PERFORMED'
+    | 'SWT_FAILED'
+    // Nest grouping violations, from NestViolationType.
+    | 'HEIGHT_VARIATION_EXCEEDED'
+    | 'NEW_OLD_MIXED'
+    | 'BAND_MIXED';
   description: string;
-  severity: 'CRITICAL_BLOCKER' | 'WARNING' | 'ADVISORY';
+  severity: 'CRITICAL_BLOCKER' | 'CRITICAL' | 'WARNING' | 'ADVISORY';
   remediationAction: string;
 }
 
@@ -149,7 +176,7 @@ export class WagonRepository {
 
     // Audit log
     logAuditEvent(this.db, {
-      eventType: 'WAGON_REGISTERED' as any,
+      eventType: 'WAGON_REGISTERED',
       userId: createdBy,
       userRole: 'INSPECTOR',
       payload: { wagonId: id, wagonNumber, wagonType, owningRailway, entryDate },
@@ -294,7 +321,7 @@ export class WagonRepository {
 
     // Log to audit trail
     logAuditEvent(this.db, {
-      eventType: 'WAGON_STAGE_TRANSITION' as any,
+      eventType: 'WAGON_STAGE_TRANSITION',
       userId: data.performedBy,
       userRole: data.performerRole,
       payload: {
@@ -753,7 +780,7 @@ export class WagonRepository {
     // left no trace at all. The system's claim is that nothing is skipped
     // silently; that has to include the record of the inspection itself.
     logAuditEvent(this.db, {
-      eventType: 'CHECKLIST_ITEM_INSPECTED' as any,
+      eventType: 'CHECKLIST_ITEM_INSPECTED',
       userId: options?.userId || 'usr_system',
       userRole: options?.userRole || 'SYSTEM',
       payload: {
@@ -845,7 +872,7 @@ export class WagonRepository {
       logAuditEvent(this.db, {
         id: `audit_bulk_${crypto.randomUUID()}`,
         inspectionId: null,
-        eventType: 'CHECKLIST_ITEM_UPDATED' as any,
+        eventType: 'CHECKLIST_ITEM_UPDATED',
         userId: options.userId,
         userRole: options.userRole,
         payload: {
@@ -1654,7 +1681,7 @@ export class WagonRepository {
     // That is the single most consequential act in the system and the one a
     // DRM would look for first.
     logAuditEvent(this.db, {
-      eventType: 'GATE_SIGNOFF_COMPLETED' as any,
+      eventType: 'GATE_SIGNOFF_COMPLETED',
       userId: data.supervisorId,
       userRole: 'SUPERVISOR',
       payload: {
@@ -1771,7 +1798,7 @@ export class WagonRepository {
     };
   }
 
-  private requireActor(userId: string, context: string): string {
+  private requireActor(userId: string | undefined | null, context: string): string {
     if (!userId) {
       throw new Error(`${context}: no user was supplied. Every record must name who made it.`);
     }
@@ -1840,7 +1867,7 @@ export class WagonRepository {
     // do casually to the append-only audit log — so the precise meaning lives
     // in the payload's action field.
     logAuditEvent(this.db, {
-      eventType: 'INSPECTION_CREATED' as any,
+      eventType: 'INSPECTION_CREATED',
       userId: data.testedBy,
       userRole: 'INSPECTOR',
       payload: {
@@ -2216,7 +2243,7 @@ export class WagonRepository {
 
     // Audit log
     logAuditEvent(this.db, {
-      eventType: 'ACOUSTIC_DEFECT_LOGGED' as any,
+      eventType: 'ACOUSTIC_DEFECT_LOGGED',
       userId: inspectorId,
       userRole: 'INSPECTOR',
       payload: {

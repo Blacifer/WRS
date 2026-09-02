@@ -9,6 +9,7 @@
  */
 
 import { DatabaseSync } from 'node:sqlite';
+import type { SQLInputValue } from 'node:sqlite';
 import crypto from 'node:crypto';
 import type {
   SerializedComponent,
@@ -372,7 +373,7 @@ export class ComponentRepository {
     pagination: { total: number; page: number; limit: number; pages: number };
   } {
     const conditions: string[] = ['1=1'];
-    const params: unknown[] = [];
+    const params: SQLInputValue[] = [];
 
     if (filter.componentType && filter.componentType !== 'ALL') {
       conditions.push('component_type = ?');

@@ -81,7 +81,7 @@ export class TotpService {
       .run(now, Math.floor(Date.now() / 1000 / STEP_SECONDS), userId);
 
     logAuditEvent(this.db, {
-      eventType: 'OTP_VERIFIED' as any,
+      eventType: 'OTP_VERIFIED',
       userId,
       userRole: actorRole,
       payload: { action: 'TOTP_ENROLLED' }
@@ -141,7 +141,7 @@ export class TotpService {
       .run(userId);
 
     logAuditEvent(this.db, {
-      eventType: 'SECURITY_ALERT' as any,
+      eventType: 'SECURITY_ALERT',
       userId: byUserId,
       userRole: byRole,
       payload: { action: 'TOTP_RESET', targetUserId: userId, targetUsername: u.username }

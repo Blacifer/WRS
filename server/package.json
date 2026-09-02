@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "node --experimental-strip-types src/index.ts",
     "build": "node build.js",
+    "typecheck": "tsc --noEmit",
     "start": "node --experimental-strip-types src/index.ts",
     "seed": "node --experimental-strip-types src/db/seed.ts",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
@@ -20,14 +21,7 @@
     "qrcode-generator": "^2.0.4"
   },
   "devDependencies": {
-    "@types/bcryptjs": "^2.4.6",
-    "@types/cors": "^2.8.17",
-    "@types/express": "^4.17.21",
-    "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^22.10.1",
-    "@types/supertest": "^6.0.2",
-    "supertest": "^7.0.0",
-    "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }
 }
