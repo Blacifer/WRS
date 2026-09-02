@@ -7,7 +7,7 @@ import { Router } from '../framework/index.ts';
 import type { Request, Response } from '../framework/index.ts';
 import { authMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
-import { requireRole } from '../middleware/rbac.ts';
+import { requireCapability } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
 import { logAuditEvent } from '../db/auditLog.ts';
@@ -167,7 +167,16 @@ photosRouter.post('/upload', authMiddleware, async (req: Request, res: Response)
 photosRouter.get(
   '/dataset/defects',
   authMiddleware,
-  requireRole('SUPERVISOR', 'ADMIN'),
+  /*
+   * A judgement call, stated rather than buried.
+   *
+   * This is a bulk export of the workshop's own photograph dataset, which is
+   * divisional reading rather than shop-floor work, so it moves to
+   * analytics.read — the administrator and the DRM. A supervisor loses it and
+   * the DRM gains it. Nothing in the interface calls this endpoint; it is used
+   * out of band to assemble a training set, so no screen changes.
+   */
+  requireCapability('analytics.read'),
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const db = getDatabase();

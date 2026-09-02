@@ -182,7 +182,14 @@ describe('Phase 2 R1: 7-Stage Wagon Lifecycle Tracking & State Machine', () => {
 
     assert.equal(res.status, 403);
     assert.equal(res.body.success, false);
-    assert.match(res.body.message, /strictly requires SUPERVISOR or ADMIN/);
+    /*
+     * The refusal is unchanged; its wording is. The engine used to say
+     * "strictly requires SUPERVISOR or ADMIN role" because it carried its own
+     * hardcoded role check. It now asks the capability matrix, which grants
+     * wagon.override to a supervisor and to nobody else, so the message names
+     * the one role that can.
+     */
+    assert.match(res.body.message, /Only a supervisor can skip a stage/);
   });
 
   test('TC-WAG-07: Stage skipping with Supervisor role and justification >= 10 chars is permitted', async () => {

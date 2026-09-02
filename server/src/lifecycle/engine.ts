@@ -8,6 +8,7 @@
 
 import type { LifecycleStage, UserRole } from '../../../shared/types.ts';
 import { LIFECYCLE_STAGES } from '../../../shared/types.ts';
+import { can } from '../../../shared/auth/permissions.ts';
 
 export interface TransitionValidationResult {
   valid: boolean;
@@ -58,15 +59,28 @@ export class LifecycleEngine {
 
     const currentIndex = this.stageIndexMap[currentStage] ?? 0;
     const targetIndex = this.stageIndexMap[targetStage] ?? 0;
-    const roleUpper = (userRole || 'INSPECTOR').toUpperCase();
-    const isSupervisorOrAdmin = roleUpper === 'SUPERVISOR' || roleUpper === 'ADMIN';
+    /*
+     * The same authority the rest of the system uses.
+     *
+     * This was `roleUpper === 'SUPERVISOR' || roleUpper === 'ADMIN'` — a third
+     * permission mechanism, hardcoded, sitting underneath the route guards and
+     * disagreeing with them. The gate sign-off route refuses an administrator
+     * because the matrix deliberately withholds wagon.release from them: an
+     * administrator runs the system and does not certify that a wagon is fit
+     * to run. This engine then let that same administrator override a stage
+     * transition, reopen a released wagon, and force a move to RELEASE.
+     *
+     * One boundary, in one place. A supervisor holds wagon.override; an
+     * administrator and the DRM do not, and now cannot.
+     */
+    const mayOverride = can(userRole, 'wagon.override');
 
     // 1. Reopening a released wagon (from RELEASE to earlier stage)
     if (currentStage === 'RELEASE') {
-      if (!isSupervisorOrAdmin) {
+      if (!mayOverride) {
         return {
           valid: false,
-          error: 'Only Supervisors and Admins can reopen a released wagon.',
+          error: 'Only a supervisor can reopen a released wagon.',
           statusCode: 403,
           transitionType: 'REOPEN'
         };
@@ -97,10 +111,10 @@ export class LifecycleEngine {
             transitionType: 'NORMAL'
           };
         }
-        if (!isSupervisorOrAdmin) {
+        if (!mayOverride) {
           return {
             valid: false,
-            error: 'Supervisor override to RELEASE requires SUPERVISOR or ADMIN role.',
+            error: 'Only a supervisor can override a wagon to RELEASE.',
             statusCode: 403,
             transitionType: 'GATE_SIGNOFF'
           };
@@ -135,10 +149,10 @@ export class LifecycleEngine {
           transitionType: 'OVERRIDE_SKIP'
         };
       }
-      if (!isSupervisorOrAdmin) {
+      if (!mayOverride) {
         return {
           valid: false,
-          error: 'Insufficient permissions: stage skipping strictly requires SUPERVISOR or ADMIN role.',
+          error: 'Only a supervisor can skip a stage.',
           statusCode: 403,
           transitionType: 'OVERRIDE_SKIP'
         };
@@ -168,10 +182,10 @@ export class LifecycleEngine {
           transitionType: 'OVERRIDE_BACKWARD'
         };
       }
-      if (!isSupervisorOrAdmin) {
+      if (!mayOverride) {
         return {
           valid: false,
-          error: 'Insufficient permissions: backward transitions strictly require SUPERVISOR or ADMIN role.',
+          error: 'Only a supervisor can move a wagon back a stage.',
           statusCode: 403,
           transitionType: 'OVERRIDE_BACKWARD'
         };

@@ -13,7 +13,7 @@ import { LearningService } from '../learning/learningService.ts';
 import type { LearningSubsystem } from '../learning/learningService.ts';
 import { authMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
-import { requireRole, requireCapability } from '../middleware/rbac.ts';
+import { requireCapability } from '../middleware/rbac.ts';
 
 export const learningRouter = Router();
 
@@ -196,7 +196,7 @@ learningRouter.get(
 learningRouter.post(
   '/analyze',
   authMiddleware,
-  requireRole('SUPERVISOR', 'ADMIN'),
+  requireCapability('learning.approve'),
   (_req: AuthenticatedRequest, res: Response) => {
     const svc = service();
     svc.ensureParameters();
@@ -218,7 +218,7 @@ learningRouter.post(
 learningRouter.post(
   '/parameters/:paramKey/decide',
   authMiddleware,
-  requireRole('ADMIN'),
+  requireCapability('system.configure'),
   (req: AuthenticatedRequest, res: Response) => {
     try {
       const paramKey = req.params?.paramKey;

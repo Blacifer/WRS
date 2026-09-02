@@ -362,12 +362,41 @@ describe('Phase 2 R2: CASNUB Bogie Parts Checklist & Phase 1 Integration', () =>
     assert.ok(Array.isArray(getRes.body.data));
     assert.ok(getRes.body.data.length > 0);
 
-    // 2. Supervisor updates a rule
-    const postRes = await app.dispatch({
+    /*
+     * 2. An administrator updates a rule — and a supervisor no longer can.
+     *
+     * This route was guarded by rank and accepted a supervisor. The checklist
+     * template decides what must be inspected on every wagon of a type, so
+     * editing it changes what the exit gate demands of every future wagon —
+     * removing a mandatory item there weakens the gate everywhere at once.
+     * The capability matrix holds that as checklist.configure, an
+     * administrator's act, and the route now agrees with it. Nothing in the
+     * interface calls this endpoint, so no screen changes.
+     */
+    const adminToken = generateToken({
+      id: 'usr_adm_001',
+      username: 'admin1',
+      role: 'ADMIN',
+      name: 'A. K. Mishra',
+      employeeId: 'WRS-ADM-3001'
+    });
+
+    const refusedForSupervisor = await app.dispatch({
       method: 'POST',
       url: '/api/checklist/config',
       headers: {
         authorization: `Bearer ${supervisorToken}`,
+        'content-type': 'application/json'
+      },
+      body: { wagonType: 'BOXNHL', category: 'BODY_UNDERFRAME', partName: 'x', isMandatory: true }
+    });
+    assert.equal(refusedForSupervisor.status, 403, 'a supervisor can still rewrite the checklist template');
+
+    const postRes = await app.dispatch({
+      method: 'POST',
+      url: '/api/checklist/config',
+      headers: {
+        authorization: `Bearer ${adminToken}`,
         'content-type': 'application/json'
       },
       body: {

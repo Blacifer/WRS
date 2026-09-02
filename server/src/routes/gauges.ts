@@ -15,7 +15,7 @@ import { getDatabase } from '../db/connection.ts';
 import { GaugeRepository } from '../db/gaugeRepository.ts';
 import { authMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
-import { requireRole } from '../middleware/rbac.ts';
+import { requireCapability } from '../middleware/rbac.ts';
 import { logAuditEvent } from '../db/auditLog.ts';
 
 export const gaugesRouter = Router();
@@ -89,7 +89,7 @@ gaugesRouter.get('/exposure', authMiddleware, (_req: AuthenticatedRequest, res: 
 gaugesRouter.put(
   '/:gaugeCode',
   authMiddleware,
-  requireRole('ADMIN'),
+  requireCapability('system.configure'),
   (req: AuthenticatedRequest, res: Response) => {
     try {
       const gaugeCode = String(req.params?.gaugeCode || '').trim();

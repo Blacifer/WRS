@@ -8,7 +8,7 @@ import { Router } from '../framework/index.ts';
 import type { Request, Response } from '../framework/index.ts';
 import { authMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
-import { requireRole } from '../middleware/rbac.ts';
+import { requireCapability } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
 import { logAuditEvent } from '../db/auditLog.ts';
@@ -69,7 +69,7 @@ checklistRouter.get('/config', authMiddleware, async (req: Request, res: Respons
 // 2. Set / Update Mandatory Rule for Wagon Type
 // -------------------------------------------------------------------------
 
-checklistRouter.post('/config', authMiddleware, requireRole('SUPERVISOR'), async (req: Request, res: Response) => {
+checklistRouter.post('/config', authMiddleware, requireCapability('checklist.configure'), async (req: Request, res: Response) => {
   const repo = getRepo();
   const { wagonType, category, partName, bogiePosition, isMandatory, standardReference } = req.body;
 
@@ -356,7 +356,14 @@ checklistRouter.post('/voice-action', authMiddleware, async (req: Request, res: 
 checklistRouter.post(
   '/bulk-clear',
   authMiddleware,
-  requireRole('SUPERVISOR', 'ADMIN'),
+  /*
+   * The other judgement call. Clearing a run of pending checklist items behind
+   * an attestation is shop-floor work, and this codebase already holds that an
+   * administrator has no shop floor — they cannot release a wagon either. It
+   * moves to wagon.override, which the supervisor holds and the administrator
+   * does not.
+   */
+  requireCapability('wagon.override'),
   async (req: AuthenticatedRequest, res: Response) => {
     try {
       const { wagonNumber, attestation, excludeCategories } = req.body || {};

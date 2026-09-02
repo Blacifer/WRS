@@ -6,7 +6,7 @@
 import { Router } from '../framework/index.ts';
 import type { Request, Response } from '../framework/index.ts';
 import { authMiddleware } from '../middleware/auth.ts';
-import { requireRole } from '../middleware/rbac.ts';
+import { requireCapability } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { InventoryRepository } from '../db/inventoryRepository.ts';
 
@@ -266,7 +266,7 @@ inventoryRouter.post('/issue', authMiddleware, async (req: Request, res: Respons
 // -------------------------------------------------------------------------
 // 7. Restock Part Inventory
 // -------------------------------------------------------------------------
-inventoryRouter.post('/restock', authMiddleware, requireRole('SUPERVISOR'), async (req: Request, res: Response) => {
+inventoryRouter.post('/restock', authMiddleware, requireCapability('stores.manage'), async (req: Request, res: Response) => {
   try {
     const repo = getRepo();
     const { partCode, quantity } = req.body;

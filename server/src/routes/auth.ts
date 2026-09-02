@@ -10,7 +10,7 @@ import { signToken } from '../auth/jwt.ts';
 import { otpService } from '../auth/otpService.ts';
 import { authMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
-import { requireRole } from '../middleware/rbac.ts';
+import { requireCapability } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { InspectionRepository } from '../db/repository.ts';
 import { logAuditEvent } from '../db/auditLog.ts';
@@ -286,7 +286,7 @@ authRouter.get('/me', authMiddleware, (req: AuthenticatedRequest, res: Response,
 /**
  * GET /api/auth/users — Admin-only: list all accounts (no password hashes).
  */
-authRouter.get('/users', authMiddleware, requireRole('ADMIN'), (_req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+authRouter.get('/users', authMiddleware, requireCapability('users.manage'), (_req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   try {
     const db = getDatabase();
     const repo = new InspectionRepository(db);
@@ -342,7 +342,7 @@ function requireUserMgmtToken(req: AuthenticatedRequest, res: Response): boolean
 /**
  * POST /api/auth/users — Admin-only: create a real inspector/supervisor/admin account.
  */
-authRouter.post('/users', authMiddleware, requireRole('ADMIN'), (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+authRouter.post('/users', authMiddleware, requireCapability('users.manage'), (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   if (!requireUserMgmtToken(req, res)) return;
   try {
     const { username, password, role, fullName, employeeId } = req.body || {};
@@ -404,7 +404,7 @@ authRouter.post('/users', authMiddleware, requireRole('ADMIN'), (req: Authentica
  * (e.g. the seeded demo logins, once real accounts are in place). Never
  * hard-deletes — users are referenced by FK from inspection/audit rows.
  */
-authRouter.patch('/users/:id/deactivate', authMiddleware, requireRole('ADMIN'), (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+authRouter.patch('/users/:id/deactivate', authMiddleware, requireCapability('users.manage'), (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   if (!requireUserMgmtToken(req, res)) return;
   try {
     const db = getDatabase();
@@ -419,7 +419,7 @@ authRouter.patch('/users/:id/deactivate', authMiddleware, requireRole('ADMIN'), 
 /**
  * PATCH /api/auth/users/:id/reactivate — Admin-only: re-enable a disabled account.
  */
-authRouter.patch('/users/:id/reactivate', authMiddleware, requireRole('ADMIN'), (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+authRouter.patch('/users/:id/reactivate', authMiddleware, requireCapability('users.manage'), (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
   if (!requireUserMgmtToken(req, res)) return;
   try {
     const db = getDatabase();
@@ -517,7 +517,7 @@ authRouter.post('/totp/verify', authMiddleware, (req: AuthenticatedRequest, res:
   });
 });
 
-authRouter.post('/users/:userId/totp/reset', authMiddleware, requireRole('ADMIN'), (req: AuthenticatedRequest, res: Response): void => {
+authRouter.post('/users/:userId/totp/reset', authMiddleware, requireCapability('users.manage'), (req: AuthenticatedRequest, res: Response): void => {
   const targetId = req.params?.userId;
   if (!targetId || !req.user?.id) {
     res.status(400).json({ success: false, error: 'MISSING_PARAM', message: 'userId is required', statusCode: 400, timestamp: new Date().toISOString() });

@@ -20,7 +20,7 @@ import {
 } from '../reports/certificateSigning.ts';
 import { authMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
-import { requireRole, requireCapability } from '../middleware/rbac.ts';
+import { requireCapability } from '../middleware/rbac.ts';
 
 export const auditRouter = Router();
 

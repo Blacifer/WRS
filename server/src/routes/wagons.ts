@@ -8,7 +8,7 @@ import { Router } from '../framework/index.ts';
 import type { Request, Response } from '../framework/index.ts';
 import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
-import { requireRole, requireCapability } from '../middleware/rbac.ts';
+import { requireCapability } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { logAuditEvent } from '../db/auditLog.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
