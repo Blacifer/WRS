@@ -17,6 +17,7 @@ import { getWagonSpringConfig } from '../../../shared/classification/wagonTypes.
 import { judgeSortedSpring, isSortingBogie } from '../../../shared/classification/springJudgement.ts';
 import type { SortingBogie } from '../../../shared/classification/springJudgement.ts';
 import type { BogieType, SpringCondition, SpringPosition } from '../../../shared/types.ts';
+import { allocateNests } from '../../../shared/sorting/nestAllocation.ts';
 
 export const sortingRouter = Router();
 
@@ -332,6 +333,58 @@ sortingRouter.get('/stock', authMiddleware, (req: AuthenticatedRequest, res: Res
     });
   } catch (err: any) {
     bad(res, err?.message || 'Could not read sorting stock', 'SORTING_FAILED', 500);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/sorting/allocation?bogieType=&condition=&forWagon=
+//
+// What the sorted stock can actually build, and what is stranded.
+//
+// /stock already reports complete groups per band. This answers the question
+// the shop floor has instead: how many whole bogies, and which position is
+// holding that number down. A supervisor reading twenty complete outer groups
+// beside two snubber groups cannot see at a glance that the answer is two.
+// ---------------------------------------------------------------------------
+sortingRouter.get('/allocation', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const q = (req.query || {}) as Record<string, string>;
+    const bogieType = q.bogieType as BogieType;
+    const condition = (q.condition || 'USED') as SpringCondition;
+
+    if (!bogieType) return bad(res, 'bogieType is required');
+    if (!q.forWagon) {
+      return bad(res, 'forWagon is required — the spring counts a bogie needs come from its designation.');
+    }
+
+    const config = getWagonSpringConfig(q.forWagon);
+    if (!config) {
+      return bad(res, `Unknown wagon designation "${q.forWagon}". It must not be guessed.`, 'UNKNOWN_WAGON_TYPE');
+    }
+
+    const holdings = repo().stockByBand(bogieType, condition, {
+      fromDate: q.fromDate,
+      toDate: q.toDate
+    });
+
+    const allocation = allocateNests(holdings, config.counts);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        bogieType,
+        condition,
+        wagon: {
+          designation: config.designation,
+          counts: config.counts,
+          tableRef: config.tableRef
+        },
+        allocation
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (err: any) {
+    bad(res, err?.message || 'Could not compute nest allocation', 'SORTING_FAILED', 500);
   }
 });
 
