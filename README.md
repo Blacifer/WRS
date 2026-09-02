@@ -57,8 +57,9 @@ Stated plainly, because a system used for safety decisions should be clear about
 ## 🛠️ Architecture & Tech Stack
 
 - **Frontend**: React 18, TypeScript, Tailwind CSS, Vite, HTML5 Canvas 2D AR HUD, Web Audio API DSP, Web Speech API, IndexedDB offline store.
-- **Backend**: Node.js 22, Express REST API router, Node native SQLite (`DatabaseSync`) with WAL mode, foreign keys, and cryptographic audit log triggers.
-- **Testing**: 41 comprehensive E2E test suites with 260 automated test cases (Boundary Value Analysis, Combinatorial, High-Load multi-shift simulation, and adversarial integrity tests).
+- **Backend**: Node.js 22, Node native SQLite (`DatabaseSync`) with WAL mode, foreign keys, and cryptographic audit log triggers.
+- **No web framework and no ORM.** The HTTP layer is a small Express-shaped router of our own over `node:http` (`server/src/framework/`), and the only runtime dependencies are `dotenv` and `qrcode-generator`. This is deliberate for a system that has to be auditable and to keep running on a workshop LAN for years: there is no dependency tree to audit, and nothing to patch on someone else's release schedule.
+- **Testing**: 646 server tests, 173 client tests, and 39 E2E suites (Boundary Value Analysis, Combinatorial, High-Load multi-shift simulation, and adversarial integrity tests).
 
 ---
 
@@ -107,9 +108,20 @@ npm run dev
 npm run start:live
 ```
 
+#### Type checking
+
+```bash
+npm run typecheck        # server and client, both must report zero errors
+```
+
+The server runs under `node --experimental-strip-types`, which removes type
+annotations without checking them. That means nothing catches a type error at
+runtime until the line executes, so `npm run typecheck` is the only thing that
+does — run it before pushing. It is wired into `npm run build` for that reason.
+
 #### Production Build & Run
 ```bash
-# Build backend and frontend bundle
+# Type-check, then build backend and frontend bundle
 npm run build
 
 # Start production server (serves both API and client on port 3000)
@@ -123,15 +135,18 @@ Access the application at `http://localhost:3000`.
 
 Execute the end-to-end verification suite across all tiers:
 
-The suite that exercises the real server is `server/tests` — **503 cases**. Run it with:
+The suite that exercises the real server is `server/tests` — **646 tests across 113 suites** in 54 files. Run it with:
 
 ```bash
 node --experimental-strip-types --test server/tests/*.test.ts
 ```
 
-The root harness is a separate, largely hand-written parallel suite — 38 suites and
-239 cases, of which 7 files import the real server and the rest test a mock harness.
-It is useful, but a green run there is not on its own evidence that the product works:
+The root harness is a separate, largely hand-written parallel suite — **39 suites**,
+of which 7 files import the real server and the rest test a mock harness. It is
+useful, but a green run there is not on its own evidence that the product works.
+
+Note the runner refuses to start if a `.test.ts` under `tests/e2e/` is registered
+in no tier of `tests/runner.ts`, rather than passing over a suite it never opened:
 
 ```bash
 npm test
@@ -176,10 +191,10 @@ npm run test:tier5    # Adversarial stress & immutability trigger validation
 ```text
 ├── client/              # React 18 frontend PWA application
 │   ├── src/             # UI components, pages, AR HUD canvas, audio DSP, hooks
-│   ├── build.js         # Client build script
 │   └── vite.config.ts   # Vite configuration & API proxy
-├── server/              # Express + SQLite Node.js 22 backend
-│   ├── src/             # REST controllers, routes, repositories, triggers, migrations
+├── server/              # Node.js 22 + native SQLite backend
+│   ├── src/             # Routes, repositories, triggers, migrations
+│   │   └── framework/   # The small node:http router used in place of Express
 │   ├── data/            # SQLite database file (wrs_inspections.db)
 │   └── build.js         # Backend build script
 ├── shared/              # Shared TypeScript types, enums, RDSO data structures
