@@ -138,6 +138,61 @@ authRouter.post('/login', (req: Request, res: Response, next: NextFunction): voi
       return;
     }
 
+    /*
+     * A demo password must not open a production deployment.
+     *
+     * seed.ts already refuses to CREATE the demo accounts when
+     * NODE_ENV=production, and that guard is correct as far as it goes. It
+     * does not go far enough: the realistic path to a live workshop is a
+     * database that was seeded during development and then deployed, or a
+     * server pointed at that same file. Those accounts already exist, and
+     * until now production authenticated them happily — admin1/password123,
+     * a full administrator, on whatever the shop is reachable from.
+     *
+     * Checked against the password actually supplied rather than against a
+     * list of usernames, so it also catches a real account somebody created
+     * with the demo password because it was in the README.
+     *
+     * The same deliberate escape hatch as the seed: SEED_DEMO_USERS=true, for
+     * a supervised demonstration on a production build. It has to be typed on
+     * purpose.
+     */
+    const DEMO_PASSWORD = 'password123';
+    /*
+     * Read from the environment at request time rather than from the config
+     * singleton, which is resolved once at import. seed.ts makes the same
+     * check the same way, so the two halves of this guard — refusing to
+     * create the demo accounts, and refusing to authenticate them — cannot
+     * drift apart or disagree about which environment they are in.
+     */
+    const demoAllowed =
+      process.env.NODE_ENV !== 'production' || process.env.SEED_DEMO_USERS === 'true';
+
+    if (!demoAllowed && password === DEMO_PASSWORD) {
+      logAuditEvent(db, {
+        eventType: 'SECURITY_ALERT',
+        userId: 'usr_system',
+        userRole: 'SYSTEM',
+        payload: {
+          action: 'DEMO_PASSWORD_REFUSED_IN_PRODUCTION',
+          attemptedUsername: String(username).slice(0, 64)
+        }
+      });
+
+      res.status(403).json({
+        success: false,
+        error: 'DEMO_CREDENTIAL_REFUSED',
+        message:
+          'This account still uses the demonstration password, which is published in ' +
+          'the README and cannot be used on a production deployment. Set a real ' +
+          'password for it from the User Accounts screen, or create the first ' +
+          'administrator with BOOTSTRAP_ADMIN_USERNAME and BOOTSTRAP_ADMIN_PASSWORD.',
+        statusCode: 403,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
     clearFailures(attemptKey);
 
     const user = {
