@@ -15,6 +15,8 @@ The **WRS Raipur Quality Control Platform** is an enterprise-grade web applicati
    - **Band-first entry**: inspectors check the spring against the strip and tap the band, as RDSO's "Grouping of Springs (By strip method)" describes. One tap, no typing.
    - **Bulk sorting** of dismantled springs with no wagon number, which is the ~900/day work — with per-band tallies and, more usefully, how many *complete matched nests* the stock can supply.
    - **Set-level checks** a person cannot perform by eye: nest free-height variation, band mixing, and new/old mixing.
+   - **How many whole bogies the pile builds**, and which spring position is holding that number down — a bogie needs its outer, inner and snubber groups together and is finished when the scarcest runs out, which a per-band tally cannot show. Springs stranded in a band too thin to fill a group are counted rather than left looking like stock.
+   - **A reading that does not belong is questioned.** Every free height here is entered by hand, so a transposed digit — 260.5 typed as 206.5 — is a permanent hazard rather than one an instrument could remove. Readings are compared against others of their kind using median and MAD, and an odd one raises an advisory naming the likely typo. It never changes a verdict, never blocks a save, and stays silent until it has seen a dozen springs of that kind. Note which way the error runs: a typo of this sort does not pass a bad spring, it condemns a good one.
 
 2. **Wagon type registry (WMM 2.0 Tables 1.1–1.3)**
    - 33 wagon designations — BOXN, BOSTHS M1/M2, BOXNLW, BRN, BCNA and others — each carrying its bogie, axle load and spring configuration from the manual.
@@ -34,12 +36,17 @@ The **WRS Raipur Quality Control Platform** is an enterprise-grade web applicati
    - QR/RFID traceability for wheelsets, bearings, draft gear and couplers.
    - Enforces WMM 2.0 Chapter 6 clause (f): every bearing under one wagon must share its overhaul cycle — the rule currently kept in yellow paint on end cap screws and verified by sample check.
 
-7. **Tamper-evident record**
+7. **What Stores should expect to issue**
+   - Expected spring replacements for the coming fortnight, built from three inputs of deliberately different kinds: the shop's own out-turn return (5,747 wagons last year, BOXNHL 43.6% of them), RDSO's published spring counts, and the condemnation rate observed here. Only the last is learned.
+   - There is no model, and that is a choice. The arithmetic is the answer and a supervisor can check it on paper; every line reports how many observations its rate rests on.
+   - A spring type with fewer than 30 condemnations on record is reported as *not forecast yet* rather than given a number. An order quantity invented from four observations is worse than a blank, because somebody acts on it.
+
+8. **Tamper-evident record**
    - SHA-256 hash chain across every event, with database-level append-only triggers.
    - The **Audit Chain** screen (supervisor and above), or `GET /api/audit/verify`, re-derives the whole chain and names the first altered entry. A changed *role* breaks it, not just changed data. The screen also states what a pass does *not* prove: that no record was altered after it was written is not the same as every measurement having been correct.
    - Release certificates carry a keyed HMAC over their own contents and can be re-verified from the stored record.
 
-8. **Built for the shop floor**
+9. **Built for the shop floor**
    - Offline-first PWA with an IndexedDB queue; work continues without a network and syncs without duplicating.
    - Bilingual throughout (English / Hindi).
    - Hands-free voice checklist entry, and acoustic bearing/leak diagnostics using real Web Audio FFT.
@@ -59,7 +66,7 @@ Stated plainly, because a system used for safety decisions should be clear about
 - **Frontend**: React 18, TypeScript, Tailwind CSS, Vite, HTML5 Canvas 2D AR HUD, Web Audio API DSP, Web Speech API, IndexedDB offline store.
 - **Backend**: Node.js 22, Node native SQLite (`DatabaseSync`) with WAL mode, foreign keys, and cryptographic audit log triggers.
 - **No web framework and no ORM.** The HTTP layer is a small Express-shaped router of our own over `node:http` (`server/src/framework/`), and the only runtime dependencies are `dotenv` and `qrcode-generator`. This is deliberate for a system that has to be auditable and to keep running on a workshop LAN for years: there is no dependency tree to audit, and nothing to patch on someone else's release schedule.
-- **Testing**: 646 server tests, 173 client tests, and 39 E2E suites (Boundary Value Analysis, Combinatorial, High-Load multi-shift simulation, and adversarial integrity tests).
+- **Testing**: 691 server tests, 173 client tests, and 39 E2E suites (Boundary Value Analysis, Combinatorial, High-Load multi-shift simulation, and adversarial integrity tests).
 
 ---
 
@@ -135,7 +142,7 @@ Access the application at `http://localhost:3000`.
 
 Execute the end-to-end verification suite across all tiers:
 
-The suite that exercises the real server is `server/tests` — **646 tests across 113 suites** in 54 files. Run it with:
+The suite that exercises the real server is `server/tests` — **691 tests across 133 suites** in 58 files. Run it with:
 
 ```bash
 node --experimental-strip-types --test server/tests/*.test.ts

@@ -8,13 +8,13 @@
 
 The complete opaque-box E2E test suite for **Phase 1** (Spring Classification & Inspection System) and **Phase 2** (Wagon Lifecycle, CASNUB Bogie Parts Checklist, Zero-Defect Exit Gate, & DRM Analytics) has been designed, implemented, and verified.
 
-Figures below were re-measured on 2 September 2026. The previous version of
+Figures below were re-measured on 3 September 2026. The previous version of
 this file attested to "31/31 suites"; the suite count had since grown and the
 number was never updated, so treat any figure here as good only as of the date
 above and re-run the commands in §3 before relying on it.
 
 - **E2E suites**: 39 on disk, all 39 registered and executed, **39 passing** (~81s).
-- **Server unit/integration**: 646 tests across 113 suites (54 files) — **0 failing**.
+- **Server unit/integration**: 691 tests across 133 suites (58 files) — **0 failing**.
 - **Client**: 173 tests across 15 files — **0 failing**.
 - **Total Verification Tiers**: 5 Tiers (Tier 1: Feature Coverage, Tier 2: Boundary & Corner Cases, Tier 3: Cross-Feature Flows, Tier 4: Real-World Scenarios, Tier 5: Adversarial Stress)
 - **Harness Framework**: Native Node.js 22 test runner (`node:test`, `node:assert`, `node:sqlite`) with zero runtime mock facades.
@@ -67,7 +67,7 @@ The `npm test` commands above cover the E2E tier suites only. The server and
 client suites are separate, and both must pass:
 
 ```bash
-npm test --prefix server   # 646 tests / 113 suites — takes ~7 minutes
+npm test --prefix server   # 691 tests / 133 suites — takes ~7 minutes
 npm test --prefix client   # 173 tests / 15 files — takes ~8 seconds
 ```
 

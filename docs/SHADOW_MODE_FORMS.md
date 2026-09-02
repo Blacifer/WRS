@@ -60,6 +60,20 @@ One per shift, filled in by the supervisor at the end.
 | …of those, the app was wrong | |
 | …of those, the register was wrong | |
 
+**The app's "Worth a second look" box**
+
+Four figures, because the interesting one is the last. See
+`SHADOW_MODE_ROLLOUT.md` for why an unanswered advisory is a finding about the
+app rather than about the inspector.
+
+| Measure | Count |
+|---|---|
+| Springs that raised the amber box | |
+| …answered *Re-measured — it was wrong* | |
+| …answered *The reading stands* | |
+| …not answered at all | |
+| Transcription errors the paper diff caught that the box did **not** raise | |
+
 **Time comparison** — take one wagon and time it both ways:
 
 | | Minutes |
@@ -91,6 +105,12 @@ moving out of shadow mode, expect to see:
   annoyance, the app being under-cautious is the thing that must never happen.
 - Every "app could not answer" case either fixed or written down as a known
   limitation someone has accepted.
+- **Most amber boxes answered.** Not most of them correct — most of them
+  answered. A high unanswered count means inspectors have learned to dismiss
+  the box, and a check people dismiss protects nobody; that is a reason to
+  change where it appears, not a reason to press on.
+- The box's false-alarm rate steady or falling, and any transcription error it
+  missed understood rather than merely noted.
 
 Keep the completed logs. When CRIS or an RDSO reviewer asks how the system was
 validated, this is the answer, and it is a much better one than a test suite.
