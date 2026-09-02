@@ -13,7 +13,7 @@ import { LearningService } from '../learning/learningService.ts';
 import type { LearningSubsystem } from '../learning/learningService.ts';
 import { authMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
-import { requireRole } from '../middleware/rbac.ts';
+import { requireRole, requireCapability } from '../middleware/rbac.ts';
 
 export const learningRouter = Router();
 
@@ -133,7 +133,20 @@ learningRouter.post('/outcome', authMiddleware, (req: AuthenticatedRequest, res:
 learningRouter.get(
   '/dashboard',
   authMiddleware,
-  requireRole('SUPERVISOR', 'ADMIN'),
+  /*
+   * Reading is a capability, not a rank.
+   *
+   * requireRole asks "are you this senior or above" against a ladder that
+   * lists INSPECTOR, SUPERVISOR and ADMIN and does not contain DRM at all —
+   * so the divisional officer scores zero and is refused, while his own
+   * navigation offers him this screen because he holds learning.view. Same
+   * shape as the Audit Chain bug: the nav and the enforcement disagreed and
+   * the officer lost.
+   *
+   * Deciding a proposal below stays a rank check, because approving a change
+   * to how the system behaves is not something the DRM does.
+   */
+  requireCapability('learning.view'),
   (_req: AuthenticatedRequest, res: Response) => {
     const svc = service();
     svc.ensureParameters();
@@ -151,7 +164,8 @@ learningRouter.get(
 learningRouter.get(
   '/accuracy/:subsystem',
   authMiddleware,
-  requireRole('SUPERVISOR', 'ADMIN'),
+  // Read, so the same capability as the dashboard above.
+  requireCapability('learning.view'),
   (req: AuthenticatedRequest, res: Response) => {
     const subsystem = req.params?.subsystem as LearningSubsystem;
     if (!VALID_SUBSYSTEMS.includes(subsystem)) {

@@ -34,7 +34,20 @@ export const auditRouter = Router();
 auditRouter.get(
   '/verify',
   authMiddleware,
-  requireRole('SUPERVISOR'),
+  /*
+   * Guarded by the capability, not by rank.
+   *
+   * This said requireRole('SUPERVISOR'), which asks "are you this senior or
+   * above" against a ladder the DRM does not sit on. So the divisional
+   * officer — who holds audit.read, and whose navigation therefore offers him
+   * Audit Chain — opened his own screen and was told "Insufficient
+   * permissions. Requires minimum role: SUPERVISOR".
+   *
+   * The nav is capability-gated and this was not, so the two disagreed. A
+   * menu entry that bounces the person it was drawn for is worse than no
+   * entry, and this one bounced the officer the system is being built for.
+   */
+  requireCapability('audit.read'),
   (_req: AuthenticatedRequest, res: Response) => {
     try {
       const result = verifyAuditChain(getDatabase());

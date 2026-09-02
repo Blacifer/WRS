@@ -152,17 +152,46 @@ describe('The activity ledger', () => {
   });
 
   it('shows a supervisor more than springs', async () => {
-    const res = await get('/api/audit/activity?limit=200', {
+    /*
+     * Causes the second kind of event itself rather than trusting the ledger
+     * to already hold one.
+     *
+     * This asked for the newest two hundred entries and asserted that more
+     * than one kind appeared among them. That passes or fails on whatever the
+     * database happens to contain: a run of sign-ins — which is what a day of
+     * driving the app produces — fills the newest two hundred with AUTH_LOGIN
+     * and the assertion collapses, describing the test's history rather than
+     * the product's behaviour.
+     *
+     * An export writes BATCH_EXPORTED. Doing one here means the two kinds are
+     * guaranteed to exist, and the test then checks the thing it is actually
+     * about: that the ledger returns more than spring inspections.
+     */
+    const exported = await get('/api/inspections/export?format=json', {
       authorization: `Bearer ${supervisorToken}`
     });
-    assert.equal(res.status, 200);
+    assert.equal(exported.status, 200, 'the export a supervisor is allowed was refused');
 
-    const body = await res.json();
-    const kinds = new Set(body.data.entries.map((e: any) => e.eventType));
-    assert.ok(kinds.size > 1, 'the ledger returned only one kind of event');
+    const [logins, exports] = await Promise.all([
+      get('/api/audit/activity?eventType=AUTH_LOGIN&limit=5', {
+        authorization: `Bearer ${supervisorToken}`
+      }),
+      get('/api/audit/activity?eventType=BATCH_EXPORTED&limit=5', {
+        authorization: `Bearer ${supervisorToken}`
+      })
+    ]);
+
+    const loginBody = await logins.json();
+    const exportBody = await exports.json();
+
+    assert.ok(loginBody.data.entries.length > 0, 'no sign-in reached the ledger');
     assert.ok(
-      [...kinds].some(k => k !== 'INSPECTION_CREATED'),
-      'the ledger still only talks about springs'
+      exportBody.data.entries.length > 0,
+      'an export happened and the ledger does not mention it'
+    );
+    assert.ok(
+      exportBody.data.entries.every((e: any) => e.eventType === 'BATCH_EXPORTED'),
+      'filtering by event type returned other kinds'
     );
   });
 
