@@ -524,6 +524,46 @@ export class SortingRepository {
    * 143 outer springs means nothing until you know how they split. Counting
    * per band and dividing by what one nest needs turns a pile into a plan.
    */
+  /**
+   * Recent free heights for one kind of spring, for the anomaly check.
+   *
+   * Only PASS records are returned. A condemned spring is genuinely far from
+   * the population — that is what condemned means — so including them would
+   * teach the check that low readings are normal and blunt the very signal it
+   * exists to raise. The population is "what an acceptable spring of this kind
+   * measures", not "what has been measured".
+   *
+   * `recentInOrder` is the newest few in entry order, which is the only thing
+   * the repeated-value check can be computed from.
+   */
+  public recentHeights(
+    bogieType: BogieType,
+    condition: SpringCondition,
+    springPosition: SpringPosition,
+    limit = 200
+  ): { heights: number[]; recentInOrder: number[] } {
+    const rows = this.db
+      .prepare(
+        `SELECT measured_height AS h
+           FROM spring_sorting_records
+          WHERE bogie_type = ?
+            AND spring_condition = ?
+            AND spring_position = ?
+            AND status = 'PASS'
+          ORDER BY created_at DESC, rowid DESC
+          LIMIT ?`
+      )
+      .all(bogieType, condition, springPosition, limit) as Array<Record<string, unknown>>;
+
+    const newestFirst = rows.map((r) => Number(r.h)).filter((n) => Number.isFinite(n));
+
+    return {
+      heights: newestFirst,
+      // Oldest-to-newest, so appending the reading under test gives a run.
+      recentInOrder: [...newestFirst].reverse().slice(-8)
+    };
+  }
+
   public nestCapacity(
     bogieType: BogieType,
     condition: SpringCondition,

@@ -80,6 +80,12 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
   const [days, setDays] = useState<Day[]>([]);
   const [sortingStock, setSortingStock] = useState<any[]>([]);
   const [gaugeExposure, setGaugeExposure] = useState<{ total: number; summary: string } | null>(null);
+  /*
+   * What Stores should expect to issue. Held as whatever the server returned,
+   * including its refusal to quote — a spring type without enough
+   * condemnations behind it is reported as such rather than given a number.
+   */
+  const [forecast, setForecast] = useState<any>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
 
@@ -102,14 +108,18 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
         d.setDate(d.getDate() - i);
         return d.toISOString().slice(0, 10);
       });
-      const [dayResults, stock, exposure] = await Promise.all([
+      const [dayResults, stock, exposure, demand] = await Promise.all([
         Promise.all(dates.map(d => api.getSortingThroughput(d).then(r => r.data).catch(() => null))),
         api.getSortingStock('CASNUB_22_NLB', 'USED'),
-        api.getGaugeExposure()
+        api.getGaugeExposure(),
+        // A supervisor reaching this page does not hold analytics.read, so a
+        // 403 here is expected rather than exceptional. Swallowed to null.
+        api.getConsumptionForecast(14).then(r => r.data).catch(() => null)
       ]);
       setDays(dayResults.filter(Boolean).reverse() as Day[]);
       setSortingStock(stock.data.stock || []);
       setGaugeExposure(exposure.data);
+      setForecast(demand);
     } catch {
       // A quiet failure here must not take the rest of the page with it.
     }
@@ -307,6 +317,60 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/*
+          * What Stores should expect to issue.
+          *
+          * Shown with its own basis on every line, because an order quantity
+          * nobody can interrogate is one nobody should act on. Types with too
+          * thin a record are named as withheld rather than omitted — a missing
+          * row reads as no demand, which is the opposite of what it means.
+          */}
+        {forecast && (
+          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 mb-6">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wide mb-1">
+              Expected spring replacements — next {forecast.periodDays} working days
+            </h3>
+            <p className="text-[12px] text-slate-400 mb-3">{forecast.summary}</p>
+
+            {forecast.lines.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-[12.5px]">
+                  <thead>
+                    <tr className="text-slate-400 text-left border-b border-slate-800">
+                      <th className="py-1.5 pr-3 font-semibold">Spring</th>
+                      <th className="py-1.5 pr-3 font-semibold text-right">Handled</th>
+                      <th className="py-1.5 pr-3 font-semibold text-right">Condemned</th>
+                      <th className="py-1.5 pr-3 font-semibold text-right">Order</th>
+                      <th className="py-1.5 font-semibold text-right">From</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {forecast.lines.map((l: any) => (
+                      <tr key={`${l.bogieType}-${l.springPosition}`} className="border-b border-slate-800/60">
+                        <td className="py-1.5 pr-3 text-slate-200">
+                          {l.bogieType.replace('CASNUB_22_', '')} {l.springPosition.toLowerCase()}
+                        </td>
+                        <td className="py-1.5 pr-3 text-right text-slate-300 tabular-nums">{l.springsHandled}</td>
+                        <td className="py-1.5 pr-3 text-right text-slate-300 tabular-nums">{l.condemnationRatePct}%</td>
+                        <td className="py-1.5 pr-3 text-right text-white font-bold tabular-nums">{l.expectedReplacements}</td>
+                        <td className="py-1.5 text-right text-slate-500 tabular-nums">{l.basis}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {forecast.notForecast.length > 0 && (
+              <p className="text-[11px] text-slate-500 mt-3 leading-relaxed">
+                Not forecast yet: {forecast.notForecast
+                  .map((n: any) => `${n.bogieType.replace('CASNUB_22_', '')} ${n.springPosition.toLowerCase()} (${n.condemned})`)
+                  .join(', ')}. A rate needs 30 condemnations behind it before an order quantity is offered.
+              </p>
+            )}
           </div>
         )}
 

@@ -18,6 +18,8 @@ import { judgeSortedSpring, isSortingBogie } from '../../../shared/classificatio
 import type { SortingBogie } from '../../../shared/classification/springJudgement.ts';
 import type { BogieType, SpringCondition, SpringPosition } from '../../../shared/types.ts';
 import { allocateNests } from '../../../shared/sorting/nestAllocation.ts';
+import { findMeasurementAnomaly } from '../../../shared/analysis/measurementAnomaly.ts';
+import { LearningService } from '../learning/learningService.ts';
 
 export const sortingRouter = Router();
 
@@ -76,7 +78,34 @@ sortingRouter.post('/record', authMiddleware, (req: AuthenticatedRequest, res: R
       damageNotes: b.damageNotes
     });
 
-    const { id, alreadyRecorded } = repo().record({
+    /*
+     * Judged against the readings that came BEFORE it, so a spring cannot
+     * help decide whether it is itself unusual. Computed before the insert
+     * for that reason, not after.
+     *
+     * This never gates the insert. The reading is recorded either way and the
+     * advisory rides back with it, because the inspector already has the undo
+     * path for a wrong tap — a wrong tap being, at 700 springs a shift, a
+     * certainty rather than a risk.
+     */
+    const r = repo();
+    let anomaly = null;
+    try {
+      const population = r.recentHeights(bogieType as BogieType, condition, springPosition);
+      const result = findMeasurementAnomaly(measuredFreeHeight, {
+        bogieType: bogieType as BogieType,
+        springPosition,
+        condition,
+        heights: population.heights,
+        recentInOrder: population.recentInOrder
+      });
+      if (result.flagged) anomaly = result;
+    } catch {
+      // An advisory must never be the reason a spring cannot be recorded.
+      anomaly = null;
+    }
+
+    const { id, alreadyRecorded } = r.record({
       batchId: String(b.batchId),
       bogieType: bogieType as BogieType,
       condition,
@@ -112,10 +141,48 @@ sortingRouter.post('/record', authMiddleware, (req: AuthenticatedRequest, res: R
         // False for LWLH25 and LCCF20: the published data gives a verdict and
         // no colour. The screen must not draw a band swatch for these.
         bandingAvailable: verdict.bandingAvailable,
-        note: verdict.note ?? null
+        note: verdict.note ?? null,
+        /*
+         * Null unless the reading looked wrong. The screen shows it beside the
+         * band as a question, never as a verdict — the band above it is the
+         * RDSO answer and is not affected by anything here.
+         */
+        anomaly
       },
       timestamp: new Date().toISOString()
     });
+
+    /*
+     * Logged after the response so the ledger can never delay a tap. Records
+     * the question that was asked; POST /api/sorting/records/:id/anomaly-outcome
+     * records what the inspector did about it.
+     */
+    if (anomaly && !alreadyRecorded) {
+      try {
+        new LearningService(getDatabase()).recordOutcome({
+          subsystem: 'MEASUREMENT_ANOMALY',
+          inspectionId: id,
+          machineOutput: {
+            measuredHeight: measuredFreeHeight,
+            kinds: anomaly.findings.map((f) => f.kind),
+            suggested: anomaly.findings.find((f) => f.suggested !== undefined)?.suggested ?? null
+          },
+          // Unanswered until the inspector responds; assume nothing meanwhile.
+          wasCorrected: false,
+          context: {
+            bogieType,
+            springPosition,
+            condition,
+            populationSize: anomaly.populationSize,
+            answered: false
+          },
+          userId: req.user?.id ?? null,
+          userRole: req.user?.role ?? null
+        });
+      } catch {
+        // A ledger failure must not surface as a failed sorting tap.
+      }
+    }
   } catch (err: any) {
     bad(res, err?.message || 'Could not record sorted spring', 'SORTING_FAILED', 500);
   }
@@ -176,6 +243,73 @@ sortingRouter.post('/batches/:batchId/undo', authMiddleware, (req: Authenticated
       message: err?.message || 'That spring could not be corrected.',
       statusCode: 400, timestamp: new Date().toISOString()
     });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/sorting/records/:id/anomaly-outcome
+//
+// What the inspector did about a flagged reading.
+//
+// This is the half that makes the flag worth having. Recording that a question
+// was asked tells you nothing; recording the answer tells you whether asking
+// was justified, and that is the only thing that can honestly tune the
+// threshold later.
+//
+// Two answers, and they mean opposite things about the machine:
+//
+//   RE_MEASURED  the inspector gauged it again and the value changed. The
+//                flag caught a real transcription error.
+//   CONFIRMED    gauged again, the reading stands. The flag was a false
+//                alarm, and enough of these is the argument for widening the
+//                threshold — an argument this ledger will be able to make
+//                with evidence instead of impressions.
+//
+// Nothing here alters the recorded spring. Correcting a reading is what the
+// undo path is for, and it stays the only way to change a record.
+// ---------------------------------------------------------------------------
+sortingRouter.post('/records/:id/anomaly-outcome', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const id = req.params?.id;
+    const action = String(req.body?.action || '').toUpperCase();
+
+    if (!id) return bad(res, 'A record id is required.');
+    if (action !== 'RE_MEASURED' && action !== 'CONFIRMED') {
+      return bad(res, 'action must be RE_MEASURED (the reading changed) or CONFIRMED (it stands).');
+    }
+    if (!req.user?.id) return bad(res, 'Authenticated inspector required.', 'UNAUTHORIZED', 401);
+
+    const originalHeight = Number(req.body?.originalHeight);
+    const correctedHeight = Number(req.body?.correctedHeight);
+    const bothKnown = Number.isFinite(originalHeight) && Number.isFinite(correctedHeight);
+
+    new LearningService(getDatabase()).recordOutcome({
+      subsystem: 'MEASUREMENT_ANOMALY',
+      inspectionId: id,
+      machineOutput: { flagged: true, originalHeight: Number.isFinite(originalHeight) ? originalHeight : null },
+      humanOutput: { action, correctedHeight: Number.isFinite(correctedHeight) ? correctedHeight : null },
+      // True when the flag changed the recorded outcome — the flag was right.
+      wasCorrected: action === 'RE_MEASURED',
+      correctionMagnitude: bothKnown ? Math.abs(correctedHeight - originalHeight) : null,
+      context: { answered: true },
+      userId: req.user.id,
+      userRole: req.user.role ?? null
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        recorded: true,
+        action,
+        message:
+          action === 'RE_MEASURED'
+            ? 'Recorded — the check caught a reading that needed correcting.'
+            : 'Recorded — the reading stands and the check was a false alarm.'
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (err: any) {
+    bad(res, err?.message || 'Could not record the outcome', 'SORTING_FAILED', 500);
   }
 });
 

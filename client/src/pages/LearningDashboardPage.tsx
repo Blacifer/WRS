@@ -26,7 +26,8 @@ const SUBSYSTEM_LABELS: Record<string, string> = {
   SPRING_CLASSIFICATION: 'Spring Classification',
   VOICE_COMMAND: 'Voice Commands',
   ACOUSTIC_DIAGNOSTIC: 'Acoustic Diagnostics',
-  DEFECT_SUGGESTION: 'Defect Suggestions'
+  DEFECT_SUGGESTION: 'Defect Suggestions',
+  MEASUREMENT_ANOMALY: 'Unusual Readings'
 };
 
 export const LearningDashboardPage: React.FC<LearningDashboardPageProps> = ({ lang, user }) => {

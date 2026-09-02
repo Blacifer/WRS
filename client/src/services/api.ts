@@ -504,6 +504,14 @@ export class ApiClient {
     return this.request<{ success: boolean; data: any }>('/analytics/parts');
   }
 
+  /**
+   * Expected spring replacements over the coming period, so Stores can
+   * pre-position rather than react. Divisional reading — analytics.read.
+   */
+  public async getConsumptionForecast(days = 14): Promise<{ success: boolean; data: any }> {
+    return this.request<{ success: boolean; data: any }>(`/analytics/forecast?days=${days}`);
+  }
+
   public async getAnalyticsInspectors(): Promise<{ success: boolean; data: any }> {
     return this.request<{ success: boolean; data: any }>('/analytics/inspectors');
   }
@@ -957,6 +965,31 @@ export class ApiClient {
     const params = new URLSearchParams({ bogieType, condition });
     if (forWagon) params.set('forWagon', forWagon);
     return this.request(`/sorting/stock?${params.toString()}`);
+  }
+
+  /**
+   * How many whole bogies the sorted stock builds, and which position limits it.
+   *
+   * getSortingStock answers "how many groups can each band supply". This answers
+   * the question the floor has: a bogie needs its outer, inner and snubber
+   * groups together and is finished when the scarcest runs out.
+   */
+  public async getNestAllocation(bogieType: string, condition: string, forWagon: string): Promise<{ success: boolean; data: { allocation: any; wagon: any } }> {
+    const params = new URLSearchParams({ bogieType, condition, forWagon });
+    return this.request(`/sorting/allocation?${params.toString()}`);
+  }
+
+  /** What the inspector did about a reading the anomaly check questioned. */
+  public async recordAnomalyOutcome(
+    recordId: string,
+    action: 'RE_MEASURED' | 'CONFIRMED',
+    originalHeight?: number,
+    correctedHeight?: number
+  ): Promise<{ success: boolean; data: any }> {
+    return this.request(`/sorting/records/${encodeURIComponent(recordId)}/anomaly-outcome`, {
+      method: 'POST',
+      body: JSON.stringify({ action, originalHeight, correctedHeight })
+    });
   }
 
   /**

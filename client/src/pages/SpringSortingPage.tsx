@@ -218,6 +218,20 @@ export function SpringSortingPage({ lang, onClose }: Props) {
   });
   const [tallies, setTallies] = useState<Tally[]>([]);
   const [capacity, setCapacity] = useState<Capacity[]>([]);
+  /*
+   * How many whole bogies the sorted stock builds. The per-band capacity above
+   * says how many groups each band supplies; this says what that adds up to,
+   * which is the number a supervisor is actually asked for.
+   */
+  const [allocation, setAllocation] = useState<any>(null);
+  /*
+   * A reading the server thought looked wrong, held until the inspector
+   * answers. It never blocks the next spring — the record is already made,
+   * and this is a question beside it, not a gate in front of it.
+   */
+  const [queried, setQueried] = useState<
+    { recordId: string; height: number; messages: string[]; suggested: number | null } | null
+  >(null);
   const [totals, setTotals] = useState({ total: 0, passed: 0, condemned: 0 });
   // Today's total across every session, which is the figure the DRM quoted as
   // ~900 and the one worth watching against it.
@@ -264,11 +278,16 @@ export function SpringSortingPage({ lang, onClose }: Props) {
 
   const refresh = useCallback(async () => {
     try {
-      const [batch, stock, throughput] = await Promise.all([
+      const [batch, stock, throughput, alloc] = await Promise.all([
         api.getSortingBatch(batchId),
         api.getSortingStock(bogieType, condition, forWagon),
-        api.getSortingThroughput()
+        api.getSortingThroughput(),
+        // Tolerated separately: a bogie whose springs this system cannot
+        // classify has no allocation to report, and that must not blank the
+        // tallies beside it.
+        api.getNestAllocation(bogieType, condition, forWagon).catch(() => null)
       ]);
+      setAllocation(alloc?.data?.allocation ?? null);
       setToday(throughput.data);
       setTotals({
         total: batch.data.total,
@@ -448,6 +467,19 @@ export function SpringSortingPage({ lang, onClose }: Props) {
       });
       if (res.data.status === 'CONDEMNED') playCondemnedBuzz();
       else playPassChime();
+
+      const flagged = (res.data as any).anomaly;
+      setQueried(
+        flagged
+          ? {
+              recordId: res.data.id,
+              height,
+              messages: flagged.findings.map((f: any) => (isHi ? f.messageHi : f.message)),
+              suggested:
+                flagged.findings.find((f: any) => f.suggested !== undefined)?.suggested ?? null
+            }
+          : null
+      );
       setLastRecorded(
         res.data.status === 'CONDEMNED'
           ? (isHi ? 'कंडम' : 'Condemned')
@@ -1169,6 +1201,95 @@ export function SpringSortingPage({ lang, onClose }: Props) {
             </select>
           </label>
         </div>
+
+        {/*
+          * A reading the check questioned.
+          *
+          * Amber, never red: the spring is recorded and the RDSO verdict above
+          * stands regardless of what is answered here. The two buttons are the
+          * whole interaction, and both are useful — "it stands" is how the
+          * threshold earns the evidence to be widened later.
+          */}
+        {queried && (
+          <div className="rounded-xl border border-amber-600/70 bg-amber-950/40 px-4 py-3 mb-3">
+            <p className="text-[11px] font-bold text-amber-300 uppercase tracking-wide mb-1.5">
+              {isHi ? 'यह माप जाँच लें' : 'Worth a second look'}
+            </p>
+            {queried.messages.map((m, i) => (
+              <p key={i} className="text-[13px] text-amber-50 mb-1 leading-snug">{m}</p>
+            ))}
+            <div className="flex gap-2 mt-2.5 flex-wrap">
+              <button
+                type="button"
+                onClick={async () => {
+                  const q = queried;
+                  setQueried(null);
+                  try {
+                    await api.recordAnomalyOutcome(
+                      q.recordId, 'RE_MEASURED', q.height, q.suggested ?? undefined
+                    );
+                  } catch { /* the answer is useful, not critical */ }
+                }}
+                className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-[12px] font-bold"
+              >
+                {isHi ? 'दोबारा मापा — बदल गया' : 'Re-measured — it was wrong'}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const q = queried;
+                  setQueried(null);
+                  try {
+                    await api.recordAnomalyOutcome(q.recordId, 'CONFIRMED', q.height, q.height);
+                  } catch { /* as above */ }
+                }}
+                className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-[12px] font-bold"
+              >
+                {isHi ? 'माप सही है' : 'The reading stands'}
+              </button>
+            </div>
+            <p className="text-[10.5px] text-amber-200/70 mt-2">
+              {isHi
+                ? 'स्प्रिंग दर्ज हो चुकी है — सुधारने के लिए पिछला रद्द करें।'
+                : 'The spring is already recorded. Use undo to correct it.'}
+            </p>
+          </div>
+        )}
+
+        {/*
+          * What the pile adds up to.
+          *
+          * The per-band tallies below answer "how many of each", which is the
+          * counting. This answers "how many bogies", which is the question,
+          * and names the position holding it down so the next hour of sorting
+          * goes where it changes the number.
+          */}
+        {allocation && allocation.totalHeld > 0 && (
+          <div className="rounded-xl border border-cyan-800/60 bg-cyan-950/30 px-4 py-3 mb-3">
+            <div className="flex items-baseline justify-between gap-3 flex-wrap">
+              <span className="text-[11px] font-bold text-cyan-300 uppercase tracking-wide">
+                {isHi ? 'तैयार बोगी' : 'Complete bogies from stock'}
+              </span>
+              <span className="text-2xl font-black text-white tabular-nums">
+                {allocation.bogiesBuildable}
+              </span>
+            </div>
+            <p className="text-[12px] text-cyan-100/90 mt-1">
+              {allocation.limitingPosition && allocation.bogiesBuildable === 0
+                ? (isHi
+                    ? `अभी एक भी पूरी बोगी नहीं — ${allocation.limitingPosition} स्प्रिंग कम हैं।`
+                    : allocation.summary)
+                : allocation.summary}
+            </p>
+            {allocation.totalStranded > 0 && (
+              <p className="text-[11px] text-amber-300 mt-1.5">
+                {isHi
+                  ? `${allocation.totalStranded} स्प्रिंग किसी समूह में नहीं जा सकतीं`
+                  : `${allocation.totalStranded} of ${allocation.totalHeld} sorted springs cannot complete a group in their own band`}
+              </p>
+            )}
+          </div>
+        )}
 
         {wagonConfig && !wagonConfig.bogieType && (
           <p className="text-[11px] text-amber-300 bg-amber-950/40 border border-amber-800 rounded-lg px-3 py-2">
