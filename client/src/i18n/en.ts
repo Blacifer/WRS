@@ -35,7 +35,7 @@ export const en = {
     users: 'User Accounts',
     logout: 'Logout',
     sync: 'Sync Data',
-    shiftTarget: 'Shift Target: 1,800 - 2,000'
+    shiftTarget: 'About 700 a day, per the shop'
   },
   /*
    * One label per role, and the DRM has its own.
@@ -292,7 +292,9 @@ export const en = {
   },
   analytics: {
     shiftThroughput: 'Shift Throughput & Outturn',
-    target: 'Target: 1,800 - 2,000 springs/shift',
+    // The shop's own figure, attributed. Was '1,800 - 2,000 springs/shift',
+    // which came from the deleted ROI block's claim about a nonexistent AI.
+    target: 'About 700 a day — the shop\u2019s own figure, not a target set here',
     passed: 'Passed / Serviceable',
     condemned: 'Condemned / Reject',
     condemnRate: 'Condemnation Rate',

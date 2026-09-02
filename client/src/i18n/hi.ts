@@ -31,7 +31,7 @@ export const hi = {
     users: 'उपयोगकर्ता खाते',
     logout: 'लॉग आउट',
     sync: 'डेटा सिंक करें',
-    shiftTarget: 'शिफ्ट लक्ष्य: 1,800 - 2,000'
+    shiftTarget: 'लगभग 700 प्रतिदिन — शॉप का अपना आंकड़ा'
   },
   roles: {
     INSPECTOR: 'निरीक्षक (इंस्पेक्टर)',
@@ -273,7 +273,7 @@ export const hi = {
   },
   analytics: {
     shiftThroughput: 'शिफ्ट थ्रूपुट एवं उत्पादन',
-    target: 'लक्ष्य: 1,800 - 2,000 स्प्रिंग/शिफ्ट',
+    target: 'लगभग 700 प्रतिदिन — शॉप का अपना आंकड़ा, यहाँ तय किया गया लक्ष्य नहीं',
     passed: 'उत्तीर्ण / सेवा योग्य',
     condemned: 'अस्वीकृत / स्क्रैप (कंडम)',
     condemnRate: 'अस्वीकृति दर (Condemnation Rate)',

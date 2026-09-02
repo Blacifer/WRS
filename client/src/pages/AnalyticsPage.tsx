@@ -52,7 +52,34 @@ const CustomTooltip = ({ active, payload }: any) => {
 
 export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
   const dict = getDictionary(lang);
+  const isHi = lang === 'hi';
   const [stats, setStats] = useState<InspectionStats | null>(null);
+
+  /*
+   * The sorting operation, which is the one this screen is named after.
+   *
+   * This page read /api/inspections/stats alone. That table holds the
+   * one-spring-at-a-time and batch flows — forty-one records here — and does
+   * not contain a single sorted spring, of which there are ninety-four. The
+   * shop sorts roughly nine hundred a day through Spring Sorting, so a screen
+   * called Spring Analytics was reporting on everything except the work.
+   *
+   * stockByBand, nestCapacity and dailyThroughput have existed in the sorting
+   * repository, and been served at /api/sorting/stock and
+   * /api/sorting/throughput, the whole time. Nothing asked them.
+   */
+  type Day = {
+    date: string; total: number; passed: number; condemned: number;
+    firstAt: string | null; lastAt: string | null;
+  };
+  /*
+   * Seven days rather than one. A single day's figure is zero every morning
+   * before the shift starts and says nothing about whether the floor is
+   * keeping up — which is the question the number is there to answer.
+   */
+  const [days, setDays] = useState<Day[]>([]);
+  const [sortingStock, setSortingStock] = useState<any[]>([]);
+  const [gaugeExposure, setGaugeExposure] = useState<{ total: number; summary: string } | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
 
@@ -68,14 +95,35 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
     }
   };
 
+  const loadSorting = async () => {
+    try {
+      const dates = Array.from({ length: 7 }, (_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        return d.toISOString().slice(0, 10);
+      });
+      const [dayResults, stock, exposure] = await Promise.all([
+        Promise.all(dates.map(d => api.getSortingThroughput(d).then(r => r.data).catch(() => null))),
+        api.getSortingStock('CASNUB_22_NLB', 'USED'),
+        api.getGaugeExposure()
+      ]);
+      setDays(dayResults.filter(Boolean).reverse() as Day[]);
+      setSortingStock(stock.data.stock || []);
+      setGaugeExposure(exposure.data);
+    } catch {
+      // A quiet failure here must not take the rest of the page with it.
+    }
+  };
+
+  useEffect(() => {
+    loadSorting();
+  }, []);
+
   useEffect(() => {
     loadStats();
   }, []);
 
   const totalInspected = stats?.totalInspections || 0;
-  const targetShiftMin = 1800;
-  const targetShiftMax = 2000;
-  const shiftProgressPercent = Math.min(100, Math.round((totalInspected / targetShiftMin) * 100));
 
   // Gates the audit-trail export button. Asked as a capability rather than a
   // list of role spellings, so the DRM — whose whole job is oversight —
@@ -105,7 +153,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
 
         <div className="flex items-center gap-2 self-start sm:self-auto">
           <button
-            onClick={loadStats}
+            onClick={() => { loadStats(); loadSorting(); }}
             disabled={isLoading}
             className="min-h-[44px] px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-slate-700"
           >
@@ -125,35 +173,213 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
         </div>
       </div>
 
-      {/* 1. Shift Throughput Target Gauge (1,800 - 2,000 / shift) */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h3 className="text-base font-black text-white">{dict.analytics?.shiftThroughput || 'Shift Throughput & Outturn'}</h3>
-            <p className="text-xs font-semibold text-slate-400">{dict.analytics?.target || 'Target: 1,800 - 2,000 springs/shift'}</p>
-          </div>
-          <div className="text-left sm:text-right">
-            <span className="font-mono text-2xl sm:text-3xl font-black text-blue-400">
-              {totalInspected.toLocaleString()}
-            </span>
-            <span className="text-xs font-semibold text-slate-400"> / {targetShiftMin.toLocaleString()} springs</span>
-          </div>
+      {/*
+        * The sorting floor. Placed first because it is the larger operation by
+        * an order of magnitude and the one the DRM asked for by name — roughly
+        * nine hundred springs a day against forty-one records in the table this
+        * page used to read from exclusively.
+        */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4" data-testid="sorting-analytics">
+        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
+          <h2 className="text-base font-black text-white">
+            {isHi ? 'स्प्रिंग सॉर्टिंग' : 'Spring sorting'}
+          </h2>
+          <span className="text-[11px] text-slate-500">
+            {days.length > 0
+              ? (isHi
+                  ? `${days[0].date} से ${days[days.length - 1].date}`
+                  : `${days[0].date} to ${days[days.length - 1].date}`)
+              : (isHi ? 'पिछले 7 दिन' : 'the last 7 days')}
+          </span>
         </div>
 
-        {/* Progress bar */}
-        <div className="space-y-1.5">
-          <div className="h-4 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
-            <div
-              className="h-full bg-gradient-to-r from-blue-600 via-indigo-500 to-emerald-500 rounded-full transition-all duration-500"
-              style={{ width: `${Math.max(5, shiftProgressPercent)}%` }}
-            ></div>
+        {(() => {
+          const today = days[days.length - 1];
+          const week = days.reduce((a, d) => a + d.total, 0);
+          const weekCondemned = days.reduce((a, d) => a + d.condemned, 0);
+          const busiest = days.reduce((a, d) => (d.total > (a?.total ?? -1) ? d : a), null as Day | null);
+          /*
+           * Rate is measured from the first and last spring of the busiest
+           * day, not assumed from a shift length. A figure derived from a
+           * shift nobody timed is the kind of number this system exists to
+           * stop producing.
+           */
+          const rate = busiest && busiest.firstAt && busiest.lastAt && busiest.total > 1
+            ? (() => {
+                const mins = (new Date(busiest.lastAt).getTime() - new Date(busiest.firstAt).getTime()) / 60000;
+                return mins > 0 ? Math.round(busiest.total / (mins / 60)) : null;
+              })()
+            : null;
+
+          return (
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="bg-slate-950/60 border border-slate-700 rounded-xl p-3">
+                  <p className="text-2xl font-black text-white tabular-nums" data-testid="sorted-today">
+                    {today?.total ?? 0}
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">{isHi ? 'आज सॉर्ट की गईं' : 'sorted today'}</p>
+                </div>
+                <div className="bg-slate-950/60 border border-slate-700 rounded-xl p-3">
+                  <p className="text-2xl font-black text-white tabular-nums" data-testid="sorted-week">{week}</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">{isHi ? 'पिछले 7 दिनों में' : 'over the last 7 days'}</p>
+                </div>
+                <div className="bg-slate-950/60 border border-slate-700 rounded-xl p-3">
+                  <p className="text-2xl font-black text-red-300 tabular-nums">{weekCondemned}</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {isHi ? 'कंडम' : 'condemned'}
+                    {week > 0 && <span className="text-slate-500"> · {((weekCondemned / week) * 100).toFixed(1)}%</span>}
+                  </p>
+                </div>
+                <div className="bg-slate-950/60 border border-slate-700 rounded-xl p-3">
+                  <p className="text-2xl font-black text-blue-300 tabular-nums">{rate ?? '—'}</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    {rate
+                      ? (isHi ? 'प्रति घंटा — मापी गई' : 'per hour, measured')
+                      : (isHi ? 'दर के लिए पर्याप्त डेटा नहीं' : 'not enough yet for a rate')}
+                  </p>
+                </div>
+              </div>
+
+              {/* Seven days at a glance. Bars rather than a chart library:
+                  the shape is the whole message and it has to read on a tablet. */}
+              {days.length > 0 && (
+                <div className="flex items-end gap-1.5 h-16" data-testid="sorting-trend">
+                  {days.map(d => {
+                    const max = Math.max(1, ...days.map(x => x.total));
+                    const h = Math.round((d.total / max) * 100);
+                    const isToday = d === today;
+                    return (
+                      <div key={d.date} className="flex-1 flex flex-col items-center justify-end h-full gap-1">
+                        <span className="text-[10px] text-slate-500 tabular-nums">{d.total || ''}</span>
+                        <div
+                          className={`w-full rounded-t ${isToday ? 'bg-blue-500' : 'bg-slate-700'}`}
+                          style={{ height: `${Math.max(d.total > 0 ? 6 : 2, h)}%` }}
+                          title={`${d.date}: ${d.total} sorted, ${d.condemned} condemned`}
+                        />
+                        <span className="text-[9px] text-slate-600">{d.date.slice(8)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          );
+        })()}
+
+        {/*
+          * What is actually on the floor right now, by band.
+          *
+          * Distinct from the throughput figures above, which say how much work
+          * was done. This says what the pile can supply — the question asked
+          * when somebody needs to band a wagon this afternoon.
+          */}
+        {sortingStock.length > 0 && (
+          <div data-testid="sorting-stock">
+            <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">
+              {isHi ? 'फ़र्श पर उपलब्ध स्टॉक, बैंड अनुसार' : 'Serviceable stock on the floor, by band'}
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-slate-500 text-left">
+                    <th className="py-1.5 pr-3 font-semibold">{isHi ? 'स्थिति' : 'Position'}</th>
+                    <th className="py-1.5 pr-3 font-semibold">{isHi ? 'बैंड' : 'Band'}</th>
+                    <th className="py-1.5 font-semibold text-right">{isHi ? 'संख्या' : 'Count'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortingStock.slice(0, 14).map((row: any, i: number) => (
+                    <tr key={i} className="border-t border-slate-800">
+                      <td className="py-1.5 pr-3 text-slate-300">{row.springPosition || '—'}</td>
+                      <td className="py-1.5 pr-3">
+                        <span className="inline-flex items-center gap-1.5 text-slate-200">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full inline-block border border-slate-600"
+                            style={{ backgroundColor: BAND_COLORS[row.band]?.hex || '#64748b' }}
+                          />
+                          {row.band || '—'}
+                        </span>
+                      </td>
+                      <td className="py-1.5 text-right text-white font-bold tabular-nums">{row.count ?? 0}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div className="flex justify-between text-[11px] font-bold text-slate-400">
-            <span>0</span>
-            <span>Target: {targetShiftMin} - {targetShiftMax}</span>
-            <span>{shiftProgressPercent}% Complete</span>
-          </div>
-        </div>
+        )}
+
+        {gaugeExposure && gaugeExposure.total > 0 && (
+          <p className="text-[11px] text-amber-300/90 bg-amber-950/30 border border-amber-800/50 rounded-lg px-3 py-2 font-semibold">
+            {gaugeExposure.summary}
+          </p>
+        )}
+      </div>
+
+      {/*
+        * The day against the shop's own figure.
+        *
+        * This panel read "Target: 1,800 - 2,000 springs/shift" and showed the
+        * floor at 2% of it. That pair of numbers came from the ROI block that
+        * was deleted from the DRM dashboard two sessions ago — "Manual: 900
+        * springs/day → With AI: 2,000+" — a claim about an AI that classifies
+        * nothing. It survived here, so the same invention was still being
+        * shown to the DRM, now dressed as his shop missing a target.
+        *
+        * The figure used instead is the one the shop gave: about 700 a day,
+        * from its own SSE on 27 August 2026, and it is labelled as theirs
+        * rather than presented as a standard. The count is sorted springs,
+        * which is the work — the old one counted the inspections table, which
+        * does not contain a single sorted spring.
+        */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+        {(() => {
+          const today = days[days.length - 1];
+          const sortedToday = today?.total ?? 0;
+          const shopFigure = 700;
+          const pct = Math.min(100, Math.round((sortedToday / shopFigure) * 100));
+          return (
+            <>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-base font-black text-white">
+                    {isHi ? 'आज का काम' : "Today's sorting against the shop's own figure"}
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    {isHi
+                      ? 'लगभग 700 प्रतिदिन — यह आंकड़ा शॉप के अपने SSE ने 27 अगस्त 2026 को दिया।'
+                      : 'About 700 a day — the figure the shop\u2019s own SSE gave on 27 August 2026. Not a target set by this system.'}
+                  </p>
+                </div>
+                <div className="text-left sm:text-right">
+                  <span className="font-mono text-2xl sm:text-3xl font-black text-blue-400 tabular-nums">
+                    {sortedToday.toLocaleString()}
+                  </span>
+                  <span className="text-xs font-semibold text-slate-400"> / ~{shopFigure} {isHi ? '' : 'springs'}</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="h-4 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
+                  <div
+                    className="h-full bg-gradient-to-r from-blue-600 to-emerald-500 rounded-full transition-all duration-500"
+                    style={{ width: `${sortedToday === 0 ? 0 : Math.max(2, pct)}%` }}
+                  />
+                </div>
+                <div className="flex justify-between text-[11px] font-bold text-slate-400">
+                  <span>0</span>
+                  <span className="text-slate-500 font-normal">
+                    {sortedToday === 0
+                      ? (isHi ? 'आज अभी कुछ दर्ज नहीं हुआ' : 'nothing recorded yet today')
+                      : `${pct}% ${isHi ? 'का' : 'of a typical day'}`}
+                  </span>
+                  <span>~{shopFigure}</span>
+                </div>
+              </div>
+            </>
+          );
+        })()}
       </div>
 
       {/* 2. Top Summary KPI Cards */}
