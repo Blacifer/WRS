@@ -24,6 +24,7 @@ import { useI18n } from '../i18n/index.ts';
 import type { InspectionStats } from '../../../shared/types.ts';
 import { configuredCoverage } from '../../../shared/knowledge/raipurWorkload.ts';
 import { DAILY_PILE } from '../../../shared/sorting/throughput.ts';
+import { ShopFloorNow } from '../components/ShopFloorNow.tsx';
 
 const RDSO_BAND_COLORS: Record<string, { en: string; hi: string; color: string }> = {
   BLUE: { en: 'Blue (Band I)', hi: 'नीला (बैंड I)', color: '#2563eb' },
@@ -193,6 +194,13 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
+      {/*
+        * Placed above the charts on purpose. The figures below it are true and
+        * each needs interpreting; this states the decision each one implies,
+        * which is what a divisional officer opens the screen for.
+        */}
+      <ShopFloorNow lang={lang} />
+
       {/* Top Banner & Export Actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl">
         <div>
