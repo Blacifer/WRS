@@ -87,11 +87,16 @@ export interface ChecklistItemData {
  * types without checking them) nothing ever complained. They are widened here
  * to the real vocabulary rather than the aspirational one.
  *
- * Note the two spellings of the same idea: `CRITICAL_BLOCKER` and `CRITICAL`
- * are both emitted. Nothing decides anything from them — release is gated on
- * `blockers.length === 0`, i.e. on which array a detail was pushed into, not
- * on this label — so the inconsistency is cosmetic. Worth normalising to one
- * spelling, but that changes the API payload, so it is left alone here.
+ * The gate once emitted two spellings of one idea, `CRITICAL_BLOCKER` and
+ * `CRITICAL`, and the union admitted both. Nothing ever decided anything from
+ * the label — release is gated on `blockers.length === 0`, i.e. on which array
+ * a detail was pushed into — so no wagon was ever mis-released by it. It is
+ * now normalised to CRITICAL_BLOCKER and the bare form removed from the union,
+ * so a third spelling cannot appear without failing to compile.
+ *
+ * Unrelated, despite the identical string: OMRS predicted defects in seed.ts
+ * carry their own severity vocabulary in which 'CRITICAL' is correct. Those
+ * are a different object and were deliberately left alone.
  */
 export interface ExitGateBlockerDetail {
   id: string;
@@ -114,7 +119,7 @@ export interface ExitGateBlockerDetail {
     | 'NEW_OLD_MIXED'
     | 'BAND_MIXED';
   description: string;
-  severity: 'CRITICAL_BLOCKER' | 'CRITICAL' | 'WARNING' | 'ADVISORY';
+  severity: 'CRITICAL_BLOCKER' | 'WARNING' | 'ADVISORY';
   remediationAction: string;
 }
 
@@ -1337,7 +1342,7 @@ export class WagonRepository {
 
       if (v.type === 'NEW_OLD_MIXED') {
         blockers.push(v.message);
-        blockerDetails.push({ ...detail, severity: 'CRITICAL' });
+        blockerDetails.push({ ...detail, severity: 'CRITICAL_BLOCKER' });
       } else {
         advisories.push(v.message);
         advisoryDetails.push({ ...detail, severity: 'ADVISORY' });
@@ -1389,7 +1394,7 @@ export class WagonRepository {
           description:
             `${fittedBearings.length} bearings fitted, spanning ${cycles.length} overhaul cycles (${summary}). ` +
             `Serials: ${fittedBearings.map((b) => `${b.serial_number} (${b.roh_cycles_since_poh})`).join(', ')}.`,
-          severity: 'CRITICAL',
+          severity: 'CRITICAL_BLOCKER',
           remediationAction:
             'Refit so every bearing under this wagon carries the same painting scheme, per WMM 2.0 Chapter 6 clause (f).'
         });
@@ -1421,7 +1426,7 @@ export class WagonRepository {
         description:
           'No Single Wagon Test on record for this wagon. WMM 2.0 §720 requires one after POH ' +
           'and after any change of distributor valve.',
-        severity: 'CRITICAL',
+        severity: 'CRITICAL_BLOCKER',
         remediationAction: 'Carry out the Single Wagon Test and record the proforma readings.'
       });
     } else if (!latestSwt.passed) {
@@ -1438,7 +1443,7 @@ export class WagonRepository {
         partName: 'Single Wagon Test',
         issueType: 'SWT_FAILED',
         description: `Single Wagon Test did not pass — ${parts.join('; ')}.`,
-        severity: 'CRITICAL',
+        severity: 'CRITICAL_BLOCKER',
         remediationAction: 'Rectify the air brake faults and repeat the Single Wagon Test.'
       });
     }
