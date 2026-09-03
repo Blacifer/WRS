@@ -36,6 +36,21 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        /*
+         * Smart Vision is opt-in, so its code is not forced onto every tablet.
+         *
+         * TensorFlow.js is about 1.9 MB of JavaScript and it is only reachable
+         * from one screen. Precaching it would more than double what an
+         * inspector downloads in the background to make a feature their role
+         * rarely opens available offline. It is fetched when the camera is
+         * started and cached by the browser from then on.
+         *
+         * The 19 MB of model weights under /models are already outside the
+         * glob above, having neither a listed extension nor any extension at
+         * all — this keeps the code consistent with the weights it needs.
+         */
+        globIgnores: ['**/tensorflow-*.js'],
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -111,6 +126,21 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    emptyOutDir: true
+    emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        /*
+         * Named rather than hash-only chunks for the two heavy libraries, so
+         * the service worker can be told to skip TensorFlow by name. Vite
+         * would otherwise emit them as index-<hash>.js, which cannot be
+         * matched by a glob without also matching the entry chunk.
+         */
+        manualChunks(id: string) {
+          if (id.includes('@tensorflow')) return 'tensorflow';
+          if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) return 'charts';
+          return undefined;
+        }
+      }
+    }
   }
 });

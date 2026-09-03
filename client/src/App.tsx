@@ -60,6 +60,16 @@ const AuditVerificationPage = lazy(() =>
 const HistoryPage = lazy(() =>
   import('./pages/HistoryPage.tsx').then((m) => ({ default: m.HistoryPage }))
 );
+/*
+ * Smart Vision carries TensorFlow.js and a 19 MB detection model. It is the
+ * single heaviest thing in this application, and an inspector who only sorts
+ * springs must never pay for it — so it is lazy like the divisional screens,
+ * and the weights are fetched only when the camera is actually started.
+ */
+const SmartVisionCamera = lazy(() =>
+  import('./components/SmartVisionCamera.tsx').then((m) => ({ default: m.SmartVisionCamera }))
+);
+
 const AnalyticsPage = lazy(() =>
   import('./pages/AnalyticsPage.tsx').then((m) => ({ default: m.AnalyticsPage }))
 );
@@ -311,6 +321,41 @@ export const App: React.FC = () => {
                 <span>{currentLang === 'hi' ? 'मुख्य पृष्ठ पर लौटें' : 'Back to Home'}</span>
               </button>
             </div>
+            {/*
+              * The AR camera the Smart Vision requirement asks for: it shows
+              * what it recognises, marks people and clutter as excluded, and
+              * records only the region left over.
+              */}
+            <details className="rounded-xl border border-slate-700 bg-slate-900/40">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-bold text-slate-200 select-none">
+                {currentLang === 'hi'
+                  ? 'स्मार्ट विज़न कैमरा — व्यक्ति और पृष्ठभूमि को बाहर रखता है'
+                  : 'Smart Vision camera — excludes people and background from the capture'}
+              </summary>
+              <div className="px-4 pb-4">
+                <SmartVisionCamera
+                  lang={currentLang}
+                  onCapture={(dataUrl) => {
+                    /*
+                     * The image stored is already cropped to the target
+                     * region, so a recognised person is not in the bytes that
+                     * reach the audit trail — which is what the requirement
+                     * means by "strictly record the target component".
+                     */
+                    void api
+                      .uploadPhoto({
+                        wagonNumber: 'SMART_VISION_CAPTURE',
+                        partCategory: 'SPRINGS',
+                        partName: 'Smart Vision capture',
+                        imageBase64: dataUrl,
+                        tags: ['SMART_VISION', 'FILTERED']
+                      })
+                      .catch(() => undefined);
+                  }}
+                />
+              </div>
+            </details>
+
             <SpringBatchPage
               lang={currentLang}
               user={user}

@@ -12,6 +12,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@tensorflow-models/coco-ssd": "^2.2.3",
+    "@tensorflow/tfjs": "^4.22.0",
     "jsqr": "^1.4.0",
     "qrcode-generator": "^2.0.4",
     "react": "^18.3.1",
