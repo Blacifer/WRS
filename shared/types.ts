@@ -264,6 +264,9 @@ export interface InspectionRecord {
    * type-stripping never surfaced.
    */
   syncId?: string | null;
+  /** When the server accepted this record. Sent as syncedAt; the snake_case
+   *  form is still accepted on input from queued offline records. */
+  syncedAt?: string | null;
   synced_at?: string | null;
   /**
    * Set when a reading was taken without a scale reference and so cannot be

@@ -674,75 +674,67 @@ export class InspectionRepository {
     this.db.prepare('DELETE FROM inspections WHERE id = ?').run(id);
   }
 
+  /*
+   * One name per field, matching mapWagonRow.
+   *
+   * This mapper returned twenty-eight fields under two spellings each. The
+   * database columns are snake_case and the API is camelCase; crossing that
+   * boundary is what this function is for, and emitting both sides of it
+   * simply moved the ambiguity downstream.
+   *
+   * Two names are kept on purpose and are not oversights:
+   *
+   *   band            an alias for classifiedBand that WagonDetailPage and
+   *                   SpringBatchPage both read. A semantic alias rather than
+   *                   a spelling variant, and removing it is a separate
+   *                   change with its own risk.
+   *   syncStatus      derived, not a column.
+   *
+   * As with wagons, what the server ACCEPTS is unchanged: insertInspection
+   * still reads data.syncId ?? data.sync_id and the offline forms of every
+   * other field, because tablets hold queued readings written that way.
+   */
   private mapRowToInspection(row: any): InspectionRecord {
     return {
       id: row.id,
       sequenceNumber: row.sequence_number,
-      sequence_number: row.sequence_number,
       timestamp: row.created_at,
-      created_at: row.created_at,
       inspectorId: row.inspector_id,
-      inspector_id: row.inspector_id,
       inspectorName: row.inspector_name,
-      inspector_name: row.inspector_name,
       wagonNumber: row.wagon_number,
-      wagon_number: row.wagon_number,
       bogieType: row.bogie_type,
-      bogie_type: row.bogie_type,
       springPosition: row.spring_position,
-      spring_position: row.spring_position,
       // Which bogie, and which spring within its nest. Stored since per-spring
       // indexing landed, but never surfaced here — so anything reading a wagon
       // through the API saw twelve indistinguishable outer springs.
       bogiePosition: row.bogie_position ?? null,
-      bogie_position: row.bogie_position ?? null,
       nestIndex: row.nest_index ?? null,
-      nest_index: row.nest_index ?? null,
       // Whether the height is a band midpoint from the strip rather than a
       // measurement. A reader that cannot tell the difference will treat an
       // approximate value as precise.
       heightIsApproximate: row.height_is_approximate === 1,
-      height_is_approximate: row.height_is_approximate ?? 0,
       condition: row.spring_condition,
-      spring_condition: row.spring_condition,
       measuredFreeHeight: row.measured_height,
-      measured_height: row.measured_height,
       classifiedBand: row.classified_band,
-      classified_band: row.classified_band,
       band: row.classified_band,
       bandRoman: row.band_roman,
-      band_roman: row.band_roman,
       status: row.status,
       damageType: row.damage_type,
-      damage_type: row.damage_type,
       damageNotes: row.damage_notes,
-      damage_notes: row.damage_notes,
       condemnationReason: row.condemnation_reason,
-      condemnation_reason: row.condemnation_reason,
       tableReference: row.table_reference,
-      table_reference: row.table_reference,
       isOverridden: row.supervisor_override === 1,
-      supervisor_override: row.supervisor_override,
       originalBand: row.original_band,
-      original_band: row.original_band,
       overrideBand: row.override_band,
-      override_band: row.override_band,
       overrideReason: row.override_reason,
-      override_reason: row.override_reason,
       supervisorId: row.override_supervisor_id,
-      override_supervisor_id: row.override_supervisor_id,
       supervisorName: row.override_supervisor_name,
-      override_supervisor_name: row.override_supervisor_name,
       otpTokenRef: row.otp_token_ref,
-      otp_token_ref: row.otp_token_ref,
       measurementSource: row.measurement_source,
-      measurement_source: row.measurement_source,
       ocrConfidence: row.ocr_confidence,
-      ocr_confidence: row.ocr_confidence,
       ocrImageRef: row.ocr_image_ref,
-      ocr_image_ref: row.ocr_image_ref,
       syncStatus: 'SYNCED',
-      synced_at: row.synced_at,
+      syncedAt: row.synced_at,
       auditHash: row.audit_hash
     };
   }
