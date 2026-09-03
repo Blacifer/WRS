@@ -66,7 +66,7 @@ Stated plainly, because a system used for safety decisions should be clear about
 - **Frontend**: React 18, TypeScript, Tailwind CSS, Vite, HTML5 Canvas 2D AR HUD, Web Audio API DSP, Web Speech API, IndexedDB offline store.
 - **Backend**: Node.js 22, Node native SQLite (`DatabaseSync`) with WAL mode, foreign keys, and cryptographic audit log triggers.
 - **No web framework and no ORM.** The HTTP layer is a small Express-shaped router of our own over `node:http` (`server/src/framework/`), and the only runtime dependencies are `dotenv` and `qrcode-generator`. This is deliberate for a system that has to be auditable and to keep running on a workshop LAN for years: there is no dependency tree to audit, and nothing to patch on someone else's release schedule.
-- **Testing**: 691 server tests, 173 client tests, and 39 E2E suites (Boundary Value Analysis, Combinatorial, High-Load multi-shift simulation, and adversarial integrity tests).
+- **Testing**: 697 server tests, 173 client tests, and 39 E2E suites (Boundary Value Analysis, Combinatorial, High-Load multi-shift simulation, and adversarial integrity tests).
 
 ---
 
@@ -142,7 +142,7 @@ Access the application at `http://localhost:3000`.
 
 Execute the end-to-end verification suite across all tiers:
 
-The suite that exercises the real server is `server/tests` — **691 tests across 133 suites** in 58 files. Run it with:
+The suite that exercises the real server is `server/tests` — **697 tests across 139 suites** in 59 files. Run it with:
 
 ```bash
 node --experimental-strip-types --test server/tests/*.test.ts
