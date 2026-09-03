@@ -13,7 +13,10 @@ this file attested to "31/31 suites"; the suite count had since grown and the
 number was never updated, so treat any figure here as good only as of the date
 above and re-run the commands in §3 before relying on it.
 
-- **E2E suites**: 39 on disk, all 39 registered and executed, **39 passing** (~81s).
+- **E2E suites**: 39 on disk, all 39 registered and executed, **39 passing**
+  — **251 test cases**, 0 failing (~81s). The case count is quotable for the
+  first time: the runner's metric parser was reading a reporter format these
+  suites do not emit, so it reported 0 cases under a green pass until 3 Sep.
 - **Server unit/integration**: 697 tests across 139 suites (59 files) — **0 failing**.
 - **Client**: 173 tests across 15 files — **0 failing**.
 - **Total Verification Tiers**: 5 Tiers (Tier 1: Feature Coverage, Tier 2: Boundary & Corner Cases, Tier 3: Cross-Feature Flows, Tier 4: Real-World Scenarios, Tier 5: Adversarial Stress)

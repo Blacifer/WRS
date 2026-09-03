@@ -44,9 +44,11 @@ before any suite does — a `.test.ts` under `tests/e2e/` that belongs to no tie
 is a hard error (exit 1) naming the file, rather than a pass over work nobody
 checked.
 
-Note also that the runner's per-test counters are not wired up: the summary
-always reports `Total Test Cases: 0`. Suite pass/fail is accurate; the test
-case numbers in that block are not.
+The runner's per-test counters used to be broken — its parser matched TAP's
+`# tests N` while these suites emit Node's `ℹ tests N`, so the summary printed
+`Total Test Cases: 0` beneath a green pass. Fixed on 3 September; the tiers
+hold 251 cases across 39 suites. Suite pass/fail was always accurate, since
+that comes from exit codes rather than the parser.
 
 ## Coverage Thresholds
 - **Tier 1**: ≥5 test cases per feature (5 × 5 = 25+ cases)
