@@ -96,6 +96,20 @@ export interface SubsystemAccuracy {
   totalEvents: number;
   acceptedCount: number;
   correctedCount: number;
+  /**
+   * Questions the machine asked that nobody answered.
+   *
+   * Only MEASUREMENT_ANOMALY can produce these: it raises a flag when a
+   * reading is recorded and the inspector answers separately, or not at all.
+   * They are excluded from the counts above and reported here instead,
+   * because an unanswered question is not evidence the machine was right —
+   * counting it as one would flatter every subsystem that asks them.
+   *
+   * It is also the figure shadow mode cares about most. A high unanswered
+   * count means inspectors have learned to dismiss the box, which is a
+   * finding about where the box appears rather than about the inspectors.
+   */
+  unansweredCount: number;
   /** Share of machine outputs the human accepted unchanged, 0.0 - 1.0. */
   acceptanceRate: number;
   meanCorrectionMagnitude: number | null;
@@ -223,12 +237,26 @@ export class LearningService {
       params.push(new Date(Date.now() - windowDays * 86400000).toISOString());
     }
 
-    const rows = this.db.prepare(`
-      SELECT was_corrected, correction_magnitude, machine_confidence, created_at
+    const allRows = this.db.prepare(`
+      SELECT was_corrected, correction_magnitude, machine_confidence, created_at,
+             json_extract(context_json, '$.answered') AS answered
       FROM machine_learning_events
       WHERE subsystem = ?${windowClause}
       ORDER BY created_at ASC
     `).all(...(params as any[])) as any[];
+
+    /*
+     * A row carrying answered = 0 is a question that was put to a human and
+     * never came back. Subsystems that do not ask questions have no `answered`
+     * key at all, so json_extract yields NULL for them and they all pass this
+     * filter untouched.
+     *
+     * They are separated rather than dropped because both figures are wanted:
+     * accuracy must not count silence as agreement, and shadow mode needs to
+     * know how much silence there was.
+     */
+    const unansweredCount = allRows.filter((r) => r.answered === 0).length;
+    const rows = allRows.filter((r) => r.answered !== 0);
 
     const totalEvents = rows.length;
     const correctedCount = rows.filter((r) => r.was_corrected === 1).length;
@@ -257,6 +285,7 @@ export class LearningService {
       totalEvents,
       acceptedCount,
       correctedCount,
+      unansweredCount,
       acceptanceRate: totalEvents === 0 ? 0 : Number((acceptedCount / totalEvents).toFixed(4)),
       meanCorrectionMagnitude:
         magnitudes.length === 0
