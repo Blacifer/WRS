@@ -93,6 +93,43 @@ being HMAC'd is exactly what a DSC would sign.
 
 Anything exported leaves the system's protection entirely.
 
+### 6. The CORS origin is a wildcard, and the server only warns about it
+
+`scripts/pilot-tunnel.sh` starts the server with `NODE_ENV=production`, and the
+pilot's `.env` carries `CORS_ORIGIN=*`. In that combination the server prints
+
+    [config] WARNING: CORS_ORIGIN is "*" in production.
+
+and **starts anyway**. State this plainly rather than let a reviewer discover
+it: of the three production start-up guards, two refuse to start and one only
+warns.
+
+| Condition | Behaviour |
+|---|---|
+| `JWT_SECRET` unset in production | **Refuses to start** |
+| `OTP_DELIVERY=SMS` | **Refuses to start** (no gateway is integrated) |
+| `CORS_ORIGIN` unset or `*` in production | **Warns, then starts** |
+
+The warning is the right behaviour for this deployment rather than an
+oversight. The server serves the client bundle and the API from the same
+origin and port, so a tablet loading the app makes same-origin requests and
+needs no CORS grant at all. The pilot is additionally reached over a
+Cloudflare tunnel whose hostname changes between sessions, so there is no
+stable origin to pin. Making this refuse would stop the pilot booting and buy
+nothing, because the wildcard is not what a tablet relies on.
+
+What it does mean: any origin may call the API from a browser that already
+holds a valid token. On a closed LAN, with an authenticated API, that is
+accepted risk. Before any deployment reachable from outside the workshop,
+`CORS_ORIGIN` should be set to the exact origin the tablets load from — and at
+that point the wildcard warning becomes something to act on rather than note.
+
+> A caution for whoever maintains the deployment: the comment beside
+> `CORS_ORIGIN` in the pilot `.env` currently claims the server "refuses to
+> start in production if this is left as `*`". It does not. Correct that
+> comment rather than trusting it — a security control believed to be enforced
+> and merely warned about is worse than one known to be absent.
+
 ---
 
 ## Things that were found and fixed
