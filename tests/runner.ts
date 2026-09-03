@@ -136,10 +136,25 @@ export interface TestFileResult {
 }
 
 function parseTapMetrics(output: string): { testsCount: number; passCount: number; failCount: number; skipCount: number } {
-  const testsMatch = output.match(/# tests\s+(\d+)/);
-  const passMatch = output.match(/# pass\s+(\d+)/);
-  const failMatch = output.match(/# fail\s+(\d+)/);
-  const skipMatch = output.match(/# (?:skipped|cancelled|todo)\s+(\d+)/);
+  /*
+   * Two summary formats, because there are two reporters.
+   *
+   * This matched only TAP's "# tests 12". Node's default reporter writes
+   * "\u2139 tests 12" instead, and that is what these suites actually
+   * produce — so every count parsed as zero and the summary block below has
+   * been reporting "Total Test Cases: 0" for as long as it has existed, under
+   * a green ALL TESTS PASSED. Suite pass/fail was always right; only these
+   * numbers were fiction.
+   *
+   * Both prefixes are accepted rather than switching to the new one, so the
+   * parser keeps working if a suite is ever run with --test-reporter=tap.
+   */
+  const metric = (name: string): RegExp => new RegExp(`(?:^|\\n)\\s*(?:#|\\u2139)\\s*${name}\\s+(\\d+)`);
+
+  const testsMatch = output.match(metric('tests'));
+  const passMatch = output.match(metric('pass'));
+  const failMatch = output.match(metric('fail'));
+  const skipMatch = output.match(metric('(?:skipped|cancelled|todo)'));
 
   const testsCount = testsMatch ? parseInt(testsMatch[1], 10) : 0;
   const passCount = passMatch ? parseInt(passMatch[1], 10) : 0;
