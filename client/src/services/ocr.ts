@@ -3,7 +3,7 @@
  * Indian Railways WRS Raipur
  */
 
-import Tesseract from 'tesseract.js';
+
 import type { CaliperOCRResult } from '../../../shared/types.ts';
 
 export interface SampleFixture {
@@ -171,6 +171,16 @@ export async function processCaliperImage(input: string, range: MeasurementRange
   try {
     const processedUrl = await preprocessImageForOCR(input);
 
+/*
+     * Loaded on demand rather than at start-up.
+     *
+     * Tesseract brings a WASM recognition engine and its language data, and it was
+     * being downloaded by every user on every visit — including the great majority
+     * who never open a camera at all. It is fetched the first time a read is
+     * actually attempted, which is a moment the user has already chosen to wait
+     * through, and never otherwise.
+     */
+    const { default: Tesseract } = await import('tesseract.js');
     const worker = await Tesseract.createWorker('eng');
     await worker.setParameters({
       tessedit_char_whitelist: '0123456789.',

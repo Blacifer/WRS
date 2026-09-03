@@ -3,7 +3,7 @@
  * Indian Railways WRS Raipur Quality Control System
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import type { User, NavigationTab } from '../../shared/types.ts';
 import { isUserInspector, isUserSupervisorOrAdmin, canAccessTab } from '../../shared/types.ts';
 import type { LanguageCode } from './i18n/index.ts';
@@ -12,21 +12,57 @@ import { Header } from './components/Header.tsx';
 import { InspectionPage } from './pages/InspectionPage.tsx';
 import { SpringBatchPage } from './pages/SpringBatchPage.tsx';
 import { SpringSortingPage } from './pages/SpringSortingPage.tsx';
-import { HistoryPage } from './pages/HistoryPage.tsx';
-import { AnalyticsPage } from './pages/AnalyticsPage.tsx';
 import { LoginPage } from './pages/LoginPage.tsx';
 import { AdminExportModal } from './components/AdminExportModal.tsx';
 import { WagonsListPage } from './pages/WagonsListPage.tsx';
 import { WagonDetailPage } from './pages/WagonDetailPage.tsx';
-import { DashboardPage } from './pages/DashboardPage.tsx';
-import { StoresInventoryPage } from './pages/StoresInventoryPage.tsx';
-import { ComponentPassportsPage } from './pages/ComponentPassportsPage.tsx';
 import { InspectorLandingView } from './components/InspectorLandingView.tsx';
 import { PassportQRScannerModal } from './components/PassportQRScannerModal.tsx';
-import { UserManagementPage } from './pages/UserManagementPage.tsx';
-import { LearningDashboardPage } from './pages/LearningDashboardPage.tsx';
 import { ManualSearchPage } from './pages/ManualSearchPage.tsx';
-import { AuditVerificationPage } from './pages/AuditVerificationPage.tsx';
+
+/*
+ * Screens split out of the first download.
+ *
+ * The whole app arrived as one 1.26 MB chunk, so an inspector opening the
+ * sorting screen on shop wifi was also fetching the charting library for the
+ * DRM's dashboard, the OCR engine, and the QR scanner for component passports
+ * — none of which their role can even reach. The pilot navigation is narrowed
+ * to three jobs; the download was not.
+ *
+ * Split by who can open the screen rather than by how big it is. Everything an
+ * inspector touches — the landing view, sorting, a wagon and its checklist,
+ * single inspection, the manual — stays eagerly imported and in the first
+ * chunk, because putting a loading state in front of the ~700-a-shift job to
+ * save bytes on a screen they never open is a bad trade.
+ *
+ * These are the divisional and administrative screens. They fetch when opened,
+ * which for a DRM on an office connection is unnoticeable, and never for
+ * anyone else.
+ */
+const DashboardPage = lazy(() =>
+  import('./pages/DashboardPage.tsx').then((m) => ({ default: m.DashboardPage }))
+);
+const StoresInventoryPage = lazy(() =>
+  import('./pages/StoresInventoryPage.tsx').then((m) => ({ default: m.StoresInventoryPage }))
+);
+const ComponentPassportsPage = lazy(() =>
+  import('./pages/ComponentPassportsPage.tsx').then((m) => ({ default: m.ComponentPassportsPage }))
+);
+const UserManagementPage = lazy(() =>
+  import('./pages/UserManagementPage.tsx').then((m) => ({ default: m.UserManagementPage }))
+);
+const LearningDashboardPage = lazy(() =>
+  import('./pages/LearningDashboardPage.tsx').then((m) => ({ default: m.LearningDashboardPage }))
+);
+const AuditVerificationPage = lazy(() =>
+  import('./pages/AuditVerificationPage.tsx').then((m) => ({ default: m.AuditVerificationPage }))
+);
+const HistoryPage = lazy(() =>
+  import('./pages/HistoryPage.tsx').then((m) => ({ default: m.HistoryPage }))
+);
+const AnalyticsPage = lazy(() =>
+  import('./pages/AnalyticsPage.tsx').then((m) => ({ default: m.AnalyticsPage }))
+);
 
 export { isUserInspector, isUserSupervisorOrAdmin, canAccessTab };
 
@@ -174,6 +210,22 @@ export const App: React.FC = () => {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+        {/*
+          * One boundary around every screen rather than one per lazy page.
+          * The eager screens never suspend, so this is only ever seen when a
+          * divisional screen is opened for the first time in a session.
+          */}
+        <Suspense
+          fallback={
+            <div className="flex items-center justify-center py-24 text-slate-400" role="status">
+              <div
+                className="h-6 w-6 mr-3 rounded-full border-2 border-slate-600 border-t-sky-400 animate-spin"
+                aria-hidden="true"
+              />
+              {currentLang === 'hi' ? 'स्क्रीन खोली जा रही है…' : 'Opening…'}
+            </div>
+          }
+        >
         {/* 1. INSPECTOR LANDING VIEW */}
         {activeTab === 'inspector_home' && (
           <InspectorLandingView
@@ -304,6 +356,7 @@ export const App: React.FC = () => {
         {activeTab === 'history' && !isInspector && <HistoryPage lang={currentLang} />}
         {activeTab === 'analytics' && !isInspector && <AnalyticsPage lang={currentLang} user={user} />}
         {activeTab === 'users' && user.role?.toUpperCase() === 'ADMIN' && <UserManagementPage lang={currentLang} />}
+        </Suspense>
       </main>
 
       {/* Admin Export Dialog (Guarded from Inspector) */}

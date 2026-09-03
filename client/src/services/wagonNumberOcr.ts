@@ -30,7 +30,7 @@
  * matching the standard.
  */
 
-import Tesseract from 'tesseract.js';
+import type Tesseract from 'tesseract.js';
 import { parseWagonNumber } from '../../../shared/wagons/wagonNumber.ts';
 
 export interface WagonNumberCandidate {
@@ -139,7 +139,10 @@ export async function readWagonNumber(image: string | Blob | HTMLCanvasElement):
   let worker: Tesseract.Worker | null = null;
 
   try {
-    worker = await Tesseract.createWorker('eng');
+    // See ocr.ts: the engine is fetched when a read is attempted, not at
+    // start-up. The import above is type-only and costs nothing at runtime.
+    const { default: TesseractRuntime } = await import('tesseract.js');
+    worker = await TesseractRuntime.createWorker('eng');
 
     // Constrained to digits. Stencilled numerals are frequently misread as
     // letters otherwise — 0 as O, 1 as I, 8 as B — and every one of those
