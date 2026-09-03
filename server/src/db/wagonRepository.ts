@@ -2014,35 +2014,41 @@ export class WagonRepository {
       ? Math.max(0, Math.round(((Date.now() - new Date(row.entry_date).getTime()) / (1000 * 60 * 60)) * 10) / 10)
       : 0;
 
+    /*
+     * One name per field.
+     *
+     * This returned every field twice — wagonNumber AND wagon_number, twelve
+     * pairs of them — so /api/wagons was sending each value under two names.
+     * The cost is not really the doubled payload. It is that two names for one
+     * value invite code that reads one and writes the other, and a mapper that
+     * updates one spelling and forgets its twin produces an object that
+     * disagrees with itself. Nothing had gone wrong yet; the arrangement was
+     * simply waiting for it to.
+     *
+     * The database columns stay snake_case and the API stays camelCase, which
+     * is the boundary this mapper exists to cross. What the server ACCEPTS is
+     * unchanged and still takes either spelling — an offline tablet may hold
+     * queued records written in the older form, and refusing them to tidy up
+     * the response would lose real readings. Liberal in what it accepts,
+     * single-voiced in what it sends.
+     */
     return {
       id: row.id,
       wagonNumber: row.wagon_number,
-      wagon_number: row.wagon_number,
       wagonType: row.wagon_type,
-      wagon_type: row.wagon_type,
       owningRailway: row.owning_railway,
-      owning_railway: row.owning_railway,
       currentStage: row.current_stage as LifecycleStage,
-      current_stage: row.current_stage as LifecycleStage,
       status: row.status,
       entryDate: row.entry_date,
-      entry_date: row.entry_date,
       targetReleaseDate: row.target_release_date,
-      target_release_date: row.target_release_date,
       actualReleaseDate: row.actual_release_date,
-      actual_release_date: row.actual_release_date,
       releaseDate: row.actual_release_date,
       entryNotes: row.entry_notes,
-      entry_notes: row.entry_notes,
       conditionNotes: row.condition_notes || row.entry_notes,
-      condition_notes: row.condition_notes || row.entry_notes,
       createdBy: row.created_by,
-      created_by: row.created_by,
       isReleased: row.current_stage === 'RELEASE',
       createdAt: row.created_at,
-      created_at: row.created_at,
       updatedAt: row.updated_at,
-      updated_at: row.updated_at,
       totalElapsedHours
     };
   }
