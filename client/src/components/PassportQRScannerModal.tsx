@@ -16,6 +16,7 @@ import { useI18n } from '../i18n/index.ts';
 import jsQR from 'jsqr';
 import { api } from '../services/api.ts';
 import type { SerializedComponent } from '../../../shared/types.ts';
+import { AlertTriangleIcon, IdCardIcon } from './Icons.tsx';
 
 declare global {
   interface Window {
@@ -295,22 +296,22 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-      <div className="bg-slate-900 border border-cyan-500/30 rounded-2xl shadow-2xl max-w-xl w-full overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-page backdrop-blur-md p-4 animate-in fade-in duration-200">
+      <div className="bg-card border border-accent-line rounded-card max-w-xl w-full overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-4 bg-slate-950/70 border-b border-slate-800 flex items-center justify-between">
+        <div className="p-4 bg-page border-b border-line flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 font-bold text-base">
-              🪪
+            <div className="w-8 h-8 rounded-control bg-accent-soft border border-accent-line flex items-center justify-center text-accent-ink font-bold text-base">
+              <IdCardIcon size={20} />
             </div>
             <div>
               <h2 className="text-base font-bold text-white tracking-wide">{title}</h2>
-              <p className="text-[11px] text-cyan-400 font-mono">WRS-PASSPORT://v1 Protocol Scanner</p>
+              <p className="text-[11px] text-accent-ink font-mono">WRS-PASSPORT://v1 Protocol Scanner</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center font-bold text-sm transition"
+            className="w-8 h-8 rounded-control bg-raised hover:bg-selected text-ink-muted hover:text-white flex items-center justify-center font-bold text-sm transition"
           >
             ✕
           </button>
@@ -335,15 +336,15 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
           <canvas ref={decodeCanvasRef} className="hidden" />
 
           {cameraError && (
-            <div className="absolute inset-x-4 top-4 z-20 p-2.5 bg-amber-950/80 border border-amber-500/50 rounded-lg text-amber-200 text-xs text-center backdrop-blur-sm">
-              ℹ️ {cameraError}
+            <div className="absolute inset-x-4 top-4 z-20 p-2.5 bg-warn-soft border border-warn-line rounded-control text-warn-ink text-xs text-center backdrop-blur-sm">
+              <AlertTriangleIcon size={15} className="inline align-[-2px] mr-1.5" />{cameraError}
             </div>
           )}
 
           {isResolving && (
-            <div className="absolute inset-0 z-30 bg-slate-950/80 flex flex-col items-center justify-center gap-3">
-              <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-xs font-mono text-cyan-300 font-bold">Resolving Component Passport...</p>
+            <div className="absolute inset-0 z-30 bg-page flex flex-col items-center justify-center gap-3">
+              <div className="w-8 h-8 border-2 border-accent-line border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-xs font-mono text-accent-ink font-bold">Resolving Component Passport...</p>
             </div>
           )}
         </div>
@@ -351,11 +352,11 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
         {/* Action / Fallback Section */}
         <div className="p-4 sm:p-5 space-y-4 overflow-y-auto">
           {resolutionError && (
-            <div className="p-3 bg-rose-950/60 border border-rose-500/50 rounded-xl text-rose-300 text-xs flex items-center justify-between">
-              <span>⚠️ {resolutionError}</span>
+            <div className="p-3 bg-bad-soft border border-bad-line rounded-control text-bad-ink text-xs flex items-center justify-between">
+              <span className="inline-flex items-center gap-1.5"><AlertTriangleIcon size={14} />{resolutionError}</span>
               <button
                 onClick={() => setResolutionError(null)}
-                className="text-rose-400 hover:text-white font-bold ml-2"
+                className="text-bad-ink hover:text-white font-bold ml-2"
               >
                 ✕
               </button>
@@ -364,9 +365,9 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
 
           {/* Manual Input Form */}
           <form onSubmit={handleManualSubmit} className="space-y-2">
-            <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+            <label className="text-xs font-semibold text-ink-body flex items-center justify-between">
               <span>{isHi ? 'मैन्युअल क्रम संख्या / क्यूआर पेलोड' : 'Manual Serial Number / QR Payload'}</span>
-              <span className="text-[10px] text-slate-500 font-mono">e.g. WRS-WS-2026-001</span>
+              <span className="text-[10px] text-ink-faint font-mono">e.g. WRS-WS-2026-001</span>
             </label>
             <div className="flex gap-2">
               <input
@@ -374,12 +375,12 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
                 placeholder={isHi ? 'क्रम संख्या दर्ज करें या क्यूआर यूआरआई चिपकाएँ...' : 'Enter serial number or paste QR URI...'}
-                className="flex-1 px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
+                className="flex-1 px-3 py-2 bg-page border border-line rounded-control text-sm text-white placeholder-slate-500 focus:outline-none focus:border-accent-line font-mono"
               />
               <button
                 type="submit"
                 disabled={!manualCode.trim() || isResolving}
-                className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow transition"
+                className="px-4 py-2 bg-accent hover:bg-accent-hover disabled:opacity-50 text-white text-xs font-bold rounded-control shadow transition"
               >
                 {isResolving ? 'Searching...' : 'Lookup'}
               </button>
@@ -388,9 +389,9 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
 
           {/* Dev-only simulation chips — never rendered in a production build */}
           {simulationPresets.length > 0 && (
-          <div className="space-y-2 pt-1 border-t border-slate-800/80">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-              🧪 Dev Test Chips (not shown in production):
+          <div className="space-y-2 pt-1 border-t border-line">
+            <p className="text-[11px] font-semibold text-ink-muted uppercase tracking-[0.07em]">
+              Dev test chips (not shown in production):
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {simulationPresets.map((preset, idx) => (
@@ -398,10 +399,10 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
                   key={idx}
                   type="button"
                   onClick={() => resolveQRCode(preset.payload)}
-                  className="px-3 py-2 bg-slate-800/80 hover:bg-cyan-950/40 hover:border-cyan-500/50 border border-slate-700/80 rounded-lg text-left text-xs text-slate-200 transition flex items-center justify-between group"
+                  className="px-3 py-2 bg-raised hover:bg-accent-soft hover:border-accent-line border border-line rounded-control text-left text-xs text-ink-body transition flex items-center justify-between group"
                 >
-                  <span className="font-medium group-hover:text-cyan-300 truncate">{preset.label}</span>
-                  <span className="text-[10px] text-cyan-400 opacity-0 group-hover:opacity-100 font-mono ml-1">Scan ↗</span>
+                  <span className="font-medium group-hover:text-accent-ink truncate">{preset.label}</span>
+                  <span className="text-[10px] text-accent-ink opacity-0 group-hover:opacity-100 font-mono ml-1">Scan ↗</span>
                 </button>
               ))}
             </div>
@@ -410,11 +411,11 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-3 bg-slate-950/60 border-t border-slate-800 flex justify-end">
+        <div className="p-3 bg-page border-t border-line flex justify-end">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg transition"
+            className="px-4 py-1.5 bg-raised hover:bg-selected text-ink-body text-xs font-semibold rounded-control transition"
           >{isHi ? 'रद्द करें' : 'Cancel'}</button>
         </div>
       </div>

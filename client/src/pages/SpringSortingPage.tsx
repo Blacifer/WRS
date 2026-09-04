@@ -23,6 +23,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { api } from '../services/api.ts';
 import { getBandOptions } from '../../../shared/classification/bandEntry.ts';
+import { COLOR_HEX_MAP } from '../../../shared/classification/tables.ts';
 import {
   SORTING_BOGIES,
   isBandedBogie,
@@ -38,14 +39,16 @@ import { SpringEvidenceCamera } from '../components/SpringEvidenceCamera.tsx';
 import type { SpringEvidenceHandle } from '../components/SpringEvidenceCamera.tsx';
 import type { PendingSortedSpring } from '../services/offlineDb.ts';
 
-const BAND_HEX: Record<string, string> = {
-  BLUE: '#2563eb',
-  GREEN: '#16a34a',
-  YELLOW: '#eab308',
-  ORANGE: '#ea580c',
-  WHITE: '#e2e8f0',
-  RED: '#dc2626'
-};
+/*
+ * The band colours come from the shared RDSO map, not from a copy.
+ *
+ * This file kept its own table, and it had drifted: YELLOW was #eab308 here
+ * against #ca8a04 in shared/classification/tables.ts. So the swatch an
+ * inspector tapped on this screen was a different yellow from the one the
+ * classification badge drew for the same band elsewhere in the application.
+ * These are RDSO's colours and there can only be one copy of them.
+ */
+const BAND_HEX: Record<string, string> = COLOR_HEX_MAP;
 
 const BAND_LABEL_HI: Record<string, string> = {
   BLUE: 'नीला', GREEN: 'हरा', YELLOW: 'पीला', ORANGE: 'नारंगी', WHITE: 'सफ़ेद', RED: 'लाल'
@@ -657,13 +660,13 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         where the mistake was made. Everything that is watched rather than
         used — pace, photographs, stock, finishing — sits below that.
       */}
-      <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4">
+      <div className="rounded-card border border-line bg-card p-5 space-y-4">
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 className="text-xl font-extrabold text-white">
               {isHi ? 'स्प्रिंग छँटाई' : 'Spring Sorting'}
             </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-ink-muted mt-0.5">
               {isHi
                 ? 'खुले स्प्रिंग — वैगन नंबर की आवश्यकता नहीं'
                 : 'Loose springs — no wagon number needed'}
@@ -671,7 +674,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           </div>
           <button
             onClick={onClose}
-            className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-800"
+            className="px-3 py-1.5 rounded-control border border-line text-ink-body text-xs font-bold hover:bg-raised"
           >
             {isHi ? 'बंद करें' : 'Close'}
           </button>
@@ -680,13 +683,13 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         {/* What kind of spring is in hand */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <label className="block">
-            <span className="block text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">
+            <span className="block text-[11px] font-bold text-ink-muted uppercase tracking-wide mb-1">
               {isHi ? 'बोगी प्रकार' : 'Bogie type'}
             </span>
             <select
               value={bogieType}
               onChange={(e) => setBogieType(e.target.value as SortingBogie)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+              className="w-full bg-raised border border-line rounded-control px-3 py-2 text-sm text-white"
             >
               {SORTING_BOGIES.map((b) => (
                 <option key={b.value} value={b.value}>
@@ -697,13 +700,13 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           </label>
 
           <label className="block">
-            <span className="block text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">
+            <span className="block text-[11px] font-bold text-ink-muted uppercase tracking-wide mb-1">
               {isHi ? 'स्थिति' : 'Condition'}
             </span>
             <select
               value={condition}
               onChange={(e) => setCondition(e.target.value as SpringCondition)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+              className="w-full bg-raised border border-line rounded-control px-3 py-2 text-sm text-white"
             >
               {/* The band counts belong to the G-95 tables, not to the spring's
                   age, so they are only mentioned for a bogie that has them.
@@ -719,13 +722,13 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           </label>
 
           <label className="block">
-            <span className="block text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">
+            <span className="block text-[11px] font-bold text-ink-muted uppercase tracking-wide mb-1">
               {isHi ? 'स्प्रिंग स्थान' : 'Spring position'}
             </span>
             <select
               value={position}
               onChange={(e) => setPosition(e.target.value as SpringPosition)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+              className="w-full bg-raised border border-line rounded-control px-3 py-2 text-sm text-white"
             >
               <option value="OUTER">{isHi ? 'बाहरी' : 'Outer'}</option>
               <option value="INNER">{isHi ? 'भीतरी' : 'Inner'}</option>
@@ -750,28 +753,28 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         </div>
 
         {/* Running totals for this session */}
-        <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm border-t border-slate-800 pt-3">
-          <span className="text-slate-400">
+        <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm border-t border-line pt-3">
+          <span className="text-ink-muted">
             {isHi ? 'इस सत्र में' : 'This session'}:{' '}
             <b className="text-white tabular-nums" data-testid="session-total">{sessionTotal}</b>
           </span>
-          <span className="text-emerald-400">
+          <span className="text-good-ink">
             {isHi ? 'उत्तीर्ण' : 'Passed'}: <b className="tabular-nums">{sessionPassed}</b>
           </span>
-          <span className="text-red-400">
+          <span className="text-bad-ink">
             {isHi ? 'कंडम' : 'Condemned'}: <b className="tabular-nums">{sessionCondemned}</b>
           </span>
           {lastRecorded && (
-            <span className="text-slate-300">
+            <span className="text-ink-body">
               {isHi ? 'अंतिम' : 'Last'}: <b>{lastRecorded}</b>
             </span>
           )}
           {today && (
-            <span className="text-slate-400 border-l border-slate-700 pl-6">
+            <span className="text-ink-muted border-l border-line pl-6">
               {isHi ? 'आज कुल' : 'Today, all sessions'}:{' '}
               <b className="text-white tabular-nums">{today.total.toLocaleString()}</b>
               {today.condemned > 0 && (
-                <span className="text-red-400"> ({today.condemned} {isHi ? 'कंडम' : 'condemned'})</span>
+                <span className="text-bad-ink"> ({today.condemned} {isHi ? 'कंडम' : 'condemned'})</span>
               )}
             </span>
           )}
@@ -788,7 +791,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         {pendingCount > 0 && (
           <div
             data-testid="pending-sync-banner"
-            className="rounded-xl border border-amber-700/60 bg-amber-950/40 px-4 py-2.5 text-xs text-amber-200"
+            className="rounded-control border border-warn-line bg-warn-soft px-4 py-2.5 text-xs text-warn-ink"
           >
             <b className="tabular-nums">{pendingCount}</b>{' '}
             {isHi
@@ -806,7 +809,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
       </div>
 
       {/* The work itself: one tap per spring */}
-      <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-3">
+      <div className="rounded-card border border-line bg-card p-5 space-y-3">
         <p className="text-sm font-bold text-white">
           {banded
             ? isHi
@@ -827,11 +830,11 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         */}
         {!banded && (
           <div className="space-y-3">
-            <p className="text-xs text-amber-300/90 bg-amber-950/30 border border-amber-800/50 rounded-lg px-3 py-2">
+            <p className="text-xs text-warn-ink/90 bg-warn-soft border border-warn-line rounded-control px-3 py-2">
               {isHi
                 ? 'इस बोगी के लिए कोई बैंड तालिका प्रकाशित नहीं है — केवल ठीक / कंडम।'
                 : 'No colour band is published for this bogie — only serviceable or condemned.'}{' '}
-              <span className="text-amber-400/80">
+              <span className="text-warn-ink/80">
                 {SORTING_BOGIES.find((b) => b.value === bogieType)?.source}
               </span>
             </p>
@@ -844,7 +847,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
                 value={heightInput}
                 onChange={(e) => setHeightInput(e.target.value)}
                 placeholder={isHi ? 'मिमी' : 'mm'}
-                className="flex-1 min-h-[68px] bg-slate-800 border-2 border-slate-700 rounded-xl px-4 text-2xl font-black text-white tabular-nums"
+                className="flex-1 min-h-[68px] bg-raised border-2 border-line rounded-control px-4 text-2xl font-extrabold text-white tabular-nums"
               />
               <button
                 data-testid="record-measured-spring"
@@ -854,7 +857,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
                   await record(h, null, false);
                   setHeightInput('');
                 }}
-                className="min-h-[68px] px-6 rounded-xl bg-white text-black font-extrabold text-sm disabled:opacity-40 active:scale-95 transition-transform"
+                className="min-h-[68px] px-6 rounded-control bg-white text-black font-extrabold text-sm disabled:opacity-40 active:scale-95 transition-transform"
               >
                 {isHi ? 'दर्ज करें' : 'Record'}
               </button>
@@ -868,11 +871,29 @@ export function SpringSortingPage({ lang, onClose }: Props) {
               key={b.band}
               disabled={busy}
               onClick={() => record(b.midpoint, b.band, false)}
-              className="min-h-[68px] rounded-xl border-2 border-white/15 px-3 py-2.5 text-left disabled:opacity-40 active:scale-95 transition-transform"
+              className="min-h-[68px] rounded-control border-2 border-white/15 px-3 py-2.5 text-left disabled:opacity-40 active:scale-95 transition-transform"
               style={{ backgroundColor: BAND_HEX[b.band] || '#475569' }}
             >
-              <span className={`block text-base font-black ${b.band === 'WHITE' ? 'text-slate-900' : 'text-white'}`}>
-                {isHi ? BAND_LABEL_HI[b.band] || b.band : b.band}
+              {/*
+                The band NUMBER sits beside the colour, always.
+
+                Yellow (Band III) and Orange (Band IV) are adjacent bands whose
+                published colours separate by ΔE 2.9 under deuteranopia and
+                only 11.7 in normal vision — below the threshold at which two
+                fills can be told apart at a glance, in a shed, on a scratched
+                tablet. The colours are RDSO's and cannot be changed, so the
+                name and the Roman numeral do the work of telling them apart,
+                and neither is ever dropped to save space. Mixing these two
+                bands in one nest is precisely the error this screen exists to
+                prevent.
+              */}
+              <span className={`flex items-baseline justify-between gap-2 ${b.band === 'WHITE' ? 'text-slate-900' : 'text-white'}`}>
+                <span className="text-base font-extrabold">
+                  {isHi ? BAND_LABEL_HI[b.band] || b.band : b.band}
+                </span>
+                <span className={`text-[11px] font-extrabold uppercase tracking-wide ${b.band === 'WHITE' ? 'text-slate-700' : 'text-white/90'}`}>
+                  {b.bandRoman}
+                </span>
               </span>
               <span className={`block text-[11px] font-semibold tabular-nums ${b.band === 'WHITE' ? 'text-slate-700' : 'text-white/85'}`}>
                 {b.maxHeight}–{b.minHeight} mm
@@ -885,17 +906,17 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           <button
             disabled={busy}
             onClick={() => setCondemnReasonOpen(true)}
-            className="w-full min-h-[52px] rounded-xl border-2 border-red-700 bg-red-950/50 text-red-200 font-bold text-sm disabled:opacity-40 active:scale-95 transition-transform"
+            className="w-full min-h-[52px] rounded-control border-2 border-bad-line bg-bad-soft text-bad-ink font-bold text-sm disabled:opacity-40 active:scale-95 transition-transform"
             data-testid="condemn-open"
           >
             {isHi ? 'कंडम करें' : 'Condemn this spring'}
           </button>
         ) : (
           <div
-            className="rounded-xl border-2 border-red-700 bg-red-950/40 p-3 space-y-2"
+            className="rounded-control border-2 border-bad-line bg-bad-soft p-3 space-y-2"
             data-testid="condemn-reasons"
           >
-            <p className="text-xs font-bold text-red-200">
+            <p className="text-xs font-bold text-bad-ink">
               {isHi ? 'क्या देखा गया?' : 'What did you see?'}
             </p>
             <div className="grid grid-cols-2 gap-2">
@@ -905,7 +926,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
                 <button
                   disabled={busy}
                   onClick={() => { setCondemnReasonOpen(false); record(200, null, true, 'NONE'); }}
-                  className="min-h-[52px] rounded-lg border border-red-600 bg-red-900/50 text-red-100 font-bold text-xs active:scale-95 transition-transform disabled:opacity-40"
+                  className="min-h-[52px] rounded-control border border-bad-line bg-bad-soft text-red-100 font-bold text-xs active:scale-95 transition-transform disabled:opacity-40"
                   data-testid="condemn-height"
                 >
                   {isHi ? 'पट्टी से बाहर (ऊँचाई)' : 'Off the strip (height)'}
@@ -921,7 +942,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
                   key={code}
                   disabled={busy}
                   onClick={() => { setCondemnReasonOpen(false); record(200, null, true, code); }}
-                  className="min-h-[52px] rounded-lg border border-red-600 bg-red-900/50 text-red-100 font-bold text-xs active:scale-95 transition-transform disabled:opacity-40"
+                  className="min-h-[52px] rounded-control border border-bad-line bg-bad-soft text-red-100 font-bold text-xs active:scale-95 transition-transform disabled:opacity-40"
                   data-testid={`condemn-${code.toLowerCase()}`}
                 >
                   {label}
@@ -930,7 +951,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
             </div>
             <button
               onClick={() => setCondemnReasonOpen(false)}
-              className="w-full min-h-[40px] rounded-lg bg-slate-800 text-slate-300 text-xs font-bold"
+              className="w-full min-h-[40px] rounded-control bg-raised text-ink-body text-xs font-bold"
               data-testid="condemn-cancel"
             >
               {isHi ? 'वापस' : 'Back'}
@@ -950,15 +971,15 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           * having been taken with an unverified gauge.
           */}
         {gauges.length > 0 && (
-          <div className="rounded-xl border border-slate-700 bg-slate-900/60 px-3 py-2.5" data-testid="gauge-picker">
+          <div className="rounded-control border border-line bg-card px-3 py-2.5" data-testid="gauge-picker">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-              <label className="text-[11px] font-bold uppercase tracking-wide text-slate-400 sm:min-w-[5.5rem]">
+              <label className="text-[11px] font-bold uppercase tracking-wide text-ink-muted sm:min-w-[5.5rem]">
                 {isHi ? 'गेज' : 'Gauge'}
               </label>
               <select
                 value={gaugeCode}
                 onChange={e => setGaugeCode(e.target.value)}
-                className="flex-1 bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-2 text-sm text-white"
+                className="flex-1 bg-page border border-line rounded-control px-2.5 py-2 text-sm text-white"
                 data-testid="gauge-select"
               >
                 <option value="">{isHi ? 'कोई गेज नहीं चुना' : 'No gauge named'}</option>
@@ -971,12 +992,12 @@ export function SpringSortingPage({ lang, onClose }: Props) {
             </div>
 
             {selectedGauge && selectedGauge.calibrationState !== 'VALID' && (
-              <p className="text-[11px] text-amber-300/90 mt-1.5 font-semibold" data-testid="gauge-calibration-warning">
+              <p className="text-[11px] text-warn-ink/90 mt-1.5 font-semibold" data-testid="gauge-calibration-warning">
                 {selectedGauge.calibrationSummary}
               </p>
             )}
             {!gaugeCode && (
-              <p className="text-[11px] text-slate-400 mt-1.5" data-testid="gauge-none-note">
+              <p className="text-[11px] text-ink-muted mt-1.5" data-testid="gauge-none-note">
                 {isHi
                   ? 'बिना गेज के दर्ज की गई रीडिंग रिकॉर्ड में ऐसी ही दिखेगी।'
                   : 'Readings recorded without naming a gauge are marked that way in the record.'}
@@ -986,7 +1007,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         )}
 
         {error && (
-          <p className="text-xs font-semibold text-red-300 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">
+          <p className="text-xs font-semibold text-bad-ink bg-bad-soft border border-bad-line rounded-control px-3 py-2">
             {error}
           </p>
         )}
@@ -997,12 +1018,12 @@ export function SpringSortingPage({ lang, onClose }: Props) {
       {undoNotice && (
         <div
           data-testid="undo-notice"
-          className="rounded-xl border border-sky-800/60 bg-sky-950/40 px-4 py-2.5 text-sm text-sky-200 flex items-center justify-between gap-3"
+          className="rounded-control border border-accent-line bg-accent-soft px-4 py-2.5 text-sm text-accent-ink flex items-center justify-between gap-3"
         >
           <span>↩ {undoNotice}</span>
           <button
             onClick={() => setUndoNotice(null)}
-            className="text-xs font-bold text-sky-400 hover:text-white px-2 min-h-[32px]"
+            className="text-xs font-bold text-accent-ink hover:text-white px-2 min-h-[32px]"
           >
             {isHi ? 'ठीक है' : 'OK'}
           </button>
@@ -1015,7 +1036,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
             data-testid="undo-last-spring"
             onClick={undoLast}
             disabled={busy}
-            className="min-h-[44px] px-4 rounded-xl border border-slate-600 text-slate-300 hover:bg-slate-800 text-sm font-bold disabled:opacity-40"
+            className="min-h-[44px] px-4 rounded-control border border-line-strong text-ink-body hover:bg-raised text-sm font-bold disabled:opacity-40"
           >
             ↩ {isHi ? 'पिछला हटाएँ' : 'Undo last spring'}
           </button>
@@ -1032,20 +1053,20 @@ export function SpringSortingPage({ lang, onClose }: Props) {
       {today && (() => {
         const pace = readThroughput(today);
         return (
-          <div className="rounded-2xl border border-slate-700 bg-slate-900 px-5 py-4">
+          <div className="rounded-card border border-line bg-card px-5 py-4">
             {pace.canQuoteRate ? (
               <div className="flex flex-wrap items-baseline gap-x-8 gap-y-2">
                 <div>
                   <span className="text-3xl font-extrabold text-white tabular-nums">
                     {pace.springsPerHour!.toLocaleString()}
                   </span>
-                  <span className="text-sm text-slate-400 ml-2">
+                  <span className="text-sm text-ink-muted ml-2">
                     {isHi ? 'स्प्रिंग / घंटा' : 'springs per hour'}
                   </span>
                 </div>
 
                 {pace.hoursForDailyPile !== undefined && (
-                  <div className="text-sm text-slate-300">
+                  <div className="text-sm text-ink-body">
                     {isHi
                       ? `इस रफ़्तार से ${DAILY_PILE.toLocaleString()} स्प्रिंग में `
                       : `At this rate, ${DAILY_PILE.toLocaleString()} springs takes `}
@@ -1054,7 +1075,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
                   </div>
                 )}
 
-                <div className="text-xs text-slate-500">
+                <div className="text-xs text-ink-faint">
                   {isHi
                     ? `${pace.activeMinutes} मिनट में ${today.total.toLocaleString()} स्प्रिंग`
                     : `measured over ${pace.activeMinutes} min of sorting, ${today.total.toLocaleString()} springs`}
@@ -1062,9 +1083,9 @@ export function SpringSortingPage({ lang, onClose }: Props) {
               </div>
             ) : (
               <div className="flex items-baseline gap-3">
-                <span className="text-sm text-slate-400">{pace.reason}</span>
+                <span className="text-sm text-ink-muted">{pace.reason}</span>
                 {pace.activeMinutes > 0 && (
-                  <span className="text-xs text-slate-500">
+                  <span className="text-xs text-ink-faint">
                     {isHi ? `${pace.activeMinutes} मिनट से` : `${pace.activeMinutes} min so far`}
                   </span>
                 )}
@@ -1081,7 +1102,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         spring. At ~700 a shift, a feature costing one tap each costs 700 and
         gets switched off by lunchtime.
       */}
-      <div className="rounded-2xl border border-slate-700 bg-slate-900 p-4 space-y-3">
+      <div className="rounded-card border border-line bg-card p-4 space-y-3">
         <label className="flex items-start gap-3 cursor-pointer">
           <input
             type="checkbox"
@@ -1094,7 +1115,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
             <span className="block text-sm font-bold text-white">
               {isHi ? 'छँटाई के साथ फ़ोटो लें' : 'Photograph springs while sorting'}
             </span>
-            <span className="block text-[11px] text-slate-400 mt-0.5 leading-snug">
+            <span className="block text-[11px] text-ink-muted mt-0.5 leading-snug">
               {isHi
                 ? 'हर स्प्रिंग की फ़ोटो उसी बैंड के साथ सुरक्षित होगी जो आप दबाते हैं। कोई अतिरिक्त टैप नहीं। कैमरा बैंड तय नहीं करता — वह आप तय करते हैं।'
                 : 'Each photo is saved against the band you tap. No extra taps. The camera does not decide anything — you do.'}
@@ -1109,7 +1130,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         />
         {dataset && dataset.total > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p data-testid="evidence-count" className="text-[11px] text-slate-400">
+            <p data-testid="evidence-count" className="text-[11px] text-ink-muted">
               {isHi
                 ? `अब तक ${dataset.total.toLocaleString()} लेबल-युक्त फ़ोटो, ${dataset.bands} समूहों में।`
                 : `${dataset.total.toLocaleString()} labelled photographs so far, across ${dataset.bands} ${dataset.bands === 1 ? 'group' : 'groups'}.`}
@@ -1118,7 +1139,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
               data-testid="view-photographs"
               onClick={() => (gallery ? setGallery(null) : openGallery())}
               disabled={galleryBusy}
-              className="min-h-[36px] px-3 rounded-lg border border-slate-600 text-slate-300 text-xs font-bold hover:bg-slate-800 disabled:opacity-40"
+              className="min-h-[36px] px-3 rounded-control border border-line-strong text-ink-body text-xs font-bold hover:bg-raised disabled:opacity-40"
             >
               {gallery
                 ? (isHi ? 'फ़ोटो छिपाएँ' : 'Hide photographs')
@@ -1130,21 +1151,21 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         {gallery && (
           <div className="space-y-2">
             {gallery.length === 0 ? (
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[11px] text-ink-faint">
                 {isHi ? 'अभी कोई फ़ोटो नहीं।' : 'No photographs yet.'}
               </p>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {gallery.map((g) => (
-                  <figure key={g.id} className="rounded-lg overflow-hidden border border-slate-700 bg-slate-950">
+                  <figure key={g.id} className="rounded-control overflow-hidden border border-line bg-page">
                     <img src={g.imageData} alt="" className="w-full h-24 object-cover" />
                     <figcaption className="px-2 py-1.5 text-[10px] leading-tight">
                       <span
-                        className={`font-black ${g.status === 'CONDEMNED' ? 'text-red-400' : 'text-emerald-400'}`}
+                        className={`font-extrabold ${g.status === 'CONDEMNED' ? 'text-bad-ink' : 'text-good-ink'}`}
                       >
                         {g.band || (g.status === 'CONDEMNED' ? (isHi ? 'कंडम' : 'Condemned') : (isHi ? 'ठीक' : 'Serviceable'))}
                       </span>
-                      <span className="block text-slate-500">
+                      <span className="block text-ink-faint">
                         {g.springPosition}{g.measuredHeight ? ` · ${g.measuredHeight}mm` : ''}
                       </span>
                     </figcaption>
@@ -1152,7 +1173,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
                 ))}
               </div>
             )}
-            <p className="text-[10px] text-slate-500">
+            <p className="text-[10px] text-ink-faint">
               {isHi
                 ? 'लेबल वही है जो निरीक्षक ने दबाया था — कैमरा कुछ तय नहीं करता।'
                 : 'The label under each photograph is what the inspector tapped. The camera decided none of it.'}
@@ -1162,13 +1183,13 @@ export function SpringSortingPage({ lang, onClose }: Props) {
       </div>
 
       {/* What the pile adds up to */}
-      <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4">
+      <div className="rounded-card border border-line bg-card p-5 space-y-4">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h3 className="text-sm font-extrabold text-white">
               {isHi ? 'भंडार — समूह अनुसार' : 'Stock on hand — by group'}
             </h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-[11px] text-ink-muted mt-0.5">
               {isHi
                 ? 'एक नेस्ट एक ही समूह से आना चाहिए'
                 : 'A nest must come from one group, so the split is what matters'}
@@ -1177,7 +1198,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
                 queued they are behind by exactly that many. Saying so is
                 better than showing a number that quietly under-counts. */}
             {pendingCount > 0 && (
-              <p className="text-[11px] text-amber-400/90 mt-1">
+              <p className="text-[11px] text-warn-ink/90 mt-1">
                 {isHi
                   ? `पिछले सिंक तक — ${pendingCount} स्प्रिंग अभी गिनी नहीं गई`
                   : `As of the last sync — ${pendingCount} not counted here yet`}
@@ -1185,13 +1206,13 @@ export function SpringSortingPage({ lang, onClose }: Props) {
             )}
           </div>
           <label className="block">
-            <span className="block text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">
+            <span className="block text-[11px] font-bold text-ink-muted uppercase tracking-wide mb-1">
               {isHi ? 'किस वैगन के लिए' : 'Building for'}
             </span>
             <select
               value={forWagon}
               onChange={(e) => setForWagon(e.target.value)}
-              className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white"
+              className="bg-raised border border-line rounded-control px-3 py-1.5 text-sm text-white"
             >
               {wagonOptions.map((w) => (
                 <option key={w.designation} value={w.designation}>
@@ -1211,8 +1232,8 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           * threshold earns the evidence to be widened later.
           */}
         {queried && (
-          <div className="rounded-xl border border-amber-600/70 bg-amber-950/40 px-4 py-3 mb-3">
-            <p className="text-[11px] font-bold text-amber-300 uppercase tracking-wide mb-1.5">
+          <div className="rounded-control border border-warn-line bg-warn-soft px-4 py-3 mb-3">
+            <p className="text-[11px] font-bold text-warn-ink uppercase tracking-wide mb-1.5">
               {isHi ? 'यह माप जाँच लें' : 'Worth a second look'}
             </p>
             {queried.messages.map((m, i) => (
@@ -1230,7 +1251,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
                     );
                   } catch { /* the answer is useful, not critical */ }
                 }}
-                className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-[12px] font-bold"
+                className="px-3 py-1.5 rounded-control bg-warn hover:bg-warn text-white text-[12px] font-bold"
               >
                 {isHi ? 'दोबारा मापा — बदल गया' : 'Re-measured — it was wrong'}
               </button>
@@ -1243,12 +1264,12 @@ export function SpringSortingPage({ lang, onClose }: Props) {
                     await api.recordAnomalyOutcome(q.recordId, 'CONFIRMED', q.height, q.height);
                   } catch { /* as above */ }
                 }}
-                className="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-white text-[12px] font-bold"
+                className="px-3 py-1.5 rounded-control bg-selected hover:bg-slate-600 text-white text-[12px] font-bold"
               >
                 {isHi ? 'माप सही है' : 'The reading stands'}
               </button>
             </div>
-            <p className="text-[10.5px] text-amber-200/70 mt-2">
+            <p className="text-[10.5px] text-warn-ink/70 mt-2">
               {isHi
                 ? 'स्प्रिंग दर्ज हो चुकी है — सुधारने के लिए पिछला रद्द करें।'
                 : 'The spring is already recorded. Use undo to correct it.'}
@@ -1265,16 +1286,16 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           * goes where it changes the number.
           */}
         {allocation && allocation.totalHeld > 0 && (
-          <div className="rounded-xl border border-cyan-800/60 bg-cyan-950/30 px-4 py-3 mb-3">
+          <div className="rounded-control border border-accent-line bg-accent-soft px-4 py-3 mb-3">
             <div className="flex items-baseline justify-between gap-3 flex-wrap">
-              <span className="text-[11px] font-bold text-cyan-300 uppercase tracking-wide">
+              <span className="text-[11px] font-bold text-accent-ink uppercase tracking-wide">
                 {isHi ? 'तैयार बोगी' : 'Complete bogies from stock'}
               </span>
-              <span className="text-2xl font-black text-white tabular-nums">
+              <span className="text-2xl font-extrabold text-white tabular-nums">
                 {allocation.bogiesBuildable}
               </span>
             </div>
-            <p className="text-[12px] text-cyan-100/90 mt-1">
+            <p className="text-[12px] text-ink-body mt-1">
               {allocation.limitingPosition && allocation.bogiesBuildable === 0
                 ? (isHi
                     ? `अभी एक भी पूरी बोगी नहीं — ${allocation.limitingPosition} स्प्रिंग कम हैं।`
@@ -1282,7 +1303,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
                 : allocation.summary}
             </p>
             {allocation.totalStranded > 0 && (
-              <p className="text-[11px] text-amber-300 mt-1.5">
+              <p className="text-[11px] text-warn-ink mt-1.5">
                 {isHi
                   ? `${allocation.totalStranded} स्प्रिंग किसी समूह में नहीं जा सकतीं`
                   : `${allocation.totalStranded} of ${allocation.totalHeld} sorted springs cannot complete a group in their own band`}
@@ -1292,7 +1313,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         )}
 
         {wagonConfig && !wagonConfig.bogieType && (
-          <p className="text-[11px] text-amber-300 bg-amber-950/40 border border-amber-800 rounded-lg px-3 py-2">
+          <p className="text-[11px] text-warn-ink bg-warn-soft border border-warn-line rounded-control px-3 py-2">
             {isHi
               ? `${wagonConfig.designation} की बोगी (${wagonConfig.bogieDescription}) के लिए G-95 बैंड तालिका उपलब्ध नहीं — स्प्रिंग गिने जा सकते हैं, वर्गीकृत नहीं।`
               : `${wagonConfig.designation} runs on ${wagonConfig.bogieDescription}, for which no G-95 band table is held here. Its springs can be counted but not classified.`}
@@ -1300,7 +1321,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         )}
 
         {positionTallies.length === 0 ? (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-ink-faint">
             {isHi ? 'अभी कोई स्प्रिंग दर्ज नहीं।' : 'Nothing sorted for this position yet.'}
           </p>
         ) : (
@@ -1315,11 +1336,11 @@ export function SpringSortingPage({ lang, onClose }: Props) {
                     style={{ backgroundColor: BAND_HEX[t.band] || '#475569' }}
                   />
                   <span className="text-sm font-bold text-white w-20">{t.band}</span>
-                  <span className="text-sm text-slate-300 tabular-nums w-24">
+                  <span className="text-sm text-ink-body tabular-nums w-24">
                     {t.count} {isHi ? 'स्प्रिंग' : t.count === 1 ? 'spring' : 'springs'}
                   </span>
                   {cap && (
-                    <span className="text-xs text-slate-400 tabular-nums">
+                    <span className="text-xs text-ink-muted tabular-nums">
                       {isHi
                         ? `= ${cap.completeNests} पूर्ण नेस्ट (${cap.requiredPerNest}/नेस्ट)`
                         : `= ${cap.completeNests} complete nest${cap.completeNests === 1 ? '' : 's'} (${cap.requiredPerNest} per nest)`}
@@ -1335,7 +1356,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
       <button
         onClick={finish}
         disabled={busy || sessionTotal === 0 || pendingCount > 0}
-        className="w-full min-h-[52px] rounded-xl bg-white text-black font-extrabold text-sm disabled:opacity-40 active:scale-95 transition-transform"
+        className="w-full min-h-[52px] rounded-control bg-white text-black font-extrabold text-sm disabled:opacity-40 active:scale-95 transition-transform"
       >
         {pendingCount > 0
           ? isHi

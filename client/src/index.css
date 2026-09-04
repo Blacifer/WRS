@@ -1,4 +1,13 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+/*
+ * Inter, as a variable face across the range the interface actually uses.
+ *
+ * This used to request 300;400;500;600 while the screens were full of
+ * font-bold, font-extrabold and font-black. Every one of those was being
+ * synthesised by the browser from the 600 weight — smeared, uneven, and
+ * noticeably worse on the shop tablets than on the machine it was designed on.
+ * 400..800 is the real range, delivered as one variable file.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -17,7 +26,12 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   touch-action: manipulation;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.011em;
+}
+
+/* Numbers that do not jitter as they count up. */
+.tabular {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Hide scrollbar for tabs */
@@ -39,8 +53,25 @@ body {
   animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .animate-fadeIn { animation: none; }
+  * { transition-duration: 0.01ms !important; }
+}
+
 button, input, select, textarea {
   font-family: inherit;
+}
+
+/*
+ * One focus ring for the whole application.
+ *
+ * Nothing defined one before, so keyboard focus fell back to whatever the
+ * browser drew on top of a dark surface — in practice, close to invisible.
+ */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid #3b6ff0;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* Minimalist utilities */
@@ -50,4 +81,3 @@ button, input, select, textarea {
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
-

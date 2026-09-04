@@ -34,10 +34,10 @@ interface Gauge {
 }
 
 const STATE_STYLE: Record<string, string> = {
-  VALID: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  EXPIRED: 'bg-red-500/15 text-red-300 border-red-500/30',
-  UNRECORDED: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  NO_GAUGE_NAMED: 'bg-slate-500/15 text-slate-300 border-slate-500/30'
+  VALID: 'bg-good-soft text-good-ink border-good-line',
+  EXPIRED: 'bg-bad-soft text-bad-ink border-bad-line',
+  UNRECORDED: 'bg-warn-soft text-warn-ink border-warn-line',
+  NO_GAUGE_NAMED: 'bg-slate-500/15 text-ink-body border-line-strong'
 };
 
 const STATE_WORD: Record<string, string> = {
@@ -102,21 +102,21 @@ export const GaugeRegister: React.FC<{ lang: LanguageCode }> = ({ lang }) => {
   };
 
   return (
-    <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5" data-testid="gauge-register">
+    <div className="rounded-card border border-line bg-card p-5" data-testid="gauge-register">
       <div className="flex items-start justify-between gap-3 mb-1">
-        <h3 className="text-sm font-black text-white flex items-center gap-2">
-          <ShieldIcon size={16} className="text-amber-300" />
+        <h3 className="text-sm font-extrabold text-white flex items-center gap-2">
+          <ShieldIcon size={16} className="text-warn-ink" />
           {isHi ? 'गेज रजिस्टर' : 'Gauge register'}
         </h3>
         <button
           onClick={load}
-          className="text-slate-400 hover:text-slate-200 p-1.5 rounded-lg hover:bg-slate-800"
+          className="text-ink-muted hover:text-ink-body p-1.5 rounded-control hover:bg-raised"
           title={isHi ? 'रिफ़्रेश' : 'Refresh'}
         >
           <RefreshCwIcon size={14} />
         </button>
       </div>
-      <p className="text-[11px] text-slate-500 mb-4">
+      <p className="text-[11px] text-ink-faint mb-4">
         {isHi
           ? 'हर रीडिंग किस उपकरण से ली गई और उस समय उसका अंशांकन क्या था।'
           : 'Which instrument took each reading, and what its calibration was worth at the time.'}
@@ -124,7 +124,7 @@ export const GaugeRegister: React.FC<{ lang: LanguageCode }> = ({ lang }) => {
 
       {exposure && exposure.total > 0 && (
         <p
-          className="text-[11px] text-amber-300/90 bg-amber-950/30 border border-amber-800/50 rounded-lg px-3 py-2 mb-4 font-semibold"
+          className="text-[11px] text-warn-ink/90 bg-warn-soft border border-warn-line rounded-control px-3 py-2 mb-4 font-semibold"
           data-testid="gauge-exposure"
         >
           {exposure.summary}
@@ -132,27 +132,27 @@ export const GaugeRegister: React.FC<{ lang: LanguageCode }> = ({ lang }) => {
       )}
 
       {error && (
-        <p className="text-[11px] text-red-300 bg-red-950/30 border border-red-800 rounded-lg px-3 py-2 mb-3">
+        <p className="text-[11px] text-bad-ink bg-bad-soft border border-bad-line rounded-control px-3 py-2 mb-3">
           {error}
         </p>
       )}
 
       <div className="space-y-2">
         {gauges.length === 0 && (
-          <p className="text-xs text-slate-500">{isHi ? 'रजिस्टर खाली है।' : 'The register is empty.'}</p>
+          <p className="text-xs text-ink-faint">{isHi ? 'रजिस्टर खाली है।' : 'The register is empty.'}</p>
         )}
 
         {gauges.map(g => (
-          <div key={g.gaugeCode} className="border border-slate-700 rounded-xl p-3 bg-slate-950/40">
+          <div key={g.gaugeCode} className="border border-line rounded-control p-3 bg-page">
             <div className="flex flex-wrap items-center gap-2 mb-1">
               <span className="font-mono text-xs font-bold text-white">{g.gaugeCode}</span>
-              <span className="text-xs text-slate-300 flex-1">{g.description}</span>
+              <span className="text-xs text-ink-body flex-1">{g.description}</span>
               <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded border ${STATE_STYLE[g.calibrationState]}`}>
                 {STATE_WORD[g.calibrationState]}
               </span>
             </div>
 
-            <div className="text-[11px] text-slate-500 flex flex-wrap gap-x-3">
+            <div className="text-[11px] text-ink-faint flex flex-wrap gap-x-3">
               {g.certificateNumber && <span>Cert {g.certificateNumber}</span>}
               {g.issuedTo && <span>{g.issuedTo}</span>}
               {g.appliesTo && <span>for {g.appliesTo.toLowerCase()} springs</span>}
@@ -160,23 +160,23 @@ export const GaugeRegister: React.FC<{ lang: LanguageCode }> = ({ lang }) => {
 
             {editing === g.gaugeCode ? (
               <div className="mt-2.5 flex flex-col sm:flex-row gap-2 sm:items-end">
-                <label className="text-[11px] text-slate-400 flex-1">
+                <label className="text-[11px] text-ink-muted flex-1">
                   {isHi ? 'अंशांकन तिथि' : 'Calibrated on'}
                   <input
                     type="date"
                     value={calibratedOn}
                     onChange={e => setCalibratedOn(e.target.value)}
-                    className="mt-1 w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white"
+                    className="mt-1 w-full bg-card border border-line-strong rounded-control px-2 py-1.5 text-xs text-white"
                     data-testid="gauge-calibrated-on"
                   />
                 </label>
-                <label className="text-[11px] text-slate-400 flex-1">
+                <label className="text-[11px] text-ink-muted flex-1">
                   {isHi ? 'मान्य तिथि तक' : 'Valid up to'}
                   <input
                     type="date"
                     value={validUpto}
                     onChange={e => setValidUpto(e.target.value)}
-                    className="mt-1 w-full bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-xs text-white"
+                    className="mt-1 w-full bg-card border border-line-strong rounded-control px-2 py-1.5 text-xs text-white"
                     data-testid="gauge-valid-upto"
                   />
                 </label>
@@ -184,14 +184,14 @@ export const GaugeRegister: React.FC<{ lang: LanguageCode }> = ({ lang }) => {
                   <button
                     disabled={busy}
                     onClick={() => save(g)}
-                    className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold disabled:opacity-50"
+                    className="px-3 py-1.5 rounded-control bg-good hover:bg-good text-white text-xs font-bold disabled:opacity-50"
                     data-testid="gauge-save"
                   >
                     {isHi ? 'सहेजें' : 'Save'}
                   </button>
                   <button
                     onClick={() => setEditing(null)}
-                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold"
+                    className="px-3 py-1.5 rounded-control bg-raised hover:bg-selected text-ink-body text-xs font-bold"
                   >
                     {isHi ? 'रद्द' : 'Cancel'}
                   </button>
@@ -199,10 +199,10 @@ export const GaugeRegister: React.FC<{ lang: LanguageCode }> = ({ lang }) => {
               </div>
             ) : (
               <div className="mt-2 flex items-center justify-between gap-3">
-                <span className="text-[11px] text-slate-400">{g.calibrationSummary}</span>
+                <span className="text-[11px] text-ink-muted">{g.calibrationSummary}</span>
                 <button
                   onClick={() => beginEdit(g)}
-                  className="text-[11px] font-bold text-amber-300 hover:text-amber-200 whitespace-nowrap"
+                  className="text-[11px] font-bold text-warn-ink hover:text-warn-ink whitespace-nowrap"
                   data-testid="gauge-edit"
                 >
                   {g.calibrationState === 'UNRECORDED'
@@ -213,7 +213,7 @@ export const GaugeRegister: React.FC<{ lang: LanguageCode }> = ({ lang }) => {
             )}
 
             {saved === g.gaugeCode && (
-              <p className="text-[11px] text-emerald-300 mt-1.5 font-semibold">
+              <p className="text-[11px] text-good-ink mt-1.5 font-semibold">
                 {isHi ? 'सहेजा गया।' : 'Saved. Readings from now on will carry this.'}
               </p>
             )}
@@ -221,7 +221,7 @@ export const GaugeRegister: React.FC<{ lang: LanguageCode }> = ({ lang }) => {
         ))}
       </div>
 
-      <p className="text-[10px] text-slate-600 mt-3 leading-relaxed">
+      <p className="text-[10px] text-ink-faint mt-3 leading-relaxed">
         {isHi
           ? 'पहले दर्ज की गई रीडिंग वैसी ही रहती हैं जैसी उस समय थीं — बाद में अंशांकन दर्ज करने से पुरानी रीडिंग सत्यापित नहीं हो जातीं।'
           : 'Readings already taken keep the calibration state they had at the time. Recording a calibration now does not make earlier readings retrospectively verified.'}

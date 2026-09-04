@@ -49,7 +49,7 @@ const Highlighted: React.FC<{ text: string }> = ({ text }) => (
   <>
     {text.split(/(«[^»]*»)/g).map((part, i) =>
       part.startsWith('«') && part.endsWith('»') ? (
-        <mark key={i} className="bg-amber-400/25 text-amber-200 rounded px-0.5 not-italic">
+        <mark key={i} className="bg-warn-soft text-warn-ink rounded px-0.5 not-italic">
           {part.slice(1, -1)}
         </mark>
       ) : (
@@ -106,24 +106,24 @@ export const ManualSearchPage: React.FC<ManualSearchPageProps> = ({ lang }) => {
   return (
     <div className="space-y-5 max-w-4xl mx-auto">
       {/* Header */}
-      <div className="p-5 bg-gradient-to-r from-slate-900 via-slate-900 to-teal-950/40 border border-teal-500/30 rounded-2xl shadow-xl">
-        <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+      <div className="p-5 bg-card border border-accent-line rounded-card">
+        <h1 className="text-xl sm:text-2xl font-extrabold text-white tracking-tight">
           {isHi ? 'मैनुअल से पूछें' : 'Ask the Manual'}
         </h1>
-        <p className="text-xs text-slate-400 mt-1 leading-relaxed max-w-2xl">
+        <p className="text-xs text-ink-muted mt-1 leading-relaxed max-w-2xl">
           {isHi
             ? 'आरडीएसओ वैगन रखरखाव मैनुअल में सीधे खोजें। उत्तर मैनुअल के अपने शब्दों में, पृष्ठ संख्या सहित।'
             : 'Search the RDSO Wagon Maintenance Manual directly. Answers come back in the manual’s own words with the page number — nothing is paraphrased or generated.'}
         </p>
         {status?.indexed && (
-          <p className="text-[11px] text-teal-400/80 mt-2 font-mono">
+          <p className="text-[11px] text-accent-ink mt-2 font-mono">
             {status.passageCount?.toLocaleString()} passages · {status.pageCount} pages
           </p>
         )}
       </div>
 
       {manualMissing && (
-        <div className="p-4 bg-amber-950/30 border border-amber-800 rounded-xl text-xs text-amber-200 leading-relaxed">
+        <div className="p-4 bg-warn-soft border border-warn-line rounded-control text-xs text-warn-ink leading-relaxed">
           {isHi
             ? 'इस सर्वर पर मैनुअल अभी अनुक्रमित नहीं है। व्यवस्थापक को server फ़ोल्डर में यह चलाना होगा: npm run index-manual -- "/path/to/Vol-I (System Documentation).pdf"'
             /* The script lives in server/package.json and takes the manual's
@@ -148,12 +148,12 @@ export const ManualSearchPage: React.FC<ManualSearchPageProps> = ({ lang }) => {
           placeholder={
             isHi ? 'उदा. ब्रेक ब्लॉक कंडमिंग सीमा' : 'e.g. what is the brake block condemning limit'
           }
-          className="flex-1 min-h-[48px] bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-teal-500 focus:outline-none"
+          className="flex-1 min-h-[48px] bg-page border border-line rounded-control px-4 py-3 text-sm text-white placeholder-slate-600 focus:border-accent-line focus:outline-none"
         />
         <button
           type="submit"
           disabled={loading || query.trim().length < 2}
-          className="min-h-[48px] px-6 py-3 bg-teal-600 hover:bg-teal-500 disabled:opacity-40 text-white rounded-xl text-sm font-bold transition shrink-0"
+          className="min-h-[48px] px-6 py-3 bg-accent hover:bg-accent-hover disabled:opacity-40 text-white rounded-control text-sm font-bold transition shrink-0"
         >
           {loading ? (isHi ? 'खोज रहे…' : 'Searching…') : isHi ? 'खोजें' : 'Search'}
         </button>
@@ -162,7 +162,7 @@ export const ManualSearchPage: React.FC<ManualSearchPageProps> = ({ lang }) => {
       {/* One-tap common questions */}
       {!hits && !loading && (
         <div className="space-y-2">
-          <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+          <p className="text-[11px] font-bold text-ink-muted uppercase tracking-[0.07em]">
             {isHi ? 'सामान्य प्रश्न' : 'Common questions'}
           </p>
           <div className="flex flex-wrap gap-2">
@@ -174,7 +174,7 @@ export const ManualSearchPage: React.FC<ManualSearchPageProps> = ({ lang }) => {
                   setQuery(text);
                   search(text);
                 }}
-                className="min-h-[44px] px-3 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-xl text-xs text-slate-300 hover:text-white transition text-left"
+                className="min-h-[44px] px-3 py-2 bg-card hover:bg-raised border border-line rounded-control text-xs text-ink-body hover:text-white transition text-left"
               >
                 {isHi ? q.hi : q.en}
               </button>
@@ -184,18 +184,18 @@ export const ManualSearchPage: React.FC<ManualSearchPageProps> = ({ lang }) => {
       )}
 
       {error && (
-        <div className="p-4 bg-rose-950/40 border border-rose-800 rounded-xl text-sm text-rose-300">
+        <div className="p-4 bg-bad-soft border border-bad-line rounded-control text-sm text-bad-ink">
           {error}
         </div>
       )}
 
       {/* Results */}
       {hits && hits.length === 0 && !loading && (
-        <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl text-center">
+        <div className="p-6 bg-card border border-line rounded-card text-center">
           <p className="text-sm font-bold text-white">
             {isHi ? 'कोई मिलान नहीं मिला' : 'Nothing matched'}
           </p>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-ink-muted mt-1">
             {isHi
               ? 'अलग शब्दों से प्रयास करें — जैसे पुर्जे का नाम और "सीमा"।'
               : 'Try different words — the component name plus “limit” or “wear” usually works.'}
@@ -205,19 +205,19 @@ export const ManualSearchPage: React.FC<ManualSearchPageProps> = ({ lang }) => {
 
       {answers && answers.length > 0 && (
         <div className="space-y-2 mb-5">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-emerald-400">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-good-ink">
             {isHi ? 'सीधा उत्तर — इसी ऐप के सत्यापित आँकड़ों से' : 'Direct answer — from this app’s own verified figures'}
           </p>
           {answers.map((a, idx) => (
             <div
               key={idx}
-              className="rounded-xl border border-emerald-800/70 bg-emerald-950/25 px-4 py-3"
+              className="rounded-control border border-good-line bg-good-soft px-4 py-3"
             >
-              <p className="text-[11px] text-emerald-300/80">{a.subject}</p>
+              <p className="text-[11px] text-good-ink/80">{a.subject}</p>
               <p className="text-lg font-bold text-white mt-0.5">{a.answer}</p>
-              <p className="text-[11px] text-slate-400 mt-1.5 font-mono">{a.source}</p>
+              <p className="text-[11px] text-ink-muted mt-1.5 font-mono">{a.source}</p>
               {!a.verified && (
-                <p className="text-[11px] text-amber-300 mt-1">
+                <p className="text-[11px] text-warn-ink mt-1">
                   {isHi
                     ? 'यह आँकड़ा अभी पुष्टि के अधीन है — उपयोग से पहले जाँच लें।'
                     : 'This figure is not settled — sources disagree. Confirm before relying on it.'}
@@ -230,7 +230,7 @@ export const ManualSearchPage: React.FC<ManualSearchPageProps> = ({ lang }) => {
 
       {hits && hits.length > 0 && (
         <div className="space-y-3">
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[11px] text-ink-faint">
             {isHi
               ? 'मैनुअल से शब्दशः — हमेशा उद्धृत पृष्ठ से पुष्टि करें।'
               : 'Reproduced verbatim from the manual — always confirm against the cited page.'}
@@ -239,31 +239,31 @@ export const ManualSearchPage: React.FC<ManualSearchPageProps> = ({ lang }) => {
           {hits.map((h, idx) => (
             <div
               key={idx}
-              className={`bg-slate-900 border rounded-2xl p-4 space-y-2.5 ${
-                idx === 0 ? 'border-teal-700/60' : 'border-slate-800'
+              className={`bg-card border rounded-card p-4 space-y-2.5 ${
+                idx === 0 ? 'border-accent-line' : 'border-line'
               }`}
             >
               <div className="flex flex-wrap items-center gap-2">
                 {idx === 0 && (
-                  <span className="text-[9px] font-black px-2 py-0.5 rounded bg-teal-500/20 text-teal-300">
+                  <span className="text-[9px] font-extrabold px-2 py-0.5 rounded bg-accent-soft text-accent-ink">
                     {isHi ? 'सर्वश्रेष्ठ मिलान' : 'BEST MATCH'}
                   </span>
                 )}
-                <span className="text-[11px] font-mono text-slate-400">
+                <span className="text-[11px] font-mono text-ink-muted">
                   {isHi ? 'पृष्ठ' : 'Page'} {h.page}
                 </span>
                 {h.chapter && (
-                  <span className="text-[11px] text-slate-500 truncate">{h.chapter}</span>
+                  <span className="text-[11px] text-ink-faint truncate">{h.chapter}</span>
                 )}
               </div>
 
-              <p className="text-sm text-slate-200 leading-relaxed font-mono">
+              <p className="text-sm text-ink-body leading-relaxed font-mono">
                 <Highlighted text={h.snippet} />
               </p>
 
               <button
                 onClick={() => setExpanded(expanded === idx ? null : idx)}
-                className="text-[11px] font-bold text-teal-400 hover:text-teal-300 underline underline-offset-2"
+                className="text-[11px] font-bold text-accent-ink hover:text-accent-ink underline underline-offset-2"
               >
                 {expanded === idx
                   ? isHi
@@ -275,12 +275,12 @@ export const ManualSearchPage: React.FC<ManualSearchPageProps> = ({ lang }) => {
               </button>
 
               {expanded === idx && (
-                <pre className="text-[11px] text-slate-300 bg-slate-950 border border-slate-800 rounded-xl p-3 overflow-x-auto whitespace-pre-wrap leading-relaxed">
+                <pre className="text-[11px] text-ink-body bg-page border border-line rounded-control p-3 overflow-x-auto whitespace-pre-wrap leading-relaxed">
                   {h.text}
                 </pre>
               )}
 
-              <p className="text-[10px] text-slate-500 italic">{h.citation}</p>
+              <p className="text-[10px] text-ink-faint italic">{h.citation}</p>
             </div>
           ))}
         </div>

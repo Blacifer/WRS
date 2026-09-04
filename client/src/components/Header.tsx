@@ -10,11 +10,16 @@ import { getDictionary } from '../i18n/index.ts';
 import type { LanguageCode } from '../i18n/index.ts';
 import { offlineDb } from '../services/offlineDb.ts';
 import { api } from '../services/api.ts';
-import { GlobeIcon, RefreshCwIcon, LogOutIcon, ShieldIcon } from './Icons.tsx';
+import {
+  GlobeIcon, RefreshCwIcon, LogOutIcon, ShieldIcon,
+  HomeIcon, TrainIcon, CoilIcon, CaliperIcon, BookIcon, LinkIcon, UserIcon, IdCardIcon,
+  CpuIcon, BarChartIcon, PackageIcon, HistoryIcon, ActivityIcon, SparklesIcon
+} from './Icons.tsx';
 import { TotpEnrolment } from './TotpEnrolment.tsx';
 import { isInPilotNav } from '../config/pilotScope.ts';
 import { canAccessTab } from '../../../shared/types.ts';
 import { can } from '../../../shared/auth/permissions.ts';
+import { Button, Chip, IconButton } from './ui/index.tsx';
 
 export type { NavigationTab };
 
@@ -27,6 +32,16 @@ interface HeaderProps {
   onSelectTab: (tab: NavigationTab) => void;
 }
 
+/** One entry in the navigation row. */
+interface NavItem {
+  tab: NavigationTab;
+  testId: string;
+  label: string;
+  icon: React.ReactNode;
+  /** Drawn before this item, to separate the job from the machinery. */
+  dividerBefore?: boolean;
+}
+
 export const Header: React.FC<HeaderProps> = ({
   user,
   currentLang,
@@ -36,6 +51,7 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectTab
 }) => {
   const dict = getDictionary(currentLang);
+  const isHi = currentLang === 'hi';
   const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -157,8 +173,89 @@ export const Header: React.FC<HeaderProps> = ({
    */
   const shows = (tab: NavigationTab) => canAccessTab(user?.role, tab, false);
 
+  /*
+   * The bar as data rather than as twelve near-identical buttons.
+   *
+   * Every entry used to be written out by hand with its own copy of the
+   * active/inactive class string, and they had drifted: the inspector's items
+   * were 44px tall with one set of colours, the supervisor's 40px with
+   * another, and one of them had lost its icon entirely. Building from a list
+   * means an item cannot be styled differently from its neighbours by
+   * accident, and adding a screen is one line.
+   */
+  const inspectorNav: NavItem[] = [
+    { tab: 'inspector_home', testId: 'nav-inspector-home', label: isHi ? 'होम / कार्य' : 'Tasks / Home', icon: <HomeIcon size={18} /> },
+    { tab: 'spring_sorting', testId: 'nav-spring-sorting', label: isHi ? 'छँटाई' : 'Sorting', icon: <CoilIcon size={18} /> },
+    { tab: 'inspection', testId: 'nav-inspection', label: dict.nav.inspection, icon: <CaliperIcon size={18} /> },
+    { tab: 'smart_vision', testId: 'nav-smart-vision', label: isHi ? 'स्प्रिंग बैच' : 'Spring Batch', icon: <CpuIcon size={18} /> },
+    { tab: 'manual', testId: 'nav-manual', label: isHi ? 'मैनुअल' : 'Manual', icon: <BookIcon size={18} /> }
+  ];
+
+  /*
+   * The two things the DRM actually asked for come first: the wagon pipeline
+   * and the spring flows. What follows the divider is the surrounding
+   * workshop machinery — useful, but it was leading the navigation and making
+   * the app read as inventory software rather than as a QC tool.
+   */
+  const staffNav: NavItem[] = [
+    { tab: 'wagons', testId: 'nav-wagons', label: dict.nav.wagons || 'Wagons Pipeline', icon: <TrainIcon size={18} /> },
+    { tab: 'inspection', testId: 'nav-inspection', label: dict.nav.inspection, icon: <CaliperIcon size={18} /> },
+    { tab: 'smart_vision', testId: 'nav-smart-vision', label: isHi ? 'स्प्रिंग बैच' : 'Spring Batch', icon: <CpuIcon size={18} /> },
+    { tab: 'dashboard', testId: 'nav-dashboard', label: dict.nav.dashboard || 'DRM Dashboard', icon: <BarChartIcon size={18} />, dividerBefore: true },
+    { tab: 'inventory', testId: 'nav-inventory', label: dict.nav.inventory || 'Stores & Inventory', icon: <PackageIcon size={18} /> },
+    { tab: 'passports', testId: 'nav-passports', label: dict.nav.passports || 'Component Passports', icon: <IdCardIcon size={18} /> },
+    { tab: 'history', testId: 'nav-history', label: dict.nav.history, icon: <HistoryIcon size={18} /> },
+    { tab: 'analytics', testId: 'nav-analytics', label: dict.nav.analytics, icon: <ActivityIcon size={18} /> },
+    { tab: 'manual', testId: 'nav-manual-sup', label: dict.nav.manual || 'Ask the Manual', icon: <BookIcon size={18} /> },
+    { tab: 'learning', testId: 'nav-learning', label: dict.nav.learning || 'System Learning', icon: <SparklesIcon size={18} /> },
+    { tab: 'audit', testId: 'nav-audit', label: dict.nav.audit || 'Audit Chain', icon: <LinkIcon size={18} /> },
+    { tab: 'users', testId: 'nav-users', label: dict.nav.users || 'User Accounts', icon: <UserIcon size={18} /> }
+  ];
+
+  /*
+   * `wagons`, `inspection` and `smart_vision` lead the bar and are gated by
+   * canAccessTab alone. Everything after the divider is also subject to the
+   * pilot's narrowed scope, exactly as before.
+   */
+  const alwaysOffered: NavigationTab[] = ['wagons', 'inspection', 'smart_vision'];
+  const visibleStaffNav = staffNav.filter((item) => {
+    if (!shows(item.tab)) return false;
+    if (alwaysOffered.includes(item.tab)) return true;
+    if (item.tab === 'audit') return true;
+    if (item.tab === 'manual') return true;
+    return isInPilotNav(item.tab as any, user?.role);
+  });
+
+  const navItems = isInspector ? inspectorNav.filter((i) => shows(i.tab)) : visibleStaffNav;
+
+  const navButton = (item: NavItem) => {
+    const active = activeTab === item.tab;
+    return (
+      <React.Fragment key={item.testId + item.tab}>
+        {item.dividerBefore ? (
+          <span aria-hidden="true" className="hidden sm:inline-block w-px h-6 bg-line-strong mx-1 self-center" />
+        ) : null}
+        <button
+          data-testid={item.testId}
+          onClick={() => onSelectTab(item.tab)}
+          aria-current={active ? 'page' : undefined}
+          className={[
+            'min-h-tap px-3 rounded-control inline-flex items-center gap-2 whitespace-nowrap',
+            'text-[13px] font-bold transition-colors',
+            active
+              ? 'bg-selected text-ink'
+              : 'text-ink-muted hover:text-ink hover:bg-raised'
+          ].join(' ')}
+        >
+          <span className={active ? 'text-accent-ink' : 'text-ink-faint'}>{item.icon}</span>
+          <span>{item.label}</span>
+        </button>
+      </React.Fragment>
+    );
+  };
+
   return (
-    <header className="sticky top-0 z-40 bg-[#0a0a0a]/80 backdrop-blur-md border-b border-white/10 text-white select-none">
+    <header className="sticky top-0 z-40 bg-page/90 backdrop-blur-md border-b border-line text-ink select-none">
       {/* Top Branding Bar */}
       {/*
         Wraps rather than overflowing, for the same reason the nav row below
@@ -169,75 +266,65 @@ export const Header: React.FC<HeaderProps> = ({
       */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2">
         {/* Left: Indian Railways Branding */}
-        <div 
+        <button
           onClick={() => onSelectTab(isInspector ? 'inspector_home' : 'wagons')}
-          className="flex items-center gap-3 cursor-pointer group min-w-0"
+          className="flex items-center gap-3 min-w-0 text-left group"
         >
-          <div className="w-10 h-10 rounded-lg bg-blue-700 border border-blue-500 flex items-center justify-center font-black text-white text-lg shadow-inner group-hover:scale-105 transition-transform">
+          <span className="w-9 h-9 rounded-control bg-railway-blue border border-accent-hover flex items-center justify-center font-extrabold text-white text-[13px] shrink-0">
             IR
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-sm sm:text-base tracking-tight text-white group-hover:text-blue-300 transition-colors">
+          </span>
+          <span className="min-w-0">
+            <span className="flex items-center gap-2">
+              <span className="font-bold text-[15px] tracking-[-0.015em] text-ink group-hover:text-accent-ink transition-colors">
                 WRS Raipur
               </span>
-              <span className="hidden sm:inline-block px-2 py-0.5 text-[11px] font-bold uppercase bg-blue-950 text-blue-300 border border-blue-800 rounded">
-                RDSO G-95 Rev-II
-              </span>
-            </div>
-            <p className="text-[11px] sm:text-xs text-slate-400 font-medium truncate max-w-[200px] sm:max-w-none">
+              <Chip tone="accent" className="hidden sm:inline-flex">RDSO G-95 Rev-II</Chip>
+            </span>
+            <span className="block text-[11px] text-ink-muted font-medium truncate max-w-[200px] sm:max-w-none">
               {dict.app.workshop}
-            </p>
-          </div>
-        </div>
+            </span>
+          </span>
+        </button>
 
         {/* Right Controls: Connectivity, Pending Sync, Language Toggle, User & Logout */}
-        <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3 min-w-0">
+        <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
           {/* Online/Offline Status */}
-          <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
-            isOnline ? 'bg-emerald-950/60 text-emerald-300 border-emerald-800' : 'bg-amber-950/60 text-amber-300 border-amber-800'
-          }`}>
-            <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`}></span>
-            <span>{isOnline ? dict.app.online : dict.app.offline}</span>
-          </div>
+          <Chip tone={isOnline ? 'good' : 'warn'} dot className="hidden sm:inline-flex">
+            {isOnline ? dict.app.online : dict.app.offline}
+          </Chip>
 
           {/* Pending Sync Button / Badge */}
           {pendingCount > 0 && (
-            <button
+            <Button
+              size="md"
               onClick={handleManualSync}
               disabled={isSyncing}
               title={dict.app.syncNow}
-              className="min-h-[44px] px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-lg flex items-center gap-1.5 shadow transition-all active:scale-95"
+              className="!bg-warn !border-warn !text-page hover:!bg-warn-ink"
             >
-              <RefreshCwIcon size={14} className={isSyncing ? 'animate-spin' : ''} />
+              <RefreshCwIcon size={16} className={isSyncing ? 'animate-spin' : ''} />
               {/* The count is the part that matters and is always shown; the
                   word for it is dropped on the narrowest screens rather than
                   pushing the row off the edge. */}
               <span className="hidden sm:inline">
                 {isSyncing ? dict.app.syncing : `${pendingCount} ${dict.app.syncQueue}`}
               </span>
-              <span className="sm:hidden tabular-nums">
-                {isSyncing ? '…' : pendingCount}
-              </span>
-            </button>
+              <span className="sm:hidden tabular">{isSyncing ? '…' : pendingCount}</span>
+            </Button>
           )}
 
-          {/* Language Toggle Button (Touch Target >= 48px) */}
-          <button
-            onClick={onToggleLang}
-            className="min-w-[48px] min-h-[48px] px-3 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-200 hover:text-white border border-slate-700 rounded-lg flex items-center justify-center gap-1.5 font-bold text-sm transition-all shadow-sm"
-            aria-label="Toggle language between English and Hindi"
-          >
-            <GlobeIcon size={18} className="text-blue-400" />
-            <span>{currentLang === 'en' ? 'हिंदी' : 'EN'}</span>
-          </button>
+          {/* Language Toggle */}
+          <Button size="md" onClick={onToggleLang} aria-label="Toggle language between English and Hindi">
+            <GlobeIcon size={18} className="text-accent-ink" />
+            <span>{isHi ? 'EN' : 'हिंदी'}</span>
+          </Button>
 
           {/* User Profile & Role Badge */}
           {user && (
-            <div className="hidden md:flex items-center gap-2 pl-2 border-l border-slate-800">
+            <div className="hidden md:flex items-center gap-2 pl-2 border-l border-line">
               <div className="text-right">
-                <p className="text-xs font-bold text-slate-200 leading-tight">{user.name}</p>
-                <span className="text-[10px] font-semibold text-blue-400 uppercase tracking-wider">
+                <p className="text-xs font-bold text-ink-body leading-tight">{user.name}</p>
+                <span className="text-[10px] font-semibold text-accent-ink uppercase tracking-[0.07em]">
                   {dict.roles[user.role as keyof typeof dict.roles] || user.role}
                 </span>
               </div>
@@ -252,27 +339,23 @@ export const Header: React.FC<HeaderProps> = ({
                 * of all a supervisor, who is the one signing wagons onto the
                 * line and the whole reason a second factor matters here.
                 */}
-              <button
+              <IconButton
+                variant="quiet"
                 onClick={() => setIsTotpOpen(true)}
-                title={enrolled
-                  ? 'Authenticator app — enrolled'
-                  : 'Set up an authenticator app'}
+                label={enrolled ? 'Authenticator app — enrolled' : 'Set up an authenticator app'}
                 data-testid="header-totp"
-                className={`min-w-[44px] min-h-[44px] p-2 rounded-lg transition-colors flex items-center justify-center ${
-                  enrolled
-                    ? 'text-emerald-400 hover:bg-emerald-950/40'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                }`}
+                className={enrolled ? '!text-good-ink' : ''}
               >
                 <ShieldIcon size={18} />
-              </button>
-              <button
+              </IconButton>
+              <IconButton
+                variant="quiet"
                 onClick={onLogout}
-                title={dict.nav.logout}
-                className="min-w-[44px] min-h-[44px] p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors flex items-center justify-center"
+                label={dict.nav.logout}
+                className="hover:!text-bad-ink"
               >
                 <LogOutIcon size={18} />
-              </button>
+              </IconButton>
             </div>
           )}
         </div>
@@ -289,270 +372,35 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
 
-      {/* Navigation Tabs Bar (Touch Targets >= 48px) */}
-      <nav className="bg-transparent px-4">
-        {/* Wraps rather than scrolling horizontally. This row used to be a
-            centred overflow-x-auto with the scrollbar hidden, which meant that
-            once the items no longer fitted, the ends spilled off BOTH sides with
-            nothing on screen suggesting it could scroll — and centred overflow is
-            not reliably scrollable back to the left in any case. Adding one more
-            nav item was enough to push "Wagons Pipeline" off the left edge at
-            1400px, and a shop tablet is narrower than that. Hidden horizontal
-            scroll is also the wrong affordance for a gloved hand. */}
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-start sm:justify-center gap-x-3 sm:gap-x-6 gap-y-1 py-2">
-          {/* 1. INSPECTOR ROLE: Ultra-Simple Shop-Floor Essentials ONLY */}
-          {isInspector ? (
-            <>
-              <button
-                data-testid="nav-inspector-home"
-                onClick={() => onSelectTab('inspector_home')}
-                className={`min-h-[44px] px-4 py-2 text-sm font-extrabold rounded-xl flex items-center gap-2 whitespace-nowrap transition-all ${
-                  activeTab === 'inspector_home'
-                    ? 'bg-blue-600/40 text-blue-300 border border-blue-500/60 shadow-md'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <span>🏠</span>
-                <span>{currentLang === 'hi' ? 'होम / कार्य' : 'Tasks / Home'}</span>
-              </button>
+      {/* Navigation Tabs Bar */}
+      {/* Wraps rather than scrolling horizontally. This row used to be a
+          centred overflow-x-auto with the scrollbar hidden, which meant that
+          once the items no longer fitted, the ends spilled off BOTH sides with
+          nothing on screen suggesting it could scroll — and centred overflow is
+          not reliably scrollable back to the left in any case. Adding one more
+          nav item was enough to push "Wagons Pipeline" off the left edge at
+          1400px, and a shop tablet is narrower than that. Hidden horizontal
+          scroll is also the wrong affordance for a gloved hand. */}
+      <nav className="px-3 sm:px-6 border-t border-line">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center gap-1 py-1.5">
+          {navItems.map(navButton)}
 
-              <button
-                data-testid="nav-manual"
-                onClick={() => onSelectTab('manual')}
-                className={`min-h-[44px] px-4 py-2 text-sm font-extrabold rounded-xl flex items-center gap-2 whitespace-nowrap transition-all ${
-                  activeTab === 'manual'
-                    ? 'bg-teal-600/40 text-teal-300 border border-teal-500/60 shadow-md'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <span>📖</span>
-                <span>{currentLang === 'hi' ? 'मैनुअल' : 'Manual'}</span>
-              </button>
-
-              <button
-                data-testid="nav-inspection"
-                onClick={() => onSelectTab('inspection')}
-                className={`min-h-[44px] px-4 py-2 text-sm font-extrabold rounded-xl flex items-center gap-2 whitespace-nowrap transition-all ${
-                  activeTab === 'inspection'
-                    ? 'bg-purple-600/40 text-purple-300 border border-purple-500/60 shadow-md'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <span>🌀</span>
-                <span>{dict.nav.inspection}</span>
-              </button>
-
-              <button
-                data-testid="nav-smart-vision"
-                onClick={() => onSelectTab('smart_vision')}
-                className={`min-h-[44px] px-4 py-2 text-sm font-extrabold rounded-xl flex items-center gap-2 whitespace-nowrap transition-all ${
-                  activeTab === 'smart_vision'
-                    ? 'bg-emerald-600/40 text-emerald-300 border border-emerald-500/60 shadow-md'
-                    : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
-                }`}
-              >
-                <span>🔬</span>
-                <span>{currentLang === 'hi' ? 'स्प्रिंग बैच' : 'Spring Batch'}</span>
-              </button>
-            </>
-          ) : (
-            /* 2. SUPERVISOR / ADMIN ROLES: Full Pipeline, Inventory, Analytics & Admin */
-            <>
-              <button
-                data-testid="nav-wagons"
-                onClick={() => onSelectTab('wagons')}
-                className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                  activeTab === 'wagons'
-                    ? 'text-white'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                🚂 {dict.nav.wagons || 'Wagons Pipeline'}
-              </button>
-
-
-              {/* Recording a spring is shop-floor work. An administrator and
-                  the DRM hold no spring.record capability, so the entries that
-                  lead there are not offered to them — they were, and they led
-                  to a screen the app would have bounced them off. */}
-              {shows('inspection') && (
-              <button
-                data-testid="nav-inspection"
-                onClick={() => onSelectTab('inspection')}
-                className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                  activeTab === 'inspection'
-                    ? 'text-white'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                🌀 {dict.nav.inspection}
-              </button>
-              )}
-
-              {shows('smart_vision') && (
-              <button
-                data-testid="nav-smart-vision"
-                onClick={() => onSelectTab('smart_vision')}
-                className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                  activeTab === 'smart_vision'
-                    ? 'text-white'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                🔬 {currentLang === 'hi' ? 'स्प्रिंग बैच' : 'Spring Batch'}
-              </button>
-              )}
-
-              {/* The two things the DRM actually asked for come first: the
-                  wagon pipeline and the spring flows. What follows the rule is
-                  the surrounding workshop machinery — useful, but it was
-                  leading the navigation and making the app read as inventory
-                  software rather than as a QC tool. */}
-              <span aria-hidden="true" className="hidden sm:inline-block w-px h-5 bg-slate-700 mx-1 self-center"></span>
-
-              {shows('dashboard') && isInPilotNav('dashboard', user?.role) && (
-                <button
-                  data-testid="nav-dashboard"
-                  onClick={() => onSelectTab('dashboard')}
-                  className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                    activeTab === 'dashboard'
-                      ? 'text-white'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  📊 {dict.nav.dashboard || 'DRM Dashboard'}
-                </button>
-              )}
-                  {shows('inventory') && isInPilotNav('inventory', user?.role) && (
-                  <button
-                    data-testid="nav-inventory"
-                    onClick={() => onSelectTab('inventory')}
-                    className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                      activeTab === 'inventory'
-                        ? 'text-white'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    📦 {dict.nav.inventory || 'Stores & Inventory'}
-                  </button>
-                  )}
-                  {shows('passports') && isInPilotNav('passports', user?.role) && (
-                  <button
-                    data-testid="nav-passports"
-                    onClick={() => onSelectTab('passports')}
-                    className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                      activeTab === 'passports'
-                        ? 'text-white'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`}
-                  >
-                    🪪 {dict.nav.passports || 'Component Passports'}
-                  </button>
-                  )}
-
-              {shows('history') && isInPilotNav('history', user?.role) && (
-                <button
-                  data-testid="nav-history"
-                  onClick={() => onSelectTab('history')}
-                  className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                    activeTab === 'history'
-                      ? 'text-white'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  {dict.nav.history}
-                </button>
-              )}
-
-              {shows('analytics') && isInPilotNav('analytics', user?.role) && (
-                <button
-                  data-testid="nav-analytics"
-                  onClick={() => onSelectTab('analytics')}
-                  className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                    activeTab === 'analytics'
-                      ? 'text-white'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  {dict.nav.analytics}
-                </button>
-              )}
-
-              {can(user?.role, 'certificate.export') && isInPilotNav('admin', user?.role) && (
-                <button
-                  data-testid="nav-admin"
-                  onClick={() => onSelectTab('admin')}
-                  className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                    activeTab === 'admin'
-                      ? 'text-white'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <ShieldIcon size={16} className="text-amber-400" />
-                  {dict.nav.admin}
-                </button>
-              )}
-
-              <button
-                data-testid="nav-manual-sup"
-                onClick={() => onSelectTab('manual')}
-                className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                  activeTab === 'manual'
-                    ? 'text-white'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                📖 {dict.nav.manual || 'Ask the Manual'}
-              </button>
-
-              {shows('learning') && isInPilotNav('learning', user?.role) && (
-                <button
-                  data-testid="nav-learning"
-                  onClick={() => onSelectTab('learning')}
-                  className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                    activeTab === 'learning'
-                      ? 'text-white'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  🧠 {dict.nav.learning || 'System Learning'}
-                </button>
-              )}
-
-              {shows('audit') && (
-                <button
-                  data-testid="nav-audit"
-                  onClick={() => onSelectTab('audit')}
-                  className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                    activeTab === 'audit'
-                      ? 'text-white'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  🔗 {dict.nav.audit || 'Audit Chain'}
-                </button>
-              )}
-
-              {shows('users') && isInPilotNav('users', user?.role) && (
-                <button
-                  data-testid="nav-users"
-                  onClick={() => onSelectTab('users')}
-                  className={`min-h-[40px] px-2 py-1 text-sm font-medium rounded-md flex items-center gap-2 whitespace-nowrap transition-colors ${
-                    activeTab === 'users'
-                      ? 'text-white'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  👤 {dict.nav.users || 'User Accounts'}
-                </button>
-              )}
-            </>
+          {/* The export dialog is an action, not a screen, so it sits apart. */}
+          {!isInspector && can(user?.role, 'certificate.export') && isInPilotNav('admin', user?.role) && (
+            <button
+              data-testid="nav-admin"
+              onClick={() => onSelectTab('admin')}
+              className="min-h-tap px-3 rounded-control inline-flex items-center gap-2 whitespace-nowrap text-[13px] font-bold text-ink-muted hover:text-ink hover:bg-raised transition-colors"
+            >
+              <ShieldIcon size={18} className="text-warn-ink" />
+              <span>{dict.nav.admin}</span>
+            </button>
           )}
 
           {user && (
             <button
               onClick={onLogout}
-              className="md:hidden min-h-[48px] px-3 py-2 text-sm font-bold text-rose-400 hover:bg-rose-950/30 rounded-md flex items-center gap-1.5 ml-auto"
+              className="md:hidden min-h-tap px-3 rounded-control inline-flex items-center gap-2 text-[13px] font-bold text-bad-ink hover:bg-bad-soft ml-auto"
             >
               <LogOutIcon size={16} />
               <span>{dict.nav.logout}</span>
@@ -572,28 +420,23 @@ export const Header: React.FC<HeaderProps> = ({
       {conflicts.length > 0 && (
         <div
           data-testid="sync-conflicts"
-          className="bg-amber-950/70 border-t border-amber-800 px-4 py-3"
+          className="bg-warn-soft border-t border-warn-line px-4 py-3"
         >
           <div className="max-w-7xl mx-auto space-y-2">
             <div className="flex items-start justify-between gap-3">
-              <p className="text-xs font-extrabold text-amber-200 uppercase tracking-wide">
-                {currentLang === 'hi'
+              <p className="text-xs font-extrabold text-warn-ink uppercase tracking-[0.07em]">
+                {isHi
                   ? `${conflicts.length} ऑफ़लाइन प्रविष्टि लागू नहीं हुई`
                   : `${conflicts.length} offline ${conflicts.length === 1 ? 'entry was' : 'entries were'} not applied`}
               </p>
-              <button
-                onClick={() => setConflicts([])}
-                className="min-h-[32px] px-2.5 text-[11px] font-bold text-amber-300 hover:text-white border border-amber-800 rounded-md"
-              >
-                {currentLang === 'hi' ? 'समझ गया' : 'Got it'}
-              </button>
+              <Button size="sm" variant="secondary" onClick={() => setConflicts([])} className="shrink-0">
+                {isHi ? 'समझ गया' : 'Got it'}
+              </Button>
             </div>
             <ul className="space-y-1.5">
               {conflicts.map((c, i) => (
-                <li key={c.clientTempId || i} className="text-xs text-amber-100/90 leading-snug">
-                  {c.wagonNumber && (
-                    <b className="text-amber-200">{c.wagonNumber}</b>
-                  )}{' '}
+                <li key={c.clientTempId || i} className="text-xs text-warn-ink/90 leading-snug">
+                  {c.wagonNumber && <b className="text-warn-ink">{c.wagonNumber}</b>}{' '}
                   {c.reason}
                 </li>
               ))}

@@ -8,6 +8,8 @@ import { api } from '../services/api.ts';
 import { offlineDb } from '../services/offlineDb.ts';
 import { useI18n } from '../i18n/index.ts';
 import { WagonNumberCamera } from '../components/WagonNumberCamera.tsx';
+import { TrainIcon, CameraIcon, PlusCircleIcon } from '../components/Icons.tsx';
+import { Button, Chip, inputClass } from '../components/ui/index.tsx';
 import type { WagonRecord, LifecycleStage } from '../../../shared/types.ts';
 
 interface WagonsListPageProps {
@@ -35,15 +37,22 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
   const [registering, setRegistering] = useState<boolean>(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
 
-  const stages: Array<{ key: LifecycleStage | 'ALL'; label: string; icon: string }> = [
-    { key: 'ALL', label: 'All Wagons', icon: '🚂' },
-    { key: 'ENTRY_REGISTRATION', label: '1. Registration', icon: '📝' },
-    { key: 'DISMANTLING', label: '2. Dismantling', icon: '🔧' },
-    { key: 'COMPONENT_INSPECTION', label: '3. Inspection', icon: '🔍' },
-    { key: 'REPAIR_REPLACEMENT', label: '4. Repair', icon: '⚙️' },
-    { key: 'REASSEMBLY', label: '5. Reassembly', icon: '🏗️' },
-    { key: 'FINAL_QC_GATE', label: '6. QC Gate', icon: '🛡️' },
-    { key: 'RELEASE', label: '7. Released', icon: '✅' }
+  /*
+   * The seven stages, in order, as the filter.
+   *
+   * The emoji that used to lead each pill (📝 🔧 🔍 ⚙️ 🏗️ 🛡️ ✅) said nothing
+   * the stage number does not say better, and two of them rendered as a
+   * fallback box on the workshop's Android tablets. The number is the label.
+   */
+  const stages: Array<{ key: LifecycleStage | 'ALL'; label: string; step: string }> = [
+    { key: 'ALL', label: isHi ? 'सभी वैगन' : 'All wagons', step: '' },
+    { key: 'ENTRY_REGISTRATION', label: isHi ? 'पंजीकरण' : 'Registration', step: '1' },
+    { key: 'DISMANTLING', label: isHi ? 'खोलना' : 'Dismantling', step: '2' },
+    { key: 'COMPONENT_INSPECTION', label: isHi ? 'पुर्जा निरीक्षण' : 'Inspection', step: '3' },
+    { key: 'REPAIR_REPLACEMENT', label: isHi ? 'मरम्मत' : 'Repair', step: '4' },
+    { key: 'REASSEMBLY', label: isHi ? 'पुनः जोड़ना' : 'Reassembly', step: '5' },
+    { key: 'FINAL_QC_GATE', label: isHi ? 'अंतिम गेट' : 'QC gate', step: '6' },
+    { key: 'RELEASE', label: isHi ? 'रिलीज़' : 'Released', step: '7' }
   ];
 
   useEffect(() => {
@@ -120,22 +129,23 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
   return (
     <div className="space-y-6">
       {/* Top Banner / Actions */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl">
-        <div>
-          <h2 className="text-xl font-black text-white flex items-center gap-2">
-            <span>🚂</span> {t('lifecycle.title')}
-          </h2>
-          <p className="text-xs text-slate-400 mt-1">
-            WRS Raipur POH Overhaul Pipeline & Real-Time Workshop Tracking
-          </p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-card p-6 rounded-card border border-line shadow-xl">
+        <div className="flex items-start gap-3">
+          <TrainIcon size={22} className="text-accent-ink mt-0.5 shrink-0" />
+          <div>
+            <h2 className="text-xl font-extrabold tracking-[-0.025em] text-ink">{t('lifecycle.title')}</h2>
+            <p className="text-xs text-ink-muted mt-1">
+              {isHi
+                ? 'डब्ल्यूआरएस रायपुर पीओएच पाइपलाइन'
+                : 'WRS Raipur POH overhaul pipeline'}
+            </p>
+          </div>
         </div>
 
-        <button
-          onClick={() => setShowRegisterModal(true)}
-          className="px-5 py-3 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-orange-600/30 transition flex items-center gap-2 min-h-[48px]"
-        >
-          <span>➕</span> {t('actions.registerWagon')}
-        </button>
+        <Button variant="primary" size="md" onClick={() => setShowRegisterModal(true)}>
+          <PlusCircleIcon size={18} />
+          {t('actions.registerWagon')}
+        </Button>
       </div>
 
       {/* 7-Stage Pipeline Visualizer Pills */}
@@ -148,17 +158,22 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
             <button
               key={stg.key}
               onClick={() => setStageFilter(stg.key)}
-              className={`p-3 rounded-xl border text-left transition min-h-[48px] flex flex-col justify-between ${
+              aria-pressed={isSelected}
+              className={`p-3 rounded-control border text-left transition-colors min-h-[76px] flex flex-col justify-between ${
                 isSelected
-                  ? 'bg-orange-600/20 border-orange-500 ring-1 ring-orange-500 text-white'
-                  : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                  ? 'bg-raised border-accent-line'
+                  : 'bg-card border-line hover:border-line-strong'
               }`}
             >
-              <div className="text-xs font-semibold flex items-center gap-1">
-                <span>{stg.icon}</span>
-                <span className="truncate">{stg.label}</span>
+              <div className="text-[10px] font-bold uppercase tracking-[0.07em] text-ink-faint">
+                {stg.step ? (isHi ? `चरण ${stg.step}` : `Stage ${stg.step}`) : (isHi ? 'सभी' : 'Total')}
               </div>
-              <div className="text-lg font-black text-white mt-2">{count}</div>
+              <div className={`text-2xl font-extrabold tracking-[-0.03em] tabular mt-1 ${isSelected ? 'text-accent-ink' : 'text-ink'}`}>
+                {count}
+              </div>
+              <div className={`text-[11px] font-semibold mt-0.5 truncate ${isSelected ? 'text-ink-body' : 'text-ink-muted'}`}>
+                {stg.label}
+              </div>
             </button>
           );
         })}
@@ -172,7 +187,7 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
             placeholder={isHi ? 'वैगन संख्या, रेलवे, प्रकार खोजें...' : 'Search wagon number, railway, type...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-4 pr-14 py-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-orange-500 min-h-[48px]"
+            className={inputClass + ' pr-14'}
           />
           {/*
             Scanning to FIND a wagon, which is the common case. The camera used
@@ -185,14 +200,14 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
             onClick={() => setShowSearchCamera(true)}
             title={isHi ? 'वैगन पर लिखा नंबर पढ़ें' : 'Read the number painted on the wagon'}
             aria-label={isHi ? 'वैगन नंबर स्कैन करें' : 'Scan a wagon number'}
-            className="absolute right-2 top-1/2 -translate-y-1/2 min-h-[40px] min-w-[40px] px-2 rounded-lg border border-amber-600 text-amber-300 hover:bg-amber-950/50 text-base"
+            className="absolute right-2 top-1/2 -translate-y-1/2 min-h-[40px] min-w-[40px] px-2 rounded-control border border-line-strong text-ink-muted hover:text-ink hover:bg-raised flex items-center justify-center"
           >
-            📷
+            <CameraIcon size={18} />
           </button>
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-3.5 text-slate-400 hover:text-white"
+              className="absolute right-3 top-3.5 text-ink-muted hover:text-white"
             >
               ✕
             </button>
@@ -202,16 +217,17 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
 
       {/* Wagons List Cards / Table */}
       {loading ? (
-        <div className="text-center py-20 bg-slate-900/40 rounded-2xl border border-slate-800 text-slate-400">
-          <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+        <div className="text-center py-20 bg-card rounded-card border border-line text-ink-muted">
+          <div className="w-8 h-8 border-2 border-accent-hover border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
           <p className="text-sm">Loading workshop wagon records...</p>
         </div>
       ) : wagons.length === 0 ? (
-        <div className="text-center py-20 bg-slate-900/40 rounded-2xl border border-slate-800 text-slate-400 space-y-3">
-          <div className="text-4xl">📋</div>
-          <p className="text-base font-bold text-slate-300">{isHi ? 'कोई वैगन नहीं मिला' : 'No wagons found'}</p>
-          <p className="text-xs text-slate-500">
-            Register a new wagon into Stage 1 (Entry Registration) to begin tracking.
+        <div className="text-center py-20 bg-card rounded-card border border-line text-ink-muted space-y-3">
+          <p className="text-base font-bold text-ink-body">{isHi ? 'कोई वैगन नहीं मिला' : 'No wagons found'}</p>
+          <p className="text-xs text-ink-faint">
+            {isHi
+              ? 'ट्रैकिंग शुरू करने के लिए चरण 1 में एक वैगन पंजीकृत करें।'
+              : 'Register a wagon into stage 1 to begin tracking.'}
           </p>
         </div>
       ) : (
@@ -224,42 +240,34 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
               <div
                 key={wagon.id}
                 onClick={() => onSelectWagon(wagon.wagonNumber)}
-                className="bg-slate-900 border border-slate-800 hover:border-orange-500/60 rounded-2xl p-5 shadow-lg transition duration-200 cursor-pointer space-y-4 group hover:shadow-orange-500/10"
+                className="bg-card border border-line hover:border-line-strong rounded-card p-5 transition-colors cursor-pointer space-y-4 group"
               >
                 {/* Wagon Top Header */}
                 <div className="flex justify-between items-start">
                   <div>
-                    <h3 className="text-base font-black text-white group-hover:text-orange-400 transition">
+                    <h3 className="text-base font-extrabold text-ink tabular group-hover:text-accent-ink transition-colors">
                       {wagon.wagonNumber}
                     </h3>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-ink-muted">
                       {wagon.owningRailway} • {wagon.wagonType}
                     </p>
                   </div>
 
-                  <span
-                    className={`px-2.5 py-1 rounded-full text-[10px] font-black tracking-wide ${
-                      isReleased
-                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                        : isQCGate
-                        ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
-                        : 'bg-blue-500/20 text-blue-400 border border-blue-500/40'
-                    }`}
-                  >
-                    {wagon.currentStage}
-                  </span>
+                  <Chip tone={isReleased ? 'good' : isQCGate ? 'warn' : 'accent'}>
+                    {t(`lifecycle.stages.${wagon.currentStage}` as any) || wagon.currentStage}
+                  </Chip>
                 </div>
 
                 {/* Stage Progress Visual Bar */}
                 <div className="space-y-1">
-                  <div className="flex justify-between text-[11px] text-slate-400 font-medium">
+                  <div className="flex justify-between text-[11px] text-ink-muted font-medium">
                     <span>{t(`lifecycle.stages.${wagon.currentStage}` as any) || wagon.currentStage}</span>
                     <span>{wagon.totalElapsedHours ? `${wagon.totalElapsedHours}h dwell` : 'Active'}</span>
                   </div>
-                  <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                  <div className="w-full h-2 bg-selected rounded-full overflow-hidden">
                     <div
                       className={`h-full transition-all ${
-                        isReleased ? 'bg-emerald-500' : isQCGate ? 'bg-amber-500' : 'bg-orange-500'
+                        isReleased ? 'bg-good' : isQCGate ? 'bg-warn' : 'bg-accent'
                       }`}
                       style={{
                         width: `${Math.min(
@@ -284,10 +292,10 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
                 </div>
 
                 {/* Footer Notes & Action */}
-                <div className="text-[11px] text-slate-500 flex justify-between items-center border-t border-slate-800/80 pt-3">
+                <div className="text-[11px] text-ink-faint flex justify-between items-center border-t border-line pt-3">
                   <span>Intake: {new Date(wagon.entryDate).toLocaleDateString()}</span>
-                  <span className="text-orange-400 font-bold text-xs flex items-center gap-1 group-hover:translate-x-1 transition">
-                    Open Detail →
+                  <span className="text-accent-ink font-bold text-xs flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+                    {isHi ? 'खोलें →' : 'Open →'}
                   </span>
                 </div>
               </div>
@@ -323,15 +331,15 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
       )}
 
       {showRegisterModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-850">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-card border border-line rounded-card shadow-2xl w-full max-w-lg overflow-hidden">
+            <div className="px-6 py-4 border-b border-line flex justify-between items-center bg-raised">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <span>📝</span> {t('actions.registerWagon')} (Stage 1 Intake)
+                {t('actions.registerWagon')}
               </h3>
               <button
                 onClick={() => setShowRegisterModal(false)}
-                className="text-slate-400 hover:text-white p-1 text-lg"
+                className="text-ink-muted hover:text-white p-1 text-lg"
               >
                 ✕
               </button>
@@ -345,7 +353,7 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-ink-body mb-1">
                   {t('form.wagonNumber')} *
                 </label>
                 <div className="flex gap-2">
@@ -355,28 +363,29 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
                     placeholder="e.g. NR/BOXNHL/12345 or SECR/BOXN/99021"
                     value={newWagonNumber}
                     onChange={(e) => setNewWagonNumber(e.target.value)}
-                    className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white font-mono uppercase focus:outline-none focus:border-orange-500"
+                    className="flex-1 bg-raised border border-line rounded-lg px-3 py-2.5 text-sm text-white font-mono uppercase focus:outline-none focus:border-accent-hover"
                   />
                   <button
                     type="button"
                     onClick={() => setShowNumberCamera(true)}
                     title="Read the number painted on the wagon"
-                    className="px-3 rounded-lg border border-amber-600 text-amber-300 hover:bg-amber-950/50 text-xs font-bold whitespace-nowrap"
+                    className="px-3 rounded-control border border-line-strong text-ink-muted hover:text-ink hover:bg-raised text-xs font-bold whitespace-nowrap inline-flex items-center gap-1.5"
                   >
-                    📷 {t('actions.scan') || 'Scan'}
+                    <CameraIcon size={16} />
+                    {t('actions.scan') || 'Scan'}
                   </button>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-ink-body mb-1">
                     {t('form.wagonType')}
                   </label>
                   <select
                     value={newWagonType}
                     onChange={(e) => setNewWagonType(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500"
+                    className="w-full bg-raised border border-line rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-accent-hover"
                   >
                     <option value="BOXNHL">{isHi ? 'BOXNHL (उच्च एक्सल भार)' : 'BOXNHL (High Axle Load)'}</option>
                     <option value="BOXN">{isHi ? 'BOXN (मानक खुला)' : 'BOXN (Standard Open)'}</option>
@@ -387,13 +396,13 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                  <label className="block text-xs font-semibold text-ink-body mb-1">
                     {t('form.owningRailway')}
                   </label>
                   <select
                     value={newOwningRailway}
                     onChange={(e) => setNewOwningRailway(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500"
+                    className="w-full bg-raised border border-line rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-accent-hover"
                   >
                     <option value="SECR">{isHi ? 'SECR (दक्षिण पूर्व मध्य)' : 'SECR (South East Central)'}</option>
                     <option value="ECoR">{isHi ? 'ECoR (पूर्व तट)' : 'ECoR (East Coast)'}</option>
@@ -406,7 +415,7 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-ink-body mb-1">
                   {t('form.entryNotes')}
                 </label>
                 <textarea
@@ -414,22 +423,22 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
                   value={newEntryNotes}
                   onChange={(e) => setNewEntryNotes(e.target.value)}
                   placeholder={t('form.entryNotesPlaceholder')}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+                  className="w-full bg-raised border border-line rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-hover"
                 />
               </div>
 
-              <div className="pt-3 border-t border-slate-800 flex justify-end gap-3">
+              <div className="pt-3 border-t border-line flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setShowRegisterModal(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold transition"
+                  className="px-4 py-2 rounded-lg border border-line text-ink-body hover:bg-raised text-xs font-semibold transition"
                 >
                   {t('actions.cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={registering}
-                  className="px-5 py-2 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-xs font-bold shadow-lg transition"
+                  className="px-5 py-2 rounded-control bg-accent hover:bg-accent-hover text-white text-xs font-bold transition-colors"
                 >
                   {registering ? 'Registering...' : t('actions.registerWagon')}
                 </button>

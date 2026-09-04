@@ -67,11 +67,11 @@ const WEIGHTY = new Set([
 ]);
 
 const ROLE_TINT: Record<string, string> = {
-  INSPECTOR: 'bg-blue-500/15 text-blue-300 border-blue-500/30',
-  SUPERVISOR: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  ADMIN: 'bg-purple-500/15 text-purple-300 border-purple-500/30',
-  DRM: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
-  SYSTEM: 'bg-slate-500/15 text-slate-300 border-slate-500/30'
+  INSPECTOR: 'bg-accent-soft text-accent-ink border-accent-line',
+  SUPERVISOR: 'bg-warn-soft text-warn-ink border-warn-line',
+  ADMIN: 'bg-accent-soft text-accent-ink border-accent-line',
+  DRM: 'bg-good-soft text-good-ink border-good-line',
+  SYSTEM: 'bg-slate-500/15 text-ink-body border-line-strong'
 };
 
 /** The one or two fields of a payload that are worth reading at a glance. */
@@ -161,7 +161,7 @@ export const ActivityLog: React.FC = () => {
 
   return (
     <div className="space-y-4" data-testid="activity-log">
-      <div className="bg-slate-800/60 border border-slate-700 rounded-xl p-4">
+      <div className="bg-raised border border-line rounded-control p-4">
         <form
           onSubmit={e => { e.preventDefault(); load(); }}
           className="flex flex-col sm:flex-row gap-3"
@@ -171,13 +171,13 @@ export const ActivityLog: React.FC = () => {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search a wagon number, a part, or a person"
-            className="flex-1 bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500"
+            className="flex-1 bg-card border border-line-strong rounded-control px-3 py-2 text-sm text-white placeholder-slate-500"
             data-testid="activity-search"
           />
           <select
             value={eventType}
             onChange={e => setEventType(e.target.value)}
-            className="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"
+            className="bg-card border border-line-strong rounded-control px-3 py-2 text-sm text-white"
             data-testid="activity-event-filter"
           >
             <option value="">Every kind of event</option>
@@ -188,7 +188,7 @@ export const ActivityLog: React.FC = () => {
           <select
             value={role}
             onChange={e => setRole(e.target.value)}
-            className="bg-slate-900 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white"
+            className="bg-card border border-line-strong rounded-control px-3 py-2 text-sm text-white"
             data-testid="activity-role-filter"
           >
             <option value="">Everyone</option>
@@ -200,31 +200,31 @@ export const ActivityLog: React.FC = () => {
           </select>
           <button
             type="submit"
-            className="bg-blue-600 hover:bg-blue-500 rounded-lg px-4 py-2 text-sm font-bold text-white flex items-center gap-2"
+            className="bg-accent hover:bg-accent rounded-control px-4 py-2 text-sm font-bold text-white flex items-center gap-2"
           >
             <RefreshCwIcon size={14} /> Search
           </button>
         </form>
       </div>
 
-      <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+      <div className="flex items-center justify-between text-xs text-ink-muted px-1">
         <span data-testid="activity-count">
           {loading ? 'Reading the ledger…' : `Showing ${entries.length} of ${total} recorded actions`}
         </span>
         <span className="flex items-center gap-1.5">
-          <ShieldIcon size={12} className="text-emerald-400" />
+          <ShieldIcon size={12} className="text-good-ink" />
           Append-only — entries cannot be edited or deleted, by anyone
         </span>
       </div>
 
       {error && (
-        <div className="bg-red-900/30 border border-red-700 rounded-lg p-4 text-sm text-red-200">
+        <div className="bg-bad-soft border border-bad-line rounded-control p-4 text-sm text-bad-ink">
           {error}
         </div>
       )}
 
       {!loading && !error && entries.length === 0 && (
-        <div className="bg-slate-800/40 border border-slate-700 rounded-xl p-8 text-center text-slate-400 text-sm">
+        <div className="bg-raised border border-line rounded-control p-8 text-center text-ink-muted text-sm">
           Nothing matches that search.
         </div>
       )}
@@ -237,18 +237,18 @@ export const ActivityLog: React.FC = () => {
           return (
             <div
               key={entry.id}
-              className={`bg-slate-800/60 border rounded-lg overflow-hidden ${
-                WEIGHTY.has(entry.eventType) ? 'border-amber-600/50' : 'border-slate-700'
+              className={`bg-raised border rounded-control overflow-hidden ${
+                WEIGHTY.has(entry.eventType) ? 'border-warn-line' : 'border-line'
               }`}
               data-testid="activity-entry"
             >
               <button
                 onClick={() => setExpanded(isOpen ? null : entry.id)}
-                className="w-full text-left px-4 py-3 hover:bg-slate-700/30 transition-colors"
+                className="w-full text-left px-4 py-3 hover:bg-selected transition-colors"
               >
                 <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3">
                   <span className="text-sm font-bold text-white min-w-[11rem]">{label}</span>
-                  <span className="text-sm text-slate-300 flex-1 truncate">{detail || '—'}</span>
+                  <span className="text-sm text-ink-body flex-1 truncate">{detail || '—'}</span>
                   <span
                     className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded border ${
                       ROLE_TINT[entry.actorRole] || ROLE_TINT.SYSTEM
@@ -257,8 +257,8 @@ export const ActivityLog: React.FC = () => {
                     {entry.actorRole}
                   </span>
                 </div>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[11px] text-slate-400">
-                  <span className="font-semibold text-slate-300">{entry.actorName}</span>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[11px] text-ink-muted">
+                  <span className="font-semibold text-ink-body">{entry.actorName}</span>
                   {entry.actorEmployeeId && <span>#{entry.actorEmployeeId}</span>}
                   <span className="tabular-nums">{formatWhen(entry.occurredAt)}</span>
                   <span className="tabular-nums">
@@ -270,14 +270,14 @@ export const ActivityLog: React.FC = () => {
               </button>
 
               {isOpen && (
-                <div className="border-t border-slate-700 bg-slate-900/60 px-4 py-3">
-                  <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-2 font-bold">
+                <div className="border-t border-line bg-card px-4 py-3">
+                  <div className="text-[11px] uppercase tracking-wide text-ink-faint mb-2 font-bold">
                     Everything recorded for this action
                   </div>
-                  <pre className="text-[11px] text-slate-300 overflow-x-auto whitespace-pre-wrap break-words">
+                  <pre className="text-[11px] text-ink-body overflow-x-auto whitespace-pre-wrap break-words">
 {JSON.stringify(entry.detail, null, 2)}
                   </pre>
-                  <div className="mt-2 text-[10px] text-slate-500 font-mono break-all">
+                  <div className="mt-2 text-[10px] text-ink-faint font-mono break-all">
                     entry {entry.id}
                   </div>
                 </div>
@@ -290,7 +290,7 @@ export const ActivityLog: React.FC = () => {
       {!loading && entries.length < total && (
         <button
           onClick={() => { const next = limit + 100; setLimit(next); load(next); }}
-          className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-600 rounded-lg py-2.5 text-sm font-semibold text-slate-300"
+          className="w-full bg-raised hover:bg-selected border border-line-strong rounded-control py-2.5 text-sm font-semibold text-ink-body"
         >
           Show older entries ({total - entries.length} more)
         </button>

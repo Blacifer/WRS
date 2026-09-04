@@ -17,6 +17,10 @@ import { AppAccessQr } from '../components/AppAccessQr.tsx';
 import { TotpEnrolment } from '../components/TotpEnrolment.tsx';
 import { GaugeRegister } from '../components/GaugeRegister.tsx';
 import { ActionConfirm } from '../components/ActionConfirm.tsx';
+import { RefreshCwIcon, UserIcon, CheckCircleIcon, PlusCircleIcon } from '../components/Icons.tsx';
+import { Button, Card, CardBody, CardHeader, Chip, Note } from '../components/ui/index.tsx';
+import { ROLE_CAPABILITIES } from '../../../shared/auth/permissions.ts';
+import type { Capability, Role } from '../../../shared/auth/permissions.ts';
 
 function generateStrongPassword(length = 14): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
@@ -48,6 +52,108 @@ const ROLE_LABELS: Record<string, string> = {
   SUPERVISOR: 'Supervisor',
   ADMIN: 'Administrator',
   DRM: 'DRM — Divisional Officer'
+};
+
+/*
+ * What each capability means, in the words somebody would use out loud.
+ *
+ * The capability NAMES are the authority and live in shared/auth/permissions.ts;
+ * this only supplies a reading of each. Anything added there without a label
+ * here still appears in the matrix, under its own name — better a raw key on
+ * screen than a capability silently missing from the table an administrator
+ * uses to reason about access.
+ */
+const CAPABILITY_LABELS: Partial<Record<Capability, { en: string; hi: string }>> = {
+  'spring.record':       { en: 'Record a spring',              hi: 'स्प्रिंग दर्ज करना' },
+  'spring.correct':      { en: 'Withdraw a mistapped spring',  hi: 'ग़लत दर्ज स्प्रिंग वापस लेना' },
+  'wagon.inspect':       { en: 'Answer a wagon checklist',     hi: 'वैगन जाँच सूची भरना' },
+  'wagon.photograph':    { en: 'Attach photographic evidence', hi: 'फ़ोटो प्रमाण जोड़ना' },
+  'wagon.view':          { en: 'Look at wagons and history',   hi: 'वैगन व इतिहास देखना' },
+  'wagon.release':       { en: 'Certify a wagon fit to leave', hi: 'वैगन को जाने योग्य प्रमाणित करना' },
+  'wagon.override':      { en: 'Move a wagon against the rules', hi: 'नियम के विरुद्ध चरण बदलना' },
+  'checklist.configure': { en: 'Change what the gate enforces', hi: 'गेट के नियम बदलना' },
+  'stores.manage':       { en: 'Issue and restock parts',      hi: 'पुर्जे जारी व पुनःपूर्ति' },
+  'learning.approve':    { en: 'Accept a parameter change',    hi: 'पैरामीटर परिवर्तन स्वीकारना' },
+  'audit.read':          { en: 'Verify the audit chain',       hi: 'ऑडिट श्रृंखला जाँचना' },
+  'analytics.read':      { en: 'Read the divisional dashboards', hi: 'मंडल डैशबोर्ड देखना' },
+  'learning.view':       { en: 'Read what the system learned', hi: 'सिस्टम की सीख देखना' },
+  'certificate.export':  { en: 'Export certificates',          hi: 'प्रमाणपत्र निर्यात' },
+  'users.manage':        { en: 'Manage people',                hi: 'लोगों का प्रबंधन' },
+  'system.configure':    { en: 'Configure the system',         hi: 'सिस्टम कॉन्फ़िगर करना' }
+};
+
+const MATRIX_ROLES: Role[] = ['INSPECTOR', 'SUPERVISOR', 'DRM', 'ADMIN'];
+const MATRIX_ROLE_SHORT: Record<Role, string> = {
+  INSPECTOR: 'Insp', SUPERVISOR: 'Sup', DRM: 'DRM', ADMIN: 'Admin'
+};
+
+/**
+ * Who holds what, read straight off the permission table.
+ *
+ * Built from ROLE_CAPABILITIES rather than written out here, so it cannot
+ * drift from what the guards actually enforce — a printed access matrix that
+ * disagrees with the code is worse than none, because people trust it.
+ */
+const CapabilityMatrix: React.FC<{ isHi: boolean }> = ({ isHi }) => {
+  const every = Array.from(
+    new Set(MATRIX_ROLES.flatMap((r) => [...ROLE_CAPABILITIES[r]]))
+  ) as Capability[];
+
+  return (
+    <Card>
+      <CardHeader
+        title={isHi ? 'कौन क्या कर सकता है' : 'What each role holds'}
+        meta={isHi ? 'सीधे अनुमति तालिका से' : 'Read from the permission table itself'}
+      />
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm min-w-[34rem]">
+          <thead>
+            <tr className="text-left text-[11px] uppercase tracking-[0.07em] text-ink-faint border-b border-line">
+              <th className="px-5 py-3 font-bold">{isHi ? 'क्षमता' : 'Capability'}</th>
+              {MATRIX_ROLES.map((r) => (
+                <th key={r} className="px-3 py-3 font-bold text-center w-[86px]">{MATRIX_ROLE_SHORT[r]}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {every.map((cap) => (
+              <tr key={cap} className="border-b border-line/60 hover:bg-white/[0.02]">
+                <td className="px-5 py-2.5">
+                  <div className="text-[13px] font-semibold text-ink-body">
+                    {CAPABILITY_LABELS[cap] ? (isHi ? CAPABILITY_LABELS[cap]!.hi : CAPABILITY_LABELS[cap]!.en) : cap}
+                  </div>
+                  <div className="text-[11px] font-medium text-ink-faint font-mono mt-0.5">{cap}</div>
+                </td>
+                {MATRIX_ROLES.map((r) => {
+                  const held = ROLE_CAPABILITIES[r].includes(cap);
+                  return (
+                    <td key={r} className="px-3 py-2.5 text-center">
+                      <span
+                        aria-label={held ? 'held' : 'not held'}
+                        className={[
+                          'inline-flex items-center justify-center w-6 h-6 rounded-chip border',
+                          held ? 'bg-good-soft border-good-line text-good-ink' : 'border-line text-transparent'
+                        ].join(' ')}
+                      >
+                        {held ? <CheckCircleIcon size={14} /> : null}
+                      </span>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <CardBody>
+        <Note>
+          {isHi
+            ? 'वरिष्ठता से पहुँच तय नहीं होती। प्रशासक वह खाता बना सकता है जो वैगन प्रमाणित करता है, पर स्वयं प्रमाणित नहीं कर सकता; डीआरएम सब देखता है और कुछ हस्ताक्षरित नहीं करता।'
+            : 'Access is not seniority. An administrator can create the account that certifies a wagon and cannot certify one themselves; the DRM sees everything and signs nothing.'}
+        </Note>
+      </CardBody>
+    </Card>
+  );
 };
 
 interface UserManagementPageProps {
@@ -247,7 +353,7 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
           supervisor who has lost their phone. */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <AppAccessQr lang={lang} />
-        <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5">
+        <div className="rounded-card border border-line bg-card p-5">
           <TotpEnrolment lang={lang} onClose={() => { /* inline panel, nothing to close to */ }} />
         </div>
       </div>
@@ -259,32 +365,39 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
       <GaugeRegister lang={lang} />
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 p-5 bg-gradient-to-r from-slate-900 via-slate-900 to-amber-950/30 border border-amber-500/30 rounded-2xl shadow-xl">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-amber-300 text-2xl">
-            👤
-          </div>
+          <span className="w-12 h-12 rounded-control bg-accent-soft border border-accent-line flex items-center justify-center text-accent-ink shrink-0">
+            <UserIcon size={20} />
+          </span>
           <div>
-            <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight">{isHi ? 'उपयोगकर्ता खाते' : 'User Accounts'}</h1>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Create and manage real login accounts for inspectors, supervisors, the DRM and administrators.
+            <h1 className="text-2xl font-extrabold tracking-[-0.028em] text-ink">
+              {isHi ? 'लोग, और वे क्या खोल सकते हैं' : 'People, and what they can reach'}
+            </h1>
+            <p className="text-[13px] font-medium text-ink-muted mt-1">
+              {isHi
+                ? 'निरीक्षक, पर्यवेक्षक, डीआरएम और प्रशासक के वास्तविक लॉगिन खाते।'
+                : 'Real login accounts for inspectors, supervisors, the DRM and administrators.'}
             </p>
           </div>
         </div>
-        <button
+        <Button
+          variant={isFormOpen ? 'secondary' : 'primary'}
           onClick={() => {
             setIsFormOpen((v) => !v);
             setSubmitError(null);
           }}
-          className="min-h-[44px] px-4 py-2 bg-amber-600 hover:bg-amber-500 active:bg-amber-700 text-white rounded-xl text-sm font-bold shadow-md transition-colors whitespace-nowrap"
         >
-          {isFormOpen ? '✕ Cancel' : '+ Add User'}
-        </button>
+          <PlusCircleIcon size={17} />
+          {isFormOpen ? (isHi ? 'रद्द करें' : 'Cancel') : (isHi ? 'व्यक्ति जोड़ें' : 'Add person')}
+        </Button>
       </div>
+
+      <CapabilityMatrix isHi={isHi} />
 
       {/* Just-created credentials panel — shown once */}
       {justCreated && (
-        <div className="p-5 bg-emerald-950/40 border border-emerald-500/40 rounded-2xl shadow-xl space-y-3">
+        <div className="p-5 bg-emerald-950/40 border border-emerald-500/40 rounded-card shadow-xl space-y-3">
           <div className="flex items-start justify-between gap-4">
             <div>
               <h3 className="text-sm font-black text-emerald-300">Account created for {justCreated.fullName}</h3>
@@ -294,10 +407,10 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
             </div>
             <button onClick={() => setJustCreated(null)} className="text-emerald-400/70 hover:text-emerald-300 text-sm">✕</button>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-black/30 border border-emerald-800/60 rounded-xl p-3">
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-black/30 border border-emerald-800/60 rounded-control p-3">
             <div className="font-mono text-sm text-white space-y-1">
-              <div><span className="text-slate-400">Username:</span> {justCreated.username}</div>
-              <div><span className="text-slate-400">Password:</span> {justCreated.password}</div>
+              <div><span className="text-ink-muted">Username:</span> {justCreated.username}</div>
+              <div><span className="text-ink-muted">Password:</span> {justCreated.password}</div>
             </div>
             <button
               onClick={copyCredentials}
@@ -311,7 +424,7 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
 
       {/* Add User Form */}
       {isFormOpen && (
-        <form onSubmit={handleSubmit} className="p-5 bg-slate-900 border border-slate-700 rounded-2xl shadow-xl space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 bg-card border border-line rounded-card shadow-xl space-y-4">
           <h3 className="text-sm font-black text-white">{isHi ? 'नया खाता' : 'New Account'}</h3>
 
           {submitError && (
@@ -322,33 +435,33 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-400 mb-1">{isHi ? 'पूरा नाम' : 'Full Name'}</label>
+              <label className="block text-xs font-bold text-ink-muted mb-1">{isHi ? 'पूरा नाम' : 'Full Name'}</label>
               <input
                 type="text"
                 value={fullName}
                 onChange={(e) => handleFullNameChange(e.target.value)}
                 placeholder="Ramesh Kumar"
-                className="w-full min-h-[44px] px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                className="w-full min-h-[44px] px-3 py-2 bg-raised border border-line rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
                 required
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-400 mb-1">{isHi ? 'कर्मचारी आईडी' : 'Employee ID'}</label>
+              <label className="block text-xs font-bold text-ink-muted mb-1">{isHi ? 'कर्मचारी आईडी' : 'Employee ID'}</label>
               <input
                 type="text"
                 value={employeeId}
                 onChange={(e) => setEmployeeId(e.target.value)}
                 placeholder="WRS-INSP-2031"
-                className="w-full min-h-[44px] px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                className="w-full min-h-[44px] px-3 py-2 bg-raised border border-line rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
                 required
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-400 mb-1">{isHi ? 'भूमिका' : 'Role'}</label>
+              <label className="block text-xs font-bold text-ink-muted mb-1">{isHi ? 'भूमिका' : 'Role'}</label>
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value as any)}
-                className="w-full min-h-[44px] px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white focus:outline-none focus:border-amber-500"
+                className="w-full min-h-[44px] px-3 py-2 bg-raised border border-line rounded-lg text-sm text-white focus:outline-none focus:border-amber-500"
               >
                 <option value="INSPECTOR">{isHi ? 'निरीक्षक' : 'Inspector'}</option>
                 <option value="SUPERVISOR">{isHi ? 'पर्यवेक्षक' : 'Supervisor'}</option>
@@ -359,7 +472,7 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-400 mb-1">{isHi ? 'उपयोगकर्ता नाम' : 'Username'}</label>
+              <label className="block text-xs font-bold text-ink-muted mb-1">{isHi ? 'उपयोगकर्ता नाम' : 'Username'}</label>
               <input
                 type="text"
                 value={username}
@@ -368,27 +481,27 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
                   setUsernameTouched(true);
                 }}
                 placeholder="ramesh.kumar"
-                className="w-full min-h-[44px] px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                className="w-full min-h-[44px] px-3 py-2 bg-raised border border-line rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
                 required
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-xs font-bold text-slate-400 mb-1">Password (auto-generated — edit if you'd rather set your own)</label>
+              <label className="block text-xs font-bold text-ink-muted mb-1">Password (auto-generated — edit if you'd rather set your own)</label>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="flex-1 min-h-[44px] px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white font-mono focus:outline-none focus:border-amber-500"
+                  className="flex-1 min-h-[44px] px-3 py-2 bg-raised border border-line rounded-lg text-sm text-white font-mono focus:outline-none focus:border-amber-500"
                   required
                   minLength={8}
                 />
                 <button
                   type="button"
                   onClick={() => setPassword(generateStrongPassword())}
-                  className="min-h-[44px] px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg text-xs font-bold text-slate-300 whitespace-nowrap"
+                  className="min-h-[44px] px-3 py-2 bg-raised hover:bg-selected border border-line rounded-lg text-xs font-bold text-ink-body whitespace-nowrap"
                 >
-                  🎲 Regenerate
+                  <RefreshCwIcon size={14} className="inline align-[-2px] mr-1.5" />Regenerate
                 </button>
               </div>
             </div>
@@ -397,7 +510,7 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
           <button
             type="submit"
             disabled={submitting}
-            className="min-h-[44px] px-5 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-bold shadow-md transition-colors"
+            className="min-h-[44px] px-5 py-2 bg-amber-600 hover:bg-amber-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-control text-sm font-bold shadow-md transition-colors"
           >
             {submitting ? (isHi ? 'बनाया जा रहा…' : 'Creating…') : (isHi ? 'खाता बनाएँ' : 'Create Account')}
           </button>
@@ -405,7 +518,7 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
       )}
 
       {/* Users Table */}
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-xl overflow-hidden">
+      <div className="bg-card border border-line rounded-card shadow-xl overflow-hidden">
         {/*
           Why there is no delete.
           A supervisor looked for one and reported "no place to remove". There
@@ -414,8 +527,8 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
           here instead, next to the buttons that exist.
         */}
         <div className="px-4 pt-4">
-          <p className="text-[11px] text-slate-400 bg-slate-950/60 border border-slate-800 rounded-lg px-3 py-2 leading-snug">
-            <strong className="text-slate-300">There is no delete, deliberately.</strong>{' '}
+          <p className="text-[11px] text-ink-muted bg-page border border-line rounded-lg px-3 py-2 leading-snug">
+            <strong className="text-ink-body">There is no delete, deliberately.</strong>{' '}
             Deactivating stops someone signing in immediately and keeps their name on
             everything they inspected. Removing the account would leave inspections and
             audit entries pointing at somebody who no longer exists, and a record that
@@ -424,21 +537,21 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
           </p>
         </div>
 
-        <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-          <h3 className="text-sm font-black text-white">All Accounts ({users.length})</h3>
+        <div className="p-4 border-b border-line flex items-center justify-between">
+          <h3 className="text-sm font-bold text-ink">{isHi ? 'सभी खाते' : 'All accounts'} ({users.length})</h3>
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-slate-500 text-sm">Loading accounts…</div>
+          <div className="p-8 text-center text-ink-faint text-sm">Loading accounts…</div>
         ) : loadError ? (
           <div className="p-8 text-center text-rose-400 text-sm">{loadError}</div>
         ) : users.length === 0 ? (
-          <div className="p-8 text-center text-slate-500 text-sm">No accounts yet.</div>
+          <div className="p-8 text-center text-ink-faint text-sm">No accounts yet.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
+                <tr className="text-left text-[11px] uppercase tracking-wider text-ink-faint border-b border-line">
                   <th className="px-4 py-3 font-bold">{isHi ? 'नाम' : 'Name'}</th>
                   <th className="px-4 py-3 font-bold">{isHi ? 'उपयोगकर्ता नाम' : 'Username'}</th>
                   <th className="px-4 py-3 font-bold">{isHi ? 'भूमिका' : 'Role'}</th>
@@ -447,18 +560,18 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
                   <th className="px-4 py-3 font-bold text-right">{isHi ? 'क्रिया' : 'Action'}</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-line">
                 {users.map((u) => (
                   <tr key={u.id} className="hover:bg-white/[0.02]">
                     <td className="px-4 py-3 text-white font-medium">{u.full_name}</td>
-                    <td className="px-4 py-3 text-slate-400 font-mono text-xs">{u.username}</td>
-                    <td className="px-4 py-3 text-slate-300">{ROLE_LABELS[u.role] || u.role}</td>
-                    <td className="px-4 py-3 text-slate-400 font-mono text-xs">{u.employee_id}</td>
+                    <td className="px-4 py-3 text-ink-muted font-mono text-xs">{u.username}</td>
+                    <td className="px-4 py-3 text-ink-body">{ROLE_LABELS[u.role] || u.role}</td>
+                    <td className="px-4 py-3 text-ink-muted font-mono text-xs">{u.employee_id}</td>
                     <td className="px-4 py-3">
                       {u.is_active ? (
-                        <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-emerald-950/70 text-emerald-400 border border-emerald-800">{isHi ? 'सक्रिय' : 'ACTIVE'}</span>
+                        <Chip tone="good">{isHi ? 'सक्रिय' : 'Active'}</Chip>
                       ) : (
-                        <span className="px-2 py-0.5 text-[11px] font-bold rounded bg-slate-800 text-slate-500 border border-slate-700">{isHi ? 'निष्क्रिय' : 'DEACTIVATED'}</span>
+                        <Chip>{isHi ? 'निष्क्रिय' : 'Deactivated'}</Chip>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -468,7 +581,7 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
                         onClick={() => handleResetTotp(u)}
                         disabled={busyUserId === u.id}
                         title={isHi ? 'प्रमाणक हटाएँ ताकि नया फ़ोन सेट हो सके' : 'Clear the authenticator so a new phone can be enrolled'}
-                        className="min-h-[36px] px-3 py-1.5 mr-1.5 rounded-lg text-xs font-bold border border-amber-800/60 bg-amber-950/40 text-amber-400 hover:bg-amber-900/50 transition-colors disabled:opacity-50"
+                        className="min-h-[36px] px-3 py-1.5 mr-1.5 rounded-control text-xs font-bold border border-line-strong bg-raised text-ink-body hover:bg-selected hover:text-ink transition-colors disabled:opacity-50"
                       >
                         {isHi ? 'प्रमाणक रीसेट' : 'Reset authenticator'}
                       </button>
@@ -477,8 +590,8 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
                         disabled={busyUserId === u.id}
                         className={`min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors disabled:opacity-50 ${
                           u.is_active
-                            ? 'bg-rose-950/40 border-rose-800/60 text-rose-400 hover:bg-rose-900/50'
-                            : 'bg-emerald-950/40 border-emerald-800/60 text-emerald-400 hover:bg-emerald-900/50'
+                            ? 'bg-bad-soft border-bad-line text-bad-ink hover:bg-bad/20'
+                            : 'bg-good-soft border-good-line text-good-ink hover:bg-good/20'
                         }`}
                       >
                         {busyUserId === u.id ? '…' : u.is_active ? (isHi ? 'निष्क्रिय करें' : 'Deactivate') : (isHi ? 'पुनः सक्रिय करें' : 'Reactivate')}

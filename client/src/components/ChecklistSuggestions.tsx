@@ -84,13 +84,13 @@ export function ChecklistSuggestions({ wagonNumber, lang, onApply, onApplied }: 
   const unevidenced = (suggestions || []).filter((s) => s.confidence === 0);
 
   return (
-    <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4 space-y-3">
+    <div className="rounded-control border border-line bg-card p-4 space-y-3">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h4 className="text-sm font-extrabold text-white">
             {isHi ? 'इतिहास से सुझाव' : 'Suggestions from history'}
           </h4>
-          <p className="text-[11px] text-slate-400 mt-0.5 max-w-xl">
+          <p className="text-[11px] text-ink-muted mt-0.5 max-w-xl">
             {isHi
               ? 'इसी शॉप में इस पुर्ज़े पर पहले दर्ज किए गए निर्णयों से — कोई सुझाव स्वयं लागू नहीं होता।'
               : 'Drawn from what this shop recorded on the same part before. Nothing applies itself — each one shows its evidence and waits for you.'}
@@ -100,7 +100,7 @@ export function ChecklistSuggestions({ wagonNumber, lang, onApply, onApplied }: 
           type="button"
           onClick={load}
           disabled={busy}
-          className="px-3 py-1.5 rounded-lg border border-cyan-700 text-cyan-300 hover:bg-cyan-950/50 disabled:opacity-40 text-xs font-bold whitespace-nowrap"
+          className="px-3 py-1.5 rounded-control border border-accent-line text-accent-ink hover:bg-accent-soft disabled:opacity-40 text-xs font-bold whitespace-nowrap"
         >
           {busy
             ? (isHi ? 'देख रहे हैं…' : 'Checking…')
@@ -109,13 +109,13 @@ export function ChecklistSuggestions({ wagonNumber, lang, onApply, onApplied }: 
       </div>
 
       {error && (
-        <p className="text-xs font-semibold text-red-300 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">
+        <p className="text-xs font-semibold text-bad-ink bg-bad-soft border border-bad-line rounded-control px-3 py-2">
           {error}
         </p>
       )}
 
       {suggestions && suggestions.length === 0 && (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-ink-faint">
           {isHi ? 'कोई शेष पुर्ज़ा नहीं — सब दर्ज हो चुके हैं।' : 'Nothing pending — every item has been recorded.'}
         </p>
       )}
@@ -125,20 +125,20 @@ export function ChecklistSuggestions({ wagonNumber, lang, onApply, onApplied }: 
           {evidenced.map((s) => (
             <div
               key={s.itemId}
-              className="flex items-start justify-between gap-3 rounded-lg border border-slate-800 bg-slate-800/40 px-3 py-2"
+              className="flex items-start justify-between gap-3 rounded-control border border-line bg-raised px-3 py-2"
             >
               <div className="min-w-0">
                 <p className="text-sm text-white truncate">{s.partName}</p>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-[11px] text-ink-muted">
                   {s.basis}
-                  <span className="text-slate-500"> · {(s.confidence * 100).toFixed(0)}%</span>
+                  <span className="text-ink-faint"> · {(s.confidence * 100).toFixed(0)}%</span>
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => apply(s)}
                 disabled={applying === s.itemId}
-                className="shrink-0 px-2.5 py-1 rounded border border-emerald-700 text-emerald-300 hover:bg-emerald-950/50 disabled:opacity-40 text-[11px] font-bold"
+                className="shrink-0 px-2.5 py-1 rounded border border-good-line text-good-ink hover:bg-good-soft disabled:opacity-40 text-[11px] font-bold"
               >
                 {applying === s.itemId ? '…' : `${isHi ? 'लागू करें' : 'Accept'} ${s.suggestedStatus}`}
               </button>
@@ -148,7 +148,7 @@ export function ChecklistSuggestions({ wagonNumber, lang, onApply, onApplied }: 
       )}
 
       {unevidenced.length > 0 && (
-        <p className="text-[11px] text-slate-500 border-t border-slate-800 pt-2">
+        <p className="text-[11px] text-ink-faint border-t border-line pt-2">
           {isHi
             ? `${unevidenced.length} पुर्ज़ों के लिए पर्याप्त इतिहास नहीं — इन्हें हाथ से दर्ज करें।`
             : `${unevidenced.length} item${unevidenced.length === 1 ? '' : 's'} have too little history to suggest from, and are left for you to judge.`}

@@ -29,13 +29,13 @@ export const DefectSelector: React.FC<DefectSelectorProps> = ({
   const dict = getDictionary(lang);
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 shadow-lg space-y-4">
+    <div className="bg-card border border-line rounded-control p-4 sm:p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <label className="text-sm font-bold text-slate-200">
+        <label className="text-sm font-bold text-ink-body">
           {dict.form.damageAssessment}
         </label>
         {selectedDamage !== 'NONE' && (
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-rose-950 text-rose-300 border border-rose-800">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-bad-soft text-bad-ink border border-bad-line">
             <AlertTriangleIcon size={12} />
             <span>CONDEMNS SPRING</span>
           </span>
@@ -53,12 +53,12 @@ export const DefectSelector: React.FC<DefectSelectorProps> = ({
               key={type}
               type="button"
               onClick={() => onSelectDamage(type)}
-              className={`min-h-[48px] px-3 py-2.5 rounded-lg border text-left flex items-center justify-between text-xs sm:text-sm font-bold transition-all active:scale-[0.98] ${
+              className={`min-h-[48px] px-3 py-2.5 rounded-control border text-left flex items-center justify-between text-xs sm:text-sm font-bold transition-all active:scale-[0.98] ${
                 isSelected
                   ? isDefect
-                    ? 'bg-rose-900/60 border-rose-500 text-white shadow-sm'
-                    : 'bg-emerald-900/60 border-emerald-500 text-white shadow-sm'
-                  : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
+                    ? 'bg-bad-soft border-bad-line text-white shadow-sm'
+                    : 'bg-good-soft border-good-line text-white shadow-sm'
+                  : 'bg-page border-line text-ink-body hover:border-line'
               }`}
             >
               <span>{getDamageText(type, lang)}</span>
@@ -72,7 +72,7 @@ export const DefectSelector: React.FC<DefectSelectorProps> = ({
 
       {/* Optional Damage Remarks / Notes Textarea */}
       <div className="space-y-1.5 pt-2">
-        <label className="block text-xs font-semibold text-slate-400">
+        <label className="block text-xs font-semibold text-ink-muted">
           {dict.form.damageNotes}
         </label>
         <textarea
@@ -80,7 +80,7 @@ export const DefectSelector: React.FC<DefectSelectorProps> = ({
           value={damageNotes}
           onChange={(e) => onDamageNotesChange(e.target.value)}
           placeholder={dict.form.damageNotesPlaceholder}
-          className="w-full px-3 py-2.5 bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-lg text-slate-200 text-xs sm:text-sm outline-none transition-all"
+          className="w-full px-3 py-2.5 bg-page border border-line focus:border-accent-line focus:ring-1 focus:ring-blue-500 rounded-control text-ink-body text-xs sm:text-sm outline-none transition-all"
         />
       </div>
     </div>

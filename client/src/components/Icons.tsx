@@ -185,3 +185,171 @@ export const FilterIcon: React.FC<IconProps> = ({ size = 24, className = '', ...
 );
 
 
+
+/*
+ * The navigation set.
+ *
+ * The nav bar used 🏠 📖 🌀 🔬 🚂 📊 📦 🪪 🧠 🔗 👤 as its icons. Emoji render
+ * differently on every device, cannot take the colour of the item they sit in,
+ * and on the shop's Android tablets several of them arrived as a fallback
+ * glyph. These are the same shapes, drawn on the 24px grid the rest of this
+ * file uses.
+ */
+
+export const HomeIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+    <path d="M3 10.5 12 3l9 7.5"/>
+    <path d="M5 9.5V20a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9.5"/>
+    <path d="M9.5 21v-6h5v6"/>
+  </svg>
+);
+
+export const TrainIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+    <rect x="4" y="3" width="16" height="13" rx="2"/>
+    <path d="M4 9h16"/>
+    <path d="M8 20l-1.5 2"/>
+    <path d="M16 20l1.5 2"/>
+    <circle cx="8.5" cy="18" r="1.5"/>
+    <circle cx="15.5" cy="18" r="1.5"/>
+  </svg>
+);
+
+/**
+ * A coil spring, seen from the side.
+ *
+ * Drawn as a zigzag rather than as stacked horizontal rules: the first version
+ * was five parallel lines, which at 18px is indistinguishable from a hamburger
+ * menu — and it was carrying two different navigation items.
+ */
+export const CoilIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+    <path d="M5 3.5h14"/>
+    <path d="M5 20.5h14"/>
+    <path d="M18.5 3.5 5.5 8l13 4-13 4 13 4.5"/>
+  </svg>
+);
+
+/** A vernier caliper — measuring one spring, as against sorting a pile. */
+export const CaliperIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+    <path d="M3 7h18"/>
+    <path d="M3 5v4"/>
+    <path d="M21 5v4"/>
+    <rect x="8" y="12" width="8" height="7" rx="1.5"/>
+    <path d="M12 7v5"/>
+  </svg>
+);
+
+export const BookIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+    <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v15H6.5A2.5 2.5 0 0 0 4 20.5z"/>
+    <path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H19v3H6.5"/>
+  </svg>
+);
+
+export const LinkIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+    <path d="M10 13a5 5 0 0 0 7.1.1l2-2A5 5 0 0 0 12 4l-1.2 1.2"/>
+    <path d="M14 11a5 5 0 0 0-7.1-.1l-2 2A5 5 0 0 0 12 20l1.2-1.2"/>
+  </svg>
+);
+
+export const UserIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+    <circle cx="12" cy="8" r="4"/>
+    <path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/>
+  </svg>
+);
+
+/** Component passport — a card with a photo box and two lines. */
+export const IdCardIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+    <rect x="2.5" y="5" width="19" height="14" rx="2"/>
+    <circle cx="8.5" cy="11" r="2"/>
+    <path d="M5.5 16c.6-1.3 1.7-2 3-2s2.4.7 3 2"/>
+    <path d="M15 10h4"/>
+    <path d="M15 14h4"/>
+  </svg>
+);
+
+/** Hands-free voice entry — the "greasy gloves" flow. */
+export const MicIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+    <rect x="9" y="2.5" width="6" height="11" rx="3"/>
+    <path d="M5.5 11a6.5 6.5 0 0 0 13 0"/>
+    <path d="M12 17.5V21"/>
+    <path d="M8.5 21h7"/>
+  </svg>
+);
+
+/*
+ * The rest of the set the screens were using emoji for.
+ *
+ * Same 24px grid, same 2px stroke, all taking currentColor so they inherit
+ * the tone of whatever they sit in — which an emoji cannot do.
+ */
+
+export const FileTextIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
+    <path d="M14 3v5h5"/>
+    <path d="M9 13h6"/>
+    <path d="M9 17h4"/>
+  </svg>
+);
+
+export const ClipboardIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+    <rect x="8" y="2.5" width="8" height="4" rx="1"/>
+    <path d="M16 4.5h2a2 2 0 0 1 2 2V20a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6.5a2 2 0 0 1 2-2h2"/>
+    <path d="M9 12h6"/>
+    <path d="M9 16h4"/>
+  </svg>
+);
+
+export const ClockIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+    <circle cx="12" cy="12" r="9"/>
+    <path d="M12 7v5l3.5 2"/>
+  </svg>
+);
+
+export const GearIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6M18.7 18.7l-1.6-1.6M6.9 6.9 5.3 5.3"/>
+  </svg>
+);
+
+export const WrenchIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+    <path d="M15.5 3.5a5.5 5.5 0 0 0-6.9 7L3 16.1V21h4.9l5.6-5.6a5.5 5.5 0 0 0 7-6.9l-3.1 3.1-2.9-.6-.6-2.9z"/>
+  </svg>
+);
+
+/** Air brake — the single wagon test. */
+export const WindIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+    <path d="M3 8h9a3 3 0 1 0-3-3"/>
+    <path d="M3 12h13a3 3 0 1 1-3 3"/>
+    <path d="M3 16h7"/>
+  </svg>
+);
+
+/** Acoustic bearing and leak diagnostics. */
+export const HeadphonesIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+    <path d="M4 14v-2a8 8 0 0 1 16 0v2"/>
+    <rect x="2.5" y="14" width="4.5" height="6" rx="2"/>
+    <rect x="17" y="14" width="4.5" height="6" rx="2"/>
+  </svg>
+);
+
+/** A refusal — a blocker standing between a wagon and the gate. */
+export const BanIcon: React.FC<IconProps> = ({ size = 24, className = '', ...props }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+    <circle cx="12" cy="12" r="9"/>
+    <path d="m5.6 5.6 12.8 12.8"/>
+  </svg>
+);

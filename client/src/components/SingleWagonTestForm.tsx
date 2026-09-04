@@ -111,19 +111,19 @@ export function SingleWagonTestForm({ wagonNumber, wagonType, lang, onRecorded, 
           <h3 className="text-lg font-extrabold text-white">
             {isHi ? 'एकल वैगन परीक्षण (वायु ब्रेक)' : 'Single Wagon Test (air brake)'}
           </h3>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-ink-muted mt-0.5">
             {isHi
               ? 'WMM 2.0 §720-C प्रपत्र — POH के बाद अनिवार्य'
               : 'WMM 2.0 §720-C proforma — required after POH'}
           </p>
         </div>
-        <button onClick={onClose} className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-800">
+        <button onClick={onClose} className="px-3 py-1.5 rounded-control border border-line text-ink-body text-xs font-bold hover:bg-raised">
           {isHi ? 'बंद करें' : 'Close'}
         </button>
       </div>
 
       {latest && !result && (
-        <div className={`rounded-lg border px-3 py-2 text-xs ${latest.passed ? 'border-emerald-800 bg-emerald-950/40 text-emerald-200' : 'border-red-800 bg-red-950/40 text-red-200'}`}>
+        <div className={`rounded-control border px-3 py-2 text-xs ${latest.passed ? 'border-good-line bg-good-soft text-good-ink' : 'border-bad-line bg-bad-soft text-bad-ink'}`}>
           {isHi ? 'पिछला परीक्षण' : 'Last test'}: <b>{latest.passed ? (isHi ? 'उत्तीर्ण' : 'PASSED') : (isHi ? 'अनुत्तीर्ण' : 'DID NOT PASS')}</b>
           {' · '}{latest.pipe_type} · {latest.load_condition} · {new Date(latest.created_at).toLocaleString()}
         </div>
@@ -131,26 +131,26 @@ export function SingleWagonTestForm({ wagonNumber, wagonType, lang, onRecorded, 
 
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
-          <span className="block text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">
+          <span className="block text-[11px] font-bold text-ink-muted uppercase tracking-wide mb-1">
             {isHi ? 'पाइप व्यवस्था' : 'Pipe configuration'}
           </span>
           <select
             value={pipeType}
             onChange={(e) => setPipeType(e.target.value as PipeType)}
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+            className="w-full bg-raised border border-line rounded-control px-3 py-2 text-sm text-white"
           >
             <option value="SINGLE">{isHi ? 'सिंगल पाइप' : 'Single pipe'}</option>
             <option value="TWIN">{isHi ? 'ट्विन पाइप' : 'Twin pipe'}</option>
           </select>
         </label>
         <label className="block">
-          <span className="block text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">
+          <span className="block text-[11px] font-bold text-ink-muted uppercase tracking-wide mb-1">
             {isHi ? 'भार स्थिति' : 'Load condition'}
           </span>
           <select
             value={loadCondition}
             onChange={(e) => setLoadCondition(e.target.value as LoadCondition)}
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+            className="w-full bg-raised border border-line rounded-control px-3 py-2 text-sm text-white"
           >
             <option value="EMPTY">{isHi ? 'खाली' : 'Empty'}</option>
             <option value="LOADED">{isHi ? 'लदा हुआ' : 'Loaded'}</option>
@@ -159,7 +159,7 @@ export function SingleWagonTestForm({ wagonNumber, wagonType, lang, onRecorded, 
       </div>
 
       {!strokeRange && (
-        <p className="text-[11px] text-amber-300 bg-amber-950/40 border border-amber-800 rounded-lg px-3 py-2">
+        <p className="text-[11px] text-warn-ink bg-warn-soft border border-warn-line rounded-control px-3 py-2">
           {isHi
             ? `${wagonType} हेतु §308B में पिस्टन स्ट्रोक सीमा प्रकाशित नहीं — मान दर्ज होगा, निर्णय नहीं।`
             : `No piston stroke limit is published for ${wagonType} in §308B. The reading will be recorded but not judged, and the test cannot report a pass until a limit exists.`}
@@ -167,10 +167,10 @@ export function SingleWagonTestForm({ wagonNumber, wagonType, lang, onRecorded, 
       )}
 
       {/* The proforma, in printed order */}
-      <div className="overflow-x-auto rounded-lg border border-slate-800">
+      <div className="overflow-x-auto rounded-control border border-line">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-slate-800/70 text-slate-300">
+            <tr className="bg-raised text-ink-body">
               <th className="text-left px-2 py-2 font-bold w-12">#</th>
               <th className="text-left px-2 py-2 font-bold">{isHi ? 'जाँच' : 'Check'}</th>
               <th className="text-left px-2 py-2 font-bold w-40">{isHi ? 'निर्दिष्ट' : 'Specified'}</th>
@@ -179,24 +179,24 @@ export function SingleWagonTestForm({ wagonNumber, wagonType, lang, onRecorded, 
           </thead>
           <tbody>
             {checks.map((c) => (
-              <tr key={c.ref} className="border-t border-slate-800 align-top">
-                <td className="px-2 py-2 font-mono text-xs text-slate-400">{c.ref}</td>
-                <td className="px-2 py-2 text-slate-200">{isHi ? c.labelHi : c.label}</td>
-                <td className="px-2 py-2 text-xs text-slate-400 tabular-nums">{specifiedFor(c)}</td>
+              <tr key={c.ref} className="border-t border-line align-top">
+                <td className="px-2 py-2 font-mono text-xs text-ink-muted">{c.ref}</td>
+                <td className="px-2 py-2 text-ink-body">{isHi ? c.labelHi : c.label}</td>
+                <td className="px-2 py-2 text-xs text-ink-muted tabular-nums">{specifiedFor(c)}</td>
                 <td className="px-2 py-2">
                   {c.observational ? (
                     <div className="flex gap-1.5">
                       <button
                         type="button"
                         onClick={() => setObserved((p) => ({ ...p, [c.ref]: true }))}
-                        className={`px-2.5 py-1 rounded text-xs font-bold border ${observed[c.ref] === true ? 'bg-emerald-600 border-emerald-500 text-white' : 'border-slate-700 text-slate-300'}`}
+                        className={`px-2.5 py-1 rounded text-xs font-bold border ${observed[c.ref] === true ? 'bg-good border-good-line text-white' : 'border-line text-ink-body'}`}
                       >
                         {isHi ? 'हाँ' : 'As specified'}
                       </button>
                       <button
                         type="button"
                         onClick={() => setObserved((p) => ({ ...p, [c.ref]: false }))}
-                        className={`px-2.5 py-1 rounded text-xs font-bold border ${observed[c.ref] === false ? 'bg-red-600 border-red-500 text-white' : 'border-slate-700 text-slate-300'}`}
+                        className={`px-2.5 py-1 rounded text-xs font-bold border ${observed[c.ref] === false ? 'bg-bad border-bad-line text-white' : 'border-line text-ink-body'}`}
                       >
                         {isHi ? 'नहीं' : 'Not'}
                       </button>
@@ -208,8 +208,8 @@ export function SingleWagonTestForm({ wagonNumber, wagonType, lang, onRecorded, 
                       inputMode="decimal"
                       value={values[c.ref] ?? ''}
                       onChange={(e) => setValues((p) => ({ ...p, [c.ref]: e.target.value }))}
-                      className={`w-28 bg-slate-800 border rounded px-2 py-1 text-sm text-white tabular-nums ${
-                        looksOutOfRange(c) ? 'border-red-500' : 'border-slate-700'
+                      className={`w-28 bg-raised border rounded px-2 py-1 text-sm text-white tabular-nums ${
+                        looksOutOfRange(c) ? 'border-bad-line' : 'border-line'
                       }`}
                     />
                   )}
@@ -221,18 +221,18 @@ export function SingleWagonTestForm({ wagonNumber, wagonType, lang, onRecorded, 
       </div>
 
       <label className="block">
-        <span className="block text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">
+        <span className="block text-[11px] font-bold text-ink-muted uppercase tracking-wide mb-1">
           {isHi ? 'टिप्पणी' : 'Notes'}
         </span>
         <input
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
-          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white"
+          className="w-full bg-raised border border-line rounded-control px-3 py-2 text-sm text-white"
         />
       </label>
 
       {unanswered.length > 0 && (
-        <p className="text-[11px] text-slate-400">
+        <p className="text-[11px] text-ink-muted">
           {isHi
             ? `${unanswered.length} पंक्ति शेष — प्रपत्र की हर पंक्ति भरी जानी चाहिए (${unanswered.map((c) => c.ref).join(', ')})`
             : `${unanswered.length} row${unanswered.length === 1 ? '' : 's'} still blank — the proforma requires every row answered (${unanswered.map((c) => c.ref).join(', ')})`}
@@ -240,28 +240,28 @@ export function SingleWagonTestForm({ wagonNumber, wagonType, lang, onRecorded, 
       )}
 
       {error && (
-        <p className="text-xs font-semibold text-red-300 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">{error}</p>
+        <p className="text-xs font-semibold text-bad-ink bg-bad-soft border border-bad-line rounded-control px-3 py-2">{error}</p>
       )}
 
       {result && (
-        <div className={`rounded-lg border px-3 py-3 space-y-1 ${result.passed ? 'border-emerald-700 bg-emerald-950/40' : 'border-red-700 bg-red-950/40'}`}>
-          <p className={`text-sm font-black ${result.passed ? 'text-emerald-300' : 'text-red-300'}`}>
+        <div className={`rounded-control border px-3 py-3 space-y-1 ${result.passed ? 'border-good-line bg-good-soft' : 'border-bad-line bg-bad-soft'}`}>
+          <p className={`text-sm font-extrabold ${result.passed ? 'text-good-ink' : 'text-bad-ink'}`}>
             {result.passed
               ? (isHi ? 'परीक्षण उत्तीर्ण' : 'Test passed')
               : (isHi ? 'परीक्षण उत्तीर्ण नहीं' : 'Test did not pass')}
           </p>
           {result.failedRefs?.length > 0 && (
-            <p className="text-xs text-red-200">
+            <p className="text-xs text-bad-ink">
               {isHi ? 'सीमा से बाहर' : 'Outside limit'}: {result.failedRefs.join(', ')}
             </p>
           )}
           {result.missingRefs?.length > 0 && (
-            <p className="text-xs text-amber-200">
+            <p className="text-xs text-warn-ink">
               {isHi ? 'दर्ज नहीं' : 'Not recorded'}: {result.missingRefs.join(', ')}
             </p>
           )}
           {result.unjudgedRefs?.length > 0 && (
-            <p className="text-xs text-amber-200">
+            <p className="text-xs text-warn-ink">
               {isHi ? 'सीमा प्रकाशित नहीं' : 'No published limit'}: {result.unjudgedRefs.join(', ')}
             </p>
           )}
@@ -271,7 +271,7 @@ export function SingleWagonTestForm({ wagonNumber, wagonType, lang, onRecorded, 
       <button
         onClick={submit}
         disabled={busy}
-        className="w-full min-h-[48px] rounded-xl bg-white text-black font-extrabold text-sm disabled:opacity-40 active:scale-95 transition-transform"
+        className="w-full min-h-[48px] rounded-control bg-white text-black font-extrabold text-sm disabled:opacity-40 active:scale-95 transition-transform"
       >
         {busy
           ? (isHi ? 'दर्ज हो रहा है…' : 'Recording…')

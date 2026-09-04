@@ -32,9 +32,9 @@ interface SmartVisionCameraProps {
 type LoadState = 'IDLE' | 'LOADING' | 'READY' | 'FAILED';
 
 const ROLE_STYLE: Record<Detection['role'], { box: string; chip: string }> = {
-  PERSON: { box: '#f87171', chip: 'bg-red-950/70 text-red-200 border-red-800' },
-  BACKGROUND: { box: '#fbbf24', chip: 'bg-amber-950/70 text-amber-200 border-amber-800' },
-  OTHER: { box: '#a3a3a3', chip: 'bg-slate-800/70 text-slate-300 border-slate-600' }
+  PERSON: { box: '#f87171', chip: 'bg-bad-soft text-bad-ink border-bad-line' },
+  BACKGROUND: { box: '#fbbf24', chip: 'bg-warn-soft text-warn-ink border-warn-line' },
+  OTHER: { box: '#a3a3a3', chip: 'bg-raised text-ink-body border-line-strong' }
 };
 
 export const SmartVisionCamera: React.FC<SmartVisionCameraProps> = ({ lang, onCapture, onClose }) => {
@@ -180,7 +180,7 @@ export const SmartVisionCamera: React.FC<SmartVisionCameraProps> = ({ lang, onCa
 
   return (
     <div className="space-y-3">
-      <div className="relative bg-black rounded-xl overflow-hidden border border-slate-700">
+      <div className="relative bg-black rounded-control overflow-hidden border border-line">
         <video ref={videoRef} playsInline muted className="w-full block" />
         <canvas
           ref={overlayRef}
@@ -190,7 +190,7 @@ export const SmartVisionCamera: React.FC<SmartVisionCameraProps> = ({ lang, onCa
         {loadState !== 'READY' && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/70 p-6 text-center">
             <div className="space-y-3">
-              <p className="text-slate-200 text-sm">
+              <p className="text-ink-body text-sm">
                 {loadState === 'LOADING'
                   ? (isHi ? 'पहचान मॉडल लोड हो रहा है… (~19 MB, केवल पहली बार)' : 'Loading the detection model… (~19 MB, first time only)')
                   : (isHi ? 'यह कैमरा व्यक्ति और पृष्ठभूमि को पहचानकर बाहर रखता है।' : 'This camera recognises people and background clutter and keeps them out of the capture.')}
@@ -198,7 +198,7 @@ export const SmartVisionCamera: React.FC<SmartVisionCameraProps> = ({ lang, onCa
               {loadState !== 'LOADING' && (
                 <button
                   onClick={() => void start()}
-                  className="min-h-[44px] px-5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-bold"
+                  className="min-h-[44px] px-5 py-2 bg-accent hover:bg-accent-hover text-white rounded-control font-bold"
                 >
                   {isHi ? 'स्मार्ट विज़न शुरू करें' : 'Start Smart Vision'}
                 </button>
@@ -209,20 +209,20 @@ export const SmartVisionCamera: React.FC<SmartVisionCameraProps> = ({ lang, onCa
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-800 bg-red-950/40 px-3 py-2 text-sm text-red-200">{error}</div>
+        <div className="rounded-control border border-bad-line bg-bad-soft px-3 py-2 text-sm text-bad-ink">{error}</div>
       )}
 
       {/* The requirement's visible demonstration: what was recognised, and that it was excluded. */}
       {loadState === 'READY' && (
-        <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-3 space-y-2">
-          <div className="flex items-center justify-between text-xs font-mono text-slate-400">
+        <div className="rounded-control border border-line bg-card p-3 space-y-2">
+          <div className="flex items-center justify-between text-xs font-mono text-ink-muted">
             <span>{isHi ? 'पहचान' : 'DETECTION'}</span>
             <span>{result ? `${result.inferenceMs} ms` : '—'}</span>
           </div>
 
           <div className="flex flex-wrap gap-2">
             {result && result.detections.length === 0 && (
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-ink-muted">
                 {isHi ? 'कुछ भी पहचाना नहीं गया — पूरा फ़्रेम रिकॉर्ड होगा।' : 'Nothing recognised — the whole frame will be recorded.'}
               </span>
             )}
@@ -237,7 +237,7 @@ export const SmartVisionCamera: React.FC<SmartVisionCameraProps> = ({ lang, onCa
           </div>
 
           {result && (
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-ink-muted">
               {isHi
                 ? `${result.personCount} व्यक्ति, ${result.backgroundCount} पृष्ठभूमि वस्तुएँ बाहर रखी गईं।`
                 : `${result.personCount} person(s) and ${result.backgroundCount} background object(s) excluded from the capture.`}
@@ -245,7 +245,7 @@ export const SmartVisionCamera: React.FC<SmartVisionCameraProps> = ({ lang, onCa
           )}
 
           {blocked && (
-            <div className="rounded-lg border border-amber-800 bg-amber-950/40 px-3 py-2 text-sm text-amber-200">
+            <div className="rounded-control border border-warn-line bg-warn-soft px-3 py-2 text-sm text-warn-ink">
               {isHi
                 ? 'फ़्रेम में व्यक्ति बहुत बड़ा है — घटक दिखाई नहीं दे रहा। कृपया हट जाएँ और दोबारा लें।'
                 : 'A person fills too much of the frame for the component to be photographed. Step aside and try again.'}
@@ -257,7 +257,7 @@ export const SmartVisionCamera: React.FC<SmartVisionCameraProps> = ({ lang, onCa
             * and the inspector should both know exactly what the model does
             * and does not recognise.
             */}
-          <p className="text-[11px] text-slate-500 leading-relaxed border-t border-slate-800 pt-2">
+          <p className="text-[11px] text-ink-faint leading-relaxed border-t border-line pt-2">
             {isHi
               ? 'यह मॉडल व्यक्ति और सामान्य वस्तुओं को पहचानता है। यह स्प्रिंग या उसका बैंड नहीं पहचानता — बैंड पट्टी से तय होता है।'
               : 'This model recognises people and everyday objects. It does not identify the spring or its band — the band is decided by the strip, and free height by the gauge.'}
@@ -269,14 +269,14 @@ export const SmartVisionCamera: React.FC<SmartVisionCameraProps> = ({ lang, onCa
         <button
           onClick={capture}
           disabled={loadState !== 'READY' || !result || blocked}
-          className="flex-1 min-h-[48px] px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-xl font-bold"
+          className="flex-1 min-h-[48px] px-4 py-2 bg-good hover:bg-good disabled:bg-raised disabled:text-ink-faint text-white rounded-control font-bold"
         >
           {isHi ? 'लक्ष्य क्षेत्र कैप्चर करें' : 'Capture target region'}
         </button>
         {onClose && (
           <button
             onClick={onClose}
-            className="min-h-[48px] px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-bold border border-slate-700"
+            className="min-h-[48px] px-4 py-2 bg-raised hover:bg-selected text-ink-body rounded-control font-bold border border-line"
           >
             {isHi ? 'बंद करें' : 'Close'}
           </button>
