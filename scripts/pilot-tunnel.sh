@@ -245,7 +245,23 @@ start_tunnel() {
 
   if [[ "$want" != "localtunnel" ]] && command -v cloudflared >/dev/null 2>&1; then
     TUNNEL_KIND="cloudflared"
-    cloudflared tunnel --url "$SCHEME://localhost:$PORT" --no-autoupdate \
+    #
+    # --no-tls-verify is required, not optional, whenever the origin is HTTPS.
+    #
+    # When a LAN certificate exists this script serves over TLS, and that
+    # certificate is self-signed. cloudflared validates the origin certificate
+    # by default, refuses to trust it, and then publishes a hostname it can
+    # never route to — which is exactly the "published a URL but never started
+    # routing" message, reported as a tunnel failure when it is a trust
+    # failure.
+    #
+    # Safe here because the origin is loopback on this same machine: there is
+    # nothing between cloudflared and the server to intercept, and the
+    # certificate being distrusted is our own.
+    local cf_tls=()
+    [[ "$SCHEME" == "https" ]] && cf_tls=(--no-tls-verify)
+
+    cloudflared tunnel --url "$SCHEME://localhost:$PORT" --no-autoupdate "${cf_tls[@]}" \
       >/tmp/wrs_pilot_tunnel.log 2>&1 &
     TUNNEL_PID=$!
     for _ in $(seq 1 40); do
@@ -255,7 +271,15 @@ start_tunnel() {
     done
   else
     TUNNEL_KIND="localtunnel"
-    npx --yes localtunnel --port "$PORT" >/tmp/wrs_pilot_tunnel.log 2>&1 &
+    #
+    # localtunnel assumes a plain HTTP origin. Pointed at an HTTPS port it
+    # speaks HTTP to a TLS listener and every request comes back 502 Bad
+    # Gateway — which is what the fallback was doing, so both tunnels appeared
+    # broken for the same underlying reason.
+    local lt_tls=()
+    [[ "$SCHEME" == "https" ]] && lt_tls=(--local-https --allow-invalid-cert)
+
+    npx --yes localtunnel --port "$PORT" "${lt_tls[@]}" >/tmp/wrs_pilot_tunnel.log 2>&1 &
     TUNNEL_PID=$!
     for _ in $(seq 1 45); do
       PUBLIC_URL="$(grep -oE 'https://[a-z0-9-]+\.loca\.lt' /tmp/wrs_pilot_tunnel.log 2>/dev/null | head -1)"
