@@ -258,11 +258,17 @@ start_tunnel() {
     # Safe here because the origin is loopback on this same machine: there is
     # nothing between cloudflared and the server to intercept, and the
     # certificate being distrusted is our own.
-    local cf_tls=()
-    [[ "$SCHEME" == "https" ]] && cf_tls=(--no-tls-verify)
-
-    cloudflared tunnel --url "$SCHEME://localhost:$PORT" --no-autoupdate "${cf_tls[@]}" \
-      >/tmp/wrs_pilot_tunnel.log 2>&1 &
+    # Written as two whole commands rather than a flag array on purpose.
+    # macOS ships bash 3.2, where `set -u` (line 20) makes expanding an EMPTY
+    # array a fatal "unbound variable" that aborts this function mid-way. An
+    # array here would work on the developer's shell and die on the shop's.
+    if [[ "$SCHEME" == "https" ]]; then
+      cloudflared tunnel --url "https://localhost:$PORT" --no-autoupdate --no-tls-verify \
+        >/tmp/wrs_pilot_tunnel.log 2>&1 &
+    else
+      cloudflared tunnel --url "http://localhost:$PORT" --no-autoupdate \
+        >/tmp/wrs_pilot_tunnel.log 2>&1 &
+    fi
     TUNNEL_PID=$!
     for _ in $(seq 1 40); do
       PUBLIC_URL="$(tunnel_url_from_log)"
@@ -276,10 +282,12 @@ start_tunnel() {
     # speaks HTTP to a TLS listener and every request comes back 502 Bad
     # Gateway — which is what the fallback was doing, so both tunnels appeared
     # broken for the same underlying reason.
-    local lt_tls=()
-    [[ "$SCHEME" == "https" ]] && lt_tls=(--local-https --allow-invalid-cert)
-
-    npx --yes localtunnel --port "$PORT" "${lt_tls[@]}" >/tmp/wrs_pilot_tunnel.log 2>&1 &
+    if [[ "$SCHEME" == "https" ]]; then
+      npx --yes localtunnel --port "$PORT" --local-https --allow-invalid-cert \
+        >/tmp/wrs_pilot_tunnel.log 2>&1 &
+    else
+      npx --yes localtunnel --port "$PORT" >/tmp/wrs_pilot_tunnel.log 2>&1 &
+    fi
     TUNNEL_PID=$!
     for _ in $(seq 1 45); do
       PUBLIC_URL="$(grep -oE 'https://[a-z0-9-]+\.loca\.lt' /tmp/wrs_pilot_tunnel.log 2>/dev/null | head -1)"
