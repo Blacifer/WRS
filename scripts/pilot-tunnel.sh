@@ -203,6 +203,24 @@ TUNNEL_KIND=""
 # Set once a provider is proven to route on this network, so a reconnect does
 # not go back to one that already failed.
 WORKING_KIND=""
+# Pull the quick-tunnel hostname out of cloudflared's log.
+#
+# Not a plain grep, because cloudflared also logs its own control-plane
+# endpoint — https://api.trycloudflare.com — which matches the obvious pattern
+# and sorts first often enough to be picked by `head -1`. When that happened the
+# script health-checked api.trycloudflare.com/api/health, got something that was
+# not the app, declared "published a URL but never started routing", fell back
+# to localtunnel, and then told the operator to open
+# https://api.trycloudflare.com on the tablet. The tunnel itself was fine.
+#
+# Quick-tunnel hostnames are always several hyphenated words; the control plane
+# is a single label. Excluding it by name is the narrow, obvious fix.
+tunnel_url_from_log() {
+  grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/wrs_pilot_tunnel.log 2>/dev/null \
+    | grep -v '://api\.' \
+    | head -1
+}
+
 start_tunnel() {
   # $1 optionally forces a kind ("cloudflared" | "localtunnel"); default: prefer
   # cloudflared when installed.
@@ -216,7 +234,7 @@ start_tunnel() {
       >/tmp/wrs_pilot_tunnel.log 2>&1 &
     TUNNEL_PID=$!
     for _ in $(seq 1 40); do
-      PUBLIC_URL="$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/wrs_pilot_tunnel.log 2>/dev/null | head -1)"
+      PUBLIC_URL="$(tunnel_url_from_log)"
       [[ -n "$PUBLIC_URL" ]] && break
       sleep 1
     done
