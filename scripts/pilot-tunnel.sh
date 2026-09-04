@@ -179,7 +179,22 @@ fi
 # ----------------------------------------------------------------------- server
 step "Starting the server on :$PORT"
 lsof -ti:"$PORT" -sTCP:LISTEN 2>/dev/null | xargs -r kill 2>/dev/null
-( cd server && NODE_ENV=production PORT="$PORT" node --experimental-strip-types src/index.ts \
+#
+# NODE_ENV=production because testing the development server would exercise a
+# code path that never runs in the shed. But production deliberately refuses
+# the demonstration password — the server returns DEMO_CREDENTIAL_REFUSED and
+# logs a SECURITY_ALERT — so booting this way while printing
+# "inspector1 / password123" below handed the operator credentials the server
+# would not accept, which is what happened on the first real launch.
+#
+# SEED_DEMO_USERS is the documented escape hatch for exactly this: a
+# supervised demonstration, typed on purpose. One flag governs both creating
+# the demo accounts and authenticating them, so the two cannot disagree about
+# which environment they are in.
+#
+# This makes the script a TEST harness, not a deployment. A real pilot sets
+# BOOTSTRAP_ADMIN_USERNAME and BOOTSTRAP_ADMIN_PASSWORD and never sets this.
+( cd server && NODE_ENV=production SEED_DEMO_USERS=true PORT="$PORT" node --experimental-strip-types src/index.ts \
     >/tmp/wrs_pilot_server.log 2>&1 ) &
 SERVER_PID=$!
 
@@ -330,10 +345,16 @@ ${BLD}  OPEN THIS ON THE PHONE OR TABLET${NC}
      Free tunnel. If it returns 503 the URL has changed — check this
      terminal for a new one.
 
-${BLD}  Sign in${NC}
+${BLD}  Sign in${NC}  ${YEL}(demo accounts — enabled because this is a test session)${NC}
      inspector1  / password123    (shop-floor view)
      supervisor1 / password123    (pipeline, gate, learning)
      admin1      / password123    (everything + user accounts)
+
+     These work because this script sets SEED_DEMO_USERS=true. A real
+     deployment does not, and the server then refuses this password outright
+     and logs the attempt. To rehearse the real thing, start the server with
+     BOOTSTRAP_ADMIN_USERNAME and BOOTSTRAP_ADMIN_PASSWORD instead and add the
+     rest of the roster from the User Accounts screen.
 
 ${BLD}  Worth testing on the real device — these cannot be tested here${NC}
      1. Add to Home Screen, then open it from the icon
