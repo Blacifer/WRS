@@ -154,12 +154,23 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
 
   // Real, currently in-progress wagons for the quick-pick switcher — not a
   // hardcoded demo list that would 404 the moment someone selects it.
+  /*
+   * Loaded whenever the inspector is on wagon work, not only once the picker
+   * modal is opened.
+   *
+   * Before this, choosing "A wagon" showed an empty card reading "No active
+   * wagon — scan a QR code or pick a wagon", while eight wagons sat
+   * in progress one modal away. An inspector looking at emptiness where the
+   * shop has real work reasonably concludes the screen is broken, and the
+   * first person to use the pilot said exactly that. The request was already
+   * being made; it was only gated behind a click.
+   */
   useEffect(() => {
-    if (!isWagonSelectorOpen) return;
+    if (!isWagonSelectorOpen && workMode !== 'WAGON') return;
     api.queryWagons({ limit: 8 })
       .then((res) => setRecentWagons((res?.data || []).filter(w => w.currentStage !== 'RELEASE')))
       .catch(() => setRecentWagons([]));
-  }, [isWagonSelectorOpen]);
+  }, [isWagonSelectorOpen, workMode]);
 
   const handleManualWagonSelect = (e: React.FormEvent) => {
     e.preventDefault();
@@ -386,8 +397,37 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
                     {isHi ? 'कोई सक्रिय वैगन नहीं' : 'No active wagon'}
                   </div>
                   <p className="mt-1.5 text-sm text-ink-body">
-                    {isHi ? 'शुरू करने के लिए QR स्कैन करें या वैगन चुनें' : 'Scan a QR code or pick a wagon to get started'}
+                    {isHi
+                      ? 'नीचे से एक वैगन चुनें, या QR स्कैन करें।'
+                      : 'Pick one of the wagons below, or scan its QR code.'}
                   </p>
+                  {/*
+                    * The wagons actually in the shop, listed here rather than
+                    * hidden behind the picker. This is the inspector's only
+                    * route to a wagon — the Wagons tab appears in the bar only
+                    * once one is selected — so an empty card was a dead end
+                    * dressed as a starting point.
+                    */}
+                  {recentWagons.length > 0 && (
+                    <div className="mt-4 space-y-2" data-testid="wagons-in-progress">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.07em] text-ink-muted">
+                        {isHi ? 'शॉप में अभी' : 'In the shop now'}
+                      </div>
+                      {recentWagons.map((w) => (
+                        <button
+                          key={w.wagonNumber}
+                          onClick={() => onSelectWagon(w.wagonNumber)}
+                          className="w-full min-h-[56px] px-4 py-3 flex items-center justify-between gap-3 rounded-control border border-line bg-raised hover:border-line-strong active:opacity-80 text-left transition"
+                        >
+                          <span className="font-bold text-ink-strong truncate">{w.wagonNumber}</span>
+                          <span className="text-[11px] font-mono uppercase tracking-wide text-ink-muted whitespace-nowrap">
+                            {String(w.currentStage || '').replace(/_/g, ' ')}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   <div className="flex flex-wrap gap-3 mt-4">
                     <Button variant="primary" size="touch" onClick={onOpenQRScanner}>
                       <CameraIcon size={20} />
@@ -399,7 +439,7 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
                       onClick={() => setIsWagonSelectorOpen(true)}
                     >
                       <SearchIcon size={20} />
-                      <span>{isHi ? 'वैगन चुनें' : 'Pick a wagon'}</span>
+                      <span>{isHi ? 'सभी वैगन' : 'All wagons'}</span>
                     </Button>
                   </div>
                 </>
