@@ -17,7 +17,20 @@
  */
 
 export const ALL_LEARNING_SUBSYSTEMS = [
-  /** Reading a measurement off a digital caliper display. */
+  /**
+   * Reading a measurement off a digital caliper display.
+   *
+   * Expect this to stay empty at WRS Raipur, and that is correct rather than
+   * broken. The shop measures everything by hand — confirmed by its own
+   * officer — and the only machine-assisted test on the floor is air
+   * pressure, which is the Single Wagon Test and produces no caliper reading.
+   * The camera that feeds this subsystem is hidden by default for exactly
+   * that reason.
+   *
+   * Kept because the capability is real for a shop that owns a digital
+   * caliper, and removing it would discard the readings any such shop had
+   * already recorded.
+   */
   'OCR_CALIPER',
   /** Judging a spring against the RDSO band tables. */
   'SPRING_CLASSIFICATION',

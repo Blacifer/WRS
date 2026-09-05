@@ -202,7 +202,28 @@ describe('Learning subsystems — the list, the schema, and the screens agree', 
         .observations.find((o) => o.subsystem === 'MEASUREMENT_ANOMALY');
 
       assert.ok(row);
-      assert.equal(row.total, 2);
+      /*
+       * One, not two. The unanswered flag is a question that was asked, not an
+       * observation to learn from.
+       *
+       * This assertion read `2` and was correct against the behaviour of the
+       * time. It became wrong when getAccuracy started excluding unanswered
+       * rows and getMemory did not, leaving the dashboard and the accuracy
+       * figure counting the same ledger differently — seventeen unanswered
+       * anomaly flags showed as seventeen observations while accuracy
+       * reported none.
+       *
+       * The reason the exclusion matters rather than being a presentation
+       * nicety: `total` feeds enoughToLearnFrom, which is
+       * total >= MIN_SAMPLE_FOR_INSIGHT. Counting silence would let thirty
+       * flags nobody ever answered mark this subsystem as something worth
+       * drawing conclusions from, which is the precise harm TC-LRN-U06
+       * guards against on the other path.
+       *
+       * The outcome still reaches the dashboard, which is what this test is
+       * named for — corrected is 1.
+       */
+      assert.equal(row.total, 1);
       assert.equal(row.corrected, 1);
       assert.equal(
         row.enoughToLearnFrom,

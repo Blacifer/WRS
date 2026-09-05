@@ -619,12 +619,31 @@ export class LearningService {
     const subsystems: readonly LearningSubsystem[] = ALL_LEARNING_SUBSYSTEMS;
 
     const observations = subsystems.map((subsystem) => {
+      /*
+       * Unanswered questions are excluded here for the same reason they are
+       * excluded from getAccuracy: a flag the inspector never answered is not
+       * evidence the machine was right, and counting it as an observation
+       * flatters exactly the subsystem whose usefulness is least certain.
+       *
+       * This query was written before that rule existed and kept its own
+       * COUNT(*), so the two disagreed — a run of seventeen unanswered
+       * anomaly flags showed as seventeen observations on the learning
+       * dashboard while accuracy correctly reported none. Two numbers derived
+       * from one ledger must not contradict each other; whichever a person
+       * happens to read, they should reach the same conclusion.
+       *
+       * Subsystems that ask no questions carry no `answered` key, so
+       * json_extract yields NULL for them and they are unaffected.
+       */
       const row = this.db.prepare(`
         SELECT COUNT(*) AS total,
                SUM(CASE WHEN was_corrected = 1 THEN 1 ELSE 0 END) AS corrected,
                MIN(created_at) AS firstSeen,
                MAX(created_at) AS lastSeen
-        FROM machine_learning_events WHERE subsystem = ?
+        FROM machine_learning_events
+        WHERE subsystem = ?
+          AND (json_extract(context_json, '$.answered') IS NULL
+               OR json_extract(context_json, '$.answered') != 0)
       `).get(subsystem) as any;
 
       const total = row?.total || 0;

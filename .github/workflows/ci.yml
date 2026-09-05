@@ -83,8 +83,12 @@ jobs:
   # The suite that exercises the real server: 646 tests across 113 suites.
   # This is the one that would have caught the /api/cv/measure regression.
   # ---------------------------------------------------------------------------
+  # Job names deliberately carry no test counts. They read "646", "173" and
+  # "39" while the suites held 697, 189 and 39 — a number in a label is a
+  # number nobody updates, and this repository has been bitten by exactly that
+  # kind of drift more than once.
   server-tests:
-    name: Server tests (646)
+    name: Server tests
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -107,7 +111,7 @@ jobs:
         run: npm test --prefix server
 
   client-tests:
-    name: Client tests (173)
+    name: Client tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -144,7 +148,7 @@ jobs:
   # Run them on purpose with WRS_PERF_ASSERT=1 on a quiet machine instead.
   # ---------------------------------------------------------------------------
   e2e-tests:
-    name: E2E suites (39)
+    name: E2E suites
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

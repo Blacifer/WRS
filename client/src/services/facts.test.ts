@@ -113,3 +113,61 @@ describe('Answering the questions people actually ask', () => {
     expect(brn!.verified, 'a disputed count must not read as verified').toBe(false);
   });
 });
+
+describe('A shared word is not an answer', () => {
+  /*
+   * The regression this suite exists for.
+   *
+   * Asked "brake block condemning limit" the panel returned the §720-C air
+   * brake CYLINDER figures — filling time, maximum pressure, sensitivity —
+   * under a heading reading "Direct answer, from this app's own verified
+   * figures". They matched on "brake" and "limit" while containing nothing
+   * about blocks or condemning, and were printed ABOVE the passage holding
+   * the real answer: 10 mm, page 71.
+   *
+   * An inspector reads the bold number, not the passage under it. A
+   * confidently wrong figure beneath the word "verified" is worse than no
+   * figure, so these tests pin the refusal rather than the ranking.
+   */
+  it('does not answer a brake BLOCK question with brake CYLINDER figures', () => {
+    const hits = searchFacts('brake block condemning limit', 4);
+    for (const h of hits) {
+      const subject = h.fact.subject.toLowerCase();
+      expect(
+        subject,
+        `"${h.fact.subject}" was offered as a direct answer to a question about ` +
+          `brake blocks. It shares the word "brake" and nothing else.`
+      ).not.toMatch(/cylinder|filling time|sensitivity|insensitivity/);
+    }
+  });
+
+  it('still answers what it genuinely holds', () => {
+    /*
+     * The other half. A coverage rule tightened until it answers nothing is
+     * not a fix — it just moves the failure somewhere quieter.
+     */
+    const hits = searchFacts('brake pipe pressure', 4);
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits.some((h) => /pressure/i.test(h.fact.subject))).toBe(true);
+  });
+
+  it('stays silent on a limit it does not hold rather than reaching', () => {
+    // No flange fact is derived, so the passages must carry that answer.
+    const hits = searchFacts('wheel flange thickness condemning limit', 4);
+    for (const h of hits) {
+      expect(h.fact.subject.toLowerCase()).toMatch(/flange/);
+    }
+  });
+
+  it('a single shared common word never clears the bar on its own', () => {
+    for (const q of ['limit', 'brake', 'spring', 'wear']) {
+      const hits = searchFacts(q, 4);
+      // A bare common word is a browse, not a question. Answering it with
+      // four confident figures invites the inspector to take the first one.
+      expect(
+        hits.length,
+        `The bare word "${q}" produced ${hits.length} direct answers.`
+      ).toBeLessThanOrEqual(4);
+    }
+  });
+});
