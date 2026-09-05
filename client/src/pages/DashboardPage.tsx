@@ -26,6 +26,7 @@ import type { InspectionStats } from '../../../shared/types.ts';
 import { configuredCoverage } from '../../../shared/knowledge/raipurWorkload.ts';
 import { DAILY_PILE } from '../../../shared/sorting/throughput.ts';
 import { ShopFloorNow } from '../components/ShopFloorNow.tsx';
+import { VisionReadiness } from '../components/VisionReadiness.tsx';
 import { ActivityIcon, BanIcon, BarChartIcon, CoilIcon, DownloadIcon, LayersIcon, SearchIcon, TrainIcon, UserIcon } from '../components/Icons.tsx';
 
 /*
@@ -211,6 +212,13 @@ export const DashboardPage: React.FC = () => {
         * which is what a divisional officer opens the screen for.
         */}
       <ShopFloorNow lang={lang} />
+
+      {/*
+        * The DRM asked for a camera that identifies a spring and its damage.
+        * This says, from the shop's own counts, how far off that is and what
+        * moves it — rather than leaving the answer to a conversation.
+        */}
+      <VisionReadiness lang={lang} />
 
       {/* Top Banner & Export Actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-card p-6 rounded-card border border-line">

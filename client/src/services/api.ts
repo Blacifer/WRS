@@ -1074,6 +1074,16 @@ export class ApiClient {
     return this.request('/sorting/dataset');
   }
 
+  /**
+   * How much labelled photographic evidence exists, and of what.
+   *
+   * Counts rather than images: the question is whether there is enough of a
+   * given kind to attempt or score anything, and thin classes are the answer.
+   */
+  public async getSortingDataset(): Promise<{ success: boolean; data: { total: number; byLabel: any[] } }> {
+    return this.request('/sorting/dataset');
+  }
+
   public async getSortingThroughput(date?: string): Promise<{ success: boolean; data: { date: string; total: number; passed: number; condemned: number; firstAt: string | null; lastAt: string | null } }> {
     const params = date ? `?date=${encodeURIComponent(date)}` : '';
     return this.request(`/sorting/throughput${params}`);

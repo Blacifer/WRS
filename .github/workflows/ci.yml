@@ -23,8 +23,13 @@
 name: CI
 
 on:
+  # Every branch, not only main.
+  #
+  # The work of this project happens on feature branches — design/app-refresh
+  # carried a fortnight of fixes while CI watched main and therefore watched
+  # nothing. A check that only runs after merge reports problems at the point
+  # they are most expensive to hear about.
   push:
-    branches: [main]
   pull_request:
     branches: [main]
   # Lets a maintainer re-run the suite from the Actions tab without a push,
