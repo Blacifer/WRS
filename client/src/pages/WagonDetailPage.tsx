@@ -128,6 +128,17 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
   const [overrideTargetStage, setOverrideTargetStage] = useState<LifecycleStage>('COMPONENT_INSPECTION');
   const [overrideJustification, setOverrideJustification] = useState<string>('');
   const [overrideOtp, setOverrideOtp] = useState<string>('');
+  /*
+   * The code this screen issued, when the supervisor asked for one.
+   *
+   * This modal had a bare OTP box and no way to obtain a code — no request
+   * button, no reference to an authenticator. A supervisor who reached it
+   * could not move a wagon at all, which is how the shop found it: "otp did
+   * not land". Nothing was ever sent, because with OTP_DELIVERY=INLINE the
+   * code comes back in the response and this screen never asked for it.
+   */
+  const [overrideOtpIssued, setOverrideOtpIssued] = useState<string | null>(null);
+  const [requestingOverrideOtp, setRequestingOverrideOtp] = useState(false);
   const [overrideError, setOverrideError] = useState<string | null>(null);
 
   // Gate Signoff Modal State
@@ -2245,13 +2256,66 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
               <div>
                 <label className="block text-xs font-semibold text-ink-body mb-1">{isHi ? 'पर्यवेक्षक क्रिया ओटीपी' : 'Supervisor Action OTP'}</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 123456"
-                  value={overrideOtp}
-                  onChange={(e) => setOverrideOtp(e.target.value)}
-                  className="w-full bg-raised border border-line rounded-control px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-line"
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="e.g. 123456"
+                    value={overrideOtp}
+                    onChange={(e) => setOverrideOtp(e.target.value)}
+                    className="flex-1 bg-raised border border-line rounded-control px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-line"
+                  />
+                  {/*
+                    * Absent until now. An enrolled supervisor reads the code
+                    * from their authenticator and needs no button; everyone
+                    * else had no way to obtain one at all.
+                    */}
+                  {!totpEnrolled && (
+                    <button
+                      type="button"
+                      disabled={requestingOverrideOtp}
+                      onClick={async () => {
+                        setRequestingOverrideOtp(true);
+                        try {
+                          const res = await api.requestOtp('OVERRIDE');
+                          if (res.devOtpCode) setOverrideOtpIssued(res.devOtpCode);
+                        } catch {
+                          setOverrideOtpIssued(null);
+                        } finally {
+                          setRequestingOverrideOtp(false);
+                        }
+                      }}
+                      className="px-4 py-2 rounded-control border border-accent-line text-accent-ink hover:bg-raised text-xs font-bold whitespace-nowrap disabled:opacity-50"
+                    >
+                      {requestingOverrideOtp
+                        ? (isHi ? 'माँगा जा रहा है…' : 'Requesting…')
+                        : (isHi ? 'कोड भेजें' : 'Send code')}
+                    </button>
+                  )}
+                </div>
+
+                {totpEnrolled && (
+                  <p className="mt-1.5 text-[11px] text-ink-muted">
+                    {isHi
+                      ? 'अपने ऑथेंटिकेटर ऐप से छह अंकों का कोड दर्ज करें।'
+                      : 'Enter the six-digit code from your authenticator app.'}
+                  </p>
+                )}
+
+                {/*
+                  * Shown, not auto-filled. Filling it in would turn a
+                  * deliberate confirmation into a single click, which is the
+                  * one thing this step exists to prevent.
+                  */}
+                {!totpEnrolled && overrideOtpIssued && (
+                  <p className="mt-1.5 text-[11px] text-ink-muted">
+                    {isHi ? 'कोड: ' : 'Code: '}
+                    <strong className="font-mono text-warn-ink text-sm">{overrideOtpIssued}</strong>
+                    {isHi
+                      ? ' — यह दूसरा कारक नहीं, एक जानबूझकर दूसरा कदम है।'
+                      : ' — returned here rather than sent. A deliberate second step, not a second factor.'}
+                  </p>
+                )}
               </div>
 
               <div className="pt-3 border-t border-line flex justify-end gap-3">
