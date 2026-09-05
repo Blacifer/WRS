@@ -1143,10 +1143,10 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                 <button
                   key={catKey}
                   onClick={() => setSelectedCategory(catKey)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
+                  className={`min-h-tap px-4 py-2 rounded-control text-sm font-semibold transition-colors flex items-center gap-2 ${
                     isSelected
-                      ? 'bg-white text-black'
-                      : 'bg-transparent text-neutral-400 hover:text-white'
+                      ? 'bg-selected text-ink'
+                      : 'bg-transparent text-ink-muted hover:text-ink'
                   }`}
                 >
                   <span>{t(`checklist.categories.${catKey}` as any) || catKey}</span>
@@ -2140,6 +2140,17 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
               condition="USED"
               initialTarget={smartVisionModalTarget.initialTarget || 'OUTER_SPRING'}
               measuredHeight={null}
+              /*
+               * Same as SpringBatchPage, which already had these and this call
+               * site did not: springs at Raipur are gauged by hand against a
+               * calibrated go/no-go post, not read off a digital display. The
+               * camera path exists to photograph a caliper LCD, so on this
+               * bench it asked the supervisor to "align caliper LCD here" in
+               * front of an instrument that has no display at all — which is
+               * how the shop's own officer found it.
+               */
+              defaultMode="manual"
+              hideCamera
               onClose={() => setSmartVisionModalTarget(null)}
               onMeasurementChange={(height, _source, confidence) => {
                 const componentType = smartVisionModalTarget.initialTarget || 'OUTER_SPRING';
