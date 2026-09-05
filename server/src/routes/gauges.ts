@@ -118,6 +118,40 @@ gaugesRouter.put(
         return;
       }
 
+      /*
+       * A field this endpoint does not understand is refused rather than
+       * ignored.
+       *
+       * Sending calibrationValidUpto instead of validUpto — a plausible
+       * mistake, and one made while testing this very endpoint — returned 200
+       * with a gauge that was not calibrated at all. The administrator sees
+       * success, the gauge keeps reading UNRECORDED, and every spring measured
+       * on it stays flagged in the audit export with nobody able to say why.
+       *
+       * Silent acceptance of something that did nothing is the failure mode
+       * this system can least afford, since the whole point of the gauge
+       * register is that a reading is worth its instrument's calibration
+       * record.
+       */
+      const ACCEPTED = new Set([
+        'description', 'appliesTo', 'certificateNumber', 'issuedTo',
+        'calibratedOn', 'validUpto', 'notes'
+      ]);
+      const unknown = Object.keys(body).filter((k) => !ACCEPTED.has(k));
+      if (unknown.length > 0) {
+        res.status(400).json({
+          success: false,
+          error: 'VALIDATION_ERROR',
+          message:
+            `Unrecognised field${unknown.length > 1 ? 's' : ''}: ${unknown.join(', ')}. ` +
+            `A calibration is recorded with calibratedOn and validUpto (YYYY-MM-DD). ` +
+            `Accepted fields: ${[...ACCEPTED].join(', ')}.`,
+          statusCode: 400,
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
+
       // A date is either a real ISO date or it is absent. A malformed one
       // would read as a calibration record while meaning nothing.
       for (const field of ['calibratedOn', 'validUpto']) {
