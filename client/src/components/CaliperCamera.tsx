@@ -30,22 +30,32 @@ interface CaliperCameraProps {
   initialTarget?: CVComponentTarget;
   onClose?: () => void;
   /**
-   * Which input mode opens first.
+   * Which input mode opens first. Defaults to 'manual'.
    *
-   * Springs at WRS Raipur are measured with a manual gauge, not a digital
-   * caliper — there is no LCD to photograph. Opening the camera for them
-   * costs an extra tap on every spring (~900/day) and triggers a pointless
-   * camera-permission prompt. Callers measuring springs should pass
-   * 'manual'. Components that genuinely use a digital caliper can keep the
-   * camera default.
+   * WRS Raipur measures everything by hand. Confirmed by the shop's own
+   * officer: there is no instrument on this floor with a display of any kind,
+   * and the only machine-assisted test is air pressure, which is the Single
+   * Wagon Test and has nothing to do with this component.
+   *
+   * A shop that genuinely owns a digital caliper opts in with 'camera'.
    */
   defaultMode?: 'camera' | 'manual';
   /**
-   * Hides the camera entirely. The OCR reads digits off a measuring
-   * instrument's DIGITAL DISPLAY — it cannot tell anything from a photograph
-   * of the component itself. Springs at Raipur are gauged by hand with no
-   * display to read, so offering a camera there invites the reasonable but
-   * wrong assumption that photographing a spring will identify or measure it.
+   * Whether to offer the camera at all. Defaults to TRUE — hidden.
+   *
+   * This default is inverted on purpose, and the inversion is the point.
+   *
+   * The OCR reads digits off a measuring instrument's DIGITAL DISPLAY. It
+   * cannot tell anything from a photograph of the component itself. When the
+   * default was `false`, every call site had to remember to opt out, and one
+   * of the three forgot — so a supervisor at Raipur was asked to "align
+   * caliper LCD here" while holding a go/no-go gauge with no display on it.
+   * The shop's own officer found that, not a test.
+   *
+   * Making the camera opt-in means a call site added next year cannot
+   * reintroduce that by forgetting something. A shop with a digital caliper
+   * passes `hideCamera={false}` and states, at that call site, that it has
+   * one.
    */
   hideCamera?: boolean;
 }
@@ -56,8 +66,8 @@ export const CaliperCamera: React.FC<CaliperCameraProps> = ({
   onMeasurementChange,
   onClose,
   initialTarget,
-  defaultMode = 'camera',
-  hideCamera = false
+  defaultMode = 'manual',
+  hideCamera = true
 }) => {
   const dict = getDictionary(lang);
   const isHi = lang === 'hi';
