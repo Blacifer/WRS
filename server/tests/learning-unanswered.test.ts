@@ -148,4 +148,50 @@ describe('Learning ledger — silence is not agreement', () => {
     assert.equal(acc.hasEnoughData, false, 'silence must never authorise a tuning proposal');
     assert.equal(acc.unansweredCount, 40);
   });
+
+  it('TC-LRN-U07: getMemory and getAccuracy cannot disagree about the same ledger', () => {
+    /*
+     * Found by driving the app, not by a test.
+     *
+     * getMemory kept its own COUNT(*) written before the unanswered rule
+     * existed, so seventeen unanswered anomaly flags showed as seventeen
+     * observations on the learning dashboard while accuracy — reading the
+     * same rows — correctly reported none.
+     *
+     * Two figures derived from one ledger must not contradict each other.
+     * Whichever a person happens to read, they should reach the same
+     * conclusion about whether anything has been learned.
+     */
+    const svc = freshService();
+    for (let i = 0; i < 9; i++) raiseUnanswered(svc, 206.5);
+    answer(svc, true, 54.0);
+
+    const acc = svc.getAccuracy('MEASUREMENT_ANOMALY');
+    const mem = svc.getMemory();
+    const observed = mem.observations.find((o: any) => o.subsystem === 'MEASUREMENT_ANOMALY');
+
+    assert.equal(acc.totalEvents, 1, 'only the answered flag is evidence');
+    assert.equal(
+      observed?.total,
+      acc.totalEvents,
+      'the dashboard and the accuracy figure must count the same ledger the same way'
+    );
+    assert.equal(observed?.corrected, acc.correctedCount);
+  });
+
+  it('TC-LRN-U08: a subsystem that asks no questions is unaffected by the filter', () => {
+    // The way this change could do real damage: if NULL were treated as
+    // unanswered, every other subsystem's dashboard total would drop to zero.
+    const svc = freshService();
+    svc.recordOutcome({
+      subsystem: 'OCR_CALIPER',
+      machineOutput: { reading: 260.5 },
+      wasCorrected: false,
+      userId: 'usr_insp_001',
+      userRole: 'INSPECTOR'
+    });
+
+    const observed = svc.getMemory().observations.find((o: any) => o.subsystem === 'OCR_CALIPER');
+    assert.equal(observed?.total, 1, 'a subsystem with no answered key must still be counted');
+  });
 });
