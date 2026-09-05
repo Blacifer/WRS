@@ -1605,7 +1605,33 @@ export class WagonRepository {
     // the certificate can never be re-verified by whoever receives it.
     const checksSummary = {
       ...(data.checksSummary as Record<string, unknown>),
-      acknowledgedAdvisoryIds: [...acknowledged].sort()
+      acknowledgedAdvisoryIds: [...acknowledged].sort(),
+
+      /*
+       * The findings themselves, in the words the supervisor was shown.
+       *
+       * Ids alone ("nest_HEIGHT_VARIATION_EXCEEDED_BOGIE_2 INNER") are enough
+       * to enforce the acknowledgement but not enough to read one back. A
+       * certificate has to state what was accepted, and it has to state it in
+       * the wording that was on the screen at the moment of signing — not a
+       * description re-derived later from springs that may since have been
+       * changed, or from a rule that may since have been reworded. Storing the
+       * text here puts it inside the canonical content the signature covers,
+       * so what the supervisor accepted cannot drift away from what they
+       * signed.
+       *
+       * Every advisory the gate raised is necessarily acknowledged by this
+       * point — the check above refuses otherwise — so this is the complete
+       * set of findings the wagon was released over.
+       */
+      acknowledgedAdvisories: (evaluation.advisoryDetails || []).map((a: any) => ({
+        id: a.id,
+        category: a.category,
+        partName: a.partName,
+        issueType: a.issueType,
+        description: a.description,
+        remediationAction: a.remediationAction
+      }))
     };
 
     const canonicalSummary = JSON.stringify({

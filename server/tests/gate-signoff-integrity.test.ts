@@ -494,6 +494,102 @@ describe('Release Sign-off Integrity', () => {
     );
   });
 
+  test('TC-ACK-06: the certificate names the finding the supervisor released the wagon over', async () => {
+    /*
+     * Found by driving the app, not by a test.
+     *
+     * Everything above this line passed while the certificate said nothing at
+     * all about the advisory. The acknowledgement was enforced at sign-off and
+     * stored in the signed summary, and then stopped there — so a wagon
+     * released with a known nest variation and a wagon with nothing wrong
+     * produced identical certificates. The certificate is the only part of
+     * this record that leaves the workshop; a decision that is invisible on it
+     * is, to everyone downstream, a decision nobody made.
+     */
+    const wagonNumber = 'SECR/BOXNHL/ACK001';
+
+    // The wording is read from what was signed rather than from the gate,
+    // because reproducing the signed text is exactly what the certificate is
+    // supposed to do.
+    const summary = JSON.parse(
+      (getDatabase()
+        .prepare('SELECT checks_summary_json FROM gate_signoffs WHERE wagon_number = ?')
+        .get(wagonNumber) as any).checks_summary_json
+    );
+
+    assert.ok(
+      Array.isArray(summary.acknowledgedAdvisories) && summary.acknowledgedAdvisories.length > 0,
+      'the signed summary must carry the finding text, not only its id'
+    );
+    const finding = summary.acknowledgedAdvisories[0];
+
+    const res = await app.dispatch({
+      method: 'GET',
+      url: `/api/wagons/${wagonNumber}/certificate`,
+      headers: auth(supervisorToken)
+    });
+    assert.equal(res.status, 200);
+    const html = typeof res.body === 'string' ? res.body : String(res.body);
+
+    assert.ok(
+      html.includes(finding.description),
+      'the certificate must state the finding in the words the supervisor was shown'
+    );
+    assert.ok(html.includes(finding.id), 'and identify it, so it can be matched to the gate record');
+    assert.ok(
+      /acknowledged\s*\n?\s*1 advisory finding/.test(html.replace(/\s+/g, ' ')) ||
+        html.replace(/\s+/g, ' ').includes('acknowledged 1 advisory finding'),
+      'the certificate must say that a named supervisor accepted it, not merely list it'
+    );
+    assert.ok(html.includes('S. K. Verma'), 'attributed to the supervisor who actually signed');
+
+    // The JSON form is what a downstream system reads, so it carries the same
+    // fact rather than only the printable page doing so.
+    const json = await app.dispatch({
+      method: 'GET',
+      url: `/api/wagons/${wagonNumber}/certificate?format=json`,
+      headers: auth(supervisorToken)
+    });
+    assert.equal(json.status, 200);
+    const acknowledged = json.body?.data?.signoff?.acknowledgedAdvisories
+      ?? json.body?.signoff?.acknowledgedAdvisories;
+    assert.equal(acknowledged?.length, summary.acknowledgedAdvisories.length);
+    assert.equal(acknowledged[0].description, finding.description);
+  });
+
+  test('TC-ACK-07: a clean wagon\'s certificate says so, rather than staying silent', async () => {
+    /*
+     * The absence of a section reads as "nothing to report" only if the
+     * section is always there. Stating the absence is what makes the presence
+     * meaningful on the wagon next to it.
+     */
+    const wagonNumber = 'SECR/BOXNHL/ACK010';
+    await driveToReleasable(wagonNumber);
+
+    const res = await signoff(wagonNumber, supervisorToken, { otpToken: 'test_token_override' });
+    assert.equal(res.status, 200, `clean wagon must release: ${res.body?.message}`);
+
+    const cert = await app.dispatch({
+      method: 'GET',
+      url: `/api/wagons/${wagonNumber}/certificate`,
+      headers: auth(supervisorToken)
+    });
+    const html = typeof cert.body === 'string' ? cert.body : String(cert.body);
+
+    assert.ok(
+      html.includes('Advisory Findings Accepted at Sign-Off'),
+      'the section must be present on every certificate'
+    );
+    assert.ok(
+      html.includes('raised no advisory findings'),
+      'and must state the absence positively'
+    );
+    assert.ok(
+      !html.includes('released this wagon on their own authority'),
+      'a clean release must not carry an acceptance statement'
+    );
+  });
+
   test('TC-ACK-04: acknowledging an unrelated id does not count as acknowledgement', async () => {
     const wagonNumber = 'SECR/BOXNHL/ACK002';
     await driveToReleasable(wagonNumber);

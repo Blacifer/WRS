@@ -15,6 +15,19 @@ import qrcode from 'qrcode-generator';
 import { SIGNATURE_ALGORITHM, certificateKeyFingerprint } from './certificateSigning.ts';
 
 /**
+ * Advisory wording is machine-generated today, but it is the one part of this
+ * document that quotes a finding rather than a fixed label, so it is escaped
+ * on the way into the HTML.
+ */
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
  * Renders the certificate's verification payload as a real, scannable QR code.
  *
  * This block used to be a styled box reading "QR VERIFIED / Scan for
@@ -105,6 +118,49 @@ export class CertificateGenerator {
     const supervisorName = signoff?.supervisorName || 'NOT SIGNED';
     const supervisorEmpId = signoff?.supervisorEmployeeId || '—';
     const digitalSignature = signoff?.digitalSignature || 'UNSIGNED';
+
+    // -----------------------------------------------------------------------
+    // What this wagon was released OVER.
+    //
+    // The exit gate raises two kinds of finding. Blockers stop the release, so
+    // a signed certificate proves there were none. Advisories do not stop it —
+    // the 3 mm nest grouping rule is worded as recommended practice — but the
+    // supervisor has to acknowledge each one by name before the sign-off is
+    // accepted. That acknowledgement is the whole point of the mechanism: it
+    // turns a notice nobody had to read into a decision somebody put their
+    // name to.
+    //
+    // Until now it went no further than the database. The certificate — the
+    // one document that leaves this workshop — said "released" and nothing
+    // else, so a wagon released with a known 5.5 mm free-height variation in
+    // one nest and a wagon with nothing at all produced identical paper. The
+    // finding, and the fact that a named supervisor accepted it, is exactly
+    // what a receiving railway or an auditor would want to see.
+    //
+    // Read from the signed summary rather than re-evaluated now: this must be
+    // what was accepted at the moment of signing, not what the gate would say
+    // today. `acknowledgedAdvisories` carries the full text; certificates
+    // signed before that field existed carry only ids, which are still worth
+    // printing, so both are handled.
+    // -----------------------------------------------------------------------
+    const signedSummary: any = signoff?.checksSummary || {};
+    const acknowledgedAdvisories: {
+      id: string;
+      partName?: string;
+      description: string;
+      remediationAction?: string;
+    }[] = Array.isArray(signedSummary.acknowledgedAdvisories) && signedSummary.acknowledgedAdvisories.length > 0
+      ? signedSummary.acknowledgedAdvisories
+      : (Array.isArray(signedSummary.acknowledgedAdvisoryIds) ? signedSummary.acknowledgedAdvisoryIds : []).map(
+          (id: string) => ({
+            id,
+            // An older certificate recorded the identifier only. Print it as
+            // it stands rather than inventing wording for a finding whose
+            // description was never stored.
+            description: `Advisory finding ${id} — acknowledged at sign-off. This certificate was ` +
+              `issued before advisory wording was recorded; see the gate sign-off record for detail.`
+          })
+        );
 
     const entryTime = new Date(wagon.entryDate).getTime();
     const releaseTime = new Date(signedAt).getTime();
@@ -225,7 +281,10 @@ export class CertificateGenerator {
         supervisorName,
         supervisorEmployeeId: supervisorEmpId,
         digitalSignature,
-        signedAt
+        signedAt,
+        // Advisory findings the certifying supervisor accepted by name. An
+        // empty array is a statement: the gate raised nothing advisory.
+        acknowledgedAdvisories
       },
 
       /*
@@ -606,6 +665,40 @@ export class CertificateGenerator {
         }
       </tbody>
     </table>
+
+    <div class="section-title">4. Advisory Findings Accepted at Sign-Off</div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 26%;">Assembly / Part</th>
+          <th>Finding</th>
+          <th style="width: 30%;">Recommended Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${
+          acknowledgedAdvisories.length > 0
+            ? acknowledgedAdvisories.map(a => `
+              <tr>
+                <td><strong>${escapeHtml(a.partName || '\u2014')}</strong><br><span style="font-size: 9px; color: #64748b;"><code>${escapeHtml(a.id)}</code></span></td>
+                <td>${escapeHtml(a.description)}</td>
+                <td style="color: #64748b;">${escapeHtml(a.remediationAction || 'Not recorded')}</td>
+              </tr>
+            `).join('')
+            : `<tr><td colspan="3" style="text-align: center; color: #166534; padding: 10px;">The exit gate raised no advisory findings for this wagon.</td></tr>`
+        }
+      </tbody>
+    </table>
+    ${
+      acknowledgedAdvisories.length > 0
+        ? `<div style="border: 1px solid #f59e0b; background: #fffbeb; padding: 8px 10px; margin-top: -4px; font-size: 10.5px; color: #92400e;">
+             <strong>${escapeHtml(supervisorName)} (${escapeHtml(supervisorEmpId)})</strong> acknowledged
+             ${acknowledgedAdvisories.length} advisory finding${acknowledgedAdvisories.length === 1 ? '' : 's'} by name and
+             released this wagon on their own authority. Advisory findings do not bar release under RDSO G-95 Rev-II;
+             they are recorded here because the decision to accept them was a decision, and it was this supervisor's.
+           </div>`
+        : ''
+    }
 
     <div class="signoff-box">
       <div class="sig-details">
