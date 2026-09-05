@@ -53,7 +53,18 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
     try {
       setCameraError(null);
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+        /*
+         * `ideal`, not a bare value. A bare facingMode is a HARD constraint:
+         * on a device with no rear camera — any laptop, which is what the
+         * shop's officer reviewed this on — getUserMedia throws
+         * OverconstrainedError and the camera dies entirely, leaving only the
+         * upload button. That is exactly the "could upload a photo but not
+         * take one" this was reported as.
+         *
+         * With `ideal` the browser prefers the rear camera on a tablet and
+         * falls back to whatever exists elsewhere.
+         */
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
       });
       setStream(mediaStream);
       if (videoRef.current) {

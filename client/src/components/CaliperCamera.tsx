@@ -96,7 +96,9 @@ export const CaliperCamera: React.FC<CaliperCameraProps> = ({
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: 'environment', // rear camera for tablets
+          // Preferred, not required: a hard constraint fails outright on a
+          // device with no rear camera. See PhotoCaptureModal.
+          facingMode: { ideal: 'environment' },
           width: { ideal: 1280 },
           height: { ideal: 720 }
         }

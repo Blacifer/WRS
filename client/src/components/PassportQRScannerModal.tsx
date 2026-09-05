@@ -105,7 +105,9 @@ export const PassportQRScannerModal: React.FC<PassportQRScannerModalProps> = ({
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+          // `ideal` rather than a hard constraint — see PhotoCaptureModal.
+          // A laptop has no rear camera and a hard value fails outright.
+          video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
         });
         streamRef.current = stream;
         if (videoRef.current) {
