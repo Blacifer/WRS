@@ -456,6 +456,18 @@ export function SpringSortingPage({ lang, onClose }: Props) {
        * was looking at when they decided — not whatever has drifted into
        * view by the time the server answers.
        */
+      /*
+       * Grabbed BEFORE the request, so the frame is the spring the inspector
+       * was looking at when they decided — not whatever has drifted into
+       * view by the time the server answers.
+       *
+       * Only when the session toggle is on. An earlier attempt here forced a
+       * grab for visible defects regardless, which cannot work: grab() returns
+       * null unless the camera is already running, so it would have looked
+       * like evidence capture while silently attaching nothing. The prompt on
+       * the condemn panel asks for the camera instead, which is honest about
+       * needing the inspector to turn it on.
+       */
       const frame = capturePhotos ? cameraRef.current?.grab() ?? null : null;
 
       const res = await api.recordSortedSpring({
@@ -919,6 +931,30 @@ export function SpringSortingPage({ lang, onClose }: Props) {
             <p className="text-xs font-bold text-bad-ink">
               {isHi ? 'क्या देखा गया?' : 'What did you see?'}
             </p>
+
+            {/*
+              * Shown only when the camera is off, and only here.
+              *
+              * A crack, corrosion or a deformation is a visible thing, and for
+              * those the photograph IS the evidence — it is the only record of
+              * what the inspector saw before the spring went to scrap. A
+              * height is not visible, which is the same reason a band cannot
+              * be read off a photograph, so nothing is asked for that.
+              *
+              * A hint rather than a block: this bench does ~700 springs a
+              * shift and stopping it to demand a permission prompt would cost
+              * more than the evidence is worth. Turning the camera on once
+              * covers the whole session at no further taps.
+              */}
+            {!capturePhotos && (
+              <div className="rounded-control border border-warn-line bg-warn-soft px-3 py-2">
+                <p className="text-[11px] text-warn-ink leading-snug">
+                  {isHi
+                    ? 'दरार, जंग या विकृति के लिए फ़ोटो ही प्रमाण है। ऊपर "छँटाई के साथ फ़ोटो लें" चालू करें — एक बार, पूरे सत्र के लिए।'
+                    : 'For a crack, corrosion or deformation the photograph is the evidence. Switch on "Photograph springs while sorting" above — once, for the whole session.'}
+                </p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-2">
               {/* Height first: on a banded bogie it is much the commonest
                   reason, so it sits where the thumb already is. */}

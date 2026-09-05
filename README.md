@@ -57,7 +57,7 @@ The **WRS Raipur Quality Control Platform** is an enterprise-grade web applicati
 Stated plainly, because a system used for safety decisions should be clear about its own limits:
 
 - **It does not identify a spring, or a wagon, from a photograph.** Free height cannot be recovered from an image without a scale. The spring queue and the wagon number are entered, not detected.
-- **It does not detect cracks or corrosion automatically.** Visible defects are recorded by the inspector, with a mandatory photograph as evidence.
+- **It does not detect cracks or corrosion automatically.** Visible defects are recorded by the inspector. In the per-wagon spring flow a photograph is mandatory — the verdict cannot be saved without one. On the loose-spring sorting bench, which runs at roughly 700 springs a shift, the photograph is attached automatically when "Photograph springs while sorting" is on, and condemning for a visible defect with it off prompts to switch it on rather than blocking the bench. A height condemnation asks for no photograph at all, for the same reason a band cannot be read off one.
 - **It does not invent limits.** Where the manual publishes no figure — the CTRB end-cap gap, the RFT spring count — the app measures and records but returns no verdict, and says why.
 - **The supervisor OTP is not a second factor.** With no SMS gateway integrated, the code is returned in the API response. It is an audited two-step confirmation; `OTP_DELIVERY` makes that posture explicit rather than implied.
 
