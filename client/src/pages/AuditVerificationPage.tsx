@@ -17,15 +17,18 @@
  *
  * WHAT A PASS DOES NOT MEAN
  * -------------------------
- * Stated on the screen, not just here. A verified chain proves no record was
- * altered after it was written. It cannot prove a record was true when it was
- * written — a wrong measurement, honestly entered, hashes exactly as well as
- * a right one. Someone reading a green tick as "the inspections were correct"
- * has read more into it than it says.
+ * Stated on the screen, not just here, and given its own panel rather than a
+ * footnote. A verified chain proves no record was altered after it was
+ * written. It cannot prove a record was true when it was written — a wrong
+ * measurement, honestly entered, hashes exactly as well as a right one.
+ * Someone reading a green tick as "the inspections were correct" has read
+ * more into it than it says.
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api.ts';
+import { ShieldIcon, RefreshCwIcon, CheckCircleIcon, AlertTriangleIcon } from '../components/Icons.tsx';
+import { Button, Card, CardBody, CardHeader, Note } from '../components/ui/index.tsx';
 
 interface Props {
   lang: 'en' | 'hi';
@@ -56,6 +59,26 @@ const BREAK_MEANING: Record<string, { en: string; hi: string }> = {
     hi: 'इस पंक्ति में कोई हैश नहीं है, इसलिए इसके बारे में कुछ भी प्रमाणित नहीं किया जा सकता।'
   }
 };
+
+/** What the chain actually attests to, in the reader's terms. */
+const COVERED: Array<{ en: string; hi: string }> = [
+  {
+    en: 'Every spring verdict, including the ones recorded offline and sent later.',
+    hi: 'हर स्प्रिंग निर्णय, उन सहित जो ऑफ़लाइन दर्ज होकर बाद में भेजे गए।'
+  },
+  {
+    en: 'Every stage transition, with who moved it and when.',
+    hi: 'हर चरण परिवर्तन — किसने और कब बदला, इसके साथ।'
+  },
+  {
+    en: 'Every release certificate, with its own keyed HMAC over its contents.',
+    hi: 'हर रिलीज़ प्रमाणपत्र, अपनी सामग्री पर कुंजीबद्ध HMAC के साथ।'
+  },
+  {
+    en: 'Every change of role — a changed role breaks the chain, not just changed data.',
+    hi: 'भूमिका का हर परिवर्तन — बदली भूमिका भी श्रृंखला तोड़ती है, केवल बदला डेटा नहीं।'
+  }
+];
 
 export function AuditVerificationPage({ lang }: Props) {
   const isHi = lang === 'hi';
@@ -89,93 +112,125 @@ export function AuditVerificationPage({ lang }: Props) {
     verify();
   }, [verify]);
 
-  const broken = result && !result.verified;
+  const broken = result ? !result.verified : false;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-4 p-4">
-      <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-extrabold text-white">
-              {isHi ? 'ऑडिट श्रृंखला जाँच' : 'Audit Chain Verification'}
-            </h2>
-            <p className="text-xs text-slate-400 mt-1 max-w-lg">
+    <div className="max-w-6xl mx-auto space-y-4 animate-fadeIn">
+
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-[-0.028em] text-ink">
+            {isHi ? 'ऑडिट श्रृंखला' : 'Audit chain'}
+          </h1>
+          <p className="mt-1.5 text-[13px] font-medium text-ink-muted max-w-xl">
+            {isHi
+              ? 'हर रिकॉर्ड का हैश पहली प्रविष्टि से दोबारा गिना जाता है, यह देखने के लिए कि लिखे जाने के बाद कुछ बदला तो नहीं।'
+              : 'SHA-256 across every event, re-derived from the first entry each time you ask.'}
+          </p>
+        </div>
+        <Button onClick={verify} disabled={busy}>
+          <RefreshCwIcon size={16} className={busy ? 'animate-spin' : ''} />
+          {busy ? (isHi ? 'जाँच जारी…' : 'Re-deriving…') : (isHi ? 'दोबारा जाँचें' : 'Verify chain again')}
+        </Button>
+      </div>
+
+      {error && (
+        <Note tone="warn">
+          <AlertTriangleIcon size={17} className="shrink-0 mt-0.5" />
+          <span>{error}</span>
+        </Note>
+      )}
+
+      {/* The verdict, read from across a room. */}
+      {result && (
+        <div
+          className={[
+            'flex flex-wrap items-center gap-5 px-7 py-6 rounded-card border',
+            broken ? 'bg-bad-soft border-bad-line' : 'bg-good-soft border-good-line'
+          ].join(' ')}
+        >
+          <span
+            className={[
+              'w-14 h-14 rounded-card flex items-center justify-center shrink-0 text-page',
+              broken ? 'bg-bad' : 'bg-good'
+            ].join(' ')}
+          >
+            <ShieldIcon size={30} />
+          </span>
+
+          <div className="flex-1 min-w-[16rem]">
+            <p className={`text-[28px] leading-tight font-extrabold tracking-[-0.03em] ${broken ? 'text-bad-ink' : 'text-good-ink'}`}>
+              {broken
+                ? (isHi ? 'श्रृंखला टूटी हुई है' : 'The chain is broken')
+                : (isHi ? 'श्रृंखला अटूट है' : 'Chain intact')}
+            </p>
+            <p className="mt-1 text-sm font-medium text-ink-body">
               {isHi
-                ? 'हर रिकॉर्ड का हैश दोबारा गिना जाता है, यह देखने के लिए कि लिखे जाने के बाद कुछ बदला तो नहीं।'
-                : 'Every record’s hash is recomputed, to check that nothing was altered after it was written.'}
+                ? `${result.entriesChecked} प्रविष्टियाँ जाँची गईं${broken ? ` — ${result.breaksFound} में गड़बड़ी` : ''}`
+                : result.summary}
             </p>
           </div>
-          <button
-            onClick={verify}
-            disabled={busy}
-            className="px-4 min-h-[40px] rounded-lg bg-white text-black text-sm font-extrabold disabled:opacity-40 shrink-0"
-          >
-            {busy ? (isHi ? 'जाँच जारी…' : 'Checking…') : (isHi ? 'दोबारा जाँचें' : 'Check again')}
-          </button>
-        </div>
 
-        {error && (
-          <div className="rounded-lg border border-amber-800 bg-amber-950/30 px-4 py-3">
-            <p className="text-sm font-semibold text-amber-200">{error}</p>
-          </div>
-        )}
-
-        {busy && !result && (
-          <p className="text-sm text-slate-400">
-            {isHi ? 'श्रृंखला पढ़ी जा रही है…' : 'Walking the chain…'}
-          </p>
-        )}
-
-        {result && (
-          <>
-            <div
-              className={`rounded-xl border px-4 py-4 ${
-                broken
-                  ? 'border-red-700 bg-red-950/40'
-                  : 'border-emerald-700 bg-emerald-950/30'
-              }`}
-            >
-              <p className={`text-lg font-extrabold ${broken ? 'text-red-200' : 'text-emerald-200'}`}>
-                {broken
-                  ? (isHi ? '⛔ श्रृंखला टूटी हुई है' : '⛔ The chain is broken')
-                  : (isHi ? '✅ श्रृंखला अटूट है' : '✅ The chain is unbroken')}
-              </p>
-              <p className="text-sm text-slate-300 mt-1.5">
-                {isHi
-                  ? `${result.entriesChecked} प्रविष्टियाँ जाँची गईं${
-                      broken ? ` — ${result.breaksFound} में गड़बड़ी` : ''
-                    }`
-                  : result.summary}
-              </p>
-              <p className="text-[11px] text-slate-500 mt-2">
-                {isHi ? 'जाँच का समय: ' : 'Checked at '}
-                {new Date(result.checkedAt).toLocaleString(isHi ? 'hi-IN' : 'en-IN')}
-              </p>
+          <div className="flex gap-8 shrink-0">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.07em] text-ink-muted">
+                {isHi ? 'प्रविष्टियाँ' : 'Entries'}
+              </div>
+              <div className={`text-[22px] font-extrabold tabular mt-1 ${broken ? 'text-bad-ink' : 'text-good-ink'}`}>
+                {result.entriesChecked}
+              </div>
             </div>
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.07em] text-ink-muted">
+                {isHi ? 'जाँच का समय' : 'Checked at'}
+              </div>
+              <div className="text-[13px] font-bold text-ink-body mt-2 tabular">
+                {new Date(result.checkedAt).toLocaleString(isHi ? 'hi-IN' : 'en-IN')}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
-            {broken && result.firstBrokenAt && (
-              <div className="rounded-xl border border-red-800 bg-slate-950 p-4 space-y-3">
-                <p className="text-xs font-bold uppercase tracking-wide text-red-300">
+      {busy && !result && !error && (
+        <Card>
+          <CardBody>
+            <p className="text-sm text-ink-muted">
+              {isHi ? 'श्रृंखला पढ़ी जा रही है…' : 'Walking the chain…'}
+            </p>
+          </CardBody>
+        </Card>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px] gap-4 items-start">
+
+        {/* Where it stops adding up, when it does. */}
+        <div className="space-y-4">
+          {result && broken && result.firstBrokenAt && (
+            <Card tone="bad">
+              <CardHeader title={
+                <span className="text-bad-ink">
                   {isHi ? 'पहली गड़बड़ी यहाँ' : 'The chain first stops adding up here'}
-                </p>
+                </span>
+              } />
+              <CardBody className="space-y-4">
+                <dl className="grid grid-cols-[auto,1fr] gap-x-5 gap-y-2 text-sm">
+                  <dt className="text-ink-faint">{isHi ? 'रिकॉर्ड' : 'Record'}</dt>
+                  <dd className="text-ink font-mono text-xs break-all">{result.firstBrokenAt.id}</dd>
 
-                <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1.5 text-sm">
-                  <dt className="text-slate-500">{isHi ? 'रिकॉर्ड' : 'Record'}</dt>
-                  <dd className="text-white font-mono text-xs break-all">{result.firstBrokenAt.id}</dd>
+                  <dt className="text-ink-faint">{isHi ? 'घटना' : 'Event'}</dt>
+                  <dd className="text-ink">{result.firstBrokenAt.eventType}</dd>
 
-                  <dt className="text-slate-500">{isHi ? 'घटना' : 'Event'}</dt>
-                  <dd className="text-white">{result.firstBrokenAt.eventType}</dd>
-
-                  <dt className="text-slate-500">{isHi ? 'लिखा गया' : 'Written'}</dt>
-                  <dd className="text-white">
+                  <dt className="text-ink-faint">{isHi ? 'लिखा गया' : 'Written'}</dt>
+                  <dd className="text-ink">
                     {new Date(result.firstBrokenAt.createdAt).toLocaleString(isHi ? 'hi-IN' : 'en-IN')}
                   </dd>
 
-                  <dt className="text-slate-500">{isHi ? 'प्रकार' : 'Kind'}</dt>
-                  <dd className="text-white font-mono text-xs">{result.firstBrokenAt.reason}</dd>
+                  <dt className="text-ink-faint">{isHi ? 'प्रकार' : 'Kind'}</dt>
+                  <dd className="text-ink font-mono text-xs">{result.firstBrokenAt.reason}</dd>
                 </dl>
 
-                <p className="text-sm text-red-100 bg-red-950/50 rounded-lg px-3 py-2.5">
+                <p className="text-sm font-semibold text-bad-ink bg-bad-soft rounded-control px-4 py-3 leading-relaxed">
                   {BREAK_MEANING[result.firstBrokenAt.reason]
                     ? (isHi
                         ? BREAK_MEANING[result.firstBrokenAt.reason].hi
@@ -183,26 +238,60 @@ export function AuditVerificationPage({ lang }: Props) {
                     : result.firstBrokenAt.detail}
                 </p>
 
-                <p className="text-xs text-slate-400 leading-relaxed">
+                <Note>
                   {isHi
                     ? 'यह अपने आप ठीक नहीं होगा। इस समय के बाद के रिकॉर्ड पर भरोसा करने से पहले बैकअप से मिलान करें और वरिष्ठ अधिकारी को सूचित करें।'
                     : 'This does not repair itself. Before relying on records from this point onward, compare against a backup and report it — a break means the database file was modified outside the application, which the application cannot undo or explain.'}
-                </p>
-              </div>
-            )}
+                </Note>
+              </CardBody>
+            </Card>
+          )}
 
-            {/* The limit of what a pass proves. A supervisor reading a green
-                tick as "the inspections were correct" has read too much into
-                it, and this is the only place that says so. */}
-            {!broken && (
-              <p className="text-xs text-slate-400 leading-relaxed border-t border-slate-800 pt-3">
-                {isHi
-                  ? 'इसका अर्थ है कि लिखे जाने के बाद कोई रिकॉर्ड बदला नहीं गया। इसका अर्थ यह नहीं है कि हर माप सही था — गलत माप भी उतनी ही सफाई से दर्ज होता है।'
-                  : 'This means no record was altered after it was written. It does not mean every measurement was correct — a wrong reading, honestly entered, hashes exactly as well as a right one.'}
-              </p>
-            )}
-          </>
-        )}
+          {result && !broken && (
+            <Card>
+              <CardHeader title={isHi ? 'क्या-क्या शामिल है' : 'What is covered'} />
+              <CardBody className="space-y-3">
+                {COVERED.map((c, i) => (
+                  <div key={i} className="flex items-start gap-3">
+                    <CheckCircleIcon size={17} className="text-good-ink shrink-0 mt-0.5" />
+                    <span className="text-[13px] font-medium text-ink-muted leading-relaxed">
+                      {isHi ? c.hi : c.en}
+                    </span>
+                  </div>
+                ))}
+                <Note className="pt-3 border-t border-line">
+                  {isHi
+                    ? 'डेटाबेस ट्रिगर लॉग को केवल-जोड़ने योग्य रखते हैं। वही जाँच '
+                    : 'Database triggers make the log append-only. The same check runs at '}
+                  <span className="font-mono text-ink-muted">GET /api/audit/verify</span>
+                  {isHi
+                    ? ' पर भी चलती है, उनके लिए जो स्क्रीन पर भरोसा नहीं करना चाहते।'
+                    : ' for anyone who would rather not trust a screen.'}
+                </Note>
+              </CardBody>
+            </Card>
+          )}
+        </div>
+
+        {/*
+          The limit of what a pass proves.
+          This was a grey footnote under a green tick. It is the single most
+          misreadable thing on the screen, so it gets a panel of its own.
+        */}
+        <Card tone="warn">
+          <div className="px-5 py-4 bg-warn-soft border-b border-warn-line">
+            <span className="text-sm font-bold text-warn-ink">
+              {isHi ? 'पास होने का अर्थ क्या नहीं है' : 'What a pass does not prove'}
+            </span>
+          </div>
+          <CardBody>
+            <p className="text-[13px] font-medium text-ink-muted leading-relaxed">
+              {isHi
+                ? 'इसका अर्थ है कि लिखे जाने के बाद कोई रिकॉर्ड बदला नहीं गया। इसका अर्थ यह नहीं है कि हर माप सही था — गलत माप भी उतनी ही सफाई से दर्ज होता है। अटूट श्रृंखला कहती है कि रजिस्टर सुरक्षित है; यह नहीं कहती कि गेज सही पढ़ा गया था।'
+                : 'That no record was altered after it was written is not the same as every measurement having been correct. A wrong reading, honestly entered, hashes exactly as well as a right one. A verified chain says the register is intact. It says nothing about whether the caliper was read properly.'}
+            </p>
+          </CardBody>
+        </Card>
       </div>
     </div>
   );

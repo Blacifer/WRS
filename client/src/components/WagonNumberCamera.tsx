@@ -90,19 +90,19 @@ export function WagonNumberCamera({ lang, onRead, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-      <div className="w-full max-w-lg rounded-2xl border border-slate-700 bg-slate-900 overflow-hidden">
-        <div className="p-4 border-b border-slate-800 flex items-start justify-between gap-3">
+      <div className="w-full max-w-lg rounded-card border border-line bg-card overflow-hidden">
+        <div className="p-4 border-b border-line flex items-start justify-between gap-3">
           <div>
             <h3 className="text-sm font-extrabold text-white">
               {isHi ? 'वैगन नंबर पढ़ें' : 'Read the wagon number'}
             </h3>
-            <p className="text-[11px] text-slate-400 mt-0.5">
+            <p className="text-[11px] text-ink-muted mt-0.5">
               {isHi
                 ? 'वैगन पर लिखे नंबर पर कैमरा रखें — पढ़ा गया नंबर आप जाँच सकेंगे'
                 : 'Point at the number painted on the wagon. You will see the reading before it is used.'}
             </p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-lg leading-none">✕</button>
+          <button onClick={onClose} className="text-ink-muted hover:text-white text-lg leading-none">✕</button>
         </div>
 
         <div className="bg-black aspect-video relative">
@@ -110,33 +110,33 @@ export function WagonNumberCamera({ lang, onRead, onClose }: Props) {
           {/* A guide the width of a stencilled number, so people frame it
               close enough for the digits to resolve. */}
           {ready && !result && (
-            <div className="absolute inset-x-8 top-1/2 -translate-y-1/2 h-20 border-2 border-amber-400/70 rounded" />
+            <div className="absolute inset-x-8 top-1/2 -translate-y-1/2 h-20 border-2 border-warn-line rounded" />
           )}
         </div>
 
         <div className="p-4 space-y-3">
           {error && (
-            <p className="text-xs font-semibold text-red-300 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">
+            <p className="text-xs font-semibold text-bad-ink bg-bad-soft border border-bad-line rounded-control px-3 py-2">
               {error}
             </p>
           )}
 
           {result && !result.ok && (
-            <div className="rounded-lg border border-amber-800 bg-amber-950/30 px-3 py-2.5 space-y-2">
-              <p className="text-xs text-amber-200">{result.reason}</p>
+            <div className="rounded-control border border-warn-line bg-warn-soft px-3 py-2.5 space-y-2">
+              <p className="text-xs text-warn-ink">{result.reason}</p>
               {result.alternatives.length > 0 && (
                 <div className="space-y-1">
-                  <p className="text-[11px] text-amber-300/80">
+                  <p className="text-[11px] text-warn-ink/80">
                     {isHi ? 'यह पढ़ा गया, पर भरोसे लायक नहीं:' : 'It read these, but not confidently enough to offer:'}
                   </p>
                   {result.alternatives.slice(0, 3).map((a) => (
                     <button
                       key={a.text}
                       onClick={() => onRead(a.text)}
-                      className="block w-full text-left font-mono text-sm text-white bg-slate-800 hover:bg-slate-700 rounded px-2.5 py-1.5"
+                      className="block w-full text-left font-mono text-sm text-white bg-raised hover:bg-selected rounded px-2.5 py-1.5"
                     >
                       {a.text}
-                      <span className="text-[11px] text-slate-400 ml-2">
+                      <span className="text-[11px] text-ink-muted ml-2">
                         {a.matchesStandardFormat
                           ? (isHi ? '11 अंक' : '11 digits')
                           : (isHi ? 'मानक लंबाई नहीं' : 'not a standard length')}
@@ -149,12 +149,12 @@ export function WagonNumberCamera({ lang, onRead, onClose }: Props) {
           )}
 
           {result?.ok && result.candidate && (
-            <div className="rounded-lg border border-emerald-700 bg-emerald-950/30 px-3 py-3 space-y-2">
-              <p className="text-[11px] text-emerald-300/80">
+            <div className="rounded-control border border-good-line bg-good-soft px-3 py-3 space-y-2">
+              <p className="text-[11px] text-good-ink/80">
                 {isHi ? 'पढ़ा गया — जाँच लें' : 'Read this — check it against the wagon'}
               </p>
               <p className="font-mono text-2xl text-white tracking-wider">{result.candidate.text}</p>
-              <p className="text-[11px] text-slate-400">
+              <p className="text-[11px] text-ink-muted">
                 {(result.candidate.confidence * 100).toFixed(0)}%
                 {' · '}
                 {result.candidate.matchesStandardFormat
@@ -167,14 +167,14 @@ export function WagonNumberCamera({ lang, onRead, onClose }: Props) {
                   percentage. A wagon type derived from the digits also tells
                   the reader the number was understood, not just transcribed. */}
               {result.candidate.checkDigitValid ? (
-                <p className="text-[11px] text-emerald-300">
+                <p className="text-[11px] text-good-ink">
                   {isHi ? '✓ चेक अंक सही' : '✓ Check digit valid'}
                   {result.candidate.impliedType
                     ? ` · ${isHi ? 'वैगन प्रकार' : 'reads as'} ${result.candidate.impliedType}`
                     : ''}
                 </p>
               ) : (
-                <p className="text-[11px] text-amber-300">
+                <p className="text-[11px] text-warn-ink">
                   {isHi
                     ? '⚠ चेक अंक मेल नहीं खाता — वैगन पर मिलान करें'
                     : '⚠ Check digit does not match — compare against the wagon before using this'}
@@ -182,7 +182,7 @@ export function WagonNumberCamera({ lang, onRead, onClose }: Props) {
               )}
               <button
                 onClick={() => onRead(result.candidate!.text)}
-                className="w-full min-h-[44px] rounded-lg bg-white text-black text-sm font-extrabold"
+                className="w-full min-h-[44px] rounded-control bg-white text-black text-sm font-extrabold"
               >
                 {isHi ? 'यही नंबर है' : 'Use this number'}
               </button>
@@ -193,7 +193,7 @@ export function WagonNumberCamera({ lang, onRead, onClose }: Props) {
             <button
               onClick={capture}
               disabled={!ready || busy}
-              className="flex-1 min-h-[48px] rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-sm disabled:opacity-40"
+              className="flex-1 min-h-[48px] rounded-control bg-warn hover:bg-amber-400 text-slate-950 font-extrabold text-sm disabled:opacity-40"
             >
               {busy
                 ? (isHi ? 'पढ़ रहे हैं…' : 'Reading…')
@@ -203,7 +203,7 @@ export function WagonNumberCamera({ lang, onRead, onClose }: Props) {
             </button>
             <button
               onClick={onClose}
-              className="px-4 rounded-lg border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-800"
+              className="px-4 rounded-control border border-line text-ink-body text-xs font-bold hover:bg-raised"
             >
               {isHi ? 'हाथ से लिखें' : 'Type it instead'}
             </button>

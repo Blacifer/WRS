@@ -107,22 +107,22 @@ export const DefectPhotoCapture: React.FC<DefectPhotoCaptureProps> = ({
   // Captured state
   if (imageBase64) {
     return (
-      <div className="rounded-xl border border-emerald-700/60 bg-emerald-950/20 p-3 space-y-2.5">
+      <div className="rounded-control border border-good-line bg-good-soft p-3 space-y-2.5">
         <div className="flex items-center gap-2">
-          <CheckCircleIcon size={16} className="text-emerald-400 shrink-0" />
-          <span className="text-xs font-bold text-emerald-300">
+          <CheckCircleIcon size={16} className="text-good-ink shrink-0" />
+          <span className="text-xs font-bold text-good-ink">
             {isHi ? 'दोष फ़ोटो संलग्न' : 'Defect photo attached'}
           </span>
         </div>
         <img
           src={imageBase64}
           alt={isHi ? 'दोष का प्रमाण' : 'Defect evidence'}
-          className="w-full max-h-52 object-contain rounded-lg bg-black"
+          className="w-full max-h-52 object-contain rounded-control bg-black"
         />
         <button
           type="button"
           onClick={() => onPhotoChange(null)}
-          className="min-h-[44px] w-full px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold border border-slate-700 transition flex items-center justify-center gap-2"
+          className="min-h-[44px] w-full px-3 py-2 bg-raised hover:bg-selected text-ink-body rounded-control text-xs font-bold border border-line transition flex items-center justify-center gap-2"
         >
           <RefreshCwIcon size={14} />
           {isHi ? 'दोबारा लें' : 'Retake'}
@@ -132,12 +132,12 @@ export const DefectPhotoCapture: React.FC<DefectPhotoCaptureProps> = ({
   }
 
   return (
-    <div className="rounded-xl border border-rose-800/60 bg-rose-950/20 p-3 space-y-2.5">
+    <div className="rounded-control border border-bad-line bg-bad-soft p-3 space-y-2.5">
       <div>
-        <p className="text-xs font-black text-rose-300">
+        <p className="text-xs font-extrabold text-bad-ink">
           {isHi ? 'दोष फ़ोटो आवश्यक' : 'Defect photo required'}
         </p>
-        <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+        <p className="text-[11px] text-ink-muted mt-0.5 leading-relaxed">
           {isHi
             ? 'कंडम पुर्जे का फ़ोटो लें। यह प्रमाण है और भविष्य में स्वचालित दोष पहचान को प्रशिक्षित करता है।'
             : 'Photograph the condemned component. This is the evidence behind the condemnation, and it trains future automatic defect detection.'}
@@ -150,20 +150,20 @@ export const DefectPhotoCapture: React.FC<DefectPhotoCaptureProps> = ({
             ref={videoRef}
             playsInline
             muted
-            className="w-full max-h-56 object-cover rounded-lg bg-black"
+            className="w-full max-h-56 object-cover rounded-control bg-black"
           />
           <div className="flex gap-2">
             <button
               type="button"
               onClick={capture}
-              className="min-h-[44px] flex-1 px-3 py-2 bg-white text-black rounded-lg text-xs font-black transition"
+              className="min-h-[44px] flex-1 px-3 py-2 bg-white text-black rounded-control text-xs font-extrabold transition"
             >
               {isHi ? 'फ़ोटो लें' : 'Capture'}
             </button>
             <button
               type="button"
               onClick={stopCamera}
-              className="min-h-[44px] px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold border border-slate-700 transition"
+              className="min-h-[44px] px-3 py-2 bg-raised hover:bg-selected text-ink-body rounded-control text-xs font-bold border border-line transition"
             >
               {isHi ? 'रद्द' : 'Cancel'}
             </button>
@@ -174,7 +174,7 @@ export const DefectPhotoCapture: React.FC<DefectPhotoCaptureProps> = ({
           <button
             type="button"
             onClick={startCamera}
-            className="min-h-[44px] flex-1 px-3 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-2"
+            className="min-h-[44px] flex-1 px-3 py-2 bg-bad hover:bg-bad text-white rounded-control text-xs font-bold transition flex items-center justify-center gap-2"
           >
             <CameraIcon size={15} />
             {isHi ? 'कैमरा खोलें' : 'Open Camera'}
@@ -182,17 +182,17 @@ export const DefectPhotoCapture: React.FC<DefectPhotoCaptureProps> = ({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="min-h-[44px] px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg text-xs font-bold border border-slate-700 transition"
+            className="min-h-[44px] px-3 py-2 bg-raised hover:bg-selected text-ink-body rounded-control text-xs font-bold border border-line transition"
           >
             {isHi ? 'गैलरी से चुनें' : 'Choose File'}
           </button>
         </div>
       )}
 
-      {cameraError && <p className="text-[11px] text-amber-400">{cameraError}</p>}
+      {cameraError && <p className="text-[11px] text-warn-ink">{cameraError}</p>}
 
-      <p className="text-[10px] text-slate-500">
-        {isHi ? 'दोष प्रकार' : 'Labelled as'}: <span className="font-mono text-slate-400">{damageType}</span>
+      <p className="text-[10px] text-ink-faint">
+        {isHi ? 'दोष प्रकार' : 'Labelled as'}: <span className="font-mono text-ink-muted">{damageType}</span>
       </p>
 
       <input

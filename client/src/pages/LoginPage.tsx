@@ -8,7 +8,8 @@ import type { User } from '../../../shared/types.ts';
 import { getDictionary } from '../i18n/index.ts';
 import type { LanguageCode } from '../i18n/index.ts';
 import { api } from '../services/api.ts';
-import { GlobeIcon, AlertTriangleIcon, RefreshCwIcon, ShieldIcon } from '../components/Icons.tsx';
+import { GlobeIcon, AlertTriangleIcon, RefreshCwIcon } from '../components/Icons.tsx';
+import { Button, Chip, Field, Note, inputClass } from '../components/ui/index.tsx';
 
 interface LoginPageProps {
   lang: LanguageCode;
@@ -22,6 +23,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   onLoginSuccess
 }) => {
   const dict = getDictionary(lang);
+  const isHi = lang === 'hi';
   const [username, setUsername] = useState<string>('inspector1');
   const [password, setPassword] = useState<string>('password123');
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -44,100 +46,104 @@ export const LoginPage: React.FC<LoginPageProps> = ({
     }
   };
 
-  const handleQuickFill = (u: string, p: string) => {
-    setUsername(u);
-    setPassword(p);
-  };
-
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col justify-between p-4 sm:p-6 text-white select-none">
-      {/* Top Header */}
-      <div className="max-w-md w-full mx-auto flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded bg-blue-700 font-black text-white flex items-center justify-center text-sm">
-            IR
-          </div>
-          <span className="font-extrabold text-sm text-slate-200">WRS Raipur</span>
-        </div>
-
-        <button
-          onClick={onToggleLang}
-          className="min-h-[44px] px-3 py-1.5 bg-slate-900 border border-slate-800 rounded-lg text-xs font-bold text-slate-300 flex items-center gap-1.5"
-        >
-          <GlobeIcon size={16} className="text-blue-400" />
-          <span>{lang === 'en' ? 'हिंदी' : 'English'}</span>
-        </button>
+    <div className="min-h-screen bg-page text-ink flex flex-col select-none">
+      {/* Language first, and reachable before anything is read: somebody who
+          cannot read the English form should not have to find the toggle
+          underneath it. */}
+      <div className="w-full max-w-md mx-auto px-6 pt-4 flex justify-end">
+        <Button size="md" variant="secondary" onClick={onToggleLang} aria-label="Toggle language">
+          <GlobeIcon size={18} className="text-accent-ink" />
+          <span>{isHi ? 'EN' : 'हिंदी'}</span>
+        </Button>
       </div>
 
-      {/* Center Login Card */}
-      <div className="max-w-md w-full mx-auto my-8 bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl space-y-6">
-        <div className="text-center space-y-1.5">
-          <div className="w-14 h-14 rounded-2xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center mx-auto text-blue-400 mb-3 shadow-inner">
-            <ShieldIcon size={28} />
-          </div>
-          <h1 className="text-xl font-black tracking-tight text-white">{dict.app.title}</h1>
-          <p className="text-xs text-slate-400 font-medium">{dict.app.subtitle}</p>
-          <div className="pt-2 flex justify-center">
-            <span className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-gradient-to-r from-blue-950 via-slate-900 to-blue-950 border border-blue-600/50 rounded-full text-xs font-bold text-blue-300 shadow-md">
-              <span className="text-amber-400">⚡</span>
-              {/* The fallback said "AI-Powered" too, so replacing the
-                  dictionary entry alone would have left the old claim showing
-                  whenever the dictionary failed to load. */}
-              <span>{dict.loginTagline || (lang === 'hi' ? 'आरडीएसओ जी-95 वर्गीकरण एवं शून्य-दोष रिलीज़ नियंत्रण' : 'RDSO G-95 Classification & Zero-Defect Release Control')}</span>
-            </span>
-          </div>
+      <div className="w-full max-w-md mx-auto px-6 pt-6">
+        <div className="w-[60px] h-[60px] rounded-touch bg-railway-blue border border-accent-hover flex items-center justify-center text-[22px] font-extrabold text-white">
+          IR
         </div>
 
+        <h1 className="mt-6 text-[30px] leading-[1.15] font-extrabold tracking-[-0.032em] text-ink">
+          {dict.app.title}
+        </h1>
+        <p className="mt-2 text-sm font-medium text-ink-muted leading-relaxed">{dict.app.subtitle}</p>
+
+        <div className="mt-4">
+          <Chip tone="accent">
+            {/* The fallback said "AI-Powered" too, so replacing the dictionary
+                entry alone would have left the old claim showing whenever the
+                dictionary failed to load. */}
+            {dict.loginTagline ||
+              (isHi
+                ? 'आरडीएसओ जी-95 वर्गीकरण एवं शून्य-दोष रिलीज़ नियंत्रण'
+                : 'RDSO G-95 Classification & Zero-Defect Release Control')}
+          </Chip>
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="w-full max-w-md mx-auto px-6 pt-8 space-y-4">
         {error && (
-          <div className="p-3 bg-rose-950/80 border border-rose-700 rounded-xl text-rose-200 text-xs font-semibold flex items-center gap-2">
+          <div
+            role="alert"
+            className="flex items-center gap-2.5 px-4 py-3 rounded-control bg-bad-soft border border-bad-line text-bad-ink text-xs font-bold"
+          >
             <AlertTriangleIcon size={16} />
             <span>{error}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-300">
-              {lang === 'hi' ? 'उपयोगकर्ता नाम (Username)' : 'Username'}
-            </label>
-            <input
-              type="text"
-              required
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full min-h-[48px] px-4 py-2.5 bg-slate-950 border border-slate-700 focus:border-blue-500 rounded-xl text-white font-bold text-sm outline-none"
-            />
-          </div>
+        <Field label={isHi ? 'कर्मचारी आईडी' : 'Staff ID'} htmlFor="login-username">
+          <input
+            id="login-username"
+            type="text"
+            required
+            autoComplete="username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            className={inputClass}
+          />
+        </Field>
 
-          <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-300">
-              {lang === 'hi' ? 'पासवर्ड (Password)' : 'Password'}
-            </label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full min-h-[48px] px-4 py-2.5 bg-slate-950 border border-slate-700 focus:border-blue-500 rounded-xl text-white font-bold text-sm outline-none"
-            />
-          </div>
+        <Field label={isHi ? 'पासवर्ड' : 'Password'} htmlFor="login-password">
+          <input
+            id="login-password"
+            type="password"
+            required
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={inputClass}
+          />
+        </Field>
 
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full min-h-[52px] px-4 py-3 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-black text-base rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
-          >
-            {isLoading ? <RefreshCwIcon size={20} className="animate-spin" /> : null}
-            <span>{isLoading ? dict.app.syncing : dict.actions.login}</span>
-          </button>
-        </form>
+        <Button type="submit" variant="primary" size="touch" block disabled={isLoading} className="!mt-6">
+          {isLoading ? <RefreshCwIcon size={20} className="animate-spin" /> : null}
+          <span>{isLoading ? dict.app.syncing : dict.actions.login}</span>
+        </Button>
+      </form>
 
-
+      {/*
+        Said here rather than discovered in a shed.
+        The offline queue is the single most important thing about this app for
+        the people using it, and nothing on the way in mentioned it.
+      */}
+      <div className="w-full max-w-md mx-auto px-6 pt-6">
+        <Note tone="warn">
+          <span>
+            <span className="block text-[13px] font-bold text-warn-ink">
+              {isHi ? 'नेटवर्क के बिना भी चलता है' : 'Works without a network'}
+            </span>
+            <span className="block mt-1 font-medium">
+              {isHi
+                ? 'शॉप वाईफ़ाई पर एक बार साइन इन करें। उसके बाद ऐप शेड में भी चलता रहता है और सिग्नल लौटने पर दर्ज कार्य भेज देता है।'
+                : 'Sign in once on shop wifi. After that the app keeps working in the shed and sends what you record when signal returns.'}
+            </span>
+          </span>
+        </Note>
       </div>
 
-      {/* Footer */}
-      <div className="text-center text-xs text-slate-500">
-        RDSO Technical Pamphlet G-95 Revision-II • Indian Railways
+      <div className="mt-auto w-full max-w-md mx-auto px-6 py-6 border-t border-line">
+        <Note>RDSO Technical Pamphlet G-95 Revision-II · Indian Railways</Note>
       </div>
     </div>
   );

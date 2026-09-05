@@ -80,23 +80,23 @@ export function TotpEnrolment({ lang, onClose }: Props) {
           <h2 className="text-xl font-extrabold text-white">
             {isHi ? 'प्रमाणक ऐप सेटअप' : 'Authenticator setup'}
           </h2>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-ink-muted mt-0.5">
             {isHi
               ? 'विमुक्ति हस्ताक्षर, ओवरराइड और खाता परिवर्तन के लिए दूसरा प्रमाण'
               : 'A second factor for release sign-off, overrides and account changes'}
           </p>
         </div>
-        <button onClick={onClose} className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-800">
+        <button onClick={onClose} className="px-3 py-1.5 rounded-control border border-line text-ink-body text-xs font-bold hover:bg-raised">
           {isHi ? 'बंद करें' : 'Close'}
         </button>
       </div>
 
       {enrolled === true && !offer && (
-        <div className="rounded-xl border border-emerald-800 bg-emerald-950/40 p-4 space-y-3">
-          <p className="text-sm font-bold text-emerald-300">
+        <div className="rounded-control border border-good-line bg-good-soft p-4 space-y-3">
+          <p className="text-sm font-bold text-good-ink">
             {isHi ? '✓ प्रमाणक पहले से सेट है' : '✓ An authenticator is already set up'}
           </p>
-          <p className="text-xs text-emerald-200/80">
+          <p className="text-xs text-good-ink/80">
             {isHi
               ? 'नया फ़ोन सेट करने पर पुराना काम करना बंद कर देगा।'
               : 'Setting up a new phone replaces the old one, which stops working immediately.'}
@@ -104,7 +104,7 @@ export function TotpEnrolment({ lang, onClose }: Props) {
           <button
             onClick={begin}
             disabled={busy}
-            className="px-4 py-2 rounded-lg border border-emerald-700 text-emerald-200 text-xs font-bold hover:bg-emerald-900/40 disabled:opacity-40"
+            className="px-4 py-2 rounded-control border border-good-line text-good-ink text-xs font-bold hover:bg-good-soft disabled:opacity-40"
           >
             {isHi ? 'नया फ़ोन सेट करें' : 'Set up a new phone'}
           </button>
@@ -112,11 +112,11 @@ export function TotpEnrolment({ lang, onClose }: Props) {
       )}
 
       {enrolled === false && !offer && !done && (
-        <div className="rounded-xl border border-amber-800 bg-amber-950/30 p-4 space-y-3">
-          <p className="text-sm font-bold text-amber-200">
+        <div className="rounded-control border border-warn-line bg-warn-soft p-4 space-y-3">
+          <p className="text-sm font-bold text-warn-ink">
             {isHi ? 'अभी कोई प्रमाणक सेट नहीं है' : 'No authenticator is set up yet'}
           </p>
-          <p className="text-xs text-amber-200/80">
+          <p className="text-xs text-warn-ink/80">
             {isHi
               ? 'आपको एक प्रमाणक ऐप चाहिए — Google Authenticator, Microsoft Authenticator या कोई अन्य। इसे इंटरनेट की आवश्यकता नहीं होती।'
               : 'You will need an authenticator app — Google Authenticator, Microsoft Authenticator, or any other. It works without internet, which matters on the shop floor.'}
@@ -124,7 +124,7 @@ export function TotpEnrolment({ lang, onClose }: Props) {
           <button
             onClick={begin}
             disabled={busy}
-            className="px-4 py-2 rounded-lg bg-white text-black text-xs font-extrabold disabled:opacity-40"
+            className="px-4 py-2 rounded-control bg-white text-black text-xs font-extrabold disabled:opacity-40"
           >
             {isHi ? 'सेटअप शुरू करें' : 'Start setup'}
           </button>
@@ -132,7 +132,7 @@ export function TotpEnrolment({ lang, onClose }: Props) {
       )}
 
       {offer && (
-        <div className="rounded-xl border border-slate-700 bg-slate-900 p-5 space-y-4">
+        <div className="rounded-control border border-line bg-card p-5 space-y-4">
           <div>
             <p className="text-sm font-bold text-white mb-1">
               {isHi ? '1. इस कोड को अपने ऐप से स्कैन करें' : '1. Scan this with your authenticator app'}
@@ -142,20 +142,20 @@ export function TotpEnrolment({ lang, onClose }: Props) {
             </div>
           </div>
 
-          <div className="border-t border-slate-800 pt-3">
-            <p className="text-xs font-bold text-slate-300 mb-1">
+          <div className="border-t border-line pt-3">
+            <p className="text-xs font-bold text-ink-body mb-1">
               {isHi ? 'कैमरा काम न करे तो यह कुंजी टाइप करें' : 'If the camera will not read it, type this key instead'}
             </p>
-            <p className="font-mono text-sm text-amber-300 tracking-wider break-all select-all">
+            <p className="font-mono text-sm text-warn-ink tracking-wider break-all select-all">
               {grouped(offer.secret)}
             </p>
           </div>
 
-          <div className="border-t border-slate-800 pt-3 space-y-2">
+          <div className="border-t border-line pt-3 space-y-2">
             <p className="text-sm font-bold text-white">
               {isHi ? '2. ऐप में दिख रहा 6-अंकीय कोड दर्ज करें' : '2. Enter the 6-digit code your app now shows'}
             </p>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-[11px] text-ink-muted">
               {isHi
                 ? 'यह पुष्टि करता है कि फ़ोन और सर्वर एक ही कोड पर सहमत हैं — नहीं तो खराबी विमुक्ति के समय पता चलती।'
                 : 'This confirms the phone and the server agree. Without it, a bad setup would only be discovered at a release gate.'}
@@ -167,12 +167,12 @@ export function TotpEnrolment({ lang, onClose }: Props) {
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
                 placeholder="000000"
-                className="w-32 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-lg text-white tracking-[0.3em] font-mono text-center"
+                className="w-32 bg-raised border border-line rounded-control px-3 py-2 text-lg text-white tracking-[0.3em] font-mono text-center"
               />
               <button
                 onClick={confirm}
                 disabled={busy || code.length !== 6}
-                className="px-5 py-2 rounded-lg bg-white text-black text-xs font-extrabold disabled:opacity-40"
+                className="px-5 py-2 rounded-control bg-white text-black text-xs font-extrabold disabled:opacity-40"
               >
                 {isHi ? 'पुष्टि करें' : 'Confirm'}
               </button>
@@ -182,11 +182,11 @@ export function TotpEnrolment({ lang, onClose }: Props) {
       )}
 
       {done && (
-        <div className="rounded-xl border border-emerald-700 bg-emerald-950/50 p-4">
-          <p className="text-sm font-black text-emerald-300">
+        <div className="rounded-control border border-good-line bg-good-soft p-4">
+          <p className="text-sm font-extrabold text-good-ink">
             {isHi ? '✓ प्रमाणक सेट हो गया' : '✓ Authenticator enrolled'}
           </p>
-          <p className="text-xs text-emerald-200/80 mt-1">
+          <p className="text-xs text-good-ink/80 mt-1">
             {isHi
               ? 'अब विमुक्ति हस्ताक्षर के समय अपने ऐप का कोड दर्ज करें। फ़ोन खो जाने पर व्यवस्थापक इसे रीसेट कर सकता है।'
               : 'Use the code from your app when signing off a release. If you lose the phone, an administrator can reset this for you.'}
@@ -195,7 +195,7 @@ export function TotpEnrolment({ lang, onClose }: Props) {
       )}
 
       {error && (
-        <p className="text-xs font-semibold text-red-300 bg-red-950/40 border border-red-800 rounded-lg px-3 py-2">
+        <p className="text-xs font-semibold text-bad-ink bg-bad-soft border border-bad-line rounded-control px-3 py-2">
           {error}
         </p>
       )}

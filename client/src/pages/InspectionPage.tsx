@@ -284,14 +284,14 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
 
       {/* Success Notification Banner */}
       {successMessage && (
-        <div className="p-4 bg-emerald-950/80 border-2 border-emerald-600 rounded-xl text-emerald-200 text-sm font-bold flex items-center justify-between shadow-lg animate-fadeIn">
+        <div className="p-4 bg-good-soft border-2 border-good-line rounded-control text-good-ink text-sm font-bold flex items-center justify-between animate-fadeIn">
           <div className="flex items-center gap-2.5">
-            <CheckCircleIcon size={22} className="text-emerald-400 shrink-0" />
+            <CheckCircleIcon size={22} className="text-good-ink shrink-0" />
             <span>{successMessage}</span>
           </div>
           <button
             onClick={() => setSuccessMessage(null)}
-            className="text-emerald-400 hover:text-white font-black text-lg p-1"
+            className="text-good-ink hover:text-white font-extrabold text-lg p-1"
           >
             &times;
           </button>
@@ -300,14 +300,14 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
 
       {/* Form Error Banner */}
       {formError && (
-        <div className="p-4 bg-rose-950/80 border-2 border-rose-600 rounded-xl text-rose-200 text-sm font-bold flex items-center justify-between shadow-lg">
+        <div className="p-4 bg-bad-soft border-2 border-bad-line rounded-control text-bad-ink text-sm font-bold flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <AlertTriangleIcon size={22} className="text-rose-400 shrink-0" />
+            <AlertTriangleIcon size={22} className="text-bad-ink shrink-0" />
             <span>{formError}</span>
           </div>
           <button
             onClick={() => setFormError(null)}
-            className="text-rose-400 hover:text-white font-black text-lg p-1"
+            className="text-bad-ink hover:text-white font-extrabold text-lg p-1"
           >
             &times;
           </button>
@@ -315,7 +315,7 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
       )}
 
       {/* Section 1: Wagon Identification & Nest Details */}
-      <div className="glass-panel rounded-2xl p-6 space-y-8">
+      <div className="glass-panel rounded-card p-6 space-y-8">
         <h2 className="text-sm font-medium text-neutral-400 tracking-wide flex items-center gap-3">
           <span className="w-5 h-5 rounded-full border border-white/20 flex items-center justify-center text-[10px]">1</span>
           <span>{lang === 'hi' ? 'वैगन व बोगी विवरण' : 'Wagon & Bogie Assembly Details'}</span>
@@ -323,7 +323,7 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
 
         {/* Wagon Number Input */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-slate-300">
+          <label className="block text-xs font-bold text-ink-body">
             {dict.form.wagonNumber}
           </label>
           <input
@@ -337,7 +337,7 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
 
         {/* Bogie Type Selector (Touch targets >= 48px) */}
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-slate-300">
+          <label className="block text-xs font-bold text-ink-body">
             {dict.form.bogieType}
           </label>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -346,10 +346,10 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
                 key={type}
                 type="button"
                 onClick={() => setBogieType(type)}
-                className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                className={`min-h-tap px-4 py-2 rounded-control border text-sm font-semibold transition-colors ${
                   bogieType === type
-                    ? 'bg-white text-black border-white'
-                    : 'bg-transparent border-white/10 text-neutral-400 hover:text-white hover:border-white/30'
+                    ? 'bg-selected text-ink border-accent-line'
+                    : 'bg-card border-line text-ink-muted hover:text-ink hover:border-line-strong'
                 }`}
               >
                 {getBogieTypeText(type, lang)}
@@ -362,7 +362,7 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
           {/* Spring Condition (Used 6 Bands / New 3 Bands) */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-300">
+            <label className="block text-xs font-bold text-ink-body">
               {dict.form.condition}
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -371,10 +371,10 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
                   key={c}
                   type="button"
                   onClick={() => setCondition(c)}
-                  className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                  className={`min-h-tap px-4 py-2 rounded-control border text-sm font-semibold transition-colors ${
                     condition === c
-                      ? 'bg-white text-black border-white'
-                      : 'bg-transparent border-white/10 text-neutral-400 hover:text-white hover:border-white/30'
+                      ? 'bg-selected text-ink border-accent-line'
+                      : 'bg-card border-line text-ink-muted hover:text-ink hover:border-line-strong'
                   }`}
                 >
                   {getConditionText(c, lang)}
@@ -385,7 +385,7 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
 
           {/* Spring Position (Outer / Inner / Snubber) */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-300">
+            <label className="block text-xs font-bold text-ink-body">
               {dict.form.position}
             </label>
             <div className="grid grid-cols-3 gap-2">
@@ -394,10 +394,10 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
                   key={p}
                   type="button"
                   onClick={() => setPosition(p)}
-                  className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                  className={`min-h-tap px-4 py-2 rounded-control border text-sm font-semibold transition-colors ${
                     position === p
-                      ? 'bg-white text-black border-white'
-                      : 'bg-transparent border-white/10 text-neutral-400 hover:text-white hover:border-white/30'
+                      ? 'bg-selected text-ink border-accent-line'
+                      : 'bg-card border-line text-ink-muted hover:text-ink hover:border-line-strong'
                   }`}
                 >
                   {getPositionText(p, lang)}
@@ -408,7 +408,7 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
 
           {/* Which bogie — needed to link this reading to the right checklist item */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-300">
+            <label className="block text-xs font-bold text-ink-body">
               {lang === 'hi' ? 'बोगी' : 'Bogie'}
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -417,10 +417,10 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
                   key={b}
                   type="button"
                   onClick={() => setBogiePosition(b)}
-                  className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                  className={`min-h-tap px-4 py-2 rounded-control border text-sm font-semibold transition-colors ${
                     bogiePosition === b
-                      ? 'bg-white text-black border-white'
-                      : 'bg-transparent border-white/10 text-neutral-400 hover:text-white hover:border-white/30'
+                      ? 'bg-selected text-ink border-accent-line'
+                      : 'bg-card border-line text-ink-muted hover:text-ink hover:border-line-strong'
                   }`}
                 >
                   {lang === 'hi' ? (b === 'BOGIE_1' ? 'बोगी 1' : 'बोगी 2') : b === 'BOGIE_1' ? 'Bogie 1' : 'Bogie 2'}
@@ -434,8 +434,8 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
 
       {/* Section 2: Caliper Camera & OCR Pipeline */}
       <div className="space-y-2">
-        <h2 className="text-sm font-extrabold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-          <span className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs">2</span>
+        <h2 className="text-sm font-extrabold text-ink-body uppercase tracking-[0.07em] flex items-center gap-2">
+          <span className="w-6 h-6 rounded-full bg-accent text-white flex items-center justify-center text-xs">2</span>
           <span>{lang === 'hi' ? 'मुक्त ऊंचाई माप' : 'Free Height Measurement'}</span>
         </h2>
         <CaliperCamera
@@ -451,27 +451,27 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
       {/* Section 3: Instant Classification Result Card (Visual & Audio Feedback R5) */}
       {classification && (
         <div
-          className={`p-5 rounded-2xl border-2 shadow-2xl space-y-4 transition-all duration-300 ${
+          className={`p-5 rounded-card border-2 space-y-4 transition-all duration-300 ${
             classification.status === 'CONDEMNED'
-              ? 'ring-4 ring-rose-600/60 bg-rose-950/60 border-rose-600 animate-bounce'
-              : 'ring-4 ring-emerald-500/50 bg-emerald-950/40 border-emerald-500 animate-pulse'
+              ? 'ring-4 ring-rose-600/60 bg-bad-soft border-bad-line animate-bounce'
+              : 'ring-4 ring-emerald-500/50 bg-good-soft border-good-line animate-pulse'
           }`}
         >
           {/* Header Bar with Visual Status Icon, Badges & Audio Controls */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               {classification.status === 'CONDEMNED' ? (
-                <div className="w-11 h-11 rounded-2xl bg-rose-600/30 border border-rose-500 flex items-center justify-center text-rose-400 shrink-0 shadow-inner">
+                <div className="w-11 h-11 rounded-card bg-bad-soft border border-bad-line flex items-center justify-center text-bad-ink shrink-0">
                   <AlertTriangleIcon size={26} />
                 </div>
               ) : (
-                <div className="w-11 h-11 rounded-2xl bg-emerald-600/30 border border-emerald-500 flex items-center justify-center text-emerald-400 shrink-0 shadow-inner">
+                <div className="w-11 h-11 rounded-card bg-good-soft border border-good-line flex items-center justify-center text-good-ink shrink-0">
                   <CheckCircleIcon size={26} />
                 </div>
               )}
 
               <div>
-                <span className="text-[11px] uppercase tracking-wider font-extrabold text-slate-300">
+                <span className="text-[11px] uppercase tracking-[0.07em] font-extrabold text-ink-body">
                   {lang === 'hi' ? 'आरडीएसओ वर्गीकरण परिणाम' : 'RDSO G-95 Classification Result'}
                 </span>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -484,13 +484,13 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
                     size="lg"
                   />
                   {classification.status === 'CONDEMNED' ? (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-rose-900/90 border border-rose-500 text-rose-200 text-xs font-black rounded-lg uppercase tracking-wide">
-                      <AlertTriangleIcon size={14} className="text-rose-400" />
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-bad-soft border border-bad-line text-bad-ink text-xs font-extrabold rounded-control uppercase tracking-wide">
+                      <AlertTriangleIcon size={14} className="text-bad-ink" />
                       {lang === 'hi' ? 'कंडम / स्क्रैप' : 'CONDEMNED / SCRAP'}
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-900/90 border border-emerald-500 text-emerald-200 text-xs font-black rounded-lg uppercase tracking-wide">
-                      <CheckCircleIcon size={14} className="text-emerald-400" />
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-good-soft border border-good-line text-good-ink text-xs font-extrabold rounded-control uppercase tracking-wide">
+                      <CheckCircleIcon size={14} className="text-good-ink" />
                       {lang === 'hi' ? 'उत्तीर्ण / सेवा योग्य' : 'PASS / SERVICEABLE'}
                     </span>
                   )}
@@ -505,19 +505,19 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
                   type="button"
                   onClick={handleReplayAudio}
                   title="Replay Audio Feedback (Web Audio API Synthesizer)"
-                  className="px-2.5 py-1 bg-slate-900/90 hover:bg-slate-850 border border-slate-700 rounded-lg text-xs font-bold text-slate-300 flex items-center gap-1.5 shadow transition active:scale-95"
+                  className="px-2.5 py-1 bg-card hover:bg-raised border border-line rounded-control text-xs font-bold text-ink-body flex items-center gap-1.5 shadow transition active:scale-95"
                 >
-                  <Volume2Icon size={14} className={classification.status === 'CONDEMNED' ? 'text-rose-400' : 'text-emerald-400'} />
+                  <Volume2Icon size={14} className={classification.status === 'CONDEMNED' ? 'text-bad-ink' : 'text-good-ink'} />
                   <span>{lang === 'hi' ? 'ध्वनि पुनः बजाएं' : 'Replay Tone'}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setSoundEnabled(!soundEnabled)}
                   title={soundEnabled ? 'Disable Audio Feedback' : 'Enable Audio Feedback'}
-                  className={`p-1.5 rounded-lg border text-xs font-bold transition active:scale-95 ${
+                  className={`p-1.5 rounded-control border text-xs font-bold transition active:scale-95 ${
                     soundEnabled
-                      ? 'bg-blue-950/80 border-blue-700 text-blue-300'
-                      : 'bg-slate-800 border-slate-700 text-slate-500'
+                      ? 'bg-accent-soft border-accent-line text-accent-ink'
+                      : 'bg-raised border-line text-ink-faint'
                   }`}
                 >
                   {soundEnabled ? <Volume2Icon size={14} /> : <VolumeXIcon size={14} />}
@@ -525,11 +525,11 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
               </div>
 
               <div className="text-left sm:text-right">
-                <span className="text-[11px] text-slate-400 font-semibold">
+                <span className="text-[11px] text-ink-muted font-semibold">
                   {lang === 'hi' ? 'आरडीएसओ संदर्भ' : 'RDSO Reference'}:
                 </span>{' '}
-                <span className="text-xs font-black text-white font-mono">{classification.tableReference}</span>
-                <span className="text-[11px] text-slate-400 block">
+                <span className="text-xs font-extrabold text-white font-mono">{classification.tableReference}</span>
+                <span className="text-[11px] text-ink-muted block">
                   [{classification.validRange.min} - {classification.validRange.max} mm]
                 </span>
               </div>
@@ -538,12 +538,12 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
 
           {/* Condemnation Alert Warning Flash */}
           {classification.status === 'CONDEMNED' && (
-            <div className="p-3.5 bg-rose-900/80 border-2 border-rose-500 rounded-xl text-rose-100 text-xs sm:text-sm font-bold flex items-start gap-2.5 shadow-lg">
-              <AlertTriangleIcon size={22} className="shrink-0 text-rose-300 mt-0.5" />
+            <div className="p-3.5 bg-bad-soft border-2 border-bad-line rounded-control text-rose-100 text-xs sm:text-sm font-bold flex items-start gap-2.5">
+              <AlertTriangleIcon size={22} className="shrink-0 text-bad-ink mt-0.5" />
               <div>
-                <p className="font-extrabold text-rose-200">{dict.messages.condemnedAlert}</p>
+                <p className="font-extrabold text-bad-ink">{dict.messages.condemnedAlert}</p>
                 {classification.condemnationReason && (
-                  <p className="font-medium text-rose-300 mt-1">{classification.condemnationReason}</p>
+                  <p className="font-medium text-bad-ink mt-1">{classification.condemnationReason}</p>
                 )}
               </div>
             </div>
@@ -551,16 +551,16 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
 
           {/* PASS Clearance Reassurance */}
           {classification.status === 'PASS' && (
-            <div className="p-3 bg-emerald-900/40 border border-emerald-600/70 rounded-xl text-emerald-200 text-xs font-bold flex items-center justify-between shadow-inner">
+            <div className="p-3 bg-good-soft border border-good-line rounded-control text-good-ink text-xs font-bold flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <CheckCircleIcon size={18} className="text-emerald-400" />
+                <CheckCircleIcon size={18} className="text-good-ink" />
                 <span>
                   {lang === 'hi'
                     ? 'स्प्रिंग विनिर्देशों के अनुरूप है — बोगी नेस्ट असेंबली हेतु अनुशंसित'
                     : 'Spring height within RDSO limits — Certified for Bogie Nest Assembly'}
                 </span>
               </div>
-              <span className="font-mono text-[10px] text-emerald-300 uppercase tracking-wider bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-700/60">
+              <span className="font-mono text-[10px] text-good-ink uppercase tracking-[0.07em] bg-good-soft px-2 py-0.5 rounded border border-good-line">
                 RDSO G-95 Rev-II
               </span>
             </div>
@@ -568,12 +568,12 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
 
           {/* Supervisor Override Applied Badge */}
           {overrideBand && (
-            <div className="p-3 bg-purple-950/70 border border-purple-600 rounded-xl text-purple-200 text-xs font-semibold flex items-center justify-between">
+            <div className="p-3 bg-accent-soft border border-accent-line rounded-control text-accent-ink text-xs font-semibold flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <ShieldIcon size={16} className="text-purple-400" />
+                <ShieldIcon size={16} className="text-accent-ink" />
                 <span>Override: {overrideReason}</span>
               </div>
-              <span className="font-mono text-[10px] text-purple-300">{lang === 'hi' ? 'ओटीपी सत्यापित' : 'OTP Auth Valid'}</span>
+              <span className="font-mono text-[10px] text-accent-ink">{lang === 'hi' ? 'ओटीपी सत्यापित' : 'OTP Auth Valid'}</span>
             </div>
           )}
         </div>
@@ -581,8 +581,8 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
 
       {/* Section 4: Physical Defect Assessment */}
       <div className="space-y-2">
-        <h2 className="text-sm font-extrabold text-slate-200 uppercase tracking-wider flex items-center gap-2">
-          <span className="w-6 h-6 rounded-full bg-blue-600 text-white flex items-center justify-center text-xs">3</span>
+        <h2 className="text-sm font-extrabold text-ink-body uppercase tracking-[0.07em] flex items-center gap-2">
+          <span className="w-6 h-6 rounded-full bg-accent text-white flex items-center justify-center text-xs">3</span>
           <span>{lang === 'hi' ? 'भौतिक क्षति एवं दोष जांच' : 'Visual Defect & Damage Inspection'}</span>
         </h2>
         <DefectSelector
@@ -610,7 +610,7 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
           type="button"
           onClick={handleSaveInspection}
           disabled={isSaving}
-          className="px-8 py-3 bg-white hover:bg-neutral-200 text-black font-semibold text-sm rounded-full flex items-center justify-center gap-2 transition-transform active:scale-95"
+          className="min-h-touch px-8 bg-accent hover:bg-accent-hover border border-accent-hover text-white font-bold text-base rounded-touch flex items-center justify-center gap-2 transition-colors active:scale-[0.98]"
         >
           {isSaving ? <RefreshCwIcon size={16} className="animate-spin" /> : <CheckCircleIcon size={16} />}
           <span>{isSaving ? dict.app.syncing : dict.actions.saveInspection}</span>

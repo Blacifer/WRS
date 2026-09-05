@@ -179,7 +179,22 @@ fi
 # ----------------------------------------------------------------------- server
 step "Starting the server on :$PORT"
 lsof -ti:"$PORT" -sTCP:LISTEN 2>/dev/null | xargs -r kill 2>/dev/null
-( cd server && NODE_ENV=production PORT="$PORT" node --experimental-strip-types src/index.ts \
+#
+# NODE_ENV=production because testing the development server would exercise a
+# code path that never runs in the shed. But production deliberately refuses
+# the demonstration password — the server returns DEMO_CREDENTIAL_REFUSED and
+# logs a SECURITY_ALERT — so booting this way while printing
+# "inspector1 / password123" below handed the operator credentials the server
+# would not accept, which is what happened on the first real launch.
+#
+# SEED_DEMO_USERS is the documented escape hatch for exactly this: a
+# supervised demonstration, typed on purpose. One flag governs both creating
+# the demo accounts and authenticating them, so the two cannot disagree about
+# which environment they are in.
+#
+# This makes the script a TEST harness, not a deployment. A real pilot sets
+# BOOTSTRAP_ADMIN_USERNAME and BOOTSTRAP_ADMIN_PASSWORD and never sets this.
+( cd server && NODE_ENV=production SEED_DEMO_USERS=true PORT="$PORT" node --experimental-strip-types src/index.ts \
     >/tmp/wrs_pilot_server.log 2>&1 ) &
 SERVER_PID=$!
 
@@ -203,6 +218,24 @@ TUNNEL_KIND=""
 # Set once a provider is proven to route on this network, so a reconnect does
 # not go back to one that already failed.
 WORKING_KIND=""
+# Pull the quick-tunnel hostname out of cloudflared's log.
+#
+# Not a plain grep, because cloudflared also logs its own control-plane
+# endpoint — https://api.trycloudflare.com — which matches the obvious pattern
+# and sorts first often enough to be picked by `head -1`. When that happened the
+# script health-checked api.trycloudflare.com/api/health, got something that was
+# not the app, declared "published a URL but never started routing", fell back
+# to localtunnel, and then told the operator to open
+# https://api.trycloudflare.com on the tablet. The tunnel itself was fine.
+#
+# Quick-tunnel hostnames are always several hyphenated words; the control plane
+# is a single label. Excluding it by name is the narrow, obvious fix.
+tunnel_url_from_log() {
+  grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/wrs_pilot_tunnel.log 2>/dev/null \
+    | grep -v '://api\.' \
+    | head -1
+}
+
 start_tunnel() {
   # $1 optionally forces a kind ("cloudflared" | "localtunnel"); default: prefer
   # cloudflared when installed.
@@ -212,17 +245,49 @@ start_tunnel() {
 
   if [[ "$want" != "localtunnel" ]] && command -v cloudflared >/dev/null 2>&1; then
     TUNNEL_KIND="cloudflared"
-    cloudflared tunnel --url "$SCHEME://localhost:$PORT" --no-autoupdate \
-      >/tmp/wrs_pilot_tunnel.log 2>&1 &
+    #
+    # --no-tls-verify is required, not optional, whenever the origin is HTTPS.
+    #
+    # When a LAN certificate exists this script serves over TLS, and that
+    # certificate is self-signed. cloudflared validates the origin certificate
+    # by default, refuses to trust it, and then publishes a hostname it can
+    # never route to — which is exactly the "published a URL but never started
+    # routing" message, reported as a tunnel failure when it is a trust
+    # failure.
+    #
+    # Safe here because the origin is loopback on this same machine: there is
+    # nothing between cloudflared and the server to intercept, and the
+    # certificate being distrusted is our own.
+    # Written as two whole commands rather than a flag array on purpose.
+    # macOS ships bash 3.2, where `set -u` (line 20) makes expanding an EMPTY
+    # array a fatal "unbound variable" that aborts this function mid-way. An
+    # array here would work on the developer's shell and die on the shop's.
+    if [[ "$SCHEME" == "https" ]]; then
+      cloudflared tunnel --url "https://localhost:$PORT" --no-autoupdate --no-tls-verify \
+        >/tmp/wrs_pilot_tunnel.log 2>&1 &
+    else
+      cloudflared tunnel --url "http://localhost:$PORT" --no-autoupdate \
+        >/tmp/wrs_pilot_tunnel.log 2>&1 &
+    fi
     TUNNEL_PID=$!
     for _ in $(seq 1 40); do
-      PUBLIC_URL="$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/wrs_pilot_tunnel.log 2>/dev/null | head -1)"
+      PUBLIC_URL="$(tunnel_url_from_log)"
       [[ -n "$PUBLIC_URL" ]] && break
       sleep 1
     done
   else
     TUNNEL_KIND="localtunnel"
-    npx --yes localtunnel --port "$PORT" >/tmp/wrs_pilot_tunnel.log 2>&1 &
+    #
+    # localtunnel assumes a plain HTTP origin. Pointed at an HTTPS port it
+    # speaks HTTP to a TLS listener and every request comes back 502 Bad
+    # Gateway — which is what the fallback was doing, so both tunnels appeared
+    # broken for the same underlying reason.
+    if [[ "$SCHEME" == "https" ]]; then
+      npx --yes localtunnel --port "$PORT" --local-https --allow-invalid-cert \
+        >/tmp/wrs_pilot_tunnel.log 2>&1 &
+    else
+      npx --yes localtunnel --port "$PORT" >/tmp/wrs_pilot_tunnel.log 2>&1 &
+    fi
     TUNNEL_PID=$!
     for _ in $(seq 1 45); do
       PUBLIC_URL="$(grep -oE 'https://[a-z0-9-]+\.loca\.lt' /tmp/wrs_pilot_tunnel.log 2>/dev/null | head -1)"
@@ -312,10 +377,16 @@ ${BLD}  OPEN THIS ON THE PHONE OR TABLET${NC}
      Free tunnel. If it returns 503 the URL has changed — check this
      terminal for a new one.
 
-${BLD}  Sign in${NC}
+${BLD}  Sign in${NC}  ${YEL}(demo accounts — enabled because this is a test session)${NC}
      inspector1  / password123    (shop-floor view)
      supervisor1 / password123    (pipeline, gate, learning)
      admin1      / password123    (everything + user accounts)
+
+     These work because this script sets SEED_DEMO_USERS=true. A real
+     deployment does not, and the server then refuses this password outright
+     and logs the attempt. To rehearse the real thing, start the server with
+     BOOTSTRAP_ADMIN_USERNAME and BOOTSTRAP_ADMIN_PASSWORD instead and add the
+     rest of the roster from the User Accounts screen.
 
 ${BLD}  Worth testing on the real device — these cannot be tested here${NC}
      1. Add to Home Screen, then open it from the icon

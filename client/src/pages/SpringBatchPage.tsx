@@ -42,8 +42,9 @@ import {
 } from '../../../shared/classification/springCounts.ts';
 import type { AxleLoad, QueuedSpring, SpringCount } from '../../../shared/classification/springCounts.ts';
 import { api } from '../services/api.ts';
+import { COLOR_HEX_MAP } from '../../../shared/classification/tables.ts';
 import { offlineDb } from '../services/offlineDb.ts';
-import { CheckCircleIcon, AlertTriangleIcon, RefreshCwIcon } from '../components/Icons.tsx';
+import { AlertTriangleIcon, BarChartIcon, CheckCircleIcon, RefreshCwIcon } from '../components/Icons.tsx';
 import { playPassChime, playCondemnedBuzz } from '../utils/audioFeedback.ts';
 
 /**
@@ -53,12 +54,17 @@ import { playPassChime, playCondemnedBuzz } from '../utils/audioFeedback.ts';
  * against the app's dark surface.
  */
 const BAND_PAINT_HEX: Record<string, string> = {
-  BLUE: '#2563eb',
-  GREEN: '#16a34a',
-  YELLOW: '#eab308',
-  ORANGE: '#ea580c',
-  WHITE: '#f1f5f9',
-  RED: '#dc2626'
+  ...COLOR_HEX_MAP,
+  /*
+   * The one deliberate deviation, and the only one.
+   *
+   * RDSO's WHITE is #e2e8f0, which is legible on paper and nearly invisible
+   * against this application's near-black surface, so the paint swatch is
+   * lifted a little. Everything else is taken from the shared map — this block
+   * used to restate all six by hand and had YELLOW as #eab308 against RDSO's
+   * #ca8a04, which was drift rather than a decision.
+   */
+  WHITE: '#f1f5f9'
 };
 
 const BAND_LABEL_HI: Record<string, string> = {
@@ -559,22 +565,22 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
           <h1 className="text-lg font-extrabold text-white">
             {isHi ? 'स्प्रिंग बैच निरीक्षण' : 'Spring Batch Inspection'}
           </h1>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-ink-muted">
             {isHi ? 'तेज़ प्रोसेसिंग — एक के बाद एक स्प्रिंग' : 'Rapid processing — one spring after another'}
           </p>
         </div>
         <button
           onClick={onClose}
-          className="min-h-[40px] px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-sm font-bold border border-slate-700"
+          className="min-h-[40px] px-4 py-2 bg-raised hover:bg-selected text-ink-body rounded-control text-sm font-bold border border-line"
         >
           {isHi ? 'बंद करें' : 'Close'}
         </button>
       </div>
 
       {/* Wagon / Bogie / Condition — set once per wagon */}
-      <div className="glass-panel rounded-2xl p-5 space-y-4">
+      <div className="glass-panel rounded-card p-5 space-y-4">
         <div className="space-y-1.5">
-          <label className="block text-xs font-bold text-slate-300">{dict.form.wagonNumber}</label>
+          <label className="block text-xs font-bold text-ink-body">{dict.form.wagonNumber}</label>
           <input
             type="text"
             value={wagonNumber}
@@ -587,7 +593,7 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-300">{dict.form.bogieType}</label>
+            <label className="block text-xs font-bold text-ink-body">{dict.form.bogieType}</label>
             <div className="grid grid-cols-1 gap-2">
               {BOGIE_TYPES.map((type) => (
                 <button
@@ -595,10 +601,10 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
                   type="button"
                   disabled={wagonLocked}
                   onClick={() => setBogieType(type)}
-                  className={`px-3 py-2 rounded-full border text-xs font-medium transition-all disabled:opacity-60 ${
+                  className={`min-h-tap px-3 py-2 rounded-control border text-xs font-semibold transition-colors disabled:opacity-60 ${
                     bogieType === type
-                      ? 'bg-white text-black border-white'
-                      : 'bg-transparent border-white/10 text-neutral-400 hover:text-white hover:border-white/30'
+                      ? 'bg-selected text-ink border-accent-line'
+                      : 'bg-card border-line text-ink-muted hover:text-ink hover:border-line-strong'
                   }`}
                 >
                   {getBogieTypeText(type, lang)}
@@ -607,7 +613,7 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
             </div>
           </div>
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold text-slate-300">{dict.form.condition}</label>
+            <label className="block text-xs font-bold text-ink-body">{dict.form.condition}</label>
             <div className="grid grid-cols-2 gap-2">
               {SPRING_CONDITIONS.map((c) => (
                 <button
@@ -615,10 +621,10 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
                   type="button"
                   disabled={wagonLocked}
                   onClick={() => setCondition(c)}
-                  className={`px-3 py-2 rounded-full border text-xs font-medium transition-all disabled:opacity-60 ${
+                  className={`min-h-tap px-3 py-2 rounded-control border text-xs font-semibold transition-colors disabled:opacity-60 ${
                     condition === c
-                      ? 'bg-white text-black border-white'
-                      : 'bg-transparent border-white/10 text-neutral-400 hover:text-white hover:border-white/30'
+                      ? 'bg-selected text-ink border-accent-line'
+                      : 'bg-card border-line text-ink-muted hover:text-ink hover:border-line-strong'
                   }`}
                 >
                   {getConditionText(c, lang)}
@@ -631,7 +637,7 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
               §601), so it decides the length of this queue. Hidden for types
               with no published configuration — those are counted by hand. */}
           <div className={`space-y-1.5 ${needsManualCounts ? 'hidden' : ''}`}>
-            <label className="block text-xs font-bold text-slate-300">
+            <label className="block text-xs font-bold text-ink-body">
               {isHi ? 'एक्सल भार' : 'Axle Load'}
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -641,10 +647,10 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
                   type="button"
                   disabled={wagonLocked}
                   onClick={() => setAxleLoad(o.axleLoad)}
-                  className={`px-3 py-2 rounded-full border text-xs font-medium transition-all disabled:opacity-60 ${
+                  className={`min-h-tap px-3 py-2 rounded-control border text-xs font-semibold transition-colors disabled:opacity-60 ${
                     axleLoad === o.axleLoad
-                      ? 'bg-white text-black border-white'
-                      : 'bg-transparent border-white/10 text-neutral-400 hover:text-white hover:border-white/30'
+                      ? 'bg-selected text-ink border-accent-line'
+                      : 'bg-card border-line text-ink-muted hover:text-ink hover:border-line-strong'
                   }`}
                 >
                   {o.axleLoad}
@@ -657,12 +663,12 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
               Defaulting it to another type's numbers would produce a
               confident, wrong completeness check at the exit gate. */}
           {needsManualCounts && (
-            <div className="sm:col-span-2 rounded-xl border border-amber-800/70 bg-amber-950/20 px-3.5 py-3 space-y-2.5">
+            <div className="sm:col-span-2 rounded-control border border-warn-line bg-warn-soft px-3.5 py-3 space-y-2.5">
               <div>
-                <p className="text-xs font-black text-amber-300">
+                <p className="text-xs font-extrabold text-warn-ink">
                   {isHi ? 'इस बोगी के स्प्रिंग गिनें' : 'Count the springs on this bogie'}
                 </p>
-                <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                <p className="text-[11px] text-ink-muted mt-1 leading-relaxed">
                   {isHi
                     ? 'इस प्रकार की स्प्रिंग संख्या आरडीएसओ दस्तावेज़ में प्रकाशित नहीं है। अनुमान लगाने के बजाय, कृपया बोगी पर गिनकर दर्ज करें।'
                     : 'The spring count for this bogie type is not published in RDSO documentation. Rather than assume another type’s figures, count them on the bogie and enter them here — one bogie only.'}
@@ -675,7 +681,7 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
                   ['snubber', isHi ? 'स्नबर' : 'Snubber']
                 ] as const).map(([key, label]) => (
                   <label key={key} className="block">
-                    <span className="block text-[11px] font-bold text-slate-300 mb-1">{label}</span>
+                    <span className="block text-[11px] font-bold text-ink-body mb-1">{label}</span>
                     <input
                       type="number"
                       inputMode="numeric"
@@ -686,13 +692,13 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
                       onChange={(e) =>
                         setManualCounts((c) => ({ ...c, [key]: Number(e.target.value) }))
                       }
-                      className="w-full min-h-[44px] bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white text-center font-mono focus:border-amber-500 focus:outline-none disabled:opacity-60"
+                      className="w-full min-h-[44px] bg-page border border-line rounded-control px-3 py-2 text-sm text-white text-center font-mono focus:border-warn-line focus:outline-none disabled:opacity-60"
                     />
                   </label>
                 ))}
               </div>
               {!manualCountsValid && (
-                <p className="text-[11px] text-rose-400 font-semibold">
+                <p className="text-[11px] text-bad-ink font-semibold">
                   {isHi
                     ? `प्रत्येक संख्या ${MANUAL_COUNT_LIMITS.min}–${MANUAL_COUNT_LIMITS.max} के बीच होनी चाहिए।`
                     : `Each count must be a whole number between ${MANUAL_COUNT_LIMITS.min} and ${MANUAL_COUNT_LIMITS.max}.`}
@@ -704,8 +710,8 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
           {/* State plainly how many springs this configuration means, so the
               inspector knows the size of the job before starting. */}
           {activeCount && (
-            <div className="sm:col-span-2 rounded-xl border border-slate-800 bg-slate-950/60 px-3.5 py-3">
-              <p className="text-xs text-slate-300">
+            <div className="sm:col-span-2 rounded-control border border-line bg-page px-3.5 py-3">
+              <p className="text-xs text-ink-body">
                 <span className="font-bold text-white">
                   {activeCount.counts.outer} {isHi ? 'बाहरी' : 'outer'} ·{' '}
                   {activeCount.counts.inner} {isHi ? 'भीतरी' : 'inner'} ·{' '}
@@ -717,9 +723,9 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
                 </span>{' '}
                 {isHi ? 'इस वैगन के लिए' : 'for this wagon'}
               </p>
-              <p className="text-[10px] text-slate-500 mt-1">{activeCount.source}</p>
+              <p className="text-[10px] text-ink-faint mt-1">{activeCount.source}</p>
               {!activeCount.verified && (
-                <p className="text-[11px] text-amber-400 font-semibold mt-1.5">
+                <p className="text-[11px] text-warn-ink font-semibold mt-1.5">
                   {isHi
                     ? '⚠ यह संख्या आरडीएसओ दस्तावेज़ से पुष्ट नहीं है — कृपया ड्राइंग से जाँचें।'
                     : '⚠ This count is not confirmed in RDSO documentation — verify against the drawing before relying on it.'}
@@ -733,20 +739,20 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
       {/* Progress. A bogie can carry 24+ springs, so one bar per spring is
           unreadable — show overall progress plus a per-nest tally instead. */}
       <div className="space-y-2">
-        <div className="h-2 rounded-full bg-slate-800 overflow-hidden">
+        <div className="h-2 rounded-full bg-raised overflow-hidden">
           <div
-            className="h-full bg-blue-500 transition-all"
+            className="h-full bg-accent transition-all"
             style={{ width: `${QUEUE.length ? (stepIndex / QUEUE.length) * 100 : 0}%` }}
           />
         </div>
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-400 tabular-nums">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-ink-muted tabular-nums">
           <span>
             {isHi ? 'पूर्ण' : 'Done'}: <span className="text-white font-bold">{stepIndex}</span> / {QUEUE.length}
           </span>
-          <span className="text-emerald-400">
+          <span className="text-good-ink">
             {isHi ? 'उत्तीर्ण' : 'Pass'}: {completed.filter((c) => c.status === 'PASS').length}
           </span>
-          <span className="text-rose-400">
+          <span className="text-bad-ink">
             {isHi ? 'कंडम' : 'Condemned'}: {completed.filter((c) => c.status === 'CONDEMNED').length}
           </span>
         </div>
@@ -755,16 +761,16 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
       {/* An unfinished sweep from a previous session. Readings already taken
           are safely recorded — this only restores the inspector's place. */}
       {resumable && !wagonLocked && (
-        <div className="rounded-2xl border border-blue-700/60 bg-blue-950/25 p-4 space-y-3">
+        <div className="rounded-card border border-accent-line bg-accent-soft p-4 space-y-3">
           <div>
-            <p className="text-sm font-black text-white">
+            <p className="text-sm font-extrabold text-white">
               {isHi ? 'अधूरा निरीक्षण मिला' : 'Unfinished sweep found'}
             </p>
-            <p className="text-xs text-slate-300 mt-1">
+            <p className="text-xs text-ink-body mt-1">
               {resumable.wagonNumber} — {resumable.stepIndex}{' '}
               {isHi ? 'स्प्रिंग पहले ही दर्ज' : 'springs already recorded'}
             </p>
-            <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+            <p className="text-[11px] text-ink-muted mt-1.5 leading-relaxed">
               {isHi
                 ? 'दर्ज की गई रीडिंग सुरक्षित हैं। जारी रखने पर आप वहीं से शुरू करेंगे जहाँ छोड़ा था।'
                 : 'Those readings are already saved. Continuing picks up from where you stopped.'}
@@ -774,14 +780,14 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
             <button
               type="button"
               onClick={resumeSweep}
-              className="min-h-[44px] px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition"
+              className="min-h-[44px] px-4 py-2 bg-accent hover:bg-accent text-white rounded-control text-xs font-bold transition"
             >
               {isHi ? 'जारी रखें' : 'Continue'}
             </button>
             <button
               type="button"
               onClick={discardSweep}
-              className="min-h-[44px] px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold border border-slate-700 transition"
+              className="min-h-[44px] px-4 py-2 bg-raised hover:bg-selected text-ink-body rounded-control text-xs font-bold border border-line transition"
             >
               {isHi ? 'नया शुरू करें' : 'Start fresh'}
             </button>
@@ -802,7 +808,7 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
       {!batchDone && currentStep && (
         <>
           <div className="text-center">
-            <span className="text-xs font-mono text-blue-400 bg-blue-950/50 border border-blue-800 px-3 py-1 rounded-full">
+            <span className="text-xs font-mono text-accent-ink bg-accent-soft border border-accent-line px-3 py-1 rounded-full">
               {currentStep.bogiePosition === 'BOGIE_1' ? (isHi ? 'बोगी 1' : 'Bogie 1') : (isHi ? 'बोगी 2' : 'Bogie 2')}
               {' · '}
               {getPositionText(currentStep.position, lang)}
@@ -817,7 +823,7 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
               holding: checking a spring against it gives the band directly, so
               asking for a three-digit height and re-deriving that band is more
               work than the tool requires — nine hundred times a day. */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-950 rounded-lg border border-slate-800">
+          <div className="flex items-center gap-1.5 p-1 bg-page rounded-control border border-line">
             {([
               ['BAND', isHi ? 'स्ट्रिप बैंड' : 'Band from strip'],
               ['HEIGHT', isHi ? 'सटीक ऊंचाई' : 'Exact height']
@@ -832,8 +838,8 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
                 }}
                 className={`flex-1 min-h-[44px] px-3 py-2 text-sm font-bold rounded-md transition-all ${
                   entryMode === mode
-                    ? 'bg-blue-600 text-white shadow'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                    ? 'bg-accent text-white shadow'
+                    : 'text-ink-muted hover:text-ink-body hover:bg-card'
                 }`}
               >
                 {label}
@@ -842,13 +848,13 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
           </div>
 
           {entryMode === 'BAND' && (
-            <div className="glass-panel rounded-2xl p-4 space-y-3">
+            <div className="glass-panel rounded-card p-4 space-y-3">
               <div>
                 <h3 className="text-white font-extrabold text-base flex items-center gap-2">
-                  <span>📊</span>
+                  <BarChartIcon size={16} />
                   {isHi ? 'स्ट्रिप पर कौन सा बैंड?' : 'Which band does the strip show?'}
                 </h3>
-                <p className="text-slate-400 text-xs mt-0.5">
+                <p className="text-ink-muted text-xs mt-0.5">
                   {isHi
                     ? 'स्प्रिंग को स्ट्रिप से मिलाएँ और वही बैंड चुनें।'
                     : 'Check the spring against the strip and tap the band it falls in.'}
@@ -864,8 +870,8 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
                       key={b.band}
                       type="button"
                       onClick={() => handleBandTap(b.band)}
-                      className={`min-h-[64px] px-3 py-2.5 rounded-xl border-2 text-left transition-all active:scale-95 ${
-                        selected ? 'border-white bg-white/10' : 'border-slate-700 hover:border-slate-500'
+                      className={`min-h-[64px] px-3 py-2.5 rounded-control border-2 text-left transition-all active:scale-95 ${
+                        selected ? 'border-white bg-white/10' : 'border-line hover:border-line-strong'
                       }`}
                     >
                       <div className="flex items-center gap-2.5">
@@ -874,10 +880,10 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
                           style={{ backgroundColor: BAND_PAINT_HEX[b.band] || '#64748b' }}
                         />
                         <div className="min-w-0">
-                          <div className="text-sm font-black text-white leading-tight">
+                          <div className="text-sm font-extrabold text-white leading-tight">
                             {isHi ? b.labelHi : b.label}
                           </div>
-                          <div className="text-[11px] text-slate-400 font-mono tabular-nums">
+                          <div className="text-[11px] text-ink-muted font-mono tabular-nums">
                             {b.maxHeight}–{b.minHeight} mm
                           </div>
                         </div>
@@ -890,7 +896,7 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
               <button
                 type="button"
                 onClick={handleOffStrip}
-                className="w-full min-h-[52px] px-3 py-2.5 rounded-xl border-2 border-rose-800 bg-rose-950/30 text-rose-300 font-black text-sm transition-all active:scale-95 hover:bg-rose-950/60"
+                className="w-full min-h-[52px] px-3 py-2.5 rounded-control border-2 border-bad-line bg-bad-soft text-bad-ink font-extrabold text-sm transition-all active:scale-95 hover:bg-bad-soft"
               >
                 {isHi
                   ? 'स्ट्रिप से बाहर — कंडम'
@@ -926,18 +932,18 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
 
           {classification && (
             <div
-              className={`p-4 rounded-2xl border-2 space-y-3 transition-all ${
+              className={`p-4 rounded-card border-2 space-y-3 transition-all ${
                 classification.status === 'CONDEMNED'
-                  ? 'bg-rose-950/60 border-rose-600'
-                  : 'bg-emerald-950/40 border-emerald-500'
+                  ? 'bg-bad-soft border-bad-line'
+                  : 'bg-good-soft border-good-line'
               }`}
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   {classification.status === 'CONDEMNED' ? (
-                    <AlertTriangleIcon size={22} className="text-rose-400 shrink-0" />
+                    <AlertTriangleIcon size={22} className="text-bad-ink shrink-0" />
                   ) : (
-                    <CheckCircleIcon size={22} className="text-emerald-400 shrink-0" />
+                    <CheckCircleIcon size={22} className="text-good-ink shrink-0" />
                   )}
                   <ClassificationBadge
                     band={classification.band}
@@ -947,10 +953,10 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
                     size="lg"
                   />
                 </div>
-                <span className="text-[11px] font-mono text-slate-400">{classification.tableReference}</span>
+                <span className="text-[11px] font-mono text-ink-muted">{classification.tableReference}</span>
               </div>
               {classification.status === 'CONDEMNED' && classification.condemnationReason && (
-                <p className="text-xs font-semibold text-rose-300">{classification.condemnationReason}</p>
+                <p className="text-xs font-semibold text-bad-ink">{classification.condemnationReason}</p>
               )}
 
               {/* Physical paint-band instruction.
@@ -963,7 +969,7 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
                 <div className="flex items-center gap-3 pt-2.5 mt-1 border-t border-white/10">
                   <span
                     aria-hidden="true"
-                    className="w-9 h-9 rounded-lg shrink-0 border-2 border-white/30 shadow-inner"
+                    className="w-9 h-9 rounded-control shrink-0 border-2 border-white/30"
                     style={{ backgroundColor: BAND_PAINT_HEX[classification.band] || '#94a3b8' }}
                   />
                   {/*
@@ -977,12 +983,12 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
                     the first shift. Naming the group is true either way.
                   */}
                   <div className="leading-tight">
-                    <p className="text-xs font-black text-white tracking-wide">
+                    <p className="text-xs font-extrabold text-white tracking-wide">
                       {isHi
                         ? `समूह: ${BAND_LABEL_HI[classification.band] || classification.band}`
                         : `Group: ${classification.band}`}
                     </p>
-                    <p className="text-[11px] text-slate-300">
+                    <p className="text-[11px] text-ink-body">
                       {isHi
                         ? 'इसी समूह के स्प्रिंग एक साथ लगाए जाएँ'
                         : 'Keep with springs of this group — a nest must come from one group'}
@@ -998,7 +1004,7 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
             <button
               type="button"
               onClick={() => setShowDefectPanel((v) => !v)}
-              className="text-xs font-bold text-slate-400 hover:text-white underline underline-offset-2"
+              className="text-xs font-bold text-ink-muted hover:text-white underline underline-offset-2"
             >
               {showDefectPanel
                 ? (isHi ? 'दोष पैनल छुपाएं' : 'Hide defect panel')
@@ -1020,25 +1026,25 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
           {/* What to do about it. A verdict without an action leaves the
               inspector to work out the replacement band themselves. */}
           {classification?.status === 'CONDEMNED' && replacementGuidance && (
-            <div className="rounded-xl border border-amber-700/60 bg-amber-950/20 p-3.5 space-y-2">
+            <div className="rounded-control border border-warn-line bg-warn-soft p-3.5 space-y-2">
               <div className="flex items-start gap-2.5">
-                <span className="text-amber-400 text-lg leading-none shrink-0">→</span>
+                <span className="text-warn-ink text-lg leading-none shrink-0">→</span>
                 <div className="min-w-0">
-                  <p className="text-xs font-black text-amber-300 mb-1">
+                  <p className="text-xs font-extrabold text-warn-ink mb-1">
                     {isHi ? 'क्या करें' : 'What to do'}
                   </p>
-                  <p className="text-xs text-slate-200 leading-relaxed">
+                  <p className="text-xs text-ink-body leading-relaxed">
                     {replacementGuidance.message}
                   </p>
                   {replacementGuidance.targetRange && (
                     <div className="flex flex-wrap items-center gap-2 mt-2">
-                      <span className="text-[11px] font-mono text-white bg-slate-950 border border-slate-700 rounded px-2 py-1 tabular-nums">
+                      <span className="text-[11px] font-mono text-white bg-page border border-line rounded px-2 py-1 tabular-nums">
                         {replacementGuidance.targetRange.min.toFixed(1)}–
                         {replacementGuidance.targetRange.max.toFixed(1)} mm
                       </span>
                       {replacementGuidance.targetBand && (
                         <span
-                          className="text-[11px] font-black rounded px-2 py-1 border"
+                          className="text-[11px] font-extrabold rounded px-2 py-1 border"
                           style={{
                             color: BAND_PAINT_HEX[replacementGuidance.targetBand] || '#e2e8f0',
                             borderColor: BAND_PAINT_HEX[replacementGuidance.targetBand] || '#334155'
@@ -1051,7 +1057,7 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
                       )}
                     </div>
                   )}
-                  <p className="text-[10px] text-slate-500 mt-1.5">{replacementGuidance.reference}</p>
+                  <p className="text-[10px] text-ink-faint mt-1.5">{replacementGuidance.reference}</p>
                 </div>
               </div>
             </div>
@@ -1069,7 +1075,7 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
           )}
 
           {saveError && (
-            <div className="p-3 bg-rose-950/70 border border-rose-600 rounded-xl text-rose-200 text-xs font-bold">
+            <div className="p-3 bg-bad-soft border border-bad-line rounded-control text-bad-ink text-xs font-bold">
               {saveError}
             </div>
           )}
@@ -1078,7 +1084,7 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
             type="button"
             onClick={handleConfirmAndNext}
             disabled={!classification || isSaving || needsDefectPhoto}
-            className="w-full min-h-[56px] px-6 py-3.5 bg-white hover:bg-neutral-200 disabled:opacity-40 text-black font-extrabold text-base rounded-2xl flex items-center justify-center gap-2 transition-transform active:scale-95"
+            className="w-full min-h-[56px] px-6 py-3.5 bg-white hover:bg-neutral-200 disabled:opacity-40 text-black font-extrabold text-base rounded-card flex items-center justify-center gap-2 transition-transform active:scale-95"
           >
             {isSaving ? (
               <RefreshCwIcon size={18} className="animate-spin" />
@@ -1097,38 +1103,38 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
       )}
 
       {batchDone && (
-        <div className="glass-panel rounded-2xl p-6 space-y-5 text-center">
-          <CheckCircleIcon size={40} className="text-emerald-400 mx-auto" />
+        <div className="glass-panel rounded-card p-6 space-y-5 text-center">
+          <CheckCircleIcon size={40} className="text-good-ink mx-auto" />
           <div>
             <h2 className="text-lg font-extrabold text-white">
               {isHi ? 'बोगी नेस्ट पूर्ण' : 'Bogie Nest Complete'}
             </h2>
-            <p className="text-sm text-slate-400 mt-1">
+            <p className="text-sm text-ink-muted mt-1">
               {wagonNumber} — {QUEUE.length} {isHi ? 'स्प्रिंग दर्ज किए गए' : 'springs recorded'}
             </p>
           </div>
           <div className="flex items-center justify-center gap-6">
             <div>
-              <div className="text-2xl font-black text-emerald-400">{passCount}</div>
-              <div className="text-[11px] text-slate-400 uppercase tracking-wide">{isHi ? 'उत्तीर्ण' : 'Pass'}</div>
+              <div className="text-2xl font-extrabold text-good-ink">{passCount}</div>
+              <div className="text-[11px] text-ink-muted uppercase tracking-wide">{isHi ? 'उत्तीर्ण' : 'Pass'}</div>
             </div>
             <div>
-              <div className="text-2xl font-black text-rose-400">{condemnedCount}</div>
-              <div className="text-[11px] text-slate-400 uppercase tracking-wide">{isHi ? 'कंडम' : 'Condemned'}</div>
+              <div className="text-2xl font-extrabold text-bad-ink">{condemnedCount}</div>
+              <div className="text-[11px] text-ink-muted uppercase tracking-wide">{isHi ? 'कंडम' : 'Condemned'}</div>
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <button
               type="button"
               onClick={handleStartNextWagon}
-              className="flex-1 min-h-[52px] px-6 py-3 bg-white hover:bg-neutral-200 text-black font-extrabold rounded-2xl transition-transform active:scale-95"
+              className="flex-1 min-h-[52px] px-6 py-3 bg-white hover:bg-neutral-200 text-black font-extrabold rounded-card transition-transform active:scale-95"
             >
               {isHi ? 'अगला वैगन शुरू करें' : 'Start Next Wagon'}
             </button>
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 min-h-[52px] px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-2xl border border-slate-700 transition-transform active:scale-95"
+              className="flex-1 min-h-[52px] px-6 py-3 bg-raised hover:bg-selected text-ink-body font-bold rounded-card border border-line transition-transform active:scale-95"
             >
               {isHi ? 'समाप्त' : 'Done'}
             </button>

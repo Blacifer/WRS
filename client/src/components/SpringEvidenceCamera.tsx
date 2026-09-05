@@ -149,7 +149,7 @@ export const SpringEvidenceCamera = forwardRef<SpringEvidenceHandle, Props>(
     if (!active) return null;
 
     return (
-      <div className="rounded-2xl border border-slate-700 bg-slate-900 overflow-hidden">
+      <div className="rounded-card border border-line bg-card overflow-hidden">
         <div className="relative bg-black">
           <video
             ref={videoRef}
@@ -159,19 +159,19 @@ export const SpringEvidenceCamera = forwardRef<SpringEvidenceHandle, Props>(
             className="w-full max-h-[220px] object-cover"
           />
           {ready && (
-            <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/70 text-[11px] font-bold text-emerald-300">
+            <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/70 text-[11px] font-bold text-good-ink">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               {isHi ? 'फ़ोटो चालू' : 'Photographing'}
             </div>
           )}
         </div>
-        <p className="px-4 py-2.5 text-[11px] text-slate-400 leading-snug">
+        <p className="px-4 py-2.5 text-[11px] text-ink-muted leading-snug">
           {isHi
             ? 'स्प्रिंग को दिखाते रहें और सामान्य रूप से बैंड दबाएँ — फ़ोटो अपने आप उसी बैंड के साथ सुरक्षित हो जाएगी। कैमरा बैंड तय नहीं करता।'
             : 'Keep the spring in view and tap the band as usual — the photo is saved against whatever you tap. The camera does not decide the band.'}
         </p>
         {problem && (
-          <p className="px-4 pb-3 text-[11px] text-amber-300">{problem}</p>
+          <p className="px-4 pb-3 text-[11px] text-warn-ink">{problem}</p>
         )}
       </div>
     );

@@ -20,6 +20,7 @@ import type {
 import { parseVoiceCommand, getCategoryLabelEn, getCategoryLabelHi } from '../utils/voiceCommandParser.ts';
 import { playPassChime, playCondemnedBuzz, playActionTap } from '../utils/audioFeedback.ts';
 import { useI18n } from '../i18n/index.ts';
+import { AlertTriangleIcon, CheckCircleIcon, MicIcon } from './Icons.tsx';
 
 export interface VoiceInspectionToolbarProps {
   wagonNumber?: string;
@@ -408,31 +409,31 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
   };
 
   return (
-    <div className="bg-white/5 border border-white/10 backdrop-blur-md rounded-xl p-5 shadow-2xl space-y-4">
+    <div className="bg-white/5 border border-white/10 backdrop-blur-md rounded-control p-5 space-y-4">
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-slate-800">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-line">
         <div className="flex items-center gap-3">
           <div
-            className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg font-black transition-all duration-300 ${
+            className={`w-10 h-10 rounded-control flex items-center justify-center text-lg font-extrabold transition-all duration-300 ${
               micStatus === 'LISTENING'
-                ? 'bg-rose-500/20 text-rose-400 ring-2 ring-rose-500/50 animate-pulse'
+                ? 'bg-bad-soft text-bad-ink ring-2 ring-rose-500/50 animate-pulse'
                 : micStatus === 'PROCESSING'
-                ? 'bg-amber-500/20 text-amber-400 ring-2 ring-amber-500/50'
+                ? 'bg-warn-soft text-warn-ink ring-2 ring-amber-500/50'
                 : 'bg-white/10 text-white'
             }`}
           >
-            {micStatus === 'LISTENING' ? '️' : micStatus === 'PROCESSING' ? '️' : ''}
+            {null}
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-base font-black text-white">
+              <h3 className="text-base font-extrabold text-white">
                 {t('voice.title') || 'Hands-Free Voice Inspection'}
               </h3>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-orange-500/20 text-orange-400 border border-orange-500/40">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-[0.07em] bg-accent-soft text-accent-ink border border-accent-line">
                 {t('voice.badge') || 'Greasy-Gloves Mode'}
               </span>
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-ink-muted">
               {micStatus === 'LISTENING'
                 ? (t('voice.listening') || 'Listening continuously for component & status...')
                 : micStatus === 'PROCESSING'
@@ -445,23 +446,23 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
         {/* Top Controls: Language Switch, TTS Toggle, Help */}
         <div className="flex flex-wrap items-center gap-2">
           {/* Language Selector */}
-          <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+          <div className="flex bg-page p-1 rounded-control border border-line">
             <button
               onClick={() => { playActionTap(); setVoiceLang('en-IN'); }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+              className={`px-3 py-1.5 rounded-control text-xs font-bold transition ${
                 voiceLang === 'en-IN'
-                  ? 'bg-orange-600 text-white shadow'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-accent text-white shadow'
+                  : 'text-ink-muted hover:text-ink-body'
               }`}
             >
               EN (India)
             </button>
             <button
               onClick={() => { playActionTap(); setVoiceLang('hi-IN'); }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+              className={`px-3 py-1.5 rounded-control text-xs font-bold transition ${
                 voiceLang === 'hi-IN'
-                  ? 'bg-orange-600 text-white shadow'
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-accent text-white shadow'
+                  : 'text-ink-muted hover:text-ink-body'
               }`}
             >
               हिन्दी (hi-IN)
@@ -472,10 +473,10 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
           <button
             onClick={() => { playActionTap(); setTtsEnabled(!ttsEnabled); }}
             title={ttsEnabled ? 'Mute Voice Readback' : 'Enable Voice Readback'}
-            className={`p-2.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 min-h-[38px] ${
+            className={`p-2.5 rounded-control border text-xs font-bold transition flex items-center gap-1.5 min-h-[38px] ${
               ttsEnabled
-                ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-300'
-                : 'bg-slate-800 border-slate-700 text-slate-500'
+                ? 'bg-good-soft border-good-line text-good-ink'
+                : 'bg-raised border-line text-ink-faint'
             }`}
           >
             <span>{ttsEnabled ? '' : ''}</span>
@@ -485,7 +486,7 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
           {/* Quick Guide Button */}
           <button
             onClick={() => { playActionTap(); setShowHelp(!showHelp); }}
-            className="p-2.5 bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 rounded-xl text-xs font-bold transition flex items-center gap-1 min-h-[38px]"
+            className="p-2.5 bg-raised hover:bg-selected border border-line text-ink-body rounded-control text-xs font-bold transition flex items-center gap-1 min-h-[38px]"
           >
             <span></span>
             <span className="hidden md:inline">{t('voice.helpBtn') || 'Guide'}</span>
@@ -498,13 +499,13 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
         {/* Big Start / Stop Button (>=48px touch target) */}
         <button
           onClick={handleToggleListening}
-          className={`px-6 py-3.5 rounded-xl font-bold text-sm transition flex items-center justify-center gap-3 shadow-xl min-h-[52px] ${
+          className={`px-6 py-3.5 rounded-control font-bold text-sm transition flex items-center justify-center gap-3 min-h-[52px] ${
             isListening
-              ? 'bg-rose-500 hover:bg-rose-600 text-white shadow-sm animate-pulse'
+              ? 'bg-bad hover:bg-bad text-white shadow-sm animate-pulse'
               : 'bg-white text-slate-900 hover:bg-slate-100 shadow-sm'
           }`}
         >
-          <span className="text-xl">{isListening ? '' : '️'}</span>
+          <span className="text-xl"><MicIcon size={20} /></span>
           <span>{isListening ? (t('voice.stop') || 'Stop Voice Inspection') : (t('voice.start') || 'Start Voice Inspection')}</span>
           {isListening && (
             <span className="flex h-3 w-3 relative">
@@ -515,16 +516,16 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
         </button>
 
         {/* Live Floating Transcript Pill */}
-        <div className="flex-1 bg-slate-950/80 border border-slate-800 rounded-xl px-4 py-2.5 flex items-center justify-between min-h-[52px]">
+        <div className="flex-1 bg-page border border-line rounded-control px-4 py-2.5 flex items-center justify-between min-h-[52px]">
           <div className="flex items-center gap-3 overflow-hidden">
-            <span className={`text-base ${isListening ? 'text-rose-500 animate-bounce' : 'text-slate-500'}`}>
+            <span className={`text-base ${isListening ? 'text-bad-ink animate-bounce' : 'text-ink-faint'}`}>
               
             </span>
             <div className="truncate">
               {liveTranscript ? (
-                <span className="text-sm font-bold text-slate-100 italic">“{liveTranscript}”</span>
+                <span className="text-sm font-bold text-ink italic">“{liveTranscript}”</span>
               ) : (
-                <span className="text-xs text-slate-500">
+                <span className="text-xs text-ink-faint">
                   {isListening
                     ? (t('voice.listeningPill') || 'Listening for speech input...')
                     : (t('voice.noSpeechYet') || 'No voice command spoken yet. Press microphone or click simulation chips.')}
@@ -538,22 +539,22 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
             <div className="flex items-center gap-2 shrink-0 ml-3">
               {lastParsedResult.actionType === 'UPDATE_STATUS' && (
                 <span
-                  className={`px-2.5 py-1 rounded-lg text-xs font-black tracking-wide uppercase ${
+                  className={`px-2.5 py-1 rounded-control text-xs font-extrabold tracking-wide uppercase ${
                     lastParsedResult.status === 'CONDEMNED' || lastParsedResult.status === 'FAIL'
-                      ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40'
-                      : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                      ? 'bg-bad-soft text-bad-ink border border-bad-line'
+                      : 'bg-good-soft text-good-ink border border-good-line'
                   }`}
                 >
                    {lastParsedResult.status}
                 </span>
               )}
               {lastParsedResult.actionType === 'SWITCH_CATEGORY' && (
-                <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/40">
+                <span className="px-2.5 py-1 rounded-control text-xs font-bold bg-accent-soft text-accent-ink border border-accent-line">
                    {lastParsedResult.categoryToSwitch}
                 </span>
               )}
               {lastParsedResult.actionType === 'UNDO' && (
-                <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-purple-500/20 text-purple-400 border border-purple-500/40">
+                <span className="px-2.5 py-1 rounded-control text-xs font-bold bg-accent-soft text-accent-ink border border-accent-line">
                   ↩ UNDO
                 </span>
               )}
@@ -565,16 +566,16 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
       {/* Spoken Feedback Alert Toast / Banner */}
       {lastParsedResult && (
         <div
-          className={`p-3.5 rounded-xl border text-xs flex items-center justify-between transition-all duration-300 ${
+          className={`p-3.5 rounded-control border text-xs flex items-center justify-between transition-all duration-300 ${
             lastParsedResult.matched
               ? lastParsedResult.status === 'CONDEMNED' || lastParsedResult.status === 'FAIL'
-                ? 'bg-rose-500/10 border-rose-500/20 text-rose-300'
-                : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300'
-              : 'bg-slate-800/40 border-slate-700 text-amber-400'
+                ? 'bg-bad-soft border-bad-line text-bad-ink'
+                : 'bg-good-soft border-good-line text-good-ink'
+              : 'bg-raised border-line text-warn-ink'
           }`}
         >
           <div className="flex items-center gap-2">
-            <span className="text-base">{lastParsedResult.matched ? '' : '️'}</span>
+            <span className="text-base">{lastParsedResult.matched ? <CheckCircleIcon size={16} /> : <AlertTriangleIcon size={16} />}</span>
             <span className="font-semibold">
               {voiceLang.startsWith('hi') && lastParsedResult.feedbackMessageHi
                 ? lastParsedResult.feedbackMessageHi
@@ -591,58 +592,57 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
 
       {/* Error / Fallback Notice */}
       {errorMessage && (
-        <div className="bg-amber-950/40 border border-amber-800/60 p-3 rounded-xl text-xs text-amber-300 flex items-center gap-2">
-          <span>️</span>
+        <div className="bg-warn-soft border border-warn-line p-3 rounded-control text-xs text-warn-ink flex items-center gap-2">
           <span>{errorMessage}</span>
         </div>
       )}
 
       {/* Help Modal Reference */}
       {showHelp && (
-        <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 text-xs text-slate-300">
-          <div className="flex justify-between items-center pb-2 border-b border-slate-800">
+        <div className="bg-page p-4 rounded-control border border-line space-y-3 text-xs text-ink-body">
+          <div className="flex justify-between items-center pb-2 border-b border-line">
             <h4 className="font-bold text-white flex items-center gap-2">
               <span></span>
               {t('voice.help.title') || 'Hands-Free Voice Command Reference'}
             </h4>
             <button
               onClick={() => setShowHelp(false)}
-              className="text-slate-400 hover:text-white font-bold"
+              className="text-ink-muted hover:text-white font-bold"
             >
               
             </button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1 bg-slate-900/60 p-3 rounded-lg border border-slate-850">
-              <p className="font-bold text-emerald-400">1. PASS / Fit Actions:</p>
-              <p className="text-[11px] text-slate-400">
+            <div className="space-y-1 bg-card p-3 rounded-control border border-slate-850">
+              <p className="font-bold text-good-ink">1. PASS / Fit Actions:</p>
+              <p className="text-[11px] text-ink-muted">
                 • "Outer spring passes" / "आउटर स्प्रिंग पास"<br />
                 • "Inner spring 1 fit" / "इनर स्प्रिंग ठीक है"<br />
                 • "CTRB bearing serviceable" / "सीटीआरबी फिट"
               </p>
             </div>
 
-            <div className="space-y-1 bg-slate-900/60 p-3 rounded-lg border border-slate-850">
-              <p className="font-bold text-rose-400">2. CONDEMNED / Scrap Actions:</p>
-              <p className="text-[11px] text-slate-400">
+            <div className="space-y-1 bg-card p-3 rounded-control border border-slate-850">
+              <p className="font-bold text-bad-ink">2. CONDEMNED / Scrap Actions:</p>
+              <p className="text-[11px] text-ink-muted">
                 • "Condemn friction wedge" / "घर्षण वेज कंडम"<br />
                 • "Friction wedge reject deep crack"<br />
                 • "Outer spring scrap broken coil"
               </p>
             </div>
 
-            <div className="space-y-1 bg-slate-900/60 p-3 rounded-lg border border-slate-850">
-              <p className="font-bold text-amber-400">3. Repaired & Replaced:</p>
-              <p className="text-[11px] text-slate-400">
+            <div className="space-y-1 bg-card p-3 rounded-control border border-slate-850">
+              <p className="font-bold text-warn-ink">3. Repaired & Replaced:</p>
+              <p className="text-[11px] text-ink-muted">
                 • "Brake beam repaired and tested" / "मरम्मत किया"<br />
                 • "CTRB bearing replaced with new" / "नया लगाया"
               </p>
             </div>
 
-            <div className="space-y-1 bg-slate-900/60 p-3 rounded-lg border border-slate-850">
-              <p className="font-bold text-blue-400">4. Category Navigation & Undo:</p>
-              <p className="text-[11px] text-slate-400">
+            <div className="space-y-1 bg-card p-3 rounded-control border border-slate-850">
+              <p className="font-bold text-accent-ink">4. Category Navigation & Undo:</p>
+              <p className="text-[11px] text-ink-muted">
                 • "Show bearings" / "Open brake system" / "स्प्रिंग्स खोलो"<br />
                 • "Undo" / "Piche lo" / "वापस लो"
               </p>

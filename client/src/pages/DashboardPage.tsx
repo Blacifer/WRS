@@ -20,25 +20,37 @@ import {
   Legend
 } from 'recharts';
 import { api } from '../services/api.ts';
+import { COLOR_HEX_MAP } from '../../../shared/classification/tables.ts';
 import { useI18n } from '../i18n/index.ts';
 import type { InspectionStats } from '../../../shared/types.ts';
 import { configuredCoverage } from '../../../shared/knowledge/raipurWorkload.ts';
 import { DAILY_PILE } from '../../../shared/sorting/throughput.ts';
 import { ShopFloorNow } from '../components/ShopFloorNow.tsx';
+import { VisionReadiness } from '../components/VisionReadiness.tsx';
+import { ActivityIcon, BanIcon, BarChartIcon, CoilIcon, DownloadIcon, LayersIcon, SearchIcon, TrainIcon, UserIcon } from '../components/Icons.tsx';
 
-const RDSO_BAND_COLORS: Record<string, { en: string; hi: string; color: string }> = {
-  BLUE: { en: 'Blue (Band I)', hi: 'नीला (बैंड I)', color: '#2563eb' },
-  GREEN: { en: 'Green (Band II)', hi: 'हरा (बैंड II)', color: '#059669' },
-  YELLOW: { en: 'Yellow (Band III)', hi: 'पीला (बैंड III)', color: '#eab308' },
-  ORANGE: { en: 'Orange (Band IV)', hi: 'नारंगी (बैंड IV)', color: '#f97316' },
-  WHITE: { en: 'White (Band V)', hi: 'सफेद (बैंड V)', color: '#e2e8f0' },
-  RED: { en: 'Red (Band VI)', hi: 'लाल (बैंड VI)', color: '#dc2626' }
+/*
+ * Band names only. The colours come from COLOR_HEX_MAP.
+ *
+ * This map carried its own hexes and they had drifted from RDSO's: GREEN was
+ * #059669 against #16a34a, YELLOW #eab308 against #ca8a04, ORANGE #f97316
+ * against #ea580c. So the same band was drawn in one colour on this chart and
+ * another on the badge beside it. There is one published set of these and it
+ * lives in shared/classification/tables.ts.
+ */
+const RDSO_BAND_COLORS: Record<string, { en: string; hi: string }> = {
+  BLUE:   { en: 'Blue (Band I)',    hi: 'नीला (बैंड I)' },
+  GREEN:  { en: 'Green (Band II)',  hi: 'हरा (बैंड II)' },
+  YELLOW: { en: 'Yellow (Band III)', hi: 'पीला (बैंड III)' },
+  ORANGE: { en: 'Orange (Band IV)', hi: 'नारंगी (बैंड IV)' },
+  WHITE:  { en: 'White (Band V)',   hi: 'सफेद (बैंड V)' },
+  RED:    { en: 'Red (Band VI)',    hi: 'लाल (बैंड VI)' }
 };
 
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-slate-900/95 border border-slate-700 p-3 rounded-xl shadow-2xl text-xs backdrop-blur-md">
+      <div className="bg-card border border-line p-3 rounded-control text-xs backdrop-blur-md">
         {label && <p className="font-bold text-white mb-1.5">{label}</p>}
         {payload.map((entry: any, index: number) => (
           <p key={`item-${index}`} className="flex items-center gap-2 font-medium" style={{ color: entry.color || entry.stroke || entry.fill }}>
@@ -154,8 +166,8 @@ export const DashboardPage: React.FC = () => {
 
   if (loading && !pipeline) {
     return (
-      <div className="text-center py-20 bg-slate-900/40 rounded-2xl border border-slate-800 text-slate-400">
-        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+      <div className="text-center py-20 bg-card rounded-card border border-line text-ink-muted">
+        <div className="w-8 h-8 border-2 border-accent-line border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
         <p className="text-sm">Loading DRM Officer analytics dashboard...</p>
       </div>
     );
@@ -188,7 +200,7 @@ export const DashboardPage: React.FC = () => {
   const springBandData = Object.entries(RDSO_BAND_COLORS).map(([bandKey, cfg]) => ({
     name: lang === 'hi' ? cfg.hi : cfg.en,
     value: springStats?.bandDistribution?.[bandKey as keyof typeof springStats.bandDistribution] || 0,
-    color: cfg.color,
+    color: COLOR_HEX_MAP[bandKey as keyof typeof COLOR_HEX_MAP] || '#71717a',
     bandKey
   })).filter(item => item.value > 0);
 
@@ -201,13 +213,21 @@ export const DashboardPage: React.FC = () => {
         */}
       <ShopFloorNow lang={lang} />
 
+      {/*
+        * The DRM asked for a camera that identifies a spring and its damage.
+        * This says, from the shop's own counts, how far off that is and what
+        * moves it — rather than leaving the answer to a conversation.
+        */}
+      <VisionReadiness lang={lang} />
+
       {/* Top Banner & Export Actions */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-card p-6 rounded-card border border-line">
         <div>
-          <h2 className="text-xl font-black text-white flex items-center gap-2">
-            <span>📊</span> {t('dashboard.title')}
+          <h2 className="text-xl font-extrabold tracking-[-0.025em] text-ink flex items-center gap-2.5">
+            <BarChartIcon size={20} className="text-accent-ink" />
+            {t('dashboard.title')}
           </h2>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-ink-muted mt-1">
             Real-Time Workshop Outturn, Turnaround Times & CASNUB Quality Compliance
           </p>
         </div>
@@ -215,15 +235,17 @@ export const DashboardPage: React.FC = () => {
         <div className="flex items-center gap-3">
           <button
             onClick={handleExportCsv}
-            className="px-4 py-2.5 bg-slate-800 hover:bg-slate-750 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition flex items-center gap-2 min-h-[48px]"
+            className="px-4 py-2.5 bg-raised hover:bg-selected text-ink-body border border-line-strong rounded-control text-xs font-bold transition-colors flex items-center gap-2 min-h-[48px]"
           >
-            📥 {t('actions.exportCsv')}
+            <DownloadIcon size={16} />
+            {t('actions.exportCsv')}
           </button>
           <button
             onClick={handleExportPdf}
-            className="px-5 py-2.5 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white rounded-xl text-xs font-bold shadow-lg transition flex items-center gap-2 min-h-[48px]"
+            className="px-5 py-2.5 bg-accent hover:bg-accent-hover border border-accent-hover text-white rounded-control text-xs font-bold transition-colors flex items-center gap-2 min-h-[48px]"
           >
-            🖨️ {t('actions.exportPdf')}
+            <DownloadIcon size={16} />
+            {t('actions.exportPdf')}
           </button>
         </div>
       </div>
@@ -250,12 +272,12 @@ export const DashboardPage: React.FC = () => {
         What replaces it is what the system can actually show, with its
         source. It is a smaller claim and it survives being asked about.
       */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-lg space-y-4">
+      <div className="bg-card border border-line rounded-card p-6 space-y-4">
         <div>
-          <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-400 bg-blue-950/80 border border-blue-800/60 px-2.5 py-1 rounded-md">
+          <span className="text-[10px] font-extrabold uppercase tracking-[0.07em] text-accent-ink bg-accent-soft border border-accent-line px-2.5 py-1 rounded-md">
             {isHi ? 'यह प्रणाली क्या करती है' : 'What this system does'}
           </span>
-          <h3 className="text-lg font-black text-white mt-2">
+          <h3 className="text-lg font-extrabold text-white mt-2">
             {isHi
               ? 'मापा गया — अनुमान नहीं'
               : 'Measured, not estimated'}
@@ -263,42 +285,42 @@ export const DashboardPage: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4">
-            <p className="text-2xl font-black text-white tabular-nums">
+          <div className="bg-page border border-line rounded-control p-4">
+            <p className="text-2xl font-extrabold text-white tabular-nums">
               {springCoverage.bandedLow}–{springCoverage.bandedHigh}%
             </p>
-            <p className="text-xs font-bold text-slate-300 mt-1">
+            <p className="text-xs font-bold text-ink-body mt-1">
               {isHi ? 'वैगनों के स्प्रिंग बैंड में वर्गीकृत' : 'of the year’s wagons can have springs banded'}
             </p>
-            <p className="text-[11px] text-slate-500 mt-1.5 leading-snug">
+            <p className="text-[11px] text-ink-faint mt-1.5 leading-snug">
               {isHi
                 ? 'शॉप के 2025-26 आउटटर्न के आधार पर। एक श्रेणी का विभाजन अज्ञात है, इसलिए यह एक सीमा है।'
                 : 'Against the shop’s own 2025–26 out-turn. A range because one reported line covers three wagon types and is not broken down.'}
             </p>
           </div>
 
-          <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4">
-            <p className="text-2xl font-black text-white tabular-nums">
+          <div className="bg-page border border-line rounded-control p-4">
+            <p className="text-2xl font-extrabold text-white tabular-nums">
               {(today?.total ?? 0).toLocaleString()}
             </p>
-            <p className="text-xs font-bold text-slate-300 mt-1">
+            <p className="text-xs font-bold text-ink-body mt-1">
               {isHi ? 'आज दर्ज स्प्रिंग' : 'springs recorded today'}
             </p>
-            <p className="text-[11px] text-slate-500 mt-1.5 leading-snug">
+            <p className="text-[11px] text-ink-faint mt-1.5 leading-snug">
               {isHi
                 ? `शॉप का लक्ष्य लगभग ${DAILY_PILE} प्रतिदिन है (SSE, 27 अगस्त 2026)।`
                 : `The shop sorts about ${DAILY_PILE} a day — the figure its own SSE gave on 27 August 2026.`}
             </p>
           </div>
 
-          <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-4">
-            <p className="text-2xl font-black text-white tabular-nums">
+          <div className="bg-page border border-line rounded-control p-4">
+            <p className="text-2xl font-extrabold text-white tabular-nums">
               {(pipeline?.totalActive ?? 0) + (pipeline?.totalReleased ?? 0)}
             </p>
-            <p className="text-xs font-bold text-slate-300 mt-1">
+            <p className="text-xs font-bold text-ink-body mt-1">
               {isHi ? 'वैगन इस रिकॉर्ड में' : 'wagons in this record'}
             </p>
-            <p className="text-[11px] text-slate-500 mt-1.5 leading-snug">
+            <p className="text-[11px] text-ink-faint mt-1.5 leading-snug">
               {isHi
                 ? 'हर निर्णय अपने आरडीएसओ खंड का हवाला देता है, और कोई भी रिकॉर्ड लिखे जाने के बाद बदला नहीं जा सकता।'
                 : 'Every verdict cites the RDSO clause it came from, and no record can be altered after it is written.'}
@@ -306,7 +328,7 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        <p className="text-[11px] text-slate-500 leading-relaxed border-t border-slate-800 pt-3">
+        <p className="text-[11px] text-ink-faint leading-relaxed border-t border-line pt-3">
           {isHi
             ? 'यह प्रणाली स्प्रिंग नहीं मापती — वह अभी भी गेज से होता है। यह लिपिकीय कार्य हटाती है: बैंड देखना, कागज़ पर लिखना, पाली के अंत में गिनती, और यह हिसाब कि ढेर से कितने पूरे नेस्ट बन सकते हैं।'
             : 'The system does not measure a spring — that is still done with the gauge. What it removes is the clerical half: looking the band up, writing it down, tallying at the end of a shift, and working out how many complete matched nests the pile can supply, which was never done by hand at all.'}
@@ -315,46 +337,46 @@ export const DashboardPage: React.FC = () => {
 
       {/* KPI Overview Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-1">
-          <p className="text-xs font-semibold text-slate-400">{t('dashboard.activeInShop')}</p>
-          <p className="text-2xl font-black text-orange-400">{pipeline?.totalActive || 0}</p>
-          <p className="text-[11px] text-slate-500">Across 6 active stages</p>
+        <div className="bg-card border border-line rounded-card p-5 space-y-1">
+          <p className="text-xs font-semibold text-ink-muted">{t('dashboard.activeInShop')}</p>
+          <p className="text-2xl font-extrabold text-accent-ink">{pipeline?.totalActive || 0}</p>
+          <p className="text-[11px] text-ink-faint">Across 6 active stages</p>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-1">
-          <p className="text-xs font-semibold text-slate-400">{t('dashboard.releasedThisMonth')}</p>
-          <p className="text-2xl font-black text-emerald-400">{pipeline?.totalReleased || 0}</p>
-          <p className="text-[11px] text-slate-500">Mainline certified</p>
+        <div className="bg-card border border-line rounded-card p-5 space-y-1">
+          <p className="text-xs font-semibold text-ink-muted">{t('dashboard.releasedThisMonth')}</p>
+          <p className="text-2xl font-extrabold text-good-ink">{pipeline?.totalReleased || 0}</p>
+          <p className="text-[11px] text-ink-faint">Mainline certified</p>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-1">
-          <p className="text-xs font-semibold text-slate-400">{t('dashboard.meanTat')}</p>
-          <p className="text-2xl font-black text-blue-400">{tat?.averageHours || 0}h</p>
-          <p className="text-[11px] text-slate-500">Average overhaul time</p>
+        <div className="bg-card border border-line rounded-card p-5 space-y-1">
+          <p className="text-xs font-semibold text-ink-muted">{t('dashboard.meanTat')}</p>
+          <p className="text-2xl font-extrabold text-accent-ink">{tat?.averageHours || 0}h</p>
+          <p className="text-[11px] text-ink-faint">Average overhaul time</p>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-1">
-          <p className="text-xs font-semibold text-slate-400">{t('dashboard.medianTat')}</p>
-          <p className="text-2xl font-black text-indigo-400">{tat?.medianHours || 0}h</p>
-          <p className="text-[11px] text-slate-500">50th percentile</p>
+        <div className="bg-card border border-line rounded-card p-5 space-y-1">
+          <p className="text-xs font-semibold text-ink-muted">{t('dashboard.medianTat')}</p>
+          <p className="text-2xl font-extrabold text-accent-ink">{tat?.medianHours || 0}h</p>
+          <p className="text-[11px] text-ink-faint">50th percentile</p>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg space-y-1">
-          <p className="text-xs font-semibold text-slate-400">{t('dashboard.p90Tat')}</p>
-          <p className="text-2xl font-black text-amber-400">{tat?.p90Hours || 0}h</p>
-          <p className="text-[11px] text-slate-500">90th percentile TAT</p>
+        <div className="bg-card border border-line rounded-card p-5 space-y-1">
+          <p className="text-xs font-semibold text-ink-muted">{t('dashboard.p90Tat')}</p>
+          <p className="text-2xl font-extrabold text-warn-ink">{tat?.p90Hours || 0}h</p>
+          <p className="text-[11px] text-ink-faint">90th percentile TAT</p>
         </div>
       </div>
 
       {/* Interactive Charts Section 1: TAT Trend & Daily Throughput */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* TAT Trend Area/Line Chart */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div className="bg-card border border-line rounded-card p-6 space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <span>📈</span> {t('charts.tatTrend')}
+              <ActivityIcon size={17} className="text-accent-ink" /> {t('charts.tatTrend')}
             </h3>
-            <span className="text-xs font-semibold text-slate-400 bg-slate-800 px-2.5 py-1 rounded-lg">
+            <span className="text-xs font-semibold text-ink-muted bg-raised px-2.5 py-1 rounded-control">
               {tat?.completedWagonsCount || 0} wagons
             </span>
           </div>
@@ -384,18 +406,19 @@ export const DashboardPage: React.FC = () => {
                 </AreaChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-500">{isHi ? 'कोई पूर्ण वैगन टर्नअराउंड प्रवृत्ति डेटा दर्ज नहीं' : 'No completed wagon turnaround trend data recorded'}</div>
+              <div className="h-full flex items-center justify-center text-xs text-ink-faint">{isHi ? 'कोई पूर्ण वैगन टर्नअराउंड प्रवृत्ति डेटा दर्ज नहीं' : 'No completed wagon turnaround trend data recorded'}</div>
             )}
           </div>
         </div>
 
         {/* Daily Throughput Bar Chart */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div className="bg-card border border-line rounded-card p-6 space-y-4">
           <div className="flex justify-between items-center">
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <span>📊</span> {t('charts.dailyThroughput')}
+            <h3 className="text-base font-bold text-ink flex items-center gap-2">
+              <BarChartIcon size={17} className="text-accent-ink" />
+              {t('charts.dailyThroughput')}
             </h3>
-            <span className="text-xs font-semibold text-slate-400 bg-slate-800 px-2.5 py-1 rounded-lg">
+            <span className="text-xs font-semibold text-ink-muted bg-raised px-2.5 py-1 rounded-control">
               {t('charts.days30')}
             </span>
           </div>
@@ -409,12 +432,20 @@ export const DashboardPage: React.FC = () => {
                   <YAxis stroke="#94a3b8" tick={{ fill: '#94a3b8', fontSize: 11 }} />
                   <Tooltip content={<CustomTooltip />} />
                   <Legend wrapperStyle={{ fontSize: '11px', color: '#cbd5e1' }} />
-                  <Bar dataKey={enteredLabel} fill="#f97316" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey={releasedLabel} fill="#10b981" radius={[4, 4, 0, 0]} />
+                  {/*
+                    A validated two-series pair, not the status palette.
+                    "Released" was drawn in #10b981 — the colour this interface
+                    reserves for a serviceable verdict — which is how a chart
+                    series ends up looking like a judgement. Blue and teal
+                    separate by ΔE 21 for normal vision and 21 under
+                    protanopia, and the legend names both.
+                  */}
+                  <Bar dataKey={enteredLabel} fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey={releasedLabel} fill="#14b8a6" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-500">{isHi ? 'कोई दैनिक उत्पादन डेटा दर्ज नहीं' : 'No daily throughput data recorded'}</div>
+              <div className="h-full flex items-center justify-center text-xs text-ink-faint">{isHi ? 'कोई दैनिक उत्पादन डेटा दर्ज नहीं' : 'No daily throughput data recorded'}</div>
             )}
           </div>
         </div>
@@ -423,12 +454,12 @@ export const DashboardPage: React.FC = () => {
       {/* Interactive Charts Section 2: CASNUB Parts Donut & Spring Band Pie */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* CASNUB Parts Distribution Donut Chart */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div className="bg-card border border-line rounded-card p-6 space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <span>🍩</span> {t('charts.partsDistribution')}
+              <LayersIcon size={17} className="text-accent-ink" /> {t('charts.partsDistribution')}
             </h3>
-            <span className="text-xs font-semibold text-slate-400 bg-slate-800 px-2.5 py-1 rounded-lg">
+            <span className="text-xs font-semibold text-ink-muted bg-raised px-2.5 py-1 rounded-control">
               {parts?.totalInspected || 0} {t('charts.totalInspected')}
             </span>
           </div>
@@ -455,18 +486,18 @@ export const DashboardPage: React.FC = () => {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-500">{isHi ? 'कोई पुर्जा निरीक्षण डेटा उपलब्ध नहीं' : 'No parts inspection data available'}</div>
+              <div className="h-full flex items-center justify-center text-xs text-ink-faint">{isHi ? 'कोई पुर्जा निरीक्षण डेटा उपलब्ध नहीं' : 'No parts inspection data available'}</div>
             )}
           </div>
         </div>
 
         {/* Spring Band Distribution Chart */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div className="bg-card border border-line rounded-card p-6 space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <span>🎨</span> {t('charts.springBands')}
+              <CoilIcon size={17} className="text-accent-ink" /> {t('charts.springBands')}
             </h3>
-            <span className="text-xs font-semibold text-slate-400 bg-slate-800 px-2.5 py-1 rounded-lg">
+            <span className="text-xs font-semibold text-ink-muted bg-raised px-2.5 py-1 rounded-control">
               {springStats?.totalInspections || 0} {t('charts.totalInspected')}
             </span>
           </div>
@@ -493,16 +524,16 @@ export const DashboardPage: React.FC = () => {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-500">{isHi ? 'कोई स्प्रिंग बैंड वर्गीकरण डेटा दर्ज नहीं' : 'No spring band classification data recorded'}</div>
+              <div className="h-full flex items-center justify-center text-xs text-ink-faint">{isHi ? 'कोई स्प्रिंग बैंड वर्गीकरण डेटा दर्ज नहीं' : 'No spring band classification data recorded'}</div>
             )}
           </div>
         </div>
       </div>
 
       {/* 7-Stage Pipeline Load Breakdown */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+      <div className="bg-card border border-line rounded-card p-6 space-y-6">
         <h3 className="text-base font-bold text-white flex items-center gap-2">
-          <span>🚂</span> {t('dashboard.pipelineTitle')}
+          <TrainIcon size={17} className="text-accent-ink" /> {t('dashboard.pipelineTitle')}
         </h3>
 
         <div className="space-y-3">
@@ -513,16 +544,16 @@ export const DashboardPage: React.FC = () => {
 
             return (
               <div key={stage} className="space-y-1">
-                <div className="flex justify-between text-xs font-semibold text-slate-300">
+                <div className="flex justify-between text-xs font-semibold text-ink-body">
                   <span>{t(`lifecycle.stages.${stage}` as any) || stage}</span>
                   <span>
                     {count} Wagons ({pct}%)
                   </span>
                 </div>
-                <div className="w-full h-3 bg-slate-800 rounded-full overflow-hidden">
+                <div className="w-full h-3 bg-raised rounded-full overflow-hidden">
                   <div
                     className={`h-full transition-all ${
-                      isReleased ? 'bg-emerald-500' : isQCGate ? 'bg-amber-500' : 'bg-orange-500'
+                      isReleased ? 'bg-good' : isQCGate ? 'bg-warn' : 'bg-accent'
                     }`}
                     style={{ width: `${Math.max(4, pct)}%` }}
                   />
@@ -536,28 +567,28 @@ export const DashboardPage: React.FC = () => {
       {/* Two Columns: Parts Defect Breakdown & Inspectors Productivity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* CASNUB Parts Defect Pareto */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div className="bg-card border border-line rounded-card p-6 space-y-4">
           <h3 className="text-base font-bold text-white flex items-center gap-2">
-            <span>🔍</span> {t('dashboard.partsTitle')}
+            <SearchIcon size={17} className="text-accent-ink" /> {t('dashboard.partsTitle')}
           </h3>
-          <p className="text-xs text-slate-400">Total inspected: {parts?.totalInspected || 0} items</p>
+          <p className="text-xs text-ink-muted">Total inspected: {parts?.totalInspected || 0} items</p>
 
           <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
             {Object.entries(parts?.categoryBreakdown || {}).map(([cat, stat]: any) => {
               return (
                 <div
                   key={cat}
-                  className="p-3 bg-slate-850/60 border border-slate-800 rounded-xl space-y-1.5"
+                  className="p-3 bg-raised border border-line rounded-control space-y-1.5"
                 >
                   <div className="flex justify-between items-center text-xs font-bold text-white">
                     <span>{t(`checklist.categories.${cat}` as any) || cat}</span>
-                    <span className="text-rose-400">{stat.condemned} Condemned</span>
+                    <span className="text-bad-ink">{stat.condemned} Condemned</span>
                   </div>
 
-                  <div className="flex justify-between text-[11px] text-slate-400">
-                    <span className="text-emerald-400">{stat.passed || stat.pass || 0} Passed</span>
-                    <span className="text-blue-400">{stat.repaired || 0} Repaired</span>
-                    <span className="text-indigo-400">{stat.replaced || 0} Replaced</span>
+                  <div className="flex justify-between text-[11px] text-ink-muted">
+                    <span className="text-good-ink">{stat.passed || stat.pass || 0} Passed</span>
+                    <span className="text-accent-ink">{stat.repaired || 0} Repaired</span>
+                    <span className="text-accent-ink">{stat.replaced || 0} Replaced</span>
                   </div>
                 </div>
               );
@@ -566,21 +597,21 @@ export const DashboardPage: React.FC = () => {
         </div>
 
         {/* Inspector Productivity Table */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div className="bg-card border border-line rounded-card p-6 space-y-4">
           <h3 className="text-base font-bold text-white flex items-center gap-2">
-            <span>👷</span> {t('dashboard.inspectorsTitle')}
+            <UserIcon size={17} className="text-accent-ink" /> {t('dashboard.inspectorsTitle')}
           </h3>
 
-          <div className="divide-y divide-slate-800/80 max-h-80 overflow-y-auto pr-1">
+          <div className="divide-y divide-line/80 max-h-80 overflow-y-auto pr-1">
             {inspectors.map((insp, idx) => (
               <div key={`${insp.inspectorId}-${idx}`} className="py-3 flex justify-between items-center">
                 <div>
                   <h5 className="text-xs font-bold text-white">{insp.inspectorName}</h5>
-                  <p className="text-[11px] text-slate-400">ID: {insp.inspectorId}</p>
+                  <p className="text-[11px] text-ink-muted">ID: {insp.inspectorId}</p>
                 </div>
                 <div className="text-right">
-                  <span className="text-sm font-black text-orange-400">{insp.itemsInspected}</span>
-                  <p className="text-[10px] text-slate-500">{isHi ? 'जाँचे गए घटक' : 'Components Checked'}</p>
+                  <span className="text-sm font-extrabold text-accent-ink">{insp.itemsInspected}</span>
+                  <p className="text-[10px] text-ink-faint">{isHi ? 'जाँचे गए घटक' : 'Components Checked'}</p>
                 </div>
               </div>
             ))}
@@ -590,24 +621,24 @@ export const DashboardPage: React.FC = () => {
 
       {/* Active QC Blockers Diagnostics List */}
       {blockers.length > 0 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-          <h3 className="text-base font-bold text-rose-400 flex items-center gap-2">
-            <span>🚫</span> {t('dashboard.blockersTitle')} ({blockers.length} Wagons)
+        <div className="bg-card border border-line rounded-card p-6 space-y-4">
+          <h3 className="text-base font-bold text-bad-ink flex items-center gap-2">
+            <BanIcon size={17} className="text-bad-ink" /> {t('dashboard.blockersTitle')} ({blockers.length} Wagons)
           </h3>
 
           <div className="space-y-3">
             {blockers.map((b) => (
               <div
                 key={b.wagonNumber}
-                className="p-4 bg-rose-950/20 border border-rose-900/60 rounded-xl space-y-2"
+                className="p-4 bg-bad-soft border border-bad-line rounded-control space-y-2"
               >
                 <div className="flex justify-between items-center">
-                  <h4 className="text-xs font-black text-white">{b.wagonNumber}</h4>
-                  <span className="text-[10px] font-bold text-rose-400 bg-rose-900/40 px-2 py-0.5 rounded">
+                  <h4 className="text-xs font-extrabold text-white">{b.wagonNumber}</h4>
+                  <span className="text-[10px] font-bold text-bad-ink bg-bad-soft px-2 py-0.5 rounded">
                     {b.currentStage}
                   </span>
                 </div>
-                <ul className="text-xs text-rose-300/90 space-y-1 list-disc list-inside">
+                <ul className="text-xs text-bad-ink/90 space-y-1 list-disc list-inside">
                   {b.blockers.map((blk: string, idx: number) => (
                     <li key={idx}>{blk}</li>
                   ))}
@@ -657,12 +688,12 @@ const GaugeExposurePanel: React.FC = () => {
 
   return (
     <div
-      className="rounded-2xl border border-amber-700/50 bg-amber-950/20 p-5"
+      className="rounded-card border border-warn-line bg-warn-soft p-5"
       data-testid="dashboard-gauge-exposure"
     >
-      <h3 className="text-sm font-black text-amber-200 mb-1">Measurements on unverified instruments</h3>
+      <h3 className="text-sm font-extrabold text-warn-ink mb-1">Measurements on unverified instruments</h3>
       <p className="text-xs text-amber-100/80">{exposure.summary}</p>
-      <p className="text-[11px] text-slate-400 mt-2">
+      <p className="text-[11px] text-ink-muted mt-2">
         A reading is only worth its gauge&rsquo;s calibration record. Recording a calibration
         does not change readings already taken — they keep the state they had.
       </p>
@@ -693,33 +724,33 @@ const RecentActivityPanel: React.FC = () => {
   if (failed) return null;
 
   return (
-    <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-5" data-testid="dashboard-activity">
+    <div className="bg-card border border-line rounded-card p-5" data-testid="dashboard-activity">
       <div className="flex items-baseline justify-between mb-1">
-        <h3 className="text-sm font-black text-white">Who did what</h3>
-        <span className="text-[11px] text-slate-500 tabular-nums">
+        <h3 className="text-sm font-extrabold text-white">Who did what</h3>
+        <span className="text-[11px] text-ink-faint tabular-nums">
           {total} actions recorded in all
         </span>
       </div>
-      <p className="text-[11px] text-slate-500 mb-4">
+      <p className="text-[11px] text-ink-faint mb-4">
         The last 25 actions across the workshop. Open History &amp; Logs to search the whole record.
       </p>
 
-      <div className="divide-y divide-slate-800">
+      <div className="divide-y divide-line">
         {entries.length === 0 && (
-          <p className="text-xs text-slate-500 py-3">Nothing recorded yet.</p>
+          <p className="text-xs text-ink-faint py-3">Nothing recorded yet.</p>
         )}
         {entries.map(e => (
           <div key={e.id} className="py-2.5 flex flex-col sm:flex-row sm:items-baseline gap-x-3 gap-y-0.5">
-            <span className="text-xs font-bold text-slate-200 min-w-[10rem]">
+            <span className="text-xs font-bold text-ink-body min-w-[10rem]">
               {ACTIVITY_LABEL[e.eventType] || e.eventType}
             </span>
-            <span className="text-xs text-slate-400 flex-1 truncate">
+            <span className="text-xs text-ink-muted flex-1 truncate">
               {e.detail?.wagonNumber || e.detail?.partName || e.detail?.username || ''}
             </span>
-            <span className="text-[11px] text-slate-500 whitespace-nowrap">
+            <span className="text-[11px] text-ink-faint whitespace-nowrap">
               {e.actorName}
             </span>
-            <span className="text-[11px] text-slate-600 tabular-nums whitespace-nowrap">
+            <span className="text-[11px] text-ink-faint tabular-nums whitespace-nowrap">
               {new Date(e.occurredAt).toLocaleString('en-IN', {
                 day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true
               })}

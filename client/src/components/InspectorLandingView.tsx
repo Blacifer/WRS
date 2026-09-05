@@ -1,22 +1,30 @@
 /**
  * InspectorLandingView.tsx
- * Ultra-Clean Shop-Floor Touch-Friendly Landing View for INSPECTOR Role
+ * The inspector's home screen
  * Indian Railways WRS Raipur (Bogie & Wagon QC Section)
  *
- * Designed specifically for shop floor touchscreens and tablets:
- * - Touch targets >= 96px with high contrast and rugged industrial styling
- * - 4 Primary prominent CTA Action Cards
- * - Active wagon inspection resume card
- * - Zero analytics charts, zero pipeline tables, zero admin clutter
+ * One question per screen, one primary action.
+ *
+ * This screen used to open with a wall of eight gradient cards, each with an
+ * emoji in a 64px tile, and its own copies of the language toggle and the exit
+ * button that the header already carries. Everything was the same size, so
+ * nothing was the answer to "what do I do next" — and the ~900-a-day job was
+ * the fourth card down.
+ *
+ * Now the work mode decides what the screen is about, and whichever mode is
+ * chosen gets exactly one large primary action with the rest subordinate to
+ * it.
  */
 
 import React, { useState, useEffect } from 'react';
 import type { User, LanguageCode, WagonRecord } from '../../../shared/types.ts';
-import { getDictionary } from '../i18n/index.ts';
 import { offlineDb } from '../services/offlineDb.ts';
 import { api } from '../services/api.ts';
-import { CameraIcon, RefreshCwIcon, GlobeIcon, CheckCircleIcon, ShieldIcon } from './Icons.tsx';
+import {
+  CameraIcon, CoilIcon, CaliperIcon, CpuIcon, MicIcon, BookIcon, SearchIcon, RefreshCwIcon
+} from './Icons.tsx';
 import { WagonNumberCamera } from './WagonNumberCamera.tsx';
+import { Button, Card, Chip, IconButton, Note, inputClass } from './ui/index.tsx';
 
 export interface InspectorLandingViewProps {
   user: User;
@@ -36,7 +44,6 @@ export interface InspectorLandingViewProps {
 export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
   user,
   currentLang,
-  onToggleLang,
   activeWagonNumber,
   onSelectWagon,
   onOpenVoiceInspection,
@@ -44,10 +51,8 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
   onOpenSpringSorting,
   onOpenSpringQC,
   onOpenQRScanner,
-  onContinueChecklist,
-  onLogout
+  onContinueChecklist
 }) => {
-  const dict = getDictionary(currentLang);
   const isHi = currentLang === 'hi';
 
   const [pendingCount, setPendingCount] = useState<number>(0);
@@ -80,11 +85,23 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
 
   const chooseWorkMode = (mode: 'SPRINGS' | 'WAGON') => {
     setWorkMode(mode);
-    try { localStorage.setItem('wrs-work-mode', mode); } catch {}
+    try { localStorage.setItem('wrs-work-mode', mode); } catch { /* private windows */ }
   };
+
   const [activeWagonInfo, setActiveWagonInfo] = useState<WagonRecord | null>(null);
   const [activeWagonLoadFailed, setActiveWagonLoadFailed] = useState<boolean>(false);
   const [recentWagons, setRecentWagons] = useState<WagonRecord[]>([]);
+
+  /*
+   * Today's real figures, not a decorative number.
+   *
+   * The shop's own count for the day, from the same endpoint the sorting
+   * screen reads. If it cannot be fetched the panel says so rather than
+   * showing a zero, because a zero here would read as "you have done nothing
+   * today" to somebody who has been sorting since seven.
+   */
+  const [today, setToday] = useState<{ total: number; condemned: number } | null>(null);
+  const [todayFailed, setTodayFailed] = useState(false);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -99,6 +116,18 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
       window.removeEventListener('offline', handleOffline);
       unsubscribe();
     };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.getSortingThroughput()
+      .then((res) => {
+        if (cancelled) return;
+        if (res?.data) setToday({ total: res.data.total ?? 0, condemned: res.data.condemned ?? 0 });
+        else setTodayFailed(true);
+      })
+      .catch(() => { if (!cancelled) setTodayFailed(true); });
+    return () => { cancelled = true; };
   }, []);
 
   // Look up the real record for the currently active wagon (if any) — never
@@ -125,12 +154,23 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
 
   // Real, currently in-progress wagons for the quick-pick switcher — not a
   // hardcoded demo list that would 404 the moment someone selects it.
+  /*
+   * Loaded whenever the inspector is on wagon work, not only once the picker
+   * modal is opened.
+   *
+   * Before this, choosing "A wagon" showed an empty card reading "No active
+   * wagon — scan a QR code or pick a wagon", while eight wagons sat
+   * in progress one modal away. An inspector looking at emptiness where the
+   * shop has real work reasonably concludes the screen is broken, and the
+   * first person to use the pilot said exactly that. The request was already
+   * being made; it was only gated behind a click.
+   */
   useEffect(() => {
-    if (!isWagonSelectorOpen) return;
+    if (!isWagonSelectorOpen && workMode !== 'WAGON') return;
     api.queryWagons({ limit: 8 })
       .then((res) => setRecentWagons((res?.data || []).filter(w => w.currentStage !== 'RELEASE')))
       .catch(() => setRecentWagons([]));
-  }, [isWagonSelectorOpen]);
+  }, [isWagonSelectorOpen, workMode]);
 
   const handleManualWagonSelect = (e: React.FormEvent) => {
     e.preventDefault();
@@ -141,230 +181,84 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
     }
   };
 
+  /* A large card that is the answer to "what do I do next". */
+  const PrimaryAction: React.FC<{
+    onClick: () => void;
+    eyebrow: string;
+    title: string;
+    detail: string;
+    icon: React.ReactNode;
+    testId?: string;
+  }> = ({ onClick, eyebrow, title, detail, icon, testId }) => (
+    <button
+      data-testid={testId}
+      onClick={onClick}
+      className="w-full text-left p-6 rounded-touch bg-accent border border-accent-hover
+                 hover:bg-accent-hover transition-colors active:scale-[0.99]"
+    >
+      <div className="flex items-center justify-between gap-4">
+        <span className="text-white">{icon}</span>
+        <span className="text-[11px] font-bold uppercase tracking-[0.07em] text-white/70">{eyebrow}</span>
+      </div>
+      <div className="mt-4 text-2xl font-extrabold tracking-[-0.02em] text-white">{title}</div>
+      <div className="mt-1 text-sm font-medium text-white/80">{detail}</div>
+    </button>
+  );
+
+  /* Everything that is not the primary action. */
+  const SecondaryAction: React.FC<{
+    onClick: () => void;
+    title: string;
+    icon: React.ReactNode;
+    testId?: string;
+  }> = ({ onClick, title, icon, testId }) => (
+    <button
+      data-testid={testId}
+      onClick={onClick}
+      className="min-h-[112px] w-full text-left p-4 rounded-card bg-card border border-line
+                 hover:border-line-strong hover:bg-raised transition-colors active:scale-[0.99]
+                 flex flex-col items-start gap-3"
+    >
+      <span className="text-accent-ink">{icon}</span>
+      <span className="text-[15px] font-bold text-ink-body leading-snug">{title}</span>
+    </button>
+  );
+
   return (
-    <div data-testid="inspector-landing-view" className="w-full max-w-6xl mx-auto space-y-6 animate-fadeIn select-none pb-12">
-      {/* 1. Shop-Floor Hero Status Header */}
-      <div data-testid="inspector-hero-header" className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-2xl backdrop-blur-xl">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-2xl shadow-inner shrink-0">
-              👷
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-blue-950 text-blue-300 border border-blue-800">
-                  {isHi ? 'रेलवे क्यूसी निरीक्षक' : 'Railway QC Inspector'}
-                </span>
-                <span className="text-xs text-slate-400 font-mono">
-                  ID: {user.username || 'insp-01'}
-                </span>
-              </div>
-              <h1 className="text-xl sm:text-2xl font-black text-white tracking-tight mt-1">
-                {user.name || 'Inspector'}
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-400 font-medium flex items-center gap-1.5 mt-0.5">
-                <span className="text-blue-400">📍</span>
-                {isHi ? 'बोगी असेंबली एवं स्प्रिंग ओवरहाल बे 3 (रायपुर डब्लूआरएस)' : 'Bogie Assembly & Spring Overhaul Bay 3 (Raipur WRS)'}
-              </p>
-            </div>
+    <div data-testid="inspector-landing-view" className="w-full max-w-3xl mx-auto space-y-5 animate-fadeIn pb-10">
+
+      {/* Who and where. The header already carries language and sign-out, so
+          this no longer keeps its own duplicate pair of them. */}
+      <div data-testid="inspector-hero-header" className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.07em] text-ink-muted">
+            {isHi ? 'रेलवे क्यूसी निरीक्षक' : 'Railway QC Inspector'}
           </div>
+          <h1 className="mt-1 text-[26px] font-extrabold tracking-[-0.025em] text-ink">
+            {user.name || 'Inspector'}
+          </h1>
+          <p className="mt-1 text-[13px] font-medium text-ink-muted">
+            {isHi
+              ? 'बोगी असेंबली एवं स्प्रिंग ओवरहाल बे 3'
+              : 'Bogie Assembly & Spring Overhaul Bay 3'}
+            {' · '}
+            {user.username || 'insp-01'}
+          </p>
+        </div>
 
-          {/* Status & Quick Bilingual Controls */}
-          <div className="flex items-center gap-3 pt-2 md:pt-0 border-t md:border-t-0 border-slate-800">
-            {/* Sync & Connectivity Status */}
-            <div data-testid="sync-status-badge" className="flex flex-col items-start md:items-end">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border bg-emerald-950/60 text-emerald-300 border-emerald-800">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span>{isOnline ? (isHi ? 'ऑनलाइन सिंक तैयार' : 'Offline Sync Ready') : (isHi ? 'ऑफ़लाइन मोड' : 'Offline Mode')}</span>
-              </div>
-              <span className="text-[11px] text-slate-400 font-mono mt-1 px-1">
-                {pendingCount === 0 
-                  ? (isHi ? '0 लंबित लॉग' : '0 Pending Logs') 
-                  : `${pendingCount} ${isHi ? 'लंबित सिंक' : 'Pending Sync'}`}
-              </span>
-            </div>
-
-            {/* Quick Language Toggle (Touch Target >= 48px) */}
-            <button
-              data-testid="btn-toggle-lang"
-              onClick={onToggleLang}
-              className="min-w-[48px] min-h-[48px] px-3.5 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-100 border border-slate-700 rounded-2xl flex items-center justify-center gap-1.5 font-bold text-sm shadow-md transition-all active:scale-95"
-              aria-label="Toggle Language"
-            >
-              <GlobeIcon size={18} className="text-blue-400" />
-              <span>{currentLang === 'en' ? 'हिंदी' : 'EN'}</span>
-            </button>
-
-            {onLogout && (
-              <button
-                data-testid="btn-logout"
-                onClick={onLogout}
-                title={isHi ? 'लॉग आउट' : 'Logout'}
-                className="min-w-[48px] min-h-[48px] px-3 py-2 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 border border-rose-800/60 rounded-2xl flex items-center justify-center font-bold text-xs shadow-md transition-all active:scale-95"
-              >
-                {isHi ? 'लॉगआउट' : 'Exit'}
-              </button>
-            )}
+        <div data-testid="sync-status-badge" className="text-right">
+          <Chip tone={isOnline ? 'good' : 'warn'} dot>
+            {isOnline
+              ? (isHi ? 'ऑनलाइन' : 'Online')
+              : (isHi ? 'ऑफ़लाइन मोड' : 'Offline mode')}
+          </Chip>
+          <div className="mt-1.5 text-[11px] font-semibold text-ink-faint tabular">
+            {pendingCount === 0
+              ? (isHi ? 'भेजने के लिए कुछ नहीं' : 'Nothing waiting to send')
+              : `${pendingCount} ${isHi ? 'लंबित' : 'waiting to send'}`}
           </div>
         </div>
       </div>
-
-      {/* 2. Active Wagon Summary Card — wagon work only.
-             A spring sorter has no wagon and does not want to be asked for
-             one; this used to be the first and largest thing they saw. */}
-      {workMode === 'WAGON' && (
-      <div data-testid="active-wagon-card" className="bg-gradient-to-r from-blue-950/40 via-slate-900 to-indigo-950/30 border-2 border-blue-500/40 rounded-3xl p-5 sm:p-7 shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl pointer-events-none"></div>
-
-        {!activeWagonNumber ? (
-          /* No wagon selected yet — don't fabricate one */
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative z-10">
-            <div>
-              <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
-                {isHi ? 'कोई सक्रिय वैगन नहीं' : 'No Active Wagon'}
-              </div>
-              <p className="text-sm text-slate-300 mt-1">
-                {isHi ? 'शुरू करने के लिए QR स्कैन करें या वैगन चुनें' : 'Scan a QR code or select a wagon to get started'}
-              </p>
-            </div>
-            <div className="flex items-stretch sm:items-center gap-3">
-              <button
-                onClick={onOpenQRScanner}
-                className="min-h-[52px] px-5 py-3 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-extrabold text-sm rounded-2xl shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95 border border-blue-400"
-              >
-                <span>📷</span>
-                <span>{isHi ? 'QR स्कैन करें' : 'Scan QR'}</span>
-              </button>
-              <button
-                data-testid="btn-switch-wagon"
-                onClick={() => setIsWagonSelectorOpen(true)}
-                className="min-h-[52px] px-4 py-3 bg-slate-800/90 hover:bg-slate-700 active:bg-slate-900 text-slate-200 hover:text-white font-bold text-sm rounded-2xl border border-slate-700 flex items-center justify-center gap-2 transition-all active:scale-95"
-              >
-                <span>🔍</span>
-                <span>{isHi ? 'वैगन चुनें' : 'Select Wagon'}</span>
-              </button>
-            </div>
-          </div>
-        ) : activeWagonLoadFailed ? (
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative z-10">
-            <div>
-              <div className="text-xs text-rose-400 font-semibold uppercase tracking-wider">
-                {isHi ? 'वैगन नहीं मिला' : 'Wagon Not Found'}
-              </div>
-              <p className="text-sm text-slate-300 mt-1 font-mono">{activeWagonNumber}</p>
-            </div>
-            <button
-              data-testid="btn-switch-wagon"
-              onClick={() => setIsWagonSelectorOpen(true)}
-              className="min-h-[52px] px-4 py-3 bg-slate-800/90 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-sm rounded-2xl border border-slate-700 flex items-center justify-center gap-2 transition-all active:scale-95"
-            >
-              <span>🔄</span>
-              <span>{isHi ? 'वैगन बदलें' : 'Switch Wagon'}</span>
-            </button>
-          </div>
-        ) : (
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 relative z-10">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-blue-900/80 text-blue-200 border border-blue-600 flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-blue-400 animate-ping"></span>
-                  {isHi ? 'सक्रिय निरीक्षण सत्र' : 'Active Inspection Session'}
-                </span>
-              </div>
-
-              <div>
-                <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">
-                  {isHi ? 'वर्तमान चयनित वैगन' : 'Current Active Wagon'}
-                </div>
-                <div data-testid="active-wagon-number" className="text-2xl sm:text-4xl font-black text-white font-mono tracking-wider text-glow-blue mt-0.5">
-                  {activeWagonNumber}
-                </div>
-              </div>
-
-              {activeWagonInfo && (
-                <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-300">
-                  <span className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700">
-                    {isHi ? 'प्रकार:' : 'Type:'} <strong className="text-white">{activeWagonInfo.wagonType}</strong>
-                  </span>
-                  <span className="px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700">
-                    {isHi ? 'रेलवे:' : 'Zone:'} <strong className="text-white">{activeWagonInfo.owningRailway}</strong>
-                  </span>
-                  <span className="px-2.5 py-1 rounded-lg bg-blue-950 text-blue-300 border border-blue-800">
-                    {isHi ? 'चरण:' : 'Stage:'} {activeWagonInfo.currentStage}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Large Action Buttons on Active Wagon (>= 56px height, spacious touch target) */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-              <button
-                data-testid="btn-continue-checklist"
-                onClick={() => onContinueChecklist(activeWagonNumber)}
-                className="min-h-[56px] px-6 py-3 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white font-extrabold text-base rounded-2xl shadow-xl shadow-blue-900/30 flex items-center justify-center gap-2 transition-all active:scale-95 border border-blue-400"
-              >
-                <span>{isHi ? 'चेकलिस्ट जारी रखें' : 'Continue Checklist'}</span>
-                <span className="text-xl">→</span>
-              </button>
-
-              <button
-                data-testid="btn-switch-wagon"
-                onClick={() => setIsWagonSelectorOpen(true)}
-                className="min-h-[56px] px-4 py-3 bg-slate-800/90 hover:bg-slate-700 active:bg-slate-900 text-slate-200 hover:text-white font-bold text-sm rounded-2xl border border-slate-700 flex items-center justify-center gap-2 transition-all active:scale-95"
-              >
-                <span>🔄</span>
-                <span>{isHi ? 'वैगन बदलें' : 'Switch Wagon'}</span>
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      )}
-
-      {/* Choosing the job, when it has not been chosen yet. */}
-      {workMode === null && (
-        <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
-          <div>
-            <h2 className="text-lg font-extrabold text-white">
-              {isHi ? 'आज आप क्या कर रहे हैं?' : 'What are you working on today?'}
-            </h2>
-            <p className="text-xs text-slate-400 mt-1">
-              {isHi
-                ? 'बाद में कभी भी बदल सकते हैं'
-                : 'You can change this any time — it just decides what this screen shows.'}
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <button
-              data-testid="choose-springs"
-              onClick={() => chooseWorkMode('SPRINGS')}
-              className="min-h-[110px] p-5 rounded-2xl border-2 border-sky-500/50 bg-sky-950/30 hover:border-sky-400 text-left transition"
-            >
-              <div className="text-3xl">⚖️</div>
-              <div className="text-lg font-extrabold text-white mt-2">
-                {isHi ? 'स्प्रिंग' : 'Springs'}
-              </div>
-              <div className="text-xs text-slate-300 mt-1">
-                {isHi ? 'छँटाई, मापन, समूह' : 'Sorting, measuring, grouping'}
-              </div>
-            </button>
-            <button
-              data-testid="choose-wagon"
-              onClick={() => chooseWorkMode('WAGON')}
-              className="min-h-[110px] p-5 rounded-2xl border-2 border-orange-500/50 bg-orange-950/30 hover:border-orange-400 text-left transition"
-            >
-              <div className="text-3xl">🚃</div>
-              <div className="text-lg font-extrabold text-white mt-2">
-                {isHi ? 'वैगन' : 'A wagon'}
-              </div>
-              <div className="text-xs text-slate-300 mt-1">
-                {isHi ? 'जाँच सूची और रिलीज़ गेट' : 'Checklist and exit gate'}
-              </div>
-            </button>
-          </div>
-        </div>
-      )}
 
       {/*
         Which job is on screen, and how to change it.
@@ -377,356 +271,394 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
         top: the inspector's navigation bar carries no wagon entry, so the
         home screen is the only route there is.
 
-        Both jobs are now always visible as a pair, so the choice explains
-        itself — you can see there IS a wagon side even while you are on the
-        spring side — and both are full touch targets for a gloved hand.
+        Both jobs are always visible as a pair, so the choice explains itself
+        — you can see there IS a wagon side even while you are on the spring
+        side — and both are full touch targets for a gloved hand.
       */}
-      {workMode !== null && (
-        <div className="space-y-2 px-1">
-          <span className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            {isHi ? 'आज का कार्य' : 'What you are working on'}
-          </span>
-          <div
-            role="group"
-            aria-label={isHi ? 'आज का कार्य' : 'What you are working on'}
-            className="grid grid-cols-2 gap-2 max-w-md"
-          >
-            {([
-              { mode: 'SPRINGS' as const, icon: '⚖️', en: 'Springs', hi: 'स्प्रिंग' },
-              { mode: 'WAGON' as const, icon: '🚃', en: 'A wagon', hi: 'वैगन' }
-            ]).map((choice) => {
-              const current = workMode === choice.mode;
-              return (
-                <button
-                  key={choice.mode}
-                  data-testid={current ? 'work-mode-current' : 'switch-work-mode'}
-                  aria-pressed={current}
-                  onClick={() => chooseWorkMode(choice.mode)}
-                  className={`min-h-[52px] px-4 rounded-xl border-2 font-extrabold text-sm flex items-center justify-center gap-2 transition-all ${
-                    current
-                      ? 'border-sky-400 bg-sky-950/50 text-white'
-                      : 'border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-500 hover:text-slate-200'
-                  }`}
-                >
-                  <span aria-hidden="true">{choice.icon}</span>
-                  <span>{isHi ? choice.hi : choice.en}</span>
-                </button>
-              );
-            })}
+      <div>
+        <span className="block mb-2 text-[11px] font-semibold uppercase tracking-[0.07em] text-ink-muted">
+          {workMode === null
+            ? (isHi ? 'आज आप क्या कर रहे हैं?' : 'What are you working on today?')
+            : (isHi ? 'आज का कार्य' : 'What you are working on')}
+        </span>
+        <div
+          role="group"
+          aria-label={isHi ? 'आज का कार्य' : 'What you are working on'}
+          className="grid grid-cols-2 gap-1.5 p-1.5 bg-card border border-line rounded-touch"
+        >
+          {([
+            { mode: 'SPRINGS' as const, en: 'Springs', hi: 'स्प्रिंग', testId: 'choose-springs' },
+            { mode: 'WAGON' as const, en: 'A wagon', hi: 'वैगन', testId: 'choose-wagon' }
+          ]).map((choice) => {
+            const current = workMode === choice.mode;
+            return (
+              <button
+                key={choice.mode}
+                data-testid={workMode === null ? choice.testId : (current ? 'work-mode-current' : 'switch-work-mode')}
+                aria-pressed={current}
+                onClick={() => chooseWorkMode(choice.mode)}
+                className={[
+                  'min-h-[52px] px-4 rounded-control text-[15px] font-bold transition-colors',
+                  current ? 'bg-selected text-ink' : 'text-ink-muted hover:text-ink hover:bg-raised'
+                ].join(' ')}
+              >
+                {isHi ? choice.hi : choice.en}
+              </button>
+            );
+          })}
+        </div>
+        {workMode === null && (
+          <Note className="mt-2">
+            {isHi
+              ? 'बाद में कभी भी बदल सकते हैं — यह सिर्फ़ तय करता है कि यह स्क्रीन क्या दिखाए।'
+              : 'You can change this any time — it just decides what this screen shows.'}
+          </Note>
+        )}
+      </div>
+
+      {/* ---------------------------------------------------------- SPRINGS */}
+      {workMode === 'SPRINGS' && (
+        <div className="space-y-3">
+          <PrimaryAction
+            onClick={onOpenSpringSorting}
+            eyebrow={isHi ? 'आज का काम' : "Today's work"}
+            title={isHi ? 'स्प्रिंग छँटाई' : 'Sort springs'}
+            detail={isHi
+              ? 'पट्टी से मिलाकर बैंड दबाएँ — खुले स्प्रिंग, वैगन नंबर नहीं चाहिए'
+              : 'Tap the band against the strip — loose springs, no wagon number needed'}
+            icon={<CoilIcon size={30} />}
+          />
+
+          {/* The shop's own count for today. */}
+          <Card>
+            <div className="px-5 py-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.07em] text-ink-muted">
+                {isHi ? 'आज, सभी सत्र' : 'Today, all sessions'}
+              </div>
+              {today ? (
+                <div className="flex items-baseline gap-6 mt-2">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-[40px] leading-none font-extrabold tracking-[-0.035em] text-ink tabular">
+                      {today.total}
+                    </span>
+                    <span className="text-sm font-semibold text-ink-muted">
+                      {isHi ? 'छँटे' : 'sorted'}
+                    </span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-extrabold text-bad-ink tabular">{today.condemned}</span>
+                    <span className="text-sm font-semibold text-ink-muted">
+                      {isHi ? 'कंडम' : 'condemned'}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <Note className="mt-2">
+                  {todayFailed
+                    ? (isHi
+                      ? 'आज की गिनती अभी नहीं मिली — छँटाई फिर भी दर्ज होती रहेगी।'
+                      : "Today's count could not be fetched. Sorting still records normally.")
+                    : (isHi ? 'गिनती लाई जा रही है…' : 'Fetching the count…')}
+                </Note>
+              )}
+            </div>
+          </Card>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <SecondaryAction
+              testId="cta-spring-qc"
+              onClick={onOpenSpringQC}
+              title={isHi ? 'एक स्प्रिंग दर्ज करें' : 'Record one spring'}
+              icon={<CaliperIcon size={24} />}
+            />
+            <SecondaryAction
+              testId="cta-smart-vision"
+              onClick={onOpenSmartVision}
+              title={isHi ? 'स्प्रिंग बैच — पूरा वैगन' : 'Spring batch — whole wagon'}
+              icon={<CpuIcon size={24} />}
+            />
+            <SecondaryAction
+              onClick={() => setIsWagonSelectorOpen(true)}
+              title={isHi ? 'वैगन चुनें' : 'Pick a wagon'}
+              icon={<SearchIcon size={24} />}
+            />
           </div>
         </div>
       )}
 
-      {/* 3. Primary actions.
-             Springs lead because that is the live workflow at Raipur and the
-             one being piloted. The wagon-checklist entry points sit below and
-             say plainly that they depend on wagon QR codes, which the workshop
-             has not put in place yet — better than a card that looks ready and
-             leads nowhere. */}
-      <div className="space-y-8">
-        <div>
-          <div className="flex items-center justify-between mb-3 px-1">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">
-              {isHi ? 'स्प्रिंग निरीक्षण' : 'Spring Inspection'}
-            </h2>
-            <span className="text-xs text-slate-500 font-mono">
-              {isHi ? 'आरडीएसओ जी-95' : 'RDSO G-95'}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
-            {/* Card 3: Spring Batch Inspection (Emerald Green) */}
-          <button
-            onClick={onOpenSpringSorting}
-            className="min-h-[120px] p-6 rounded-3xl border-2 border-sky-500/40 bg-gradient-to-br from-sky-950/40 via-slate-900 to-slate-950 hover:border-sky-400 hover:bg-sky-950/60 active:scale-[0.98] transition-all text-left shadow-xl flex items-center justify-between group cursor-pointer"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-sky-500/20 border border-sky-500/50 flex items-center justify-center text-3xl shadow-inner shrink-0 group-hover:scale-105 transition-transform">
-                ⚖️
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-extrabold uppercase px-2 py-0.5 rounded bg-sky-950 text-sky-300 border border-sky-800">
-                    {isHi ? 'खुले स्प्रिंग · वैगन नहीं' : 'Loose springs · no wagon'}
-                  </span>
-                </div>
-                <h3 className="text-xl font-extrabold text-white group-hover:text-sky-300 transition-colors">
-                  {isHi ? 'स्प्रिंग छँटाई' : 'Spring Sorting'}
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-300 font-medium line-clamp-2">
-                  {isHi
-                    ? 'ढेर से छँटाई — बैंड टैप करें, समूह और पूर्ण नेस्ट की गिनती चलती रहेगी'
-                    : 'Sort the pile — tap the band, and see how the groups and complete nests add up'}
-                </p>
-              </div>
-            </div>
-            <div className="hidden sm:flex items-center justify-center w-10 h-10 rounded-xl bg-slate-800 text-sky-400 text-lg group-hover:bg-sky-500 group-hover:text-slate-950 transition-colors shrink-0 ml-2">
-              ➔
-            </div>
-          </button>
-
-          <button
-            data-testid="cta-smart-vision"
-            onClick={onOpenSmartVision}
-            className="min-h-[120px] p-6 rounded-3xl border-2 border-emerald-500/40 bg-gradient-to-br from-emerald-950/40 via-slate-900 to-slate-950 hover:border-emerald-400 hover:bg-emerald-950/60 active:scale-[0.98] transition-all text-left shadow-xl flex items-center justify-between group cursor-pointer"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center text-3xl shadow-inner shrink-0 group-hover:scale-105 transition-transform">
-                🔬
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-extrabold uppercase px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">
-                    {isHi ? 'पूरा वैगन · हर स्प्रिंग' : 'Whole wagon · every spring'}
-                  </span>
-                </div>
-                <h3 className="text-xl font-extrabold text-white group-hover:text-emerald-300 transition-colors">
-                  {isHi ? 'स्प्रिंग बैच' : 'Spring Batch'}
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-300 font-medium line-clamp-2">
-                  {isHi
-                    ? 'पट्टी पर बैंड देखें और टैप करें — नेस्ट दर नेस्ट, पूरा वैगन'
-                    : 'Tap the band you read off the strip — nest by nest, through the whole wagon'}
-                </p>
-              </div>
-            </div>
-            <div className="hidden sm:flex items-center justify-center w-10 h-10 rounded-xl bg-slate-800 text-emerald-400 text-lg group-hover:bg-emerald-500 group-hover:text-slate-950 transition-colors shrink-0 ml-2">
-              ➔
-            </div>
-          </button>
-
-            {/* Card 4: Quick Spring QC (RDSO G-95) (Purple/Indigo) */}
-          <button
-            data-testid="cta-spring-qc"
-            onClick={onOpenSpringQC}
-            className="min-h-[120px] p-6 rounded-3xl border-2 border-purple-500/40 bg-gradient-to-br from-purple-950/40 via-slate-900 to-slate-950 hover:border-purple-400 hover:bg-purple-950/60 active:scale-[0.98] transition-all text-left shadow-xl flex items-center justify-between group cursor-pointer"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-purple-500/20 border border-purple-500/50 flex items-center justify-center text-3xl shadow-inner shrink-0 group-hover:scale-105 transition-transform">
-                🌀
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-extrabold uppercase px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800">
-                    RDSO G-95
-                  </span>
-                </div>
-                <h3 className="text-xl font-extrabold text-white group-hover:text-purple-300 transition-colors">
-                  {isHi ? 'एक स्प्रिंग' : 'Single Spring'}
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-300 font-medium line-clamp-2">
-                  {isHi 
-                    ? '6-बैंड ऊंचाई वर्गीकरण, रंग कोडिंग एवं निंदा सीमा सत्यापन' 
-                    : '6-Band height classifier, color coding & condemnation limits'}
-                </p>
-              </div>
-            </div>
-            <div className="hidden sm:flex items-center justify-center w-10 h-10 rounded-xl bg-slate-800 text-purple-400 text-lg group-hover:bg-purple-500 group-hover:text-slate-950 transition-colors shrink-0 ml-2">
-              ➔
-            </div>
-          </button>
-          </div>
-        </div>
-
-        {/* Wagon work only. Somebody sorting springs has no use for these and
-            should not have to scroll past them. */}
-        {workMode !== 'SPRINGS' && (
-        <div>
-          <div className="flex items-center justify-between mb-3 px-1">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400">
-              {isHi ? 'वैगन चेकलिस्ट' : 'Wagon Checklist'}
-            </h2>
-            <span className="text-[11px] text-amber-500/80 font-semibold">
-              {isHi ? 'वैगन क्यूआर कोड लगने के बाद' : 'Needs wagon QR codes — not in place yet'}
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 opacity-75">
-            {/* Card 1: Scan Wagon QR Code (Orange/Amber) */}
-          <button
-            data-testid="cta-scan-wagon-qr"
-            onClick={onOpenQRScanner}
-            className="min-h-[120px] p-6 rounded-3xl border-2 border-amber-500/40 bg-gradient-to-br from-amber-950/40 via-slate-900 to-slate-950 hover:border-amber-400 hover:bg-amber-950/60 active:scale-[0.98] transition-all text-left shadow-xl flex items-center justify-between group cursor-pointer"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-3xl shadow-inner shrink-0 group-hover:scale-105 transition-transform">
-                📷
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-extrabold uppercase px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800">
-                    QR / RFID
-                  </span>
-                </div>
-                <h3 className="text-xl font-extrabold text-white group-hover:text-amber-300 transition-colors">
-                  {isHi ? 'वैगन क्यूआर स्कैन करें' : 'Scan Wagon QR Code'}
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-300 font-medium line-clamp-2">
-                  {isHi 
-                    ? 'त्वरित वैगन खोज, आरएफआईडी इनटेक और घटक पासपोर्ट लिंकिंग' 
-                    : 'Instant wagon lookup, RFID intake & component passport linking'}
-                </p>
-              </div>
-            </div>
-            <div className="hidden sm:flex items-center justify-center w-10 h-10 rounded-xl bg-slate-800 text-amber-400 text-lg group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors shrink-0 ml-2">
-              ➔
-            </div>
-          </button>
-
-            {/* Card 2: Start Voice Inspection (Cyan/Blue) */}
-          <button
-            data-testid="cta-start-voice"
-            onClick={() => {
-              // A voice inspection needs a wagon. Without one this used to
-              // hand the inspector a QR scanner, which is both a confusing
-              // response to this button and useless at Raipur, where wagons
-              // carry no QR codes yet. Open the wagon picker instead.
-              if (activeWagonNumber) {
-                onOpenVoiceInspection();
-              } else {
-                setIsWagonSelectorOpen(true);
-              }
-            }}
-            className="min-h-[120px] p-6 rounded-3xl border-2 border-cyan-500/40 bg-gradient-to-br from-cyan-950/40 via-slate-900 to-slate-950 hover:border-cyan-400 hover:bg-cyan-950/60 active:scale-[0.98] transition-all text-left shadow-xl flex items-center justify-between group cursor-pointer"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-cyan-500/20 border border-cyan-500/50 flex items-center justify-center text-3xl shadow-inner shrink-0 group-hover:scale-105 transition-transform">
-                🎙️
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-extrabold uppercase px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
-                    {isHi ? 'हैंड्स-फ्री वॉयस' : 'Hands-Free Voice'}
-                  </span>
-                </div>
-                <h3 className="text-xl font-extrabold text-white group-hover:text-cyan-300 transition-colors">
-                  {isHi ? 'ध्वनि निरीक्षण शुरू करें' : 'Start Voice Inspection'}
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-300 font-medium line-clamp-2">
-                  {isHi 
-                    ? 'ग्रीसी ग्लव्स द्विभाषी भाषण कमांड्स (कासनब चेकलिस्ट ऑटो-अपडेट)' 
-                    : 'Hands-free "Greasy Gloves" bilingual speech commands for CASNUB checklist'}
-                </p>
-              </div>
-            </div>
-            <div className="hidden sm:flex items-center justify-center w-10 h-10 rounded-xl bg-slate-800 text-cyan-400 text-lg group-hover:bg-cyan-500 group-hover:text-slate-950 transition-colors shrink-0 ml-2">
-              ➔
-            </div>
-          </button>
-          </div>
-        </div>
-        )}
-      </div>
-
-      {/* 4. Wagon Switcher / Quick Picker Modal */}
-      {isWagonSelectorOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-fadeIn">
-          <div className="bg-slate-900 border border-slate-700 rounded-3xl p-6 shadow-2xl w-full max-w-lg space-y-5">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-800">
-              <div>
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <span>🚂</span>
-                  <span>{isHi ? 'वैगन का चयन करें' : 'Select Workshop Wagon'}</span>
-                </h3>
-                <p className="text-xs text-slate-400">
-                  {isHi ? 'शॉप फ्लोर पर सक्रिय वैगन चुनें या नया नंबर दर्ज करें' : 'Select an active workshop wagon or enter wagon number'}
-                </p>
-              </div>
-              <button
-                onClick={() => setIsWagonSelectorOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-800 text-slate-400 hover:text-white flex items-center justify-center font-bold"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Quick 1-Tap Presets */}
-            <div className="space-y-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                {isHi ? 'कार्यशाला में सक्रिय वैगन' : 'Active Workshop Wagons'}
-              </span>
-              <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto no-scrollbar">
-                {recentWagons.length === 0 && (
-                  <p className="text-xs text-slate-500 italic px-1 py-2">
-                    {isHi ? 'कोई वैगन नहीं मिला — नीचे नंबर दर्ज करें' : 'No wagons found — enter a number below'}
+      {/* ----------------------------------------------------------- WAGON */}
+      {workMode === 'WAGON' && (
+        <div className="space-y-3">
+          <Card tone="accent" data-testid="active-wagon-card">
+            <div className="px-5 py-5">
+              {!activeWagonNumber ? (
+                <>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.07em] text-ink-muted">
+                    {isHi ? 'कोई सक्रिय वैगन नहीं' : 'No active wagon'}
+                  </div>
+                  <p className="mt-1.5 text-sm text-ink-body">
+                    {isHi
+                      ? 'नीचे से एक वैगन चुनें, या QR स्कैन करें।'
+                      : 'Pick one of the wagons below, or scan its QR code.'}
                   </p>
-                )}
-                {recentWagons.map(w => (
-                  <button
-                    key={w.wagonNumber}
-                    onClick={() => {
-                      onSelectWagon(w.wagonNumber);
-                      setIsWagonSelectorOpen(false);
-                    }}
-                    className={`min-h-[50px] p-3 rounded-xl border flex items-center justify-between text-left transition-all ${
-                      w.wagonNumber === activeWagonNumber
-                        ? 'bg-blue-950/60 border-blue-500 text-white font-bold'
-                        : 'bg-slate-800/60 border-slate-700 text-slate-300 hover:bg-slate-800'
-                    }`}
-                  >
-                    <div>
-                      <div className="font-mono font-bold text-sm">{w.wagonNumber}</div>
-                      <div className="text-[11px] text-slate-400">{w.wagonType} • {w.owningRailway} • {w.currentStage}</div>
+                  {/*
+                    * The wagons actually in the shop, listed here rather than
+                    * hidden behind the picker. This is the inspector's only
+                    * route to a wagon — the Wagons tab appears in the bar only
+                    * once one is selected — so an empty card was a dead end
+                    * dressed as a starting point.
+                    */}
+                  {recentWagons.length > 0 && (
+                    <div className="mt-4 space-y-2" data-testid="wagons-in-progress">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.07em] text-ink-muted">
+                        {isHi ? 'शॉप में अभी' : 'In the shop now'}
+                      </div>
+                      {recentWagons.map((w) => (
+                        <button
+                          key={w.wagonNumber}
+                          onClick={() => onSelectWagon(w.wagonNumber)}
+                          className="w-full min-h-[56px] px-4 py-3 flex items-center justify-between gap-3 rounded-control border border-line bg-raised hover:border-line-strong active:opacity-80 text-left transition"
+                        >
+                          <span className="font-bold text-ink-strong truncate">{w.wagonNumber}</span>
+                          <span className="text-[11px] font-mono uppercase tracking-wide text-ink-muted whitespace-nowrap">
+                            {String(w.currentStage || '').replace(/_/g, ' ')}
+                          </span>
+                        </button>
+                      ))}
                     </div>
-                    {w.wagonNumber === activeWagonNumber && (
-                      <span className="text-xs font-bold text-blue-400 bg-blue-950 px-2 py-1 rounded border border-blue-700">
-                        {isHi ? 'सक्रिय' : 'Active'}
-                      </span>
-                    )}
-                  </button>
-                ))}
+                  )}
+
+                  <div className="flex flex-wrap gap-3 mt-4">
+                    <Button variant="primary" size="touch" onClick={onOpenQRScanner}>
+                      <CameraIcon size={20} />
+                      <span>{isHi ? 'QR स्कैन करें' : 'Scan QR'}</span>
+                    </Button>
+                    <Button
+                      data-testid="btn-switch-wagon"
+                      size="touch"
+                      onClick={() => setIsWagonSelectorOpen(true)}
+                    >
+                      <SearchIcon size={20} />
+                      <span>{isHi ? 'सभी वैगन' : 'All wagons'}</span>
+                    </Button>
+                  </div>
+                </>
+              ) : activeWagonLoadFailed ? (
+                <>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.07em] text-bad-ink">
+                    {isHi ? 'वैगन नहीं मिला' : 'Wagon not found'}
+                  </div>
+                  <p className="mt-1.5 text-lg font-bold text-ink tabular">{activeWagonNumber}</p>
+                  <Button
+                    data-testid="btn-switch-wagon"
+                    size="touch"
+                    className="mt-4"
+                    onClick={() => setIsWagonSelectorOpen(true)}
+                  >
+                    <RefreshCwIcon size={18} />
+                    <span>{isHi ? 'वैगन बदलें' : 'Switch wagon'}</span>
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.07em] text-ink-muted">
+                    {isHi ? 'सक्रिय वैगन' : 'Active wagon'}
+                  </div>
+                  <div
+                    data-testid="active-wagon-number"
+                    className="mt-1 text-2xl font-extrabold tracking-[-0.02em] text-ink tabular"
+                  >
+                    {activeWagonNumber}
+                  </div>
+
+                  {activeWagonInfo && (
+                    <div className="flex flex-wrap items-center gap-2 mt-3">
+                      <Chip>{activeWagonInfo.wagonType}</Chip>
+                      <Chip>{activeWagonInfo.owningRailway}</Chip>
+                      <Chip tone="warn">{activeWagonInfo.currentStage}</Chip>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-3 mt-5">
+                    <Button
+                      data-testid="btn-continue-checklist"
+                      variant="primary"
+                      size="touch"
+                      onClick={() => onContinueChecklist(activeWagonNumber)}
+                    >
+                      {isHi ? 'चेकलिस्ट जारी रखें' : 'Continue checklist'}
+                    </Button>
+                    <Button
+                      data-testid="btn-switch-wagon"
+                      size="touch"
+                      onClick={() => setIsWagonSelectorOpen(true)}
+                    >
+                      <RefreshCwIcon size={18} />
+                      <span>{isHi ? 'वैगन बदलें' : 'Switch wagon'}</span>
+                    </Button>
+                  </div>
+                </>
+              )}
+            </div>
+          </Card>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <SecondaryAction
+              testId="cta-scan-wagon-qr"
+              onClick={onOpenQRScanner}
+              title={isHi ? 'वैगन QR स्कैन करें' : 'Scan wagon QR'}
+              icon={<CameraIcon size={24} />}
+            />
+            <SecondaryAction
+              testId="cta-start-voice"
+              onClick={() => {
+                // A voice inspection needs a wagon. Without one this used to
+                // hand the inspector a QR scanner, which is both a confusing
+                // response to this button and useless at Raipur, where wagons
+                // carry no QR codes yet. Open the wagon picker instead.
+                if (activeWagonNumber) onOpenVoiceInspection();
+                else setIsWagonSelectorOpen(true);
+              }}
+              title={isHi ? 'ध्वनि निरीक्षण' : 'Voice inspection'}
+              icon={<MicIcon size={24} />}
+            />
+            <SecondaryAction
+              onClick={onOpenSpringQC}
+              title={isHi ? 'एक स्प्रिंग दर्ज करें' : 'Record one spring'}
+              icon={<CaliperIcon size={24} />}
+            />
+          </div>
+
+          <Note>
+            {isHi
+              ? 'वैगन QR कोड अभी कार्यशाला में नहीं लगे हैं — तब तक नंबर चुनें या टाइप करें।'
+              : 'Wagon QR codes are not in place in the workshop yet — until they are, pick or type the number.'}
+          </Note>
+        </div>
+      )}
+
+      {/* The manual is reachable from either job. */}
+      <Note className="pt-1">
+        <span className="inline-flex items-center gap-2">
+          <BookIcon size={14} />
+          {isHi
+            ? 'पुर्जा हाथ में हो और सीमा याद न आए — ऊपर मैनुअल खोलें।'
+            : 'Holding a component and unsure of the limit — open the manual from the bar above.'}
+        </span>
+      </Note>
+
+      {/* Wagon switcher / quick picker */}
+      {isWagonSelectorOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-fadeIn"
+          onClick={() => setIsWagonSelectorOpen(false)}
+        >
+          <Card className="w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-start gap-4 px-5 py-4 bg-raised border-b border-line">
+              <div>
+                <h3 className="text-base font-bold text-ink">
+                  {isHi ? 'वैगन का चयन करें' : 'Select a wagon'}
+                </h3>
+                <p className="text-xs text-ink-muted mt-0.5">
+                  {isHi ? 'कार्यशाला में सक्रिय वैगन, या नंबर दर्ज करें' : 'A wagon active in the shop, or type the number'}
+                </p>
               </div>
+              <IconButton
+                variant="quiet"
+                size="sm"
+                label={isHi ? 'बंद करें' : 'Close'}
+                onClick={() => setIsWagonSelectorOpen(false)}
+              >
+                <span className="text-lg leading-none">✕</span>
+              </IconButton>
             </div>
 
-            {/* Manual Entry Form */}
-            <form onSubmit={handleManualWagonSelect} className="space-y-3 pt-2 border-t border-slate-800">
-              <label className="text-xs font-bold text-slate-300 block">
-                {isHi ? 'अन्य वैगन नंबर दर्ज करें' : 'Or Enter Wagon Number Manually'}
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={manualInput}
-                  onChange={(e) => setManualInput(e.target.value)}
-                  placeholder="e.g. SECR-BOXN-202"
-                  className="flex-1 min-h-[48px] px-4 rounded-xl bg-slate-950 border border-slate-700 text-white font-mono text-sm focus:outline-none focus:border-blue-500 uppercase"
-                />
-                {/*
-                  An inspector had no way to read a wagon number with the
-                  camera at all — it existed only inside the supervisor's
-                  Register New Wagon form. Typing eleven digits with gloves on,
-                  standing at the wagon, is exactly the task a camera is for.
-                */}
-                <button
-                  type="button"
-                  onClick={() => setShowNumberCamera(true)}
-                  title={isHi ? 'वैगन पर लिखा नंबर पढ़ें' : 'Read the number painted on the wagon'}
-                  aria-label={isHi ? 'वैगन नंबर स्कैन करें' : 'Scan a wagon number'}
-                  className="min-h-[48px] px-4 rounded-xl border border-amber-600 text-amber-300 hover:bg-amber-950/50 text-base"
-                >
-                  📷
-                </button>
-                <button
-                  type="submit"
-                  disabled={!manualInput.trim()}
-                  className="min-h-[48px] px-5 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white font-bold text-sm transition-all"
-                >
-                  {isHi ? 'चुनें' : 'Select'}
-                </button>
+            <div className="px-5 py-4 space-y-4">
+              <div className="space-y-2">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.07em] text-ink-muted">
+                  {isHi ? 'कार्यशाला में सक्रिय' : 'Active in the shop'}
+                </span>
+                <div className="grid grid-cols-1 gap-2 max-h-56 overflow-y-auto no-scrollbar">
+                  {recentWagons.length === 0 && (
+                    <Note>
+                      {isHi ? 'कोई वैगन नहीं मिला — नीचे नंबर दर्ज करें' : 'No wagons found — enter a number below'}
+                    </Note>
+                  )}
+                  {recentWagons.map(w => {
+                    const current = w.wagonNumber === activeWagonNumber;
+                    return (
+                      <button
+                        key={w.wagonNumber}
+                        onClick={() => {
+                          onSelectWagon(w.wagonNumber);
+                          setIsWagonSelectorOpen(false);
+                        }}
+                        className={[
+                          'min-h-[56px] px-4 py-2.5 rounded-control border text-left transition-colors',
+                          'flex items-center justify-between gap-3',
+                          current
+                            ? 'bg-accent-soft border-accent-line'
+                            : 'bg-sunken border-line hover:border-line-strong'
+                        ].join(' ')}
+                      >
+                        <span className="min-w-0">
+                          <span className="block text-sm font-bold text-ink tabular">{w.wagonNumber}</span>
+                          <span className="block text-[11px] text-ink-faint mt-0.5">
+                            {w.wagonType} · {w.owningRailway} · {w.currentStage}
+                          </span>
+                        </span>
+                        {current && <Chip tone="accent">{isHi ? 'सक्रिय' : 'Active'}</Chip>}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </form>
 
-            {showNumberCamera && (
-              <WagonNumberCamera
-                lang={isHi ? 'hi' : 'en'}
-                onRead={(num) => {
-                  setManualInput(num);
-                  setShowNumberCamera(false);
-                }}
-                onClose={() => setShowNumberCamera(false)}
-              />
-            )}
-          </div>
+              <form onSubmit={handleManualWagonSelect} className="space-y-2 pt-3 border-t border-line">
+                <label htmlFor="wagon-manual" className="block text-[11px] font-semibold uppercase tracking-[0.07em] text-ink-muted">
+                  {isHi ? 'या नंबर दर्ज करें' : 'Or enter the number'}
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="wagon-manual"
+                    type="text"
+                    value={manualInput}
+                    onChange={(e) => setManualInput(e.target.value)}
+                    placeholder="e.g. SECR-BOXN-202"
+                    className={inputClass + ' uppercase flex-1'}
+                  />
+                  {/*
+                    An inspector had no way to read a wagon number with the
+                    camera at all — it existed only inside the supervisor's
+                    Register New Wagon form. Typing eleven digits with gloves
+                    on, standing at the wagon, is exactly the task a camera is
+                    for.
+                  */}
+                  <IconButton
+                    label={isHi ? 'वैगन नंबर स्कैन करें' : 'Read the number painted on the wagon'}
+                    onClick={() => setShowNumberCamera(true)}
+                    type="button"
+                  >
+                    <CameraIcon size={20} />
+                  </IconButton>
+                  <Button type="submit" variant="primary" disabled={!manualInput.trim()}>
+                    {isHi ? 'चुनें' : 'Select'}
+                  </Button>
+                </div>
+              </form>
+
+              {showNumberCamera && (
+                <WagonNumberCamera
+                  lang={isHi ? 'hi' : 'en'}
+                  onRead={(num) => {
+                    setManualInput(num);
+                    setShowNumberCamera(false);
+                  }}
+                  onClose={() => setShowNumberCamera(false)}
+                />
+              )}
+            </div>
+          </Card>
         </div>
       )}
     </div>

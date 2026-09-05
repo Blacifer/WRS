@@ -7,6 +7,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useI18n } from '../i18n/index.ts';
 import { api } from '../services/api.ts';
 import { offlineDb } from '../services/offlineDb.ts';
+import { AlertTriangleIcon, CameraIcon, UploadIcon } from './Icons.tsx';
 
 interface PhotoCaptureModalProps {
   wagonNumber: string;
@@ -188,22 +189,22 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-card backdrop-blur-sm p-4">
+      <div className="bg-card border border-line rounded-control w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-800/50">
+        <div className="px-6 py-4 border-b border-line flex justify-between items-center bg-raised">
           <div>
             <h3 className="text-lg font-bold text-white flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-orange-500"></span>
+              <span className="w-3 h-3 rounded-full bg-accent"></span>
               {t('photos.takePhoto')} — {wagonNumber}
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-ink-muted mt-0.5">
               {category} • {partName}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition text-lg"
+            className="text-ink-muted hover:text-white p-2 rounded-control hover:bg-raised transition text-lg"
           >
             ✕
           </button>
@@ -212,20 +213,20 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto space-y-4 flex-1">
           {/* Camera View or Captured Preview */}
-          <div className="relative rounded-lg overflow-hidden bg-black aspect-video flex items-center justify-center border border-slate-700">
+          <div className="relative rounded-control overflow-hidden bg-black aspect-video flex items-center justify-center border border-line">
             {capturedImage ? (
               <img src={capturedImage} alt="Watermarked Inspection QC" className="w-full h-full object-contain" />
             ) : isCameraActive ? (
               <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
             ) : (
-              <div className="p-6 text-center text-slate-400 space-y-3">
+              <div className="p-6 text-center text-ink-muted space-y-3">
                 <p className="text-sm">{cameraError || 'Camera inactive'}</p>
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-medium text-sm transition"
+                  className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-control font-medium text-sm transition"
                 >
-                  📁 Select Photo from Storage
+                  <UploadIcon size={15} className="inline align-[-2px] mr-1.5" />Select Photo from Storage
                 </button>
               </div>
             )}
@@ -244,14 +245,14 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
           />
 
           {/* Watermark Notice */}
-          <div className="text-xs text-slate-400 bg-slate-800/60 p-3 rounded-lg border border-slate-700/60 flex items-start gap-2">
-            <span className="text-orange-400 text-base">ℹ️</span>
+          <div className="text-xs text-ink-muted bg-raised p-3 rounded-control border border-line flex items-start gap-2">
+            <span className="text-warn-ink shrink-0"><AlertTriangleIcon size={16} /></span>
             <span>{t('photos.watermarkNotice')}</span>
           </div>
 
           {/* Tags */}
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
+            <label className="block text-xs font-semibold text-ink-body mb-1">
               Metadata Tags (comma separated)
             </label>
             <input
@@ -259,17 +260,17 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
               value={tags}
               onChange={(e) => setTags(e.target.value)}
               placeholder="e.g. CBC, Defect, Wear"
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+              className="w-full bg-raised border border-line rounded-control px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-line"
             />
           </div>
         </div>
 
         {/* Modal Footer Controls */}
-        <div className="px-6 py-4 border-t border-slate-800 bg-slate-800/40 flex justify-between items-center">
+        <div className="px-6 py-4 border-t border-line bg-raised flex justify-between items-center">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2.5 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 text-sm font-medium transition"
+            className="px-4 py-2.5 rounded-control border border-line text-ink-body hover:bg-raised text-sm font-medium transition"
           >
             {t('actions.cancel')}
           </button>
@@ -280,7 +281,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
                 <button
                   type="button"
                   onClick={handleRetake}
-                  className="px-4 py-2.5 rounded-lg border border-slate-600 text-white hover:bg-slate-800 text-sm font-medium transition"
+                  className="px-4 py-2.5 rounded-control border border-line-strong text-white hover:bg-raised text-sm font-medium transition"
                 >
                   {t('actions.retake')}
                 </button>
@@ -288,7 +289,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
                   type="button"
                   onClick={handleUpload}
                   disabled={isUploading}
-                  className="px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold shadow-lg transition flex items-center gap-2"
+                  className="px-5 py-2.5 rounded-control bg-good hover:bg-good text-white text-sm font-bold transition flex items-center gap-2"
                 >
                   {isUploading ? 'Saving...' : '✓ Confirm & Attach Photo'}
                 </button>
@@ -297,17 +298,17 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
               <button
                 type="button"
                 onClick={handleCaptureClick}
-                className="px-6 py-2.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold shadow-lg transition flex items-center gap-2"
+                className="px-6 py-2.5 rounded-control bg-accent hover:bg-accent-hover text-white text-sm font-bold transition flex items-center gap-2"
               >
-                📸 Capture Photo
+                <CameraIcon size={16} className="inline align-[-2px] mr-1.5" />Capture Photo
               </button>
             ) : (
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="px-4 py-2.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white text-sm font-bold shadow-lg transition"
+                className="px-4 py-2.5 rounded-control bg-accent hover:bg-accent-hover text-white text-sm font-bold transition"
               >
-                📁 Choose File
+                <UploadIcon size={16} className="inline align-[-2px] mr-1.5" />Choose File
               </button>
             )}
           </div>

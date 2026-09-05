@@ -52,30 +52,13 @@ import type { DatabaseSync } from 'node:sqlite';
  * The database CHECK on machine_learning_events.subsystem remains the outer
  * authority; this array must match it, and a migration is what changes it.
  */
-export const ALL_LEARNING_SUBSYSTEMS = [
-  'OCR_CALIPER',
-  'SPRING_CLASSIFICATION',
-  'VOICE_COMMAND',
-  'ACOUSTIC_DIAGNOSTIC',
-  'DEFECT_SUGGESTION',
-  /*
-   * Readings the anomaly check questioned, and what the inspector did next.
-   *
-   * This subsystem is the one whose ledger matters most, because every free
-   * height in this system is hand-entered and always will be — so this is the
-   * only running measure of how often that goes wrong.
-   *
-   * An "acceptance" here reads backwards from the others. Elsewhere the
-   * machine proposes and the human accepts or corrects it, so acceptance is
-   * the machine being right. Here the machine only ever asks a question, and
-   * the human answering "no, the reading stands" means the question was
-   * unnecessary. wasCorrected is therefore true when the inspector re-measured
-   * and changed the value — which is the flag having done its job.
-   */
-  'MEASUREMENT_ANOMALY'
-] as const;
+import { ALL_LEARNING_SUBSYSTEMS } from '../../../shared/learning/subsystems.ts';
+import type { LearningSubsystem } from '../../../shared/learning/subsystems.ts';
 
-export type LearningSubsystem = (typeof ALL_LEARNING_SUBSYSTEMS)[number];
+// Re-exported so existing importers of this module keep working unchanged.
+export { ALL_LEARNING_SUBSYSTEMS };
+export type { LearningSubsystem };
+
 
 export interface RecordOutcomeInput {
   subsystem: LearningSubsystem;

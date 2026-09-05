@@ -167,10 +167,21 @@ function normaliseText(text: string): string {
 
 /** A query token that is worth matching on. */
 function tokenise(text: string): string[] {
+  /*
+   * Filler carries no information about which fact is wanted, and since
+   * coverage is now measured over what survives here, a stray "have" or
+   * "stop" would count against every fact equally and suppress a good answer.
+   * Anything domain-bearing — "limit", "block", "condemning" — stays, because
+   * failing to match those is exactly what should suppress an answer.
+   */
   const STOP = new Set([
     'the', 'a', 'an', 'is', 'are', 'was', 'for', 'of', 'to', 'in', 'on', 'at',
     'how', 'much', 'many', 'what', 'which', 'do', 'does', 'we', 'i', 'need',
-    'needed', 'required', 'and', 'or', 'be', 'it', 'its', 'with'
+    'needed', 'required', 'and', 'or', 'be', 'it', 'its', 'with',
+    'have', 'has', 'had', 'should', 'must', 'can', 'will', 'would', 'there',
+    'any', 'get', 'give', 'tell', 'me', 'my', 'you', 'your', 'us', 'our',
+    'stop', 'use', 'when', 'where', 'why', 'carry', 'carries',
+    'about', 'from', 'that', 'this', 'these', 'those', 'per'
   ]);
   return text
     .toLowerCase()
@@ -230,17 +241,45 @@ export function searchFacts(query: string, limit = 5): FactHit[] {
     idf.set(t, Math.log((indexed.length + 1) / (df + 1)) + 0.2);
   }
 
+  /*
+   * Total distinctiveness of the question, so a fact can be asked how much of
+   * it it actually addresses rather than only how well it scored.
+   */
+  const totalIdf = tokens.reduce((sum, t) => sum + (idf.get(t) ?? 0), 0);
+
   const hits: FactHit[] = [];
   for (const i of indexed) {
     let score = 0;
+    let coveredIdf = 0;
+
     for (const t of tokens) {
       const weight = idf.get(t) ?? 0;
-      if (i.subject.includes(t)) score += 3 * weight;
-      else if (i.terms.includes(t)) score += 2 * weight;
-      else if (i.answer.includes(t)) score += 1 * weight;
+      if (i.subject.includes(t)) { score += 3 * weight; coveredIdf += weight; }
+      else if (i.terms.includes(t)) { score += 2 * weight; coveredIdf += weight; }
+      else if (i.answer.includes(t)) { score += 1 * weight; coveredIdf += weight; }
     }
-    // Require more than one incidental common word before claiming an answer.
-    if (score >= 2.0) hits.push({ fact: i.fact, score: Math.round(score * 100) / 100 });
+
+    /*
+     * A fact must address most of what was asked, not merely share a word
+     * with it.
+     *
+     * Asked "brake block condemning limit", this returned the §720-C air
+     * brake cylinder figures — filling time, maximum pressure, sensitivity —
+     * under a heading reading "Direct answer, from this app's own verified
+     * figures". They matched on "brake" and "limit" while containing nothing
+     * about blocks or condemning, scored 3.7 against the 2.0 floor, and were
+     * printed above the passage that held the real answer: 10 mm, page 71.
+     *
+     * A confidently wrong figure under the word "verified" is far worse than
+     * no figure at all — an inspector reads the bold number, not the passage
+     * below it. So the absolute floor is not enough on its own: what matters
+     * is whether the distinctive words of the question were matched, and
+     * "block" and "condemning" carry that question, not "brake".
+     */
+    const coverage = totalIdf > 0 ? coveredIdf / totalIdf : 0;
+    if (score >= 2.0 && coverage >= 0.6) {
+      hits.push({ fact: i.fact, score: Math.round(score * 100) / 100 });
+    }
   }
 
   return hits.sort((a, b) => b.score - a.score).slice(0, limit);

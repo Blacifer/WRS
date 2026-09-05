@@ -15,7 +15,10 @@
 
     <title>Indian Railways WRS Raipur — Spring Classification System</title>
   </head>
-  <body class="bg-slate-950 text-slate-100 min-h-screen">
+  <!-- Background and ink come from the tokens in index.css. These were
+       bg-slate-950/text-slate-100 utilities, which outrank the body rule by
+       specificity and tinted the whole application navy. -->
+  <body class="min-h-screen">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

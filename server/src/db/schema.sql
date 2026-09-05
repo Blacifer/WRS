@@ -911,7 +911,10 @@ CREATE TABLE IF NOT EXISTS machine_learning_events (
     -- Readings the anomaly check questioned, and what the inspector did.
     -- Kept in step with LearningSubsystem in learningService.ts; this
     -- constraint is the authority and the union follows it, not the reverse.
-    'MEASUREMENT_ANOMALY'
+    'MEASUREMENT_ANOMALY',
+    -- Reading the stencilled wagon number off a photograph, and whether the
+    -- supervisor kept what it read.
+    'WAGON_NUMBER_OCR'
   )),
   wagon_number TEXT DEFAULT NULL,
   inspection_id TEXT DEFAULT NULL,

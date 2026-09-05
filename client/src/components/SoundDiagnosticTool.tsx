@@ -16,6 +16,7 @@ import { acousticEngine, AcousticAnalysisFrame, EqualizerBand } from '../utils/a
 import { api } from '../services/api.ts';
 import type { AcousticAnomalyType, CASNUBCategory } from '../../../shared/types.ts';
 import { tunable, loadTunables } from '../services/tunables.ts';
+import { ActivityIcon, AlertTriangleIcon } from './Icons.tsx';
 
 interface SoundDiagnosticToolProps {
   wagonNumber: string;
@@ -397,23 +398,23 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
   };
 
   return (
-    <div className={`bg-white/5 border border-white/10 rounded-xl p-6 shadow-2xl backdrop-blur-md space-y-6 ${className}`}>
+    <div className={`bg-white/5 border border-white/10 rounded-control p-6 backdrop-blur-md space-y-6 ${className}`}>
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-slate-800">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-line">
         <div>
           <div className="flex items-center gap-2">
             <span className="text-2xl"></span>
-            <h3 className="text-lg font-black text-white tracking-wide">
+            <h3 className="text-lg font-extrabold text-white tracking-wide">
               {t('acoustic.title')}
             </h3>
             {/* Was "Web Audio DSP" — the name of the browser API this happens
                 to use, which tells a supervisor nothing about what the panel
                 does or whether to trust it. Named for the method instead. */}
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 uppercase">
+            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-accent-soft text-accent-ink border border-accent-line uppercase">
               {isHi ? 'ध्वनि विश्लेषण' : 'Listens for a sound'}
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-ink-muted mt-1">
             {t('acoustic.subtitle')} — Wagon: <span className="font-mono text-white font-bold">{wagonNumber}</span>
           </p>
         </div>
@@ -434,11 +435,11 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
           <button
             data-testid="acoustic-stop"
             onClick={handleStop}
-            className="min-h-[48px] px-5 rounded-xl bg-rose-950/70 border-2 border-rose-700 text-rose-200 text-sm font-extrabold hover:bg-rose-900/70 transition"
+            className="min-h-[48px] px-5 rounded-control bg-bad-soft border-2 border-bad-line text-bad-ink text-sm font-extrabold hover:bg-bad-soft transition"
           >
             ■ {isHi ? 'सुनना बंद करें' : 'Stop listening'}
           </button>
-          <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer">
+          <label className="flex items-center gap-2 text-xs text-ink-muted cursor-pointer">
             <input
               type="checkbox"
               checked={isAudible}
@@ -454,22 +455,21 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
         <button
           onClick={handleStartMic}
-          className={`px-4 py-3 rounded-xl text-xs font-bold border transition duration-150 flex flex-col items-center justify-center gap-1 min-h-[54px] ${
+          className={`px-4 py-3 rounded-control text-xs font-bold border transition duration-150 flex flex-col items-center justify-center gap-1 min-h-[54px] ${
             mode === 'MIC'
-              ? 'bg-cyan-600 border-cyan-400 text-white shadow-lg shadow-cyan-600/30'
-              : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750 hover:text-white'
+              ? 'bg-accent border-accent-line text-white '
+              : 'bg-raised border-line text-ink-body hover:bg-selected hover:text-white'
           }`}
         >
-          <span className="text-base">️</span>
           <span>{t('acoustic.simMic')}</span>
         </button>
 
         <button
           onClick={handleSimulateAirLeak}
-          className={`px-4 py-3 rounded-xl text-xs font-bold border transition duration-150 flex flex-col items-center justify-center gap-1 min-h-[54px] ${
+          className={`px-4 py-3 rounded-control text-xs font-bold border transition duration-150 flex flex-col items-center justify-center gap-1 min-h-[54px] ${
             mode === 'SIM_LEAK'
-              ? 'bg-amber-600 border-amber-400 text-white shadow-lg shadow-amber-600/30'
-              : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750 hover:text-white'
+              ? 'bg-warn border-warn-line text-white shadow-amber-600/30'
+              : 'bg-raised border-line text-ink-body hover:bg-selected hover:text-white'
           }`}
         >
           <span className="text-base"></span>
@@ -478,22 +478,21 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
 
         <button
           onClick={handleSimulateBearingKnock}
-          className={`px-4 py-3 rounded-xl text-xs font-bold border transition duration-150 flex flex-col items-center justify-center gap-1 min-h-[54px] ${
+          className={`px-4 py-3 rounded-control text-xs font-bold border transition duration-150 flex flex-col items-center justify-center gap-1 min-h-[54px] ${
             mode === 'SIM_BEARING'
-              ? 'bg-rose-600 border-rose-400 text-white shadow-lg shadow-rose-600/30'
-              : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750 hover:text-white'
+              ? 'bg-bad border-bad-line text-white shadow-rose-600/30'
+              : 'bg-raised border-line text-ink-body hover:bg-selected hover:text-white'
           }`}
         >
-          <span className="text-base">️</span>
           <span>{t('acoustic.simBearingKnock')}</span>
         </button>
 
         <button
           onClick={handleSimulateNormal}
-          className={`px-4 py-3 rounded-xl text-xs font-bold border transition duration-150 flex flex-col items-center justify-center gap-1 min-h-[54px] ${
+          className={`px-4 py-3 rounded-control text-xs font-bold border transition duration-150 flex flex-col items-center justify-center gap-1 min-h-[54px] ${
             mode === 'SIM_NORMAL'
-              ? 'bg-emerald-600 border-emerald-400 text-white shadow-lg shadow-emerald-600/30'
-              : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750 hover:text-white'
+              ? 'bg-good border-good-line text-white shadow-emerald-600/30'
+              : 'bg-raised border-line text-ink-body hover:bg-selected hover:text-white'
           }`}
         >
           <span className="text-base"></span>
@@ -502,26 +501,26 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
       </div>
 
       {/* Live Metrics Header Bar */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-950/60 p-4 rounded-xl border border-slate-800">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-page p-4 rounded-control border border-line">
         <div>
-          <p className="text-[11px] font-semibold text-slate-400">{t('acoustic.dominantFreq')}</p>
-          <p className="text-xl font-black font-mono text-cyan-400 mt-0.5">
+          <p className="text-[11px] font-semibold text-ink-muted">{t('acoustic.dominantFreq')}</p>
+          <p className="text-xl font-extrabold font-mono text-accent-ink mt-0.5">
             {dominantFreq > 0 ? `${dominantFreq.toLocaleString()} Hz` : '—'}
           </p>
         </div>
 
         <div>
-          <p className="text-[11px] font-semibold text-slate-400">{t('acoustic.splGauge')}</p>
+          <p className="text-[11px] font-semibold text-ink-muted">{t('acoustic.splGauge')}</p>
           <div className="flex items-center gap-2 mt-0.5">
-            <p className={`text-xl font-black font-mono ${
-              peakDb >= 85 ? 'text-rose-400' : peakDb >= 65 ? 'text-amber-400' : 'text-emerald-400'
+            <p className={`text-xl font-extrabold font-mono ${
+              peakDb >= 85 ? 'text-bad-ink' : peakDb >= 65 ? 'text-warn-ink' : 'text-good-ink'
             }`}>
               {peakDb.toFixed(1)} dB
             </p>
-            <div className="flex-1 bg-slate-800 h-2 rounded-full overflow-hidden">
+            <div className="flex-1 bg-raised h-2 rounded-full overflow-hidden">
               <div
                 className={`h-full transition-all duration-100 ${
-                  peakDb >= 85 ? 'bg-rose-500' : peakDb >= 65 ? 'bg-amber-500' : 'bg-emerald-500'
+                  peakDb >= 85 ? 'bg-bad' : peakDb >= 65 ? 'bg-warn' : 'bg-good'
                 }`}
                 style={{ width: `${Math.min(100, Math.max(0, ((peakDb - 30) / 80) * 100))}%` }}
               ></div>
@@ -530,20 +529,20 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
         </div>
 
         <div>
-          <p className="text-[11px] font-semibold text-slate-400">{t('acoustic.crestFactor')}</p>
-          <p className={`text-xl font-black font-mono mt-0.5 ${
-            crestFactor >= 3.8 ? 'text-rose-400 font-bold' : 'text-slate-200'
+          <p className="text-[11px] font-semibold text-ink-muted">{t('acoustic.crestFactor')}</p>
+          <p className={`text-xl font-extrabold font-mono mt-0.5 ${
+            crestFactor >= 3.8 ? 'text-bad-ink font-bold' : 'text-ink-body'
           }`}>
-            {crestFactor.toFixed(1)} {crestFactor >= 3.8 && '️'}
+            {crestFactor.toFixed(1)} {crestFactor >= 3.8 && <AlertTriangleIcon size={13} className="inline align-[-2px] text-warn-ink" />}
           </p>
         </div>
 
         <div>
-          <p className="text-[11px] font-semibold text-slate-400">{t('acoustic.highFreqRatio')}</p>
-          <p className={`text-xl font-black font-mono mt-0.5 ${
-            highFreqRatio >= 0.35 ? 'text-amber-400 font-bold' : 'text-slate-200'
+          <p className="text-[11px] font-semibold text-ink-muted">{t('acoustic.highFreqRatio')}</p>
+          <p className={`text-xl font-extrabold font-mono mt-0.5 ${
+            highFreqRatio >= 0.35 ? 'text-warn-ink font-bold' : 'text-ink-body'
           }`}>
-            {(highFreqRatio * 100).toFixed(0)}% {highFreqRatio >= 0.35 && '️'}
+            {(highFreqRatio * 100).toFixed(0)}% {highFreqRatio >= 0.35 && <AlertTriangleIcon size={13} className="inline align-[-2px] text-warn-ink" />}
           </p>
         </div>
       </div>
@@ -551,61 +550,61 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
       {/* Dual Visualizer Canvases */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Visualizer 1: 32-Band FFT Equalizer */}
-        <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4 space-y-2">
-          <div className="flex justify-between items-center text-xs text-slate-400 font-bold">
-            <span className="flex items-center gap-1.5 text-slate-300">
+        <div className="bg-page border border-line rounded-control p-4 space-y-2">
+          <div className="flex justify-between items-center text-xs text-ink-muted font-bold">
+            <span className="flex items-center gap-1.5 text-ink-body">
               <span></span> {t('acoustic.equalizerTitle')}
             </span>
-            <span className="font-mono text-[10px] text-slate-500">20 Hz - 20 kHz (32 Bands)</span>
+            <span className="font-mono text-[10px] text-ink-faint">20 Hz - 20 kHz (32 Bands)</span>
           </div>
           <canvas
             ref={eqCanvasRef}
             width={480}
             height={160}
-            className="w-full h-40 rounded-lg bg-[#090d16] border border-slate-850"
+            className="w-full h-40 rounded-control bg-[#090d16] border border-slate-850"
           />
         </div>
 
         {/* Visualizer 2: Real-Time Glowing Neon Oscilloscope */}
-        <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4 space-y-2">
-          <div className="flex justify-between items-center text-xs text-slate-400 font-bold">
-            <span className="flex items-center gap-1.5 text-slate-300">
-              <span>〰️</span> {t('acoustic.oscilloscopeTitle')}
+        <div className="bg-page border border-line rounded-control p-4 space-y-2">
+          <div className="flex justify-between items-center text-xs text-ink-muted font-bold">
+            <span className="flex items-center gap-1.5 text-ink-body">
+              <ActivityIcon size={16} /> {t('acoustic.oscilloscopeTitle')}
             </span>
-            <span className="font-mono text-[10px] text-slate-500">2048-pt Time Domain</span>
+            <span className="font-mono text-[10px] text-ink-faint">2048-pt Time Domain</span>
           </div>
           <canvas
             ref={oscCanvasRef}
             width={480}
             height={160}
-            className="w-full h-40 rounded-lg bg-[#090d16] border border-slate-850"
+            className="w-full h-40 rounded-control bg-[#090d16] border border-slate-850"
           />
         </div>
       </div>
 
       {/* Visualizer 3: Scrolling Waterfall Spectrogram (Heatmap) */}
-      <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4 space-y-2">
-        <div className="flex justify-between items-center text-xs text-slate-400 font-bold">
-          <span className="flex items-center gap-1.5 text-slate-300">
-            <span>🔥</span>{isHi ? 'वॉटरफ़ॉल स्पेक्ट्रोग्राम (लाइव हीटमैप)' : 'Waterfall Spectrogram (Live Heatmap)'}</span>
-          <span className="font-mono text-[10px] text-slate-500">{isHi ? 'आवृत्ति बनाम समय' : 'Frequency vs Time'}</span>
+      <div className="bg-page border border-line rounded-control p-4 space-y-2">
+        <div className="flex justify-between items-center text-xs text-ink-muted font-bold">
+          <span className="flex items-center gap-1.5 text-ink-body">
+            <ActivityIcon size={16} />{isHi ? 'वॉटरफ़ॉल स्पेक्ट्रोग्राम (लाइव हीटमैप)' : 'Waterfall Spectrogram (Live Heatmap)'}</span>
+          <span className="font-mono text-[10px] text-ink-faint">{isHi ? 'आवृत्ति बनाम समय' : 'Frequency vs Time'}</span>
         </div>
         <canvas
           ref={specCanvasRef}
           width={960}
           height={160}
-          className="w-full h-40 rounded-lg bg-[#090d16] border border-slate-850"
+          className="w-full h-40 rounded-control bg-[#090d16] border border-slate-850"
         />
       </div>
 
       {/* Anomaly Status Banner */}
       <div
-        className={`p-4 rounded-xl border transition-all duration-200 space-y-2 ${
+        className={`p-4 rounded-control border transition-all duration-200 space-y-2 ${
           anomalyType === 'AIR_LEAK'
-            ? 'bg-amber-500/10 border-amber-500/20'
+            ? 'bg-warn-soft border-warn-line'
             : anomalyType === 'BEARING_DEFECT'
-            ? 'bg-rose-500/10 border-rose-500/20'
-            : 'bg-slate-800/40 border-slate-700/50'
+            ? 'bg-bad-soft border-bad-line'
+            : 'bg-raised border-line'
         }`}
       >
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
@@ -615,12 +614,12 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
             </span>
             <div>
               <h4
-                className={`text-sm font-black tracking-wide ${
+                className={`text-sm font-extrabold tracking-wide ${
                   anomalyType === 'AIR_LEAK'
-                    ? 'text-amber-300'
+                    ? 'text-warn-ink'
                     : anomalyType === 'BEARING_DEFECT'
-                    ? 'text-rose-300'
-                    : 'text-emerald-300'
+                    ? 'text-bad-ink'
+                    : 'text-good-ink'
                 }`}
               >
                 {anomalyType === 'AIR_LEAK'
@@ -629,7 +628,7 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
                   ? t('acoustic.statusBearingDefect')
                   : t('acoustic.statusNominal')}
               </h4>
-              <p className="text-xs text-slate-300 mt-0.5">{details}</p>
+              <p className="text-xs text-ink-body mt-0.5">{details}</p>
 
               {/*
                 * What "nothing detected" is worth, said next to it.
@@ -644,10 +643,10 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
                 */}
               {anomalyType === 'NONE' && signalSource !== 'NO_SIGNAL' && (
                 <>
-                  <p className="text-[11px] text-slate-400 mt-1.5" data-testid="nominal-note">
+                  <p className="text-[11px] text-ink-muted mt-1.5" data-testid="nominal-note">
                     {t('acoustic.statusNominalNote')}
                   </p>
-                  <p className="text-[11px] text-amber-300/90 mt-1 font-semibold" data-testid="bearing-caveat">
+                  <p className="text-[11px] text-warn-ink/90 mt-1 font-semibold" data-testid="bearing-caveat">
                     {t('acoustic.bearingUnvalidated')}
                   </p>
                 </>
@@ -671,7 +670,7 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
                 */}
               {signalSource === 'SYNTHETIC' && (
                 <p
-                  className="text-[11px] text-amber-300/90 mt-1.5 font-semibold"
+                  className="text-[11px] text-warn-ink/90 mt-1.5 font-semibold"
                   data-testid="synthetic-warning"
                 >
                   {isHi
@@ -683,7 +682,7 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
           </div>
 
           <div className="flex items-center gap-2 self-end sm:self-auto">
-            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-900/80 text-slate-300 border border-slate-700">
+            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-card text-ink-body border border-line">
               {/*
                 * A percentage belongs to a detection, not to its absence.
                 * "Nothing detected — Confidence: 95%" reads as ninety-five
@@ -695,7 +694,7 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
                 ? 'No detection'
                 : `Confidence: ${(confidence * 100).toFixed(0)}%`}
               {belowThreshold && (
-                <span className="block text-[11px] text-amber-400 font-semibold mt-1">
+                <span className="block text-[11px] text-warn-ink font-semibold mt-1">
                   {isHi
                     ? `संकेत मिला पर सीमा (${(tunable('acoustic.alert_threshold') * 100).toFixed(0)}%) से नीचे — दोष के रूप में दर्ज नहीं`
                     : `Something was detected but sits below the ${(tunable('acoustic.alert_threshold') * 100).toFixed(0)}% alert threshold, so it is not raised as a defect.`}
@@ -706,18 +705,18 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
         </div>
 
         {anomalyType !== 'NONE' && (
-          <div className="pt-2 border-t border-slate-800/80 text-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-            <p className="text-slate-300">
+          <div className="pt-2 border-t border-line text-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <p className="text-ink-body">
               <strong className="text-white">Action:</strong> {recommendedAction}
             </p>
 
             <button
               onClick={handleLogDefect}
               disabled={isLogging}
-              className={`px-5 py-2.5 rounded-xl text-xs font-black shadow-lg transition flex items-center gap-2 min-h-[44px] shrink-0 ${
+              className={`px-5 py-2.5 rounded-control text-xs font-extrabold transition flex items-center gap-2 min-h-[44px] shrink-0 ${
                 anomalyType === 'BEARING_DEFECT'
-                  ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/30 animate-pulse'
-                  : 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/30'
+                  ? 'bg-bad hover:bg-bad text-white shadow-rose-600/30 animate-pulse'
+                  : 'bg-warn hover:bg-warn text-white shadow-amber-600/30'
               }`}
             >
               <span></span>
@@ -729,38 +728,37 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
 
       {/* Success / Error Messages */}
       {logSuccessMessage && (
-        <div className="p-4 bg-emerald-950/50 border border-emerald-500/70 rounded-xl text-xs text-emerald-200 flex items-center gap-2">
+        <div className="p-4 bg-good-soft border border-good-line rounded-control text-xs text-good-ink flex items-center gap-2">
           <span></span>
           <span>{logSuccessMessage}</span>
         </div>
       )}
 
       {logErrorMessage && (
-        <div className="p-4 bg-rose-950/50 border border-rose-500/70 rounded-xl text-xs text-rose-200 flex items-center gap-2">
-          <span>️</span>
+        <div className="p-4 bg-bad-soft border border-bad-line rounded-control text-xs text-bad-ink flex items-center gap-2">
           <span>{logErrorMessage}</span>
         </div>
       )}
 
       {/* Target Subsystem & Part Mapping Drawer */}
       {anomalyType !== 'NONE' && (
-        <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800/80 space-y-3">
+        <div className="bg-page p-4 rounded-control border border-line space-y-3">
           <div className="flex justify-between items-center">
-            <h5 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+            <h5 className="text-xs font-bold text-ink-body flex items-center gap-1.5">
               <span></span> {t('acoustic.targetComponent')}
             </h5>
-            <span className="text-[10px] text-slate-500">{t('acoustic.defectLoggedNotice')}</span>
+            <span className="text-[10px] text-ink-faint">{t('acoustic.defectLoggedNotice')}</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
             <div>
-              <label className="block text-[11px] text-slate-400 font-semibold mb-1">
+              <label className="block text-[11px] text-ink-muted font-semibold mb-1">
                 {t('acoustic.targetCategory')}
               </label>
               <select
                 value={targetCategory}
                 onChange={(e) => setTargetCategory(e.target.value as CASNUBCategory)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                className="w-full bg-raised border border-line rounded-control px-3 py-2 text-xs text-white focus:outline-none focus:border-accent-line"
               >
                 <option value="BRAKE_SYSTEM">4. Brake System & Rigging</option>
                 <option value="BEARINGS">3. Bearings (CTRB & Adapters)</option>
@@ -770,12 +768,12 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
             </div>
 
             <div>
-              <label className="block text-[11px] text-slate-400 font-semibold mb-1">{isHi ? 'घटक का नाम' : 'Component Name'}</label>
+              <label className="block text-[11px] text-ink-muted font-semibold mb-1">{isHi ? 'घटक का नाम' : 'Component Name'}</label>
               <input
                 type="text"
                 value={targetPartName}
                 onChange={(e) => setTargetPartName(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-500"
+                className="w-full bg-raised border border-line rounded-control px-3 py-2 text-xs text-white focus:outline-none focus:border-accent-line"
               />
             </div>
           </div>

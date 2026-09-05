@@ -27,6 +27,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '../services/api.ts';
+import { ActivityIcon } from './Icons.tsx';
 import { readThroughput } from '../../../shared/sorting/throughput.ts';
 
 interface ShopFloorNowProps {
@@ -46,17 +47,17 @@ interface Card {
 }
 
 const TONE: Record<Card['tone'], string> = {
-  good: 'border-emerald-800 bg-emerald-950/30',
-  watch: 'border-amber-800 bg-amber-950/30',
-  stop: 'border-red-800 bg-red-950/30',
-  neutral: 'border-slate-700 bg-slate-900/50'
+  good: 'border-good-line bg-good-soft',
+  watch: 'border-warn-line bg-warn-soft',
+  stop: 'border-bad-line bg-bad-soft',
+  neutral: 'border-line bg-card'
 };
 
 const TONE_TEXT: Record<Card['tone'], string> = {
-  good: 'text-emerald-300',
-  watch: 'text-amber-300',
-  stop: 'text-red-300',
-  neutral: 'text-slate-200'
+  good: 'text-good-ink',
+  watch: 'text-warn-ink',
+  stop: 'text-bad-ink',
+  neutral: 'text-ink-body'
 };
 
 export const ShopFloorNow: React.FC<ShopFloorNowProps> = ({ lang }) => {
@@ -217,12 +218,13 @@ export const ShopFloorNow: React.FC<ShopFloorNowProps> = ({ lang }) => {
   if (failed) return null;
 
   return (
-    <section className="bg-slate-900/80 p-6 rounded-2xl border border-slate-800 shadow-xl space-y-4">
+    <section className="bg-card p-6 rounded-card border border-line space-y-4">
       <div>
-        <h2 className="text-xl font-black text-white flex items-center gap-2">
-          <span>🚦</span> {isHi ? 'शॉप फ़्लोर — अभी' : 'Shop Floor — Right Now'}
+        <h2 className="text-xl font-extrabold tracking-[-0.025em] text-ink flex items-center gap-2.5">
+          <ActivityIcon size={20} className="text-accent-ink" />
+          {isHi ? 'शॉप फ़्लोर — अभी' : 'Shop Floor — Right Now'}
         </h2>
-        <p className="text-xs text-slate-400 mt-1">
+        <p className="text-xs text-ink-muted mt-1">
           {isHi
             ? 'हर आँकड़ा शॉप के अपने रिकॉर्ड से। जहाँ पर्याप्त प्रमाण नहीं, वहाँ अनुमान नहीं लगाया गया।'
             : "Every figure from the shop's own record. Where the evidence is thin, nothing is guessed."}
@@ -230,25 +232,25 @@ export const ShopFloorNow: React.FC<ShopFloorNowProps> = ({ lang }) => {
       </div>
 
       {!cards && (
-        <p className="text-sm text-slate-400">{isHi ? 'लोड हो रहा है…' : 'Loading…'}</p>
+        <p className="text-sm text-ink-muted">{isHi ? 'लोड हो रहा है…' : 'Loading…'}</p>
       )}
 
       {cards && (
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {cards.map((c, i) => (
-            <div key={i} className={`rounded-xl border p-4 flex flex-col gap-2 ${TONE[c.tone]}`}>
-              <p className="text-[11px] font-mono uppercase tracking-wide text-slate-400">{c.question}</p>
+            <div key={i} className={`rounded-control border p-4 flex flex-col gap-2 ${TONE[c.tone]}`}>
+              <p className="text-[11px] font-mono uppercase tracking-wide text-ink-muted">{c.question}</p>
               {c.answer ? (
-                <p className={`text-lg font-black leading-tight ${TONE_TEXT[c.tone]}`}>{c.answer}</p>
+                <p className={`text-lg font-extrabold leading-tight ${TONE_TEXT[c.tone]}`}>{c.answer}</p>
               ) : (
-                <p className="text-sm font-bold text-slate-400 leading-snug">
+                <p className="text-sm font-bold text-ink-muted leading-snug">
                   {isHi ? 'अभी ज्ञात नहीं' : 'Not yet known'}
                 </p>
               )}
               {!c.answer && c.blocked && (
-                <p className="text-xs text-slate-500 leading-snug">{c.blocked}</p>
+                <p className="text-xs text-ink-faint leading-snug">{c.blocked}</p>
               )}
-              <p className="text-xs text-slate-400 leading-snug mt-auto">{c.action}</p>
+              <p className="text-xs text-ink-muted leading-snug mt-auto">{c.action}</p>
             </div>
           ))}
         </div>

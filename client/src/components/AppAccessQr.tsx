@@ -43,12 +43,12 @@ export function AppAccessQr({ lang }: Props) {
   };
 
   return (
-    <div className="rounded-2xl border border-slate-700 bg-slate-900 p-5 space-y-4 print:border-black print:bg-white">
+    <div className="rounded-card border border-line bg-card p-5 space-y-4 print:border-black print:bg-white">
       <div>
         <h3 className="text-base font-extrabold text-white print:text-black">
           {isHi ? 'ऐप खोलने का क्यूआर कोड' : 'Open-the-app QR code'}
         </h3>
-        <p className="text-xs text-slate-400 mt-0.5 print:text-black">
+        <p className="text-xs text-ink-muted mt-0.5 print:text-black">
           {isHi
             ? 'छापकर बे के पास दीवार पर लगाएँ — टैबलेट से स्कैन करने पर ऐप खुल जाएगा'
             : 'Print this and put it on the wall by the bay. Scanning it on a tablet opens the app.'}
@@ -66,15 +66,15 @@ export function AppAccessQr({ lang }: Props) {
               level="H"
               title={`Opens ${origin}`}
             />
-            <p className="font-mono text-xs text-slate-300 break-all text-center print:text-black">{origin}</p>
+            <p className="font-mono text-xs text-ink-body break-all text-center print:text-black">{origin}</p>
           </>
         ) : (
-          <p className="text-xs text-slate-500">{isHi ? 'पता उपलब्ध नहीं' : 'Address unavailable'}</p>
+          <p className="text-xs text-ink-faint">{isHi ? 'पता उपलब्ध नहीं' : 'Address unavailable'}</p>
         )}
       </div>
 
       {isLocalhost && (
-        <p className="text-[11px] text-amber-300 bg-amber-950/40 border border-amber-800 rounded-lg px-3 py-2 print:hidden">
+        <p className="text-[11px] text-warn-ink bg-warn-soft border border-warn-line rounded-control px-3 py-2 print:hidden">
           {isHi
             ? 'यह पता केवल इसी मशीन पर काम करता है। टैबलेट के लिए पोस्टर बनाने हेतु सर्वर के नेटवर्क पते से ऐप खोलें।'
             : 'This address only works on this machine. To make a poster for the tablets, open the app using the server’s network address first — the QR always shows the address you are currently on.'}
@@ -82,7 +82,7 @@ export function AppAccessQr({ lang }: Props) {
       )}
 
       {isInsecure && (
-        <p className="text-[11px] text-amber-300 bg-amber-950/40 border border-amber-800 rounded-lg px-3 py-2 print:hidden">
+        <p className="text-[11px] text-warn-ink bg-warn-soft border border-warn-line rounded-control px-3 py-2 print:hidden">
           {isHi
             ? 'यह पता http है — कैमरा, माइक और स्कैनर केवल https पर काम करते हैं।'
             : 'This is an http address. Camera, microphone and QR scanning only work over https, so a poster pointing here would open an app with those features dead.'}
@@ -92,13 +92,13 @@ export function AppAccessQr({ lang }: Props) {
       <div className="flex gap-2 print:hidden">
         <button
           onClick={copy}
-          className="px-3 py-1.5 rounded-lg border border-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-800"
+          className="px-3 py-1.5 rounded-control border border-line text-ink-body text-xs font-bold hover:bg-raised"
         >
           {copied ? (isHi ? 'कॉपी हो गया' : 'Copied') : (isHi ? 'पता कॉपी करें' : 'Copy address')}
         </button>
         <button
           onClick={() => window.print()}
-          className="px-3 py-1.5 rounded-lg bg-white text-black text-xs font-extrabold"
+          className="px-3 py-1.5 rounded-control bg-white text-black text-xs font-extrabold"
         >
           {isHi ? 'छापें' : 'Print'}
         </button>

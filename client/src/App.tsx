@@ -227,9 +227,9 @@ export const App: React.FC = () => {
           */}
         <Suspense
           fallback={
-            <div className="flex items-center justify-center py-24 text-slate-400" role="status">
+            <div className="flex items-center justify-center py-24 text-ink-muted" role="status">
               <div
-                className="h-6 w-6 mr-3 rounded-full border-2 border-slate-600 border-t-sky-400 animate-spin"
+                className="h-6 w-6 mr-3 rounded-full border-2 border-line-strong border-t-sky-400 animate-spin"
                 aria-hidden="true"
               />
               {currentLang === 'hi' ? 'स्क्रीन खोली जा रही है…' : 'Opening…'}
@@ -315,7 +315,7 @@ export const App: React.FC = () => {
             <div className="flex items-center justify-between">
               <button
                 onClick={() => setActiveTab(isInspector ? 'inspector_home' : 'wagons')}
-                className="min-h-[44px] px-4 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-200 rounded-xl text-sm font-bold flex items-center gap-2 border border-slate-700 transition-all"
+                className="min-h-[44px] px-4 py-2 bg-raised hover:bg-selected active:bg-card text-ink-body rounded-control text-sm font-bold flex items-center gap-2 border border-line transition-all"
               >
                 <span>←</span>
                 <span>{currentLang === 'hi' ? 'मुख्य पृष्ठ पर लौटें' : 'Back to Home'}</span>
@@ -326,8 +326,8 @@ export const App: React.FC = () => {
               * what it recognises, marks people and clutter as excluded, and
               * records only the region left over.
               */}
-            <details className="rounded-xl border border-slate-700 bg-slate-900/40">
-              <summary className="cursor-pointer px-4 py-3 text-sm font-bold text-slate-200 select-none">
+            <details className="rounded-control border border-line bg-card">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-bold text-ink-body select-none">
                 {currentLang === 'hi'
                   ? 'स्मार्ट विज़न कैमरा — व्यक्ति और पृष्ठभूमि को बाहर रखता है'
                   : 'Smart Vision camera — excludes people and background from the capture'}
@@ -370,7 +370,7 @@ export const App: React.FC = () => {
             <div className="flex items-center justify-between">
               <button
                 onClick={() => setActiveTab(isInspector ? 'inspector_home' : 'wagons')}
-                className="min-h-[44px] px-4 py-2 bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-200 rounded-xl text-sm font-bold flex items-center gap-2 border border-slate-700 transition-all"
+                className="min-h-[44px] px-4 py-2 bg-raised hover:bg-selected active:bg-card text-ink-body rounded-control text-sm font-bold flex items-center gap-2 border border-line transition-all"
               >
                 <span>←</span>
                 <span>{currentLang === 'hi' ? 'मुख्य पृष्ठ पर लौटें' : 'Back to Home'}</span>

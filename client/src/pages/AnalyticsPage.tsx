@@ -16,8 +16,9 @@ import type { InspectionStats, User } from '../../../shared/types.ts';
 import { getDictionary } from '../i18n/index.ts';
 import type { LanguageCode } from '../i18n/index.ts';
 import { api } from '../services/api.ts';
+import { COLOR_HEX_MAP } from '../../../shared/classification/tables.ts';
 import { AdminExportModal } from '../components/AdminExportModal.tsx';
-import { BarChartIcon, DownloadIcon, AlertTriangleIcon, CheckCircleIcon, RefreshCwIcon, ShieldIcon } from '../components/Icons.tsx';
+import { AlertTriangleIcon, BarChartIcon, CheckCircleIcon, CoilIcon, DownloadIcon, RefreshCwIcon, ShieldIcon } from '../components/Icons.tsx';
 import { can } from '../../../shared/auth/permissions.ts';
 
 interface AnalyticsPageProps {
@@ -25,20 +26,20 @@ interface AnalyticsPageProps {
   user: User | null;
 }
 
-const BAND_COLORS: Record<string, { en: string; hi: string; color: string; hex: string; bg: string }> = {
-  BLUE: { en: 'Blue (Band I)', hi: 'नीला बैंड (बैंड I)', color: 'text-blue-400', hex: '#2563eb', bg: 'bg-blue-600' },
-  GREEN: { en: 'Green (Band II)', hi: 'हरा बैंड (बैंड II)', color: 'text-emerald-400', hex: '#059669', bg: 'bg-emerald-600' },
-  YELLOW: { en: 'Yellow (Band III)', hi: 'पीला बैंड (बैंड III)', color: 'text-yellow-400', hex: '#eab308', bg: 'bg-yellow-500' },
-  ORANGE: { en: 'Orange (Band IV)', hi: 'नारंगी बैंड (बैंड IV)', color: 'text-orange-400', hex: '#f97316', bg: 'bg-orange-500' },
-  WHITE: { en: 'White (Band V)', hi: 'सफेद बैंड (बैंड V)', color: 'text-slate-200', hex: '#e2e8f0', bg: 'bg-slate-300' },
-  RED: { en: 'Red (Band VI)', hi: 'लाल बैंड (बैंड VI)', color: 'text-red-400', hex: '#dc2626', bg: 'bg-red-600' }
+const BAND_COLORS: Record<string, { en: string; hi: string; roman: string }> = {
+  BLUE:   { en: 'Blue (Band I)',   hi: 'नीला बैंड (बैंड I)',    roman: 'Band I' },
+  GREEN:  { en: 'Green (Band II)',  hi: 'हरा बैंड (बैंड II)',    roman: 'Band II' },
+  YELLOW: { en: 'Yellow (Band III)', hi: 'पीला बैंड (बैंड III)',  roman: 'Band III' },
+  ORANGE: { en: 'Orange (Band IV)', hi: 'नारंगी बैंड (बैंड IV)', roman: 'Band IV' },
+  WHITE:  { en: 'White (Band V)',   hi: 'सफेद बैंड (बैंड V)',    roman: 'Band V' },
+  RED:    { en: 'Red (Band VI)',    hi: 'लाल बैंड (बैंड VI)',    roman: 'Band VI' }
 };
 
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0];
     return (
-      <div className="bg-slate-900/95 border border-slate-700 p-3 rounded-xl shadow-2xl text-xs backdrop-blur-md">
+      <div className="bg-card border border-line p-3 rounded-control text-xs backdrop-blur-md">
         <p className="flex items-center gap-2 font-medium" style={{ color: data.payload.fill || data.color }}>
           <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: data.payload.fill || data.color }}></span>
           <span className="font-bold text-white">{data.name}:</span>
@@ -143,7 +144,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
   const bandChartData = Object.entries(BAND_COLORS).map(([bandKey, cfg]) => ({
     name: lang === 'hi' ? cfg.hi : cfg.en,
     value: stats?.bandDistribution?.[bandKey as keyof typeof stats.bandDistribution] || 0,
-    color: cfg.hex,
+    color: COLOR_HEX_MAP[bandKey as keyof typeof COLOR_HEX_MAP] || '#71717a',
     bandKey
   })).filter(item => item.value > 0);
 
@@ -152,11 +153,11 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
-            <BarChartIcon size={24} className="text-blue-400" />
+          <h1 className="text-xl sm:text-2xl font-extrabold text-white flex items-center gap-2">
+            <BarChartIcon size={24} className="text-accent-ink" />
             <span>{dict.nav.analytics}</span>
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400">
+          <p className="text-xs sm:text-sm text-ink-muted">
             {lang === 'hi' ? 'डब्लूआरएस रायपुर शिफ्ट उत्पादकता एवं गुणवत्ता आंकड़े' : 'WRS Raipur Bogie Section Shift Throughput & Quality Metrics'}
           </p>
         </div>
@@ -165,7 +166,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
           <button
             onClick={() => { loadStats(); loadSorting(); }}
             disabled={isLoading}
-            className="min-h-[44px] px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl flex items-center gap-1.5 border border-slate-700"
+            className="min-h-[44px] px-3.5 py-2 bg-raised hover:bg-selected text-ink-body font-bold text-xs rounded-control flex items-center gap-1.5 border border-line"
           >
             <RefreshCwIcon size={16} className={isLoading ? 'animate-spin' : ''} />
             <span>{lang === 'hi' ? 'ताज़ा करें' : 'Refresh'}</span>
@@ -174,7 +175,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
           {canExport && (
             <button
               onClick={() => setIsExportModalOpen(true)}
-              className="min-h-[44px] px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white font-extrabold text-xs rounded-xl shadow flex items-center gap-2"
+              className="min-h-[44px] px-4 py-2 bg-accent hover:bg-accent text-white font-extrabold text-xs rounded-control shadow flex items-center gap-2"
             >
               <DownloadIcon size={16} />
               <span>{dict.actions.exportData}</span>
@@ -189,12 +190,12 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
         * nine hundred springs a day against forty-one records in the table this
         * page used to read from exclusively.
         */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4" data-testid="sorting-analytics">
+      <div className="bg-card border border-line rounded-card p-5 space-y-4" data-testid="sorting-analytics">
         <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
-          <h2 className="text-base font-black text-white">
+          <h2 className="text-base font-extrabold text-white">
             {isHi ? 'स्प्रिंग सॉर्टिंग' : 'Spring sorting'}
           </h2>
-          <span className="text-[11px] text-slate-500">
+          <span className="text-[11px] text-ink-faint">
             {days.length > 0
               ? (isHi
                   ? `${days[0].date} से ${days[days.length - 1].date}`
@@ -224,26 +225,26 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
           return (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="bg-slate-950/60 border border-slate-700 rounded-xl p-3">
-                  <p className="text-2xl font-black text-white tabular-nums" data-testid="sorted-today">
+                <div className="bg-page border border-line rounded-control p-3">
+                  <p className="text-2xl font-extrabold text-white tabular-nums" data-testid="sorted-today">
                     {today?.total ?? 0}
                   </p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">{isHi ? 'आज सॉर्ट की गईं' : 'sorted today'}</p>
+                  <p className="text-[11px] text-ink-muted mt-0.5">{isHi ? 'आज सॉर्ट की गईं' : 'sorted today'}</p>
                 </div>
-                <div className="bg-slate-950/60 border border-slate-700 rounded-xl p-3">
-                  <p className="text-2xl font-black text-white tabular-nums" data-testid="sorted-week">{week}</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">{isHi ? 'पिछले 7 दिनों में' : 'over the last 7 days'}</p>
+                <div className="bg-page border border-line rounded-control p-3">
+                  <p className="text-2xl font-extrabold text-white tabular-nums" data-testid="sorted-week">{week}</p>
+                  <p className="text-[11px] text-ink-muted mt-0.5">{isHi ? 'पिछले 7 दिनों में' : 'over the last 7 days'}</p>
                 </div>
-                <div className="bg-slate-950/60 border border-slate-700 rounded-xl p-3">
-                  <p className="text-2xl font-black text-red-300 tabular-nums">{weekCondemned}</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
+                <div className="bg-page border border-line rounded-control p-3">
+                  <p className="text-2xl font-extrabold text-bad-ink tabular-nums">{weekCondemned}</p>
+                  <p className="text-[11px] text-ink-muted mt-0.5">
                     {isHi ? 'कंडम' : 'condemned'}
-                    {week > 0 && <span className="text-slate-500"> · {((weekCondemned / week) * 100).toFixed(1)}%</span>}
+                    {week > 0 && <span className="text-ink-faint"> · {((weekCondemned / week) * 100).toFixed(1)}%</span>}
                   </p>
                 </div>
-                <div className="bg-slate-950/60 border border-slate-700 rounded-xl p-3">
-                  <p className="text-2xl font-black text-blue-300 tabular-nums">{rate ?? '—'}</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
+                <div className="bg-page border border-line rounded-control p-3">
+                  <p className="text-2xl font-extrabold text-accent-ink tabular-nums">{rate ?? '—'}</p>
+                  <p className="text-[11px] text-ink-muted mt-0.5">
                     {rate
                       ? (isHi ? 'प्रति घंटा — मापी गई' : 'per hour, measured')
                       : (isHi ? 'दर के लिए पर्याप्त डेटा नहीं' : 'not enough yet for a rate')}
@@ -261,13 +262,13 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
                     const isToday = d === today;
                     return (
                       <div key={d.date} className="flex-1 flex flex-col items-center justify-end h-full gap-1">
-                        <span className="text-[10px] text-slate-500 tabular-nums">{d.total || ''}</span>
+                        <span className="text-[10px] text-ink-faint tabular-nums">{d.total || ''}</span>
                         <div
-                          className={`w-full rounded-t ${isToday ? 'bg-blue-500' : 'bg-slate-700'}`}
+                          className={`w-full rounded-t ${isToday ? 'bg-accent' : 'bg-selected'}`}
                           style={{ height: `${Math.max(d.total > 0 ? 6 : 2, h)}%` }}
                           title={`${d.date}: ${d.total} sorted, ${d.condemned} condemned`}
                         />
-                        <span className="text-[9px] text-slate-600">{d.date.slice(8)}</span>
+                        <span className="text-[9px] text-ink-faint">{d.date.slice(8)}</span>
                       </div>
                     );
                   })}
@@ -286,13 +287,13 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
           */}
         {sortingStock.length > 0 && (
           <div data-testid="sorting-stock">
-            <h3 className="text-xs font-bold uppercase tracking-wide text-slate-400 mb-2">
+            <h3 className="text-xs font-bold uppercase tracking-wide text-ink-muted mb-2">
               {isHi ? 'फ़र्श पर उपलब्ध स्टॉक, बैंड अनुसार' : 'Serviceable stock on the floor, by band'}
             </h3>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="text-slate-500 text-left">
+                  <tr className="text-ink-faint text-left">
                     <th className="py-1.5 pr-3 font-semibold">{isHi ? 'स्थिति' : 'Position'}</th>
                     <th className="py-1.5 pr-3 font-semibold">{isHi ? 'बैंड' : 'Band'}</th>
                     <th className="py-1.5 font-semibold text-right">{isHi ? 'संख्या' : 'Count'}</th>
@@ -300,13 +301,13 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
                 </thead>
                 <tbody>
                   {sortingStock.slice(0, 14).map((row: any, i: number) => (
-                    <tr key={i} className="border-t border-slate-800">
-                      <td className="py-1.5 pr-3 text-slate-300">{row.springPosition || '—'}</td>
+                    <tr key={i} className="border-t border-line">
+                      <td className="py-1.5 pr-3 text-ink-body">{row.springPosition || '—'}</td>
                       <td className="py-1.5 pr-3">
-                        <span className="inline-flex items-center gap-1.5 text-slate-200">
+                        <span className="inline-flex items-center gap-1.5 text-ink-body">
                           <span
-                            className="w-2.5 h-2.5 rounded-full inline-block border border-slate-600"
-                            style={{ backgroundColor: BAND_COLORS[row.band]?.hex || '#64748b' }}
+                            className="w-2.5 h-2.5 rounded-full inline-block border border-line-strong"
+                            style={{ backgroundColor: COLOR_HEX_MAP[row.band as keyof typeof COLOR_HEX_MAP] || '#71717a' }}
                           />
                           {row.band || '—'}
                         </span>
@@ -329,17 +330,17 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
           * row reads as no demand, which is the opposite of what it means.
           */}
         {forecast && (
-          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-5 mb-6">
+          <div className="bg-card border border-line rounded-control p-5 mb-6">
             <h3 className="text-sm font-bold text-white uppercase tracking-wide mb-1">
               Expected spring replacements — next {forecast.periodDays} working days
             </h3>
-            <p className="text-[12px] text-slate-400 mb-3">{forecast.summary}</p>
+            <p className="text-[12px] text-ink-muted mb-3">{forecast.summary}</p>
 
             {forecast.lines.length > 0 && (
               <div className="overflow-x-auto">
                 <table className="w-full text-[12.5px]">
                   <thead>
-                    <tr className="text-slate-400 text-left border-b border-slate-800">
+                    <tr className="text-ink-muted text-left border-b border-line">
                       <th className="py-1.5 pr-3 font-semibold">Spring</th>
                       <th className="py-1.5 pr-3 font-semibold text-right">Handled</th>
                       <th className="py-1.5 pr-3 font-semibold text-right">Condemned</th>
@@ -349,14 +350,14 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
                   </thead>
                   <tbody>
                     {forecast.lines.map((l: any) => (
-                      <tr key={`${l.bogieType}-${l.springPosition}`} className="border-b border-slate-800/60">
-                        <td className="py-1.5 pr-3 text-slate-200">
+                      <tr key={`${l.bogieType}-${l.springPosition}`} className="border-b border-line">
+                        <td className="py-1.5 pr-3 text-ink-body">
                           {l.bogieType.replace('CASNUB_22_', '')} {l.springPosition.toLowerCase()}
                         </td>
-                        <td className="py-1.5 pr-3 text-right text-slate-300 tabular-nums">{l.springsHandled}</td>
-                        <td className="py-1.5 pr-3 text-right text-slate-300 tabular-nums">{l.condemnationRatePct}%</td>
+                        <td className="py-1.5 pr-3 text-right text-ink-body tabular-nums">{l.springsHandled}</td>
+                        <td className="py-1.5 pr-3 text-right text-ink-body tabular-nums">{l.condemnationRatePct}%</td>
                         <td className="py-1.5 pr-3 text-right text-white font-bold tabular-nums">{l.expectedReplacements}</td>
-                        <td className="py-1.5 text-right text-slate-500 tabular-nums">{l.basis}</td>
+                        <td className="py-1.5 text-right text-ink-faint tabular-nums">{l.basis}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -365,7 +366,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
             )}
 
             {forecast.notForecast.length > 0 && (
-              <p className="text-[11px] text-slate-500 mt-3 leading-relaxed">
+              <p className="text-[11px] text-ink-faint mt-3 leading-relaxed">
                 Not forecast yet: {forecast.notForecast
                   .map((n: any) => `${n.bogieType.replace('CASNUB_22_', '')} ${n.springPosition.toLowerCase()} (${n.condemned})`)
                   .join(', ')}. A rate needs 30 condemnations behind it before an order quantity is offered.
@@ -375,7 +376,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
         )}
 
         {gaugeExposure && gaugeExposure.total > 0 && (
-          <p className="text-[11px] text-amber-300/90 bg-amber-950/30 border border-amber-800/50 rounded-lg px-3 py-2 font-semibold">
+          <p className="text-[11px] text-warn-ink/90 bg-warn-soft border border-warn-line rounded-control px-3 py-2 font-semibold">
             {gaugeExposure.summary}
           </p>
         )}
@@ -397,7 +398,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
         * which is the work — the old one counted the inspections table, which
         * does not contain a single sorted spring.
         */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+      <div className="bg-card border border-line rounded-card p-5 space-y-4">
         {(() => {
           const today = days[days.length - 1];
           const sortedToday = today?.total ?? 0;
@@ -407,33 +408,33 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
             <>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div>
-                  <h3 className="text-base font-black text-white">
+                  <h3 className="text-base font-extrabold text-white">
                     {isHi ? 'आज का काम' : "Today's sorting against the shop's own figure"}
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-ink-muted">
                     {isHi
                       ? 'लगभग 700 प्रतिदिन — यह आंकड़ा शॉप के अपने SSE ने 27 अगस्त 2026 को दिया।'
                       : 'About 700 a day — the figure the shop\u2019s own SSE gave on 27 August 2026. Not a target set by this system.'}
                   </p>
                 </div>
                 <div className="text-left sm:text-right">
-                  <span className="font-mono text-2xl sm:text-3xl font-black text-blue-400 tabular-nums">
+                  <span className="font-mono text-2xl sm:text-3xl font-extrabold text-accent-ink tabular-nums">
                     {sortedToday.toLocaleString()}
                   </span>
-                  <span className="text-xs font-semibold text-slate-400"> / ~{shopFigure} {isHi ? '' : 'springs'}</span>
+                  <span className="text-xs font-semibold text-ink-muted"> / ~{shopFigure} {isHi ? '' : 'springs'}</span>
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <div className="h-4 bg-slate-950 rounded-full overflow-hidden border border-slate-800 p-0.5">
+                <div className="h-4 bg-page rounded-full overflow-hidden border border-line p-0.5">
                   <div
-                    className="h-full bg-gradient-to-r from-blue-600 to-emerald-500 rounded-full transition-all duration-500"
+                    className="h-full bg-card rounded-full transition-all duration-500"
                     style={{ width: `${sortedToday === 0 ? 0 : Math.max(2, pct)}%` }}
                   />
                 </div>
-                <div className="flex justify-between text-[11px] font-bold text-slate-400">
+                <div className="flex justify-between text-[11px] font-bold text-ink-muted">
                   <span>0</span>
-                  <span className="text-slate-500 font-normal">
+                  <span className="text-ink-faint font-normal">
                     {sortedToday === 0
                       ? (isHi ? 'आज अभी कुछ दर्ज नहीं हुआ' : 'nothing recorded yet today')
                       : `${pct}% ${isHi ? 'का' : 'of a typical day'}`}
@@ -449,39 +450,39 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
       {/* 2. Top Summary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {/* Passed Count */}
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-emerald-950/80 border border-emerald-700 flex items-center justify-center text-emerald-400">
+        <div className="p-4 bg-card border border-line rounded-control flex items-center gap-3">
+          <div className="w-12 h-12 rounded-control bg-good-soft border border-good-line flex items-center justify-center text-good-ink">
             <CheckCircleIcon size={24} />
           </div>
           <div>
-            <span className="text-xs text-slate-400 font-semibold uppercase">{dict.analytics?.passed || 'Passed'}</span>
-            <div className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">
+            <span className="text-xs text-ink-muted font-semibold uppercase">{dict.analytics?.passed || 'Passed'}</span>
+            <div className="text-xl sm:text-2xl font-extrabold text-good-ink font-mono">
               {(stats?.totalPassed || 0).toLocaleString()}
             </div>
           </div>
         </div>
 
         {/* Condemned Count */}
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-rose-950/80 border border-rose-700 flex items-center justify-center text-rose-400">
+        <div className="p-4 bg-card border border-line rounded-control flex items-center gap-3">
+          <div className="w-12 h-12 rounded-control bg-bad-soft border border-bad-line flex items-center justify-center text-bad-ink">
             <AlertTriangleIcon size={24} />
           </div>
           <div>
-            <span className="text-xs text-slate-400 font-semibold uppercase">{dict.analytics?.condemned || 'Condemned'}</span>
-            <div className="text-xl sm:text-2xl font-black text-rose-400 font-mono">
+            <span className="text-xs text-ink-muted font-semibold uppercase">{dict.analytics?.condemned || 'Condemned'}</span>
+            <div className="text-xl sm:text-2xl font-extrabold text-bad-ink font-mono">
               {(stats?.totalCondemned || 0).toLocaleString()}
             </div>
           </div>
         </div>
 
         {/* Condemnation Rate */}
-        <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-amber-950/80 border border-amber-700 flex items-center justify-center text-amber-400">
+        <div className="p-4 bg-card border border-line rounded-control flex items-center gap-3">
+          <div className="w-12 h-12 rounded-control bg-warn-soft border border-warn-line flex items-center justify-center text-warn-ink">
             <ShieldIcon size={24} />
           </div>
           <div>
-            <span className="text-xs text-slate-400 font-semibold uppercase">{dict.analytics?.condemnRate || 'Condemnation Rate'}</span>
-            <div className="text-xl sm:text-2xl font-black text-amber-400 font-mono">
+            <span className="text-xs text-ink-muted font-semibold uppercase">{dict.analytics?.condemnRate || 'Condemnation Rate'}</span>
+            <div className="text-xl sm:text-2xl font-extrabold text-warn-ink font-mono">
               {((stats?.condemnationRatePercentage || 0)).toFixed(1)}%
             </div>
           </div>
@@ -489,14 +490,14 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
       </div>
 
       {/* 3. RDSO Band Color Distribution with Interactive Chart */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-6">
-        <h3 className="text-base font-black text-white flex items-center gap-2">
-          <span>🎨</span> {dict.analytics?.bandDistribution || 'RDSO Color Band Distribution'}
+      <div className="bg-card border border-line rounded-card p-5 space-y-6">
+        <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+          <CoilIcon size={17} className="text-accent-ink" /> {dict.analytics?.bandDistribution || 'RDSO Color Band Distribution'}
         </h3>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-center">
           {/* Interactive Recharts Donut */}
-          <div className="w-full h-64 bg-slate-950/40 rounded-xl p-3 border border-slate-800/80">
+          <div className="w-full h-64 bg-page rounded-control p-3 border border-line">
             {bandChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
@@ -518,7 +519,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-full flex items-center justify-center text-xs text-slate-500">
+              <div className="h-full flex items-center justify-center text-xs text-ink-faint">
                 {lang === 'hi' ? 'कोई स्प्रिंग डेटा उपलब्ध नहीं' : 'No spring band distribution data available'}
               </div>
             )}
@@ -534,13 +535,16 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
               return (
                 <div key={bandKey} className="space-y-1">
                   <div className="flex justify-between text-xs font-bold">
-                    <span className={cfg.color}>{label}</span>
-                    <span className="font-mono text-slate-300">{count} ({pct}%)</span>
+                    <span className="text-ink-body">{label}</span>
+                    <span className="font-mono text-ink-body">{count} ({pct}%)</span>
                   </div>
-                  <div className="h-2.5 bg-slate-950 rounded-full overflow-hidden">
+                  <div className="h-2.5 bg-page rounded-full overflow-hidden">
                     <div
-                      className={`h-full ${cfg.bg} transition-all`}
-                      style={{ width: `${Math.max(count > 0 ? 3 : 0, pct)}%` }}
+                      className="h-full transition-all"
+                      style={{
+                        width: `${Math.max(count > 0 ? 3 : 0, pct)}%`,
+                        backgroundColor: COLOR_HEX_MAP[bandKey as keyof typeof COLOR_HEX_MAP] || '#71717a'
+                      }}
                     ></div>
                   </div>
                 </div>

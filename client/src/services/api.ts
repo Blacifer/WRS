@@ -3,6 +3,7 @@
  * Indian Railways Wagon Repair Shop Raipur
  */
 
+import type { LearningSubsystem } from '../../../shared/learning/subsystems.ts';
 import type {
   User,
   AuthLoginRequest,
@@ -231,7 +232,7 @@ export class ApiClient {
    * server/src/learning/learningService.ts.
    */
   public async recordLearningOutcome(payload: {
-    subsystem: 'OCR_CALIPER' | 'SPRING_CLASSIFICATION' | 'VOICE_COMMAND' | 'ACOUSTIC_DIAGNOSTIC' | 'DEFECT_SUGGESTION';
+    subsystem: LearningSubsystem;
     wagonNumber?: string;
     inspectionId?: string;
     machineOutput: unknown;
@@ -1070,6 +1071,16 @@ export class ApiClient {
       byLabel: Array<{ bogieType: string; condition: string; springPosition: string; band: string | null; status: string; count: number }>;
     };
   }> {
+    return this.request('/sorting/dataset');
+  }
+
+  /**
+   * How much labelled photographic evidence exists, and of what.
+   *
+   * Counts rather than images: the question is whether there is enough of a
+   * given kind to attempt or score anything, and thin classes are the answer.
+   */
+  public async getSortingDataset(): Promise<{ success: boolean; data: { total: number; byLabel: any[] } }> {
     return this.request('/sorting/dataset');
   }
 

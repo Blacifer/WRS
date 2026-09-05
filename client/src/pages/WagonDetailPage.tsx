@@ -5,6 +5,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api.ts';
+import { BanIcon, CaliperIcon, CameraIcon, ClipboardIcon, ClockIcon, CoilIcon, FileTextIcon, GearIcon, HeadphonesIcon, IdCardIcon, RefreshCwIcon, ShieldIcon, SparklesIcon, WindIcon, WrenchIcon } from '../components/Icons.tsx';
 import { offlineDb } from '../services/offlineDb.ts';
 import { useI18n } from '../i18n/index.ts';
 import { PhotoCaptureModal } from '../components/PhotoCaptureModal.tsx';
@@ -127,6 +128,17 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
   const [overrideTargetStage, setOverrideTargetStage] = useState<LifecycleStage>('COMPONENT_INSPECTION');
   const [overrideJustification, setOverrideJustification] = useState<string>('');
   const [overrideOtp, setOverrideOtp] = useState<string>('');
+  /*
+   * The code this screen issued, when the supervisor asked for one.
+   *
+   * This modal had a bare OTP box and no way to obtain a code — no request
+   * button, no reference to an authenticator. A supervisor who reached it
+   * could not move a wagon at all, which is how the shop found it: "otp did
+   * not land". Nothing was ever sent, because with OTP_DELIVERY=INLINE the
+   * code comes back in the response and this screen never asked for it.
+   */
+  const [overrideOtpIssued, setOverrideOtpIssued] = useState<string | null>(null);
+  const [requestingOverrideOtp, setRequestingOverrideOtp] = useState(false);
   const [overrideError, setOverrideError] = useState<string | null>(null);
 
   // Gate Signoff Modal State
@@ -801,8 +813,8 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
   if (loading && !wagon) {
     return (
-      <div className="text-center py-20 bg-slate-900/40 rounded-2xl border border-slate-800 text-slate-400">
-        <div className="w-8 h-8 border-2 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
+      <div className="text-center py-20 bg-card rounded-card border border-line text-ink-muted">
+        <div className="w-8 h-8 border-2 border-accent-line border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
         <p className="text-sm">Loading wagon {wagonNumber}...</p>
       </div>
     );
@@ -842,21 +854,21 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
   return (
     <div className="space-y-6">
       {/* Top Header Card */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+      <div className="bg-card border border-line rounded-card p-6 space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <button
               onClick={onBack}
-              className="text-xs font-semibold text-orange-400 hover:text-orange-300 flex items-center gap-1 mb-2"
+              className="text-xs font-semibold text-accent-ink hover:text-accent-ink flex items-center gap-1 mb-2"
             >
               ← Back to Wagons List
             </button>
             <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-black text-white">{wagon?.wagonNumber}</h2>
-              <span className="px-3 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs font-bold text-slate-300">
+              <h2 className="text-2xl font-extrabold text-white">{wagon?.wagonNumber}</h2>
+              <span className="px-3 py-1 bg-raised border border-line rounded-control text-xs font-bold text-ink-body">
                 {wagon?.wagonType}
               </span>
-              <span className="px-3 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs font-bold text-slate-300">
+              <span className="px-3 py-1 bg-raised border border-line rounded-control text-xs font-bold text-ink-body">
                 {wagon?.owningRailway}
               </span>
             </div>
@@ -867,9 +879,9 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
             {isReleased ? (
               <button
                 onClick={() => setShowCertificateModal(true)}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/30 transition flex items-center gap-2 min-h-[48px]"
+                className="px-5 py-2.5 bg-good hover:bg-good text-white rounded-control text-xs font-bold shadow-emerald-600/30 transition flex items-center gap-2 min-h-[48px]"
               >
-                📜 {t('actions.viewCertificate')}
+                <FileTextIcon size={16} /> {t('actions.viewCertificate')}
               </button>
             ) : isQCGate ? (
               <button
@@ -879,14 +891,18 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                     setShowSignoffModal(true);
                   }
                 }}
-                className="px-6 py-2.5 bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white rounded-xl text-xs font-bold shadow-lg transition flex items-center gap-2 min-h-[48px]"
+                className={`px-6 py-2.5 rounded-control text-xs font-bold transition-colors flex items-center gap-2 min-h-[48px] border ${
+                  gateStatus?.canRelease
+                    ? 'bg-good hover:bg-good-ink border-good text-page'
+                    : 'bg-accent hover:bg-accent-hover border-accent-hover text-white'
+                }`}
               >
-                🛡️ {t('actions.signoffRelease')}
+                <ShieldIcon size={16} /> {t('actions.signoffRelease')}
               </button>
             ) : (
               <button
                 onClick={handleNextStage}
-                className="px-6 py-2.5 bg-orange-600 hover:bg-orange-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-orange-600/30 transition flex items-center gap-2 min-h-[48px]"
+                className="px-6 py-2.5 bg-accent hover:bg-accent-hover text-white rounded-control text-xs font-bold  transition flex items-center gap-2 min-h-[48px]"
               >
                 Advance to Next Stage →
               </button>
@@ -895,16 +911,16 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
             {isSupervisor && !isReleased && (
               <button
                 onClick={() => setShowOverrideModal(true)}
-                className="px-4 py-2.5 bg-slate-800 hover:bg-slate-750 text-amber-400 border border-amber-500/40 rounded-xl text-xs font-bold transition flex items-center gap-1.5 min-h-[48px]"
+                className="px-4 py-2.5 bg-raised hover:bg-selected text-warn-ink border border-warn-line rounded-control text-xs font-bold transition flex items-center gap-1.5 min-h-[48px]"
               >
-                ⚙️ {t('actions.overrideStage')}
+                <GearIcon size={16} /> {t('actions.overrideStage')}
               </button>
             )}
           </div>
         </div>
 
         {/* 7-Stage Horizontal Stepper */}
-        <div className="pt-4 border-t border-slate-800">
+        <div className="pt-4 border-t border-line">
           <div className="grid grid-cols-7 gap-2">
             {stageList.map((stg, idx) => {
               const isPast = idx < currentStageIndex;
@@ -916,17 +932,17 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                   <div
                     className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border transition ${
                       isCurrent
-                        ? 'bg-orange-600 border-orange-400 text-white ring-4 ring-orange-500/20'
+                        ? 'bg-accent border-accent-line text-white ring-4 ring-accent-hover'
                         : isPast
-                        ? 'bg-emerald-600 border-emerald-500 text-white'
-                        : 'bg-slate-800 border-slate-700 text-slate-500'
+                        ? 'bg-good border-good-line text-white'
+                        : 'bg-raised border-line text-ink-faint'
                     }`}
                   >
                     {isPast ? '✓' : idx + 1}
                   </div>
                   <span
                     className={`text-[10px] font-semibold truncate w-full ${
-                      isCurrent ? 'text-orange-400' : isPast ? 'text-slate-300' : 'text-slate-500'
+                      isCurrent ? 'text-accent-ink' : isPast ? 'text-ink-body' : 'text-ink-faint'
                     }`}
                   >
                     {stg.replace(/_/g, ' ')}
@@ -939,29 +955,29 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex border-b border-slate-800 gap-6">
+      <div className="flex border-b border-line gap-6">
         <button
           onClick={() => setActiveTab('CHECKLIST')}
           className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
             activeTab === 'CHECKLIST'
-              ? 'border-orange-500 text-orange-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              ? 'border-accent-line text-accent-ink'
+              : 'border-transparent text-ink-muted hover:text-ink-body'
           }`}
         >
-          <span>📋</span> {t('checklist.title')}
+          <ClipboardIcon size={16} /> {t('checklist.title')}
         </button>
 
         <button
           onClick={() => setActiveTab('GATE')}
           className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
             activeTab === 'GATE'
-              ? 'border-orange-500 text-orange-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              ? 'border-accent-line text-accent-ink'
+              : 'border-transparent text-ink-muted hover:text-ink-body'
           }`}
         >
-          <span>🛡️</span> {t('exitGate.title')}
+          <ShieldIcon size={16} /> {t('exitGate.title')}
           {gateStatus && !gateStatus.canRelease && (
-            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+            <span className="w-2 h-2 rounded-full bg-bad animate-pulse"></span>
           )}
         </button>
 
@@ -969,22 +985,22 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
           onClick={() => setActiveTab('PHOTOS')}
           className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
             activeTab === 'PHOTOS'
-              ? 'border-orange-500 text-orange-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              ? 'border-accent-line text-accent-ink'
+              : 'border-transparent text-ink-muted hover:text-ink-body'
           }`}
         >
-          <span>📷</span> {t('photos.title')} ({photos.length})
+          <CameraIcon size={16} /> {t('photos.title')} ({photos.length})
         </button>
 
         <button
           onClick={() => setActiveTab('TIMELINE')}
           className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
             activeTab === 'TIMELINE'
-              ? 'border-orange-500 text-orange-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              ? 'border-accent-line text-accent-ink'
+              : 'border-transparent text-ink-muted hover:text-ink-body'
           }`}
         >
-          <span>⏱️</span>{isHi ? 'समयरेखा व ठहराव अवधि' : 'Timeline & Dwell Times'}</button>
+          <ClockIcon size={16} />{isHi ? 'समयरेखा व ठहराव अवधि' : 'Timeline & Dwell Times'}</button>
 
 
 
@@ -992,33 +1008,33 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
           onClick={() => setActiveTab('SWT')}
           className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
             activeTab === 'SWT'
-              ? 'border-cyan-500 text-cyan-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              ? 'border-accent-line text-accent-ink'
+              : 'border-transparent text-ink-muted hover:text-ink-body'
           }`}
         >
-          <span>🌬️</span>{isHi ? 'एकल वैगन परीक्षण (वायु ब्रेक)' : 'Single Wagon Test (Air Brake)'}
+          <WindIcon size={16} />{isHi ? 'एकल वैगन परीक्षण (वायु ब्रेक)' : 'Single Wagon Test (Air Brake)'}
         </button>
 
         <button
           onClick={() => setActiveTab('ACOUSTIC')}
           className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
             activeTab === 'ACOUSTIC'
-              ? 'border-cyan-500 text-cyan-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              ? 'border-accent-line text-accent-ink'
+              : 'border-transparent text-ink-muted hover:text-ink-body'
           }`}
         >
-          <span>🎧</span> {t('acoustic.title', 'Acoustic Diagnostics')}
+          <HeadphonesIcon size={16} /> {t('acoustic.title', 'Acoustic Diagnostics')}
         </button>
 
         <button
           onClick={() => setActiveTab('COMPONENTS')}
           className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
             activeTab === 'COMPONENTS'
-              ? 'border-cyan-500 text-cyan-400'
-              : 'border-transparent text-slate-400 hover:text-slate-200'
+              ? 'border-accent-line text-accent-ink'
+              : 'border-transparent text-ink-muted hover:text-ink-body'
           }`}
         >
-          <span>🪪</span> Serialized Passports ({wagonComponents.length})
+          <IdCardIcon size={16} /> Serialized Passports ({wagonComponents.length})
         </button>
       </div>
 
@@ -1055,13 +1071,13 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
               in one attested action instead of tapping 50+ items to say "fine".
               Springs and any already-recorded FAIL/CONDEMNED are never touched. */}
           {pendingCount > 0 && !isReleased && (
-            <div className="bg-slate-900 border border-indigo-800/60 rounded-2xl p-5 space-y-3">
+            <div className="bg-card border border-accent-line rounded-card p-5 space-y-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                    <span>⚡</span> {isHi ? 'अपवाद द्वारा निरीक्षण' : 'Inspect by Exception'}
+                    <SparklesIcon size={16} /> {isHi ? 'अपवाद द्वारा निरीक्षण' : 'Inspect by Exception'}
                   </h4>
-                  <p className="text-[11px] text-slate-400 mt-1 max-w-xl leading-relaxed">
+                  <p className="text-[11px] text-ink-muted mt-1 max-w-xl leading-relaxed">
                     {isHi
                       ? `${pendingCount} मद अभी लंबित हैं। पहले ऊपर कोई भी दोषपूर्ण मद दर्ज करें, फिर शेष को एक ही क्रिया में सेवा-योग्य घोषित करें। स्प्रिंग तथा कोई भी दर्ज FAIL या CONDEMNED निर्णय कभी प्रभावित नहीं होते।`
                       : `${pendingCount} item${pendingCount === 1 ? '' : 's'} still pending. Log anything defective above first, then declare the remainder serviceable in one action. Springs and any recorded FAIL or CONDEMNED verdict are never affected.`}
@@ -1070,7 +1086,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                 {!showBulkPanel && (
                   <button
                     onClick={() => setShowBulkPanel(true)}
-                    className="min-h-[44px] px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold border border-indigo-400/40 transition shrink-0"
+                    className="min-h-[44px] px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-control text-xs font-bold border border-accent-line transition shrink-0"
                   >
                     {isHi ? `शेष ${pendingCount} पूर्ण करें` : `Clear ${pendingCount} Remaining`}
                   </button>
@@ -1078,9 +1094,9 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
               </div>
 
               {showBulkPanel && (
-                <div className="space-y-3 pt-2 border-t border-slate-800">
+                <div className="space-y-3 pt-2 border-t border-line">
                   <label className="block">
-                    <span className="text-[11px] font-bold text-slate-300">
+                    <span className="text-[11px] font-bold text-ink-body">
                       {isHi
                         ? 'प्रमाणन — आपने भौतिक रूप से क्या सत्यापित किया? (न्यूनतम 10 अक्षर)'
                         : 'Attestation — what did you physically verify? (min 10 characters)'}
@@ -1094,10 +1110,10 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                           ? 'उदा. एसएसई शर्मा के साथ दोनों बोगियाँ देखीं, शेष सभी पुर्जे दृष्टिगत रूप से सेवा-योग्य पाए गए'
                           : 'e.g. Walked both bogies with SSE Sharma, all remaining components visually verified serviceable'
                       }
-                      className="mt-1.5 w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-indigo-500 focus:outline-none"
+                      className="mt-1.5 w-full bg-page border border-line rounded-control px-3 py-2 text-xs text-white placeholder-slate-600 focus:border-accent-line focus:outline-none"
                     />
                   </label>
-                  <p className="text-[10px] text-amber-400/90 leading-relaxed">
+                  <p className="text-[10px] text-warn-ink/90 leading-relaxed">
                     {isHi
                       ? 'यह प्रत्येक प्रभावित मद पर आपके नाम सहित दर्ज होता है और ऑडिट लॉग में लिखा जाता है। केवल वही घोषित करें जिसका आपने वास्तव में निरीक्षण किया है।'
                       : 'This is recorded against your name on every affected item and written to the audit log. Only declare what you actually inspected.'}
@@ -1106,7 +1122,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                     <button
                       onClick={handleBulkClear}
                       disabled={bulkAttestation.trim().length < 10 || isBulkClearing}
-                      className="min-h-[44px] px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition"
+                      className="min-h-[44px] px-4 py-2 bg-accent hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-control text-xs font-bold transition"
                     >
                       {isBulkClearing
                         ? (isHi ? 'पूर्ण किया जा रहा…' : 'Clearing…')
@@ -1117,7 +1133,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                         setShowBulkPanel(false);
                         setBulkAttestation('');
                       }}
-                      className="min-h-[44px] px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold border border-slate-700 transition"
+                      className="min-h-[44px] px-4 py-2 bg-raised hover:bg-selected text-ink-body rounded-control text-xs font-bold border border-line transition"
                     >
                       {isHi ? 'रद्द करें' : 'Cancel'}
                     </button>
@@ -1138,14 +1154,14 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                 <button
                   key={catKey}
                   onClick={() => setSelectedCategory(catKey)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
+                  className={`min-h-tap px-4 py-2 rounded-control text-sm font-semibold transition-colors flex items-center gap-2 ${
                     isSelected
-                      ? 'bg-white text-black'
-                      : 'bg-transparent text-neutral-400 hover:text-white'
+                      ? 'bg-selected text-ink'
+                      : 'bg-transparent text-ink-muted hover:text-ink'
                   }`}
                 >
                   <span>{t(`checklist.categories.${catKey}` as any) || catKey}</span>
-                  {hasCondemned && <span className="w-2 h-2 rounded-full bg-rose-500"></span>}
+                  {hasCondemned && <span className="w-2 h-2 rounded-full bg-bad"></span>}
                 </button>
               );
             })}
@@ -1153,12 +1169,12 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
           {/* Spring Sync Banner for Category 1 */}
           {selectedCategory === 'SPRINGS' && (
-            <div className="bg-blue-950/40 border border-blue-800/60 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs text-blue-300">
+            <div className="bg-accent-soft border border-accent-line p-4 rounded-control flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs text-accent-ink">
               <div className="flex items-center gap-3">
-                <span className="text-2xl">🔄</span>
+                <RefreshCwIcon size={24} className="text-ink-muted" />
                 <div>
                   <p className="font-bold">{t('checklist.springSyncNotice')}</p>
-                  <p className="text-[11px] text-blue-400 mt-0.5">
+                  <p className="text-[11px] text-accent-ink mt-0.5">
                     Phase 1 caliper height measurements and RDSO band classifications are live-linked into this checklist.
                   </p>
                 </div>
@@ -1172,9 +1188,9 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                     initialTarget: 'OUTER_SPRING'
                   })
                 }
-                className="min-h-[44px] px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-2 shrink-0 shadow-md"
+                className="min-h-[44px] px-4 py-2 bg-accent hover:bg-accent text-white rounded-control text-xs font-bold transition flex items-center gap-2 shrink-0 shadow-md"
               >
-                <span>🔬</span> {t('actions.openArCaliper') || 'Read the caliper'}
+                <CaliperIcon size={16} /> {t('actions.openArCaliper') || 'Read the caliper'}
               </button>
             </div>
           )}
@@ -1207,18 +1223,18 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                       <div className="flex items-center gap-3">
                         <h5 className="text-sm font-medium text-white">{item.partName}</h5>
                         {item.isMandatory && (
-                          <span className="px-2 py-0.5 bg-rose-500/20 text-rose-400 border border-rose-500/40 rounded text-[9px] font-black tracking-wider">
+                          <span className="px-2 py-0.5 bg-bad-soft text-bad-ink border border-bad-line rounded text-[9px] font-extrabold tracking-wider">
                             {isHi ? 'अनिवार्य' : 'MANDATORY'}
                           </span>
                         )}
                         {item.bogiePosition && item.bogiePosition !== 'NONE' && (
-                          <span className="text-[10px] text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
+                          <span className="text-[10px] text-ink-muted bg-raised px-2 py-0.5 rounded">
                             {item.bogiePosition}
                           </span>
                         )}
                       </div>
                       {item.conditionNotes && (
-                        <p className="text-xs text-slate-400 italic">“{item.conditionNotes}”</p>
+                        <p className="text-xs text-ink-muted italic">“{item.conditionNotes}”</p>
                       )}
                       {/* Appears the moment something is condemned or failed.
                           Not a modal: the verdict is already saved, so this can
@@ -1233,17 +1249,17 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                             onChange={(e) => setNoteDraft({ itemId: item.id, text: e.target.value })}
                             onKeyDown={(e) => { if (e.key === 'Enter') saveNote(item, noteDraft.text); }}
                             placeholder={isHi ? 'क्या दिखा? जैसे “दूसरे कॉइल पर दरार”' : 'What did you see? e.g. “crack near second coil”'}
-                            className="flex-1 min-w-[240px] min-h-[44px] bg-slate-800 border border-amber-700/60 rounded-lg px-3 text-sm text-white"
+                            className="flex-1 min-w-[240px] min-h-[44px] bg-raised border border-warn-line rounded-control px-3 text-sm text-white"
                           />
                           <button
                             onClick={() => saveNote(item, noteDraft.text)}
-                            className="min-h-[44px] px-4 rounded-lg bg-white text-black text-xs font-extrabold"
+                            className="min-h-[44px] px-4 rounded-control bg-white text-black text-xs font-extrabold"
                           >
                             {isHi ? 'सहेजें' : 'Save reason'}
                           </button>
                           <button
                             onClick={() => setNoteDraft(null)}
-                            className="min-h-[44px] px-3 rounded-lg border border-slate-700 text-slate-400 text-xs font-bold"
+                            className="min-h-[44px] px-3 rounded-control border border-line text-ink-muted text-xs font-bold"
                           >
                             {isHi ? 'छोड़ें' : 'Skip'}
                           </button>
@@ -1257,15 +1273,15 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                       {(item as any).measurementConflict && (
                         <p
                           data-testid="measurement-conflict"
-                          className="text-xs text-amber-300 bg-amber-950/40 border border-amber-800/60 rounded-md px-2 py-1.5 mt-1"
+                          className="text-xs text-warn-ink bg-warn-soft border border-warn-line rounded-md px-2 py-1.5 mt-1"
                         >
                           <b>{isHi ? 'मापन असहमत' : 'The measurement disagrees'}:</b>{' '}
                           {(item as any).measurementConflict.reason}
                         </p>
                       )}
                       {item.repairAction && (
-                        <p className="text-xs text-emerald-400">
-                          🔧 Action: {item.repairAction} ({item.repairNotes})
+                        <p className="text-xs text-good-ink">
+                          <WrenchIcon size={13} className="inline align-[-2px] mr-1" />Action: {item.repairAction} ({item.repairNotes})
                         </p>
                       )}
                     </div>
@@ -1281,9 +1297,9 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                             className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
                               isCurrent
                                 ? st === 'PASS'
-                                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                                  ? 'bg-good-soft border-good-line text-good-ink'
                                   : st === 'FAIL' || st === 'CONDEMNED'
-                                  ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
+                                  ? 'bg-bad-soft border-bad-line text-bad-ink'
                                   : 'bg-white/10 border-white/20 text-white'
                                 : 'bg-transparent border-transparent text-neutral-500 hover:text-neutral-300 hover:border-white/10'
                             }`}
@@ -1308,10 +1324,10 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                               initialTarget: target
                             });
                           }}
-                          className="min-h-[48px] px-3 py-2 bg-blue-950/60 hover:bg-blue-900 border border-blue-700/60 rounded-xl text-xs text-blue-300 font-bold transition flex items-center gap-1.5 shadow-sm"
+                          className="min-h-[48px] px-3 py-2 bg-accent-soft hover:bg-accent-soft border border-accent-line rounded-control text-xs text-accent-ink font-bold transition flex items-center gap-1.5 shadow-sm"
                           title="Read the caliper with the camera"
                         >
-                          <span>🤖</span>
+                          <SparklesIcon size={15} />
                           <span className="hidden sm:inline">{t('actions.smartVision') || 'Measure'}</span>
                         </button>
                       )}
@@ -1325,10 +1341,11 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                             itemId: item.id
                           })
                         }
-                        className="min-h-[48px] min-w-[48px] px-3 py-2 bg-slate-800 hover:bg-slate-750 border border-slate-700 rounded-xl text-xs text-slate-300 font-bold transition flex items-center justify-center"
+                        className="min-h-[48px] min-w-[48px] px-3 py-2 bg-raised hover:bg-selected border border-line rounded-control text-xs text-ink-body font-bold transition flex items-center justify-center"
                         title="Attach Photo Evidence"
+                        aria-label="Attach Photo Evidence"
                       >
-                        📷
+                        <CameraIcon size={18} />
                       </button>
                     </div>
                   </div>
@@ -1359,25 +1376,25 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
         <div className="space-y-6">
           {/* Gate Overview Status Card */}
           <div
-            className={`border rounded-2xl p-6 shadow-xl space-y-4 ${
+            className={`border rounded-card p-6 space-y-4 ${
               gateStatus.canRelease
-                ? 'bg-emerald-950/30 border-emerald-500/60'
-                : 'bg-rose-950/30 border-rose-500/60'
+                ? 'bg-good-soft border-good-line'
+                : 'bg-bad-soft border-bad-line'
             }`}
           >
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
                 <span
-                  className={`px-3 py-1 rounded-full text-xs font-black tracking-wider ${
+                  className={`px-3 py-1 rounded-full text-xs font-extrabold tracking-wider ${
                     gateStatus.canRelease
-                      ? 'bg-emerald-500 text-white'
-                      : 'bg-rose-600 text-white animate-pulse'
+                      ? 'bg-good text-white'
+                      : 'bg-bad text-white animate-pulse'
                   }`}
                 >
                   {gatePanel.headline}
                 </span>
-                <h3 className="text-xl font-black text-white mt-2">{t('exitGate.title')}</h3>
-                <p className="text-xs text-slate-300 mt-1">
+                <h3 className="text-xl font-extrabold text-white mt-2">{t('exitGate.title')}</h3>
+                <p className="text-xs text-ink-body mt-1">
                   {gateStatus.canRelease
                     ? 'All 4 verification tiers satisfied. Ready for supervisor digital sign-off.'
                     : 'Active quality blockers detected. Wagon cannot be certified or released until all blockers are resolved.'}
@@ -1387,39 +1404,39 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
               {gatePanel.offerSignoff && (
                 <button
                   onClick={() => setShowSignoffModal(true)}
-                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold shadow-lg shadow-emerald-600/30 transition min-h-[48px] flex items-center gap-2"
+                  className="px-6 py-3 bg-good hover:bg-good text-white rounded-control text-sm font-bold shadow-emerald-600/30 transition min-h-[48px] flex items-center gap-2"
                 >
-                  🛡️ {t('exitGate.signAndReleaseBtn')}
+                  <ShieldIcon size={16} /> {t('exitGate.signAndReleaseBtn')}
                 </button>
               )}
             </div>
 
             {/* 4-Tier Diagnostics Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-4 border-t border-slate-800/80">
-              <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
-                <p className="text-[11px] text-slate-400 font-semibold">{t('exitGate.rule1')}</p>
-                <p className="text-lg font-black text-white mt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-4 border-t border-line">
+              <div className="bg-card p-4 rounded-control border border-line">
+                <p className="text-[11px] text-ink-muted font-semibold">{t('exitGate.rule1')}</p>
+                <p className="text-lg font-extrabold text-white mt-1">
                   {gatePanel.tiers[0].value}
                 </p>
               </div>
 
-              <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
-                <p className="text-[11px] text-slate-400 font-semibold">{t('exitGate.rule2')}</p>
-                <p className="text-lg font-black text-white mt-1">
+              <div className="bg-card p-4 rounded-control border border-line">
+                <p className="text-[11px] text-ink-muted font-semibold">{t('exitGate.rule2')}</p>
+                <p className="text-lg font-extrabold text-white mt-1">
                   {gatePanel.tiers[1].value}
                 </p>
               </div>
 
-              <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
-                <p className="text-[11px] text-slate-400 font-semibold">{t('exitGate.rule3')}</p>
-                <p className="text-lg font-black text-white mt-1">
+              <div className="bg-card p-4 rounded-control border border-line">
+                <p className="text-[11px] text-ink-muted font-semibold">{t('exitGate.rule3')}</p>
+                <p className="text-lg font-extrabold text-white mt-1">
                   {gatePanel.tiers[2].value}
                 </p>
               </div>
 
-              <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
-                <p className="text-[11px] text-slate-400 font-semibold">{t('exitGate.rule4')}</p>
-                <p className="text-lg font-black text-white mt-1">
+              <div className="bg-card p-4 rounded-control border border-line">
+                <p className="text-[11px] text-ink-muted font-semibold">{t('exitGate.rule4')}</p>
+                <p className="text-lg font-extrabold text-white mt-1">
                   {gatePanel.tiers[3].value}
                 </p>
               </div>
@@ -1428,17 +1445,17 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
           {/* Active Blockers Breakdown */}
           {gateStatus.blockers && gateStatus.blockers.length > 0 && (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
-              <h4 className="text-sm font-bold text-rose-400 flex items-center gap-2">
-                <span>🚫</span> {t('exitGate.activeBlockers')} ({gateStatus.blockers.length})
+            <div className="bg-card border border-line rounded-card p-6 space-y-4">
+              <h4 className="text-sm font-bold text-bad-ink flex items-center gap-2">
+                <BanIcon size={16} /> {t('exitGate.activeBlockers')} ({gateStatus.blockers.length})
               </h4>
               <div className="space-y-2">
                 {gateStatus.blockers.map((b: string, idx: number) => (
                   <div
                     key={idx}
-                    className="p-3 bg-rose-950/30 border border-rose-900/60 rounded-xl text-xs text-rose-300 flex items-start gap-2.5"
+                    className="p-3 bg-bad-soft border border-bad-line rounded-control text-xs text-bad-ink flex items-start gap-2.5"
                   >
-                    <span className="text-rose-500 font-bold">•</span>
+                    <span className="text-bad-ink font-bold">•</span>
                     <span>{b}</span>
                   </div>
                 ))}
@@ -1450,13 +1467,13 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
               These do not block release; they surface a set-level problem the
               per-spring checks cannot see. */}
           {gateStatus.advisories && gateStatus.advisories.length > 0 && (
-            <div className="bg-slate-900 border border-amber-900/60 rounded-2xl p-6 shadow-xl space-y-4">
+            <div className="bg-card border border-warn-line rounded-card p-6 space-y-4">
               <div>
-                <h4 className="text-sm font-bold text-amber-400 flex items-center gap-2">
-                  <span>⚖️</span>{' '}
+                <h4 className="text-sm font-bold text-warn-ink flex items-center gap-2">
+                  <CoilIcon size={16} />{' '}
                   {isHi ? 'स्प्रिंग नेस्ट समूहन' : 'Spring Nest Grouping'} ({gateStatus.advisories.length})
                 </h4>
-                <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                <p className="text-[11px] text-ink-muted mt-1.5 leading-relaxed">
                   {isHi
                     ? 'केवल सलाहकारी — विमुक्ति नहीं रोकता। एक नेस्ट की सभी स्प्रिंग एक ही 3 मि.मी. बैंड में होनी चाहिए ताकि भार समान रूप से बँटे, भले ही प्रत्येक स्प्रिंग अलग-अलग उत्तीर्ण हो।'
                     : 'Advisory only — does not block release. Springs in one nest should sit within a single 3 mm band so they share load evenly, even when each spring passes on its own.'}
@@ -1466,9 +1483,9 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                 {gateStatus.advisories.map((a: string, idx: number) => (
                   <div
                     key={idx}
-                    className="p-3 bg-amber-950/30 border border-amber-900/60 rounded-xl text-xs text-amber-200 flex items-start gap-2.5"
+                    className="p-3 bg-warn-soft border border-warn-line rounded-control text-xs text-warn-ink flex items-start gap-2.5"
                   >
-                    <span className="text-amber-500 font-bold">•</span>
+                    <span className="text-warn-ink font-bold">•</span>
                     <span>{a}</span>
                   </div>
                 ))}
@@ -1477,22 +1494,22 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
               {/* Per-group breakdown so the inspector can see which nest to re-group */}
               {Array.isArray(gateStatus.summary?.springNestCheck?.groups) &&
                 gateStatus.summary.springNestCheck.groups.length > 0 && (
-                  <div className="pt-3 border-t border-slate-800 space-y-1.5">
+                  <div className="pt-3 border-t border-line space-y-1.5">
                     {gateStatus.summary.springNestCheck.groups.map((g: any) => (
                       <div
                         key={g.groupKey}
-                        className="flex items-center justify-between gap-3 text-[11px] px-3 py-2 rounded-lg bg-slate-950/60 border border-slate-800"
+                        className="flex items-center justify-between gap-3 text-[11px] px-3 py-2 rounded-control bg-page border border-line"
                       >
-                        <span className="font-bold text-slate-200">{g.groupKey}</span>
-                        <span className="text-slate-400 tabular-nums">
+                        <span className="font-bold text-ink-body">{g.groupKey}</span>
+                        <span className="text-ink-muted tabular-nums">
                           {g.springCount} {isHi ? 'स्प्रिंग' : `spring${g.springCount === 1 ? '' : 's'}`} ·{' '}
                           {g.minHeight?.toFixed(1)}–{g.maxHeight?.toFixed(1)} mm
                         </span>
                         <span
-                          className={`font-black px-2 py-0.5 rounded ${
+                          className={`font-extrabold px-2 py-0.5 rounded ${
                             g.isMatched
-                              ? 'text-emerald-400 bg-emerald-950/50'
-                              : 'text-amber-300 bg-amber-950/50'
+                              ? 'text-good-ink bg-good-soft'
+                              : 'text-warn-ink bg-warn-soft'
                           }`}
                         >
                           {g.isMatched
@@ -1539,15 +1556,15 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
       {/* Tab 4: Timeline & Dwell Times */}
       {activeTab === 'TIMELINE' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-6">
+        <div className="bg-card border border-line rounded-card p-6 space-y-6">
           <h4 className="text-sm font-bold text-white flex items-center gap-2">
-            <span>⏱️</span>{isHi ? 'कालानुक्रमिक चरण इतिहास व ठहराव अवधि' : 'Chronological Transition History & Dwell Times'}</h4>
+            <ClockIcon size={16} />{isHi ? 'कालानुक्रमिक चरण इतिहास व ठहराव अवधि' : 'Chronological Transition History & Dwell Times'}</h4>
 
           <div className="space-y-4">
             {timeline.map((tr, idx) => (
               <div
                 key={tr.id || idx}
-                className="p-4 bg-slate-850/60 border border-slate-800 rounded-xl space-y-2"
+                className="p-4 bg-raised border border-line rounded-control space-y-2"
               >
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-2">
@@ -1555,27 +1572,27 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                       {tr.fromStage} → {tr.toStage}
                     </span>
                     {tr.isOverride && (
-                      <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/40 rounded text-[9px] font-bold">
+                      <span className="px-2 py-0.5 bg-warn-soft text-warn-ink border border-warn-line rounded text-[9px] font-bold">
                         {isHi ? 'ओवरराइड' : 'OVERRIDE'}
                       </span>
                     )}
                   </div>
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-[11px] text-ink-muted">
                     {new Date(tr.timestamp).toLocaleString()}
                   </span>
                 </div>
 
-                <div className="text-xs text-slate-400 flex justify-between items-center">
+                <div className="text-xs text-ink-muted flex justify-between items-center">
                   <span>
                     By: {tr.performerName} ({tr.performerRole})
                   </span>
                   {tr.durationInStageHours !== undefined && (
-                    <span className="font-mono text-orange-400">Dwell: {tr.durationInStageHours}h</span>
+                    <span className="font-mono text-accent-ink">Dwell: {tr.durationInStageHours}h</span>
                   )}
                 </div>
 
                 {tr.overrideReason && (
-                  <p className="text-xs text-amber-300/90 bg-amber-950/30 p-2 rounded border border-amber-900/40">
+                  <p className="text-xs text-warn-ink/90 bg-warn-soft p-2 rounded border border-warn-line">
                     Justification: {tr.overrideReason}
                   </p>
                 )}
@@ -1589,7 +1606,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
       {/* Single Wagon Test — the WMM 2.0 §720-C air brake proforma */}
       {activeTab === 'SWT' && wagon && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+        <div className="bg-card border border-line rounded-card p-5">
           <SingleWagonTestForm
             wagonNumber={wagonNumber}
             wagonType={wagon.wagonType}
@@ -1614,16 +1631,16 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
       {activeTab === 'COMPONENTS' && (
         <div className="space-y-6">
           {/* Header Banner */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 bg-slate-900/80 border border-cyan-500/30 rounded-2xl shadow-xl">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 bg-card border border-line rounded-card">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/50 flex items-center justify-center text-cyan-300 text-xl font-black">
-                🪪
+              <div className="w-10 h-10 rounded-control bg-accent-soft border border-accent-line flex items-center justify-center text-accent-ink shrink-0">
+                <IdCardIcon size={20} />
               </div>
               <div>
-                <h3 className="text-base sm:text-lg font-black text-white">
+                <h3 className="text-base sm:text-lg font-extrabold text-white">
                   Serialized Component Passports ({wagonNumber})
                 </h3>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-ink-muted">
                   Track serialized wheelsets, CTRB bearings, draft gears, and bolsters assigned to bogie positions
                 </p>
               </div>
@@ -1632,14 +1649,14 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={() => setIsPassportScannerOpen(true)}
-                className="flex-1 sm:flex-none px-3.5 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5"
+                className="flex-1 sm:flex-none px-3.5 py-2 bg-accent hover:bg-accent-hover border border-accent-hover text-white font-bold text-xs rounded-control transition-colors flex items-center justify-center gap-1.5"
               >
-                <span>📷</span>
+                <CameraIcon size={15} />
                 <span>{isHi ? 'लगाने हेतु क्यूआर स्कैन करें' : 'Scan QR to Mount'}</span>
               </button>
               <button
                 onClick={() => openAssignModal('BOGIE_1')}
-                className="flex-1 sm:flex-none px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5"
+                className="flex-1 sm:flex-none px-3.5 py-2 bg-raised hover:bg-selected text-ink-body font-bold text-xs rounded-control border border-line transition flex items-center justify-center gap-1.5"
               >
                 <span>+</span>
                 <span>{isHi ? 'घटक लगाएँ' : 'Mount Component'}</span>
@@ -1650,25 +1667,25 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
           {/* Bogie Positions Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Bogie 1 (Leading) */}
-            <div className="p-5 bg-slate-900/70 border border-slate-800 rounded-2xl space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="p-5 bg-card border border-line rounded-card space-y-4">
+              <div className="flex items-center justify-between border-b border-line pb-3">
                 <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-cyan-400"></span>
+                  <span className="w-3 h-3 rounded-full bg-accent"></span>
                   <h4 className="text-sm font-extrabold text-white tracking-wide">
                     BOGIE 1 (Leading Bogie)
                   </h4>
                 </div>
                 <button
                   onClick={() => openAssignModal('BOGIE_1')}
-                  className="px-2.5 py-1 bg-cyan-950 text-cyan-300 border border-cyan-800/80 hover:bg-cyan-900 rounded-lg text-xs font-bold transition"
+                  className="px-2.5 py-1 bg-accent-soft text-accent-ink border border-accent-line hover:bg-accent-soft rounded-control text-xs font-bold transition"
                 >
                   + Mount to Bogie 1
                 </button>
               </div>
 
               {wagonComponents.filter((c) => c.currentBogiePosition === 'BOGIE_1').length === 0 ? (
-                <div className="p-8 text-center bg-slate-950/40 rounded-xl border border-dashed border-slate-800 text-slate-500 text-xs">
-                  <p className="font-semibold text-slate-400">No Serialized Components Mounted to Bogie 1</p>
+                <div className="p-8 text-center bg-page rounded-control border border-dashed border-line text-ink-faint text-xs">
+                  <p className="font-semibold text-ink-muted">No Serialized Components Mounted to Bogie 1</p>
                   <p className="mt-1">Click &quot;Mount to Bogie 1&quot; or scan a component QR code.</p>
                 </div>
               ) : (
@@ -1678,31 +1695,31 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                     .map((comp) => (
                       <div
                         key={comp.id || comp.serialNumber}
-                        className="p-4 bg-slate-950/80 border border-cyan-900/40 hover:border-cyan-500/40 rounded-xl space-y-2 transition shadow"
+                        className="p-4 bg-page border border-accent-line hover:border-accent-line rounded-control space-y-2 transition shadow"
                       >
                         <div className="flex items-start justify-between">
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-mono font-bold text-cyan-300 text-sm">
+                              <span className="font-mono font-bold text-accent-ink text-sm">
                                 {comp.serialNumber}
                               </span>
-                              <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-800 text-slate-300 border border-slate-700">
+                              <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-raised text-ink-body border border-line">
                                 {comp.componentType}
                               </span>
                             </div>
-                            <p className="text-xs text-slate-300 font-medium mt-0.5">{comp.partName}</p>
+                            <p className="text-xs text-ink-body font-medium mt-0.5">{comp.partName}</p>
                           </div>
 
                           <div className="text-right">
                             <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${
                                 comp.healthScore >= 90
-                                  ? 'bg-emerald-950 text-emerald-300 border-emerald-600'
+                                  ? 'bg-good-soft text-good-ink border-good-line'
                                   : comp.healthScore >= 75
-                                  ? 'bg-blue-950 text-blue-300 border-blue-600'
+                                  ? 'bg-accent-soft text-accent-ink border-accent-line'
                                   : comp.healthScore >= 60
-                                  ? 'bg-amber-950 text-amber-300 border-amber-600'
-                                  : 'bg-rose-950 text-rose-300 border-rose-600'
+                                  ? 'bg-warn-soft text-warn-ink border-warn-line'
+                                  : 'bg-bad-soft text-bad-ink border-bad-line'
                               }`}
                             >
                               {comp.healthScore}% {comp.healthStatus}
@@ -1710,23 +1727,23 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] text-slate-400 pt-1 border-t border-slate-850">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] text-ink-muted pt-1 border-t border-slate-850">
                           <div>
-                            <span className="text-[9px] uppercase font-bold text-slate-500 block">{isHi ? 'निर्माता' : 'Manufacturer'}</span>
-                            <span className="text-slate-200 truncate block">{comp.manufacturer}</span>
+                            <span className="text-[9px] uppercase font-bold text-ink-faint block">{isHi ? 'निर्माता' : 'Manufacturer'}</span>
+                            <span className="text-ink-body truncate block">{comp.manufacturer}</span>
                           </div>
                           <div>
-                            <span className="text-[9px] uppercase font-bold text-slate-500 block">{isHi ? 'चली दूरी (कि.मी.)' : 'Km Travelled'}</span>
-                            <span className="text-cyan-400 font-mono">{comp.totalKmTravelled.toLocaleString()} km</span>
+                            <span className="text-[9px] uppercase font-bold text-ink-faint block">{isHi ? 'चली दूरी (कि.मी.)' : 'Km Travelled'}</span>
+                            <span className="text-accent-ink font-mono">{comp.totalKmTravelled.toLocaleString()} km</span>
                           </div>
                           <div>
-                            <span className="text-[9px] uppercase font-bold text-slate-500 block">{isHi ? 'पीओएच चक्र' : 'POH Cycles'}</span>
-                            <span className="text-purple-400 font-mono">{comp.overhaulCount} Overhauls</span>
+                            <span className="text-[9px] uppercase font-bold text-ink-faint block">{isHi ? 'पीओएच चक्र' : 'POH Cycles'}</span>
+                            <span className="text-accent-ink font-mono">{comp.overhaulCount} Overhauls</span>
                           </div>
                         </div>
 
                         <div className="flex items-center justify-between pt-2 border-t border-slate-850">
-                          <span className="font-mono text-[10px] text-slate-500 truncate max-w-[200px]">
+                          <span className="font-mono text-[10px] text-ink-faint truncate max-w-[200px]">
                             {comp.qrCode}
                           </span>
                           <button
@@ -1735,7 +1752,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                               setUnassignReason('Routine POH Service');
                               setUnassignTargetStatus('AVAILABLE_IN_STORES');
                             }}
-                            className="px-2.5 py-1 bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800 rounded text-xs font-bold transition"
+                            className="px-2.5 py-1 bg-bad-soft hover:bg-bad-soft text-bad-ink border border-bad-line rounded text-xs font-bold transition"
                           >
                             Unassign ↗
                           </button>
@@ -1747,8 +1764,8 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
             </div>
 
             {/* Bogie 2 (Trailing) */}
-            <div className="p-5 bg-slate-900/70 border border-slate-800 rounded-2xl space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="p-5 bg-card border border-line rounded-card space-y-4">
+              <div className="flex items-center justify-between border-b border-line pb-3">
                 <div className="flex items-center gap-2">
                   <span className="w-3 h-3 rounded-full bg-blue-400"></span>
                   <h4 className="text-sm font-extrabold text-white tracking-wide">
@@ -1757,15 +1774,15 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                 </div>
                 <button
                   onClick={() => openAssignModal('BOGIE_2')}
-                  className="px-2.5 py-1 bg-blue-950 text-blue-300 border border-blue-800/80 hover:bg-blue-900 rounded-lg text-xs font-bold transition"
+                  className="px-2.5 py-1 bg-accent-soft text-accent-ink border border-accent-line hover:bg-accent-soft rounded-control text-xs font-bold transition"
                 >
                   + Mount to Bogie 2
                 </button>
               </div>
 
               {wagonComponents.filter((c) => c.currentBogiePosition === 'BOGIE_2').length === 0 ? (
-                <div className="p-8 text-center bg-slate-950/40 rounded-xl border border-dashed border-slate-800 text-slate-500 text-xs">
-                  <p className="font-semibold text-slate-400">No Serialized Components Mounted to Bogie 2</p>
+                <div className="p-8 text-center bg-page rounded-control border border-dashed border-line text-ink-faint text-xs">
+                  <p className="font-semibold text-ink-muted">No Serialized Components Mounted to Bogie 2</p>
                   <p className="mt-1">Click &quot;Mount to Bogie 2&quot; or scan a component QR code.</p>
                 </div>
               ) : (
@@ -1775,31 +1792,31 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                     .map((comp) => (
                       <div
                         key={comp.id || comp.serialNumber}
-                        className="p-4 bg-slate-950/80 border border-blue-900/40 hover:border-blue-500/40 rounded-xl space-y-2 transition shadow"
+                        className="p-4 bg-page border border-accent-line hover:border-accent-line rounded-control space-y-2 transition shadow"
                       >
                         <div className="flex items-start justify-between">
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-mono font-bold text-blue-300 text-sm">
+                              <span className="font-mono font-bold text-accent-ink text-sm">
                                 {comp.serialNumber}
                               </span>
-                              <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-800 text-slate-300 border border-slate-700">
+                              <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-raised text-ink-body border border-line">
                                 {comp.componentType}
                               </span>
                             </div>
-                            <p className="text-xs text-slate-300 font-medium mt-0.5">{comp.partName}</p>
+                            <p className="text-xs text-ink-body font-medium mt-0.5">{comp.partName}</p>
                           </div>
 
                           <div className="text-right">
                             <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${
                                 comp.healthScore >= 90
-                                  ? 'bg-emerald-950 text-emerald-300 border-emerald-600'
+                                  ? 'bg-good-soft text-good-ink border-good-line'
                                   : comp.healthScore >= 75
-                                  ? 'bg-blue-950 text-blue-300 border-blue-600'
+                                  ? 'bg-accent-soft text-accent-ink border-accent-line'
                                   : comp.healthScore >= 60
-                                  ? 'bg-amber-950 text-amber-300 border-amber-600'
-                                  : 'bg-rose-950 text-rose-300 border-rose-600'
+                                  ? 'bg-warn-soft text-warn-ink border-warn-line'
+                                  : 'bg-bad-soft text-bad-ink border-bad-line'
                               }`}
                             >
                               {comp.healthScore}% {comp.healthStatus}
@@ -1807,23 +1824,23 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] text-slate-400 pt-1 border-t border-slate-850">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] text-ink-muted pt-1 border-t border-slate-850">
                           <div>
-                            <span className="text-[9px] uppercase font-bold text-slate-500 block">{isHi ? 'निर्माता' : 'Manufacturer'}</span>
-                            <span className="text-slate-200 truncate block">{comp.manufacturer}</span>
+                            <span className="text-[9px] uppercase font-bold text-ink-faint block">{isHi ? 'निर्माता' : 'Manufacturer'}</span>
+                            <span className="text-ink-body truncate block">{comp.manufacturer}</span>
                           </div>
                           <div>
-                            <span className="text-[9px] uppercase font-bold text-slate-500 block">{isHi ? 'चली दूरी (कि.मी.)' : 'Km Travelled'}</span>
-                            <span className="text-blue-400 font-mono">{comp.totalKmTravelled.toLocaleString()} km</span>
+                            <span className="text-[9px] uppercase font-bold text-ink-faint block">{isHi ? 'चली दूरी (कि.मी.)' : 'Km Travelled'}</span>
+                            <span className="text-accent-ink font-mono">{comp.totalKmTravelled.toLocaleString()} km</span>
                           </div>
                           <div>
-                            <span className="text-[9px] uppercase font-bold text-slate-500 block">{isHi ? 'पीओएच चक्र' : 'POH Cycles'}</span>
-                            <span className="text-purple-400 font-mono">{comp.overhaulCount} Overhauls</span>
+                            <span className="text-[9px] uppercase font-bold text-ink-faint block">{isHi ? 'पीओएच चक्र' : 'POH Cycles'}</span>
+                            <span className="text-accent-ink font-mono">{comp.overhaulCount} Overhauls</span>
                           </div>
                         </div>
 
                         <div className="flex items-center justify-between pt-2 border-t border-slate-850">
-                          <span className="font-mono text-[10px] text-slate-500 truncate max-w-[200px]">
+                          <span className="font-mono text-[10px] text-ink-faint truncate max-w-[200px]">
                             {comp.qrCode}
                           </span>
                           <button
@@ -1832,7 +1849,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                               setUnassignReason('Routine POH Service');
                               setUnassignTargetStatus('AVAILABLE_IN_STORES');
                             }}
-                            className="px-2.5 py-1 bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800 rounded text-xs font-bold transition"
+                            className="px-2.5 py-1 bg-bad-soft hover:bg-bad-soft text-bad-ink border border-bad-line rounded text-xs font-bold transition"
                           >
                             Unassign ↗
                           </button>
@@ -1844,15 +1861,15 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
             </div>
 
             {/* Underframe & Body Assemblies */}
-            <div className="lg:col-span-2 p-5 bg-slate-900/70 border border-slate-800 rounded-2xl space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+            <div className="lg:col-span-2 p-5 bg-card border border-line rounded-card space-y-4">
+              <div className="flex items-center justify-between border-b border-line pb-3">
                 <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-purple-400"></span>
+                  <span className="w-3 h-3 rounded-full bg-accent"></span>
                   <h4 className="text-sm font-extrabold text-white tracking-wide">{isHi ? 'अंडरफ्रेम, कपलर व ब्रेक असेंबली' : 'UNDERFRAME, COUPLERS & BRAKE ASSEMBLIES'}</h4>
                 </div>
                 <button
                   onClick={() => openAssignModal('UNDERFRAME')}
-                  className="px-2.5 py-1 bg-purple-950 text-purple-300 border border-purple-800/80 hover:bg-purple-900 rounded-lg text-xs font-bold transition"
+                  className="px-2.5 py-1 bg-accent-soft text-accent-ink border border-accent-line hover:bg-accent-soft rounded-control text-xs font-bold transition"
                 >
                   + Mount to Underframe
                 </button>
@@ -1861,8 +1878,8 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
               {wagonComponents.filter(
                 (c) => c.currentBogiePosition === 'UNDERFRAME' || c.currentBogiePosition === 'BODY' || c.currentBogiePosition === 'NONE'
               ).length === 0 ? (
-                <div className="p-8 text-center bg-slate-950/40 rounded-xl border border-dashed border-slate-800 text-slate-500 text-xs">
-                  <p className="font-semibold text-slate-400">{isHi ? 'कोई ड्राफ्ट गियर, कपलर या वाल्व नहीं लगा' : 'No Draft Gears, Couplers, or Valves Mounted'}</p>
+                <div className="p-8 text-center bg-page rounded-control border border-dashed border-line text-ink-faint text-xs">
+                  <p className="font-semibold text-ink-muted">{isHi ? 'कोई ड्राफ्ट गियर, कपलर या वाल्व नहीं लगा' : 'No Draft Gears, Couplers, or Valves Mounted'}</p>
                   <p className="mt-1">Click &quot;Mount to Underframe&quot; or scan a component QR code.</p>
                 </div>
               ) : (
@@ -1877,31 +1894,31 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                     .map((comp) => (
                       <div
                         key={comp.id || comp.serialNumber}
-                        className="p-4 bg-slate-950/80 border border-purple-900/40 hover:border-purple-500/40 rounded-xl space-y-2 transition shadow"
+                        className="p-4 bg-page border border-accent-line hover:border-accent-line rounded-control space-y-2 transition shadow"
                       >
                         <div className="flex items-start justify-between">
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-mono font-bold text-purple-300 text-sm">
+                              <span className="font-mono font-bold text-accent-ink text-sm">
                                 {comp.serialNumber}
                               </span>
-                              <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-slate-800 text-slate-300 border border-slate-700">
+                              <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-raised text-ink-body border border-line">
                                 {comp.componentType}
                               </span>
                             </div>
-                            <p className="text-xs text-slate-300 font-medium mt-0.5">{comp.partName}</p>
+                            <p className="text-xs text-ink-body font-medium mt-0.5">{comp.partName}</p>
                           </div>
 
                           <div className="text-right">
                             <span
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-black border ${
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${
                                 comp.healthScore >= 90
-                                  ? 'bg-emerald-950 text-emerald-300 border-emerald-600'
+                                  ? 'bg-good-soft text-good-ink border-good-line'
                                   : comp.healthScore >= 75
-                                  ? 'bg-blue-950 text-blue-300 border-blue-600'
+                                  ? 'bg-accent-soft text-accent-ink border-accent-line'
                                   : comp.healthScore >= 60
-                                  ? 'bg-amber-950 text-amber-300 border-amber-600'
-                                  : 'bg-rose-950 text-rose-300 border-rose-600'
+                                  ? 'bg-warn-soft text-warn-ink border-warn-line'
+                                  : 'bg-bad-soft text-bad-ink border-bad-line'
                               }`}
                             >
                               {comp.healthScore}%
@@ -1910,8 +1927,8 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                         </div>
 
                         <div className="flex items-center justify-between pt-2 border-t border-slate-850">
-                          <span className="text-[11px] text-slate-400">
-                            Position: <span className="text-slate-200 font-bold">{comp.currentBogiePosition}</span>
+                          <span className="text-[11px] text-ink-muted">
+                            Position: <span className="text-ink-body font-bold">{comp.currentBogiePosition}</span>
                           </span>
                           <button
                             onClick={() => {
@@ -1919,7 +1936,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                               setUnassignReason('Routine POH Service');
                               setUnassignTargetStatus('AVAILABLE_IN_STORES');
                             }}
-                            className="px-2.5 py-1 bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800 rounded text-xs font-bold transition"
+                            className="px-2.5 py-1 bg-bad-soft hover:bg-bad-soft text-bad-ink border border-bad-line rounded text-xs font-bold transition"
                           >
                             Unassign ↗
                           </button>
@@ -1945,15 +1962,15 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
       {/* Mount Component Modal */}
       {assignModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-cyan-500/40 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-page backdrop-blur-sm p-4">
+          <div className="bg-card border border-accent-line rounded-card p-6 max-w-md w-full space-y-4">
+            <div className="flex justify-between items-center border-b border-line pb-3">
               <h3 className="text-base font-bold text-white">
                 Mount Serialized Component ({wagonNumber})
               </h3>
               <button
                 onClick={() => setAssignModalOpen(false)}
-                className="text-slate-400 hover:text-white font-bold"
+                className="text-ink-muted hover:text-white font-bold"
               >
                 ✕
               </button>
@@ -1961,11 +1978,11 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
             <form onSubmit={handleAssignComponentSubmit} className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">{isHi ? 'लक्ष्य बोगी स्थान' : 'Target Bogie Position'}</label>
+                <label className="block text-ink-body font-semibold mb-1">{isHi ? 'लक्ष्य बोगी स्थान' : 'Target Bogie Position'}</label>
                 <select
                   value={assignBogiePos}
                   onChange={(e) => setAssignBogiePos(e.target.value as any)}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white font-medium"
+                  className="w-full px-3 py-2 bg-page border border-line rounded-control text-white font-medium"
                 >
                   <option value="BOGIE_1">Bogie 1 (Leading Bogie)</option>
                   <option value="BOGIE_2">Bogie 2 (Trailing Bogie)</option>
@@ -1977,10 +1994,10 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
               {storesAvailableComponents.length > 0 && (
                 <div>
-                  <label className="block text-slate-300 font-semibold mb-1">{isHi ? 'उपलब्ध स्टोर्स डिपो स्टॉक से चुनें' : 'Select from Available Stores Depot Stock'}</label>
+                  <label className="block text-ink-body font-semibold mb-1">{isHi ? 'उपलब्ध स्टोर्स डिपो स्टॉक से चुनें' : 'Select from Available Stores Depot Stock'}</label>
                   <select
                     onChange={(e) => setAssignSerialInput(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white font-mono"
+                    className="w-full px-3 py-2 bg-page border border-line rounded-control text-white font-mono"
                     defaultValue=""
                   >
                     <option value="">-- Choose available component --</option>
@@ -1994,48 +2011,48 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
               )}
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Or Enter Serial Number Manually *</label>
+                <label className="block text-ink-body font-semibold mb-1">Or Enter Serial Number Manually *</label>
                 <input
                   type="text"
                   required
                   value={assignSerialInput}
                   onChange={(e) => setAssignSerialInput(e.target.value.toUpperCase())}
                   placeholder="e.g. WRS-WS-2026-001"
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white font-mono"
+                  className="w-full px-3 py-2 bg-page border border-line rounded-control text-white font-mono"
                 />
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">{isHi ? 'स्थापना टिप्पणी' : 'Mounting Notes'}</label>
+                <label className="block text-ink-body font-semibold mb-1">{isHi ? 'स्थापना टिप्पणी' : 'Mounting Notes'}</label>
                 <textarea
                   value={assignNotes}
                   onChange={(e) => setAssignNotes(e.target.value)}
                   placeholder={isHi ? 'स्थापना टिप्पणी, टॉर्क जाँच...' : 'Installation notes, torque check...'}
                   rows={2}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white"
+                  className="w-full px-3 py-2 bg-page border border-line rounded-control text-white"
                 />
               </div>
 
-              <div className="flex justify-between items-center pt-3 border-t border-slate-800">
+              <div className="flex justify-between items-center pt-3 border-t border-line">
                 <button
                   type="button"
                   onClick={() => {
                     setAssignModalOpen(false);
                     setIsPassportScannerOpen(true);
                   }}
-                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-400 rounded-lg font-bold flex items-center gap-1"
+                  className="px-3 py-1.5 bg-raised hover:bg-selected text-accent-ink rounded-control font-bold flex items-center gap-1"
                 >
-                  <span>📷</span>{isHi ? 'क्यूआर स्कैन करें' : 'Scan QR'}</button>
+                  <CameraIcon size={16} />{isHi ? 'क्यूआर स्कैन करें' : 'Scan QR'}</button>
 
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setAssignModalOpen(false)}
-                    className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-bold"
+                    className="px-4 py-2 bg-raised text-ink-body rounded-control font-bold"
                   >{isHi ? 'रद्द करें' : 'Cancel'}</button>
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold shadow"
+                    className="px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-control font-bold shadow"
                   >{isHi ? 'स्थापना की पुष्टि करें' : 'Confirm Mount'}</button>
                 </div>
               </div>
@@ -2046,15 +2063,15 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
       {/* Unassign Component Modal */}
       {unassignTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-amber-500/40 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-page backdrop-blur-sm p-4">
+          <div className="bg-card border border-warn-line rounded-card p-6 max-w-md w-full space-y-4">
+            <div className="flex justify-between items-center border-b border-line pb-3">
               <h3 className="text-base font-bold text-white">
                 Unassign Component: {unassignTarget.serialNumber}
               </h3>
               <button
                 onClick={() => setUnassignTarget(null)}
-                className="text-slate-400 hover:text-white font-bold"
+                className="text-ink-muted hover:text-white font-bold"
               >
                 ✕
               </button>
@@ -2062,11 +2079,11 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
             <form onSubmit={handleUnassignComponentSubmit} className="space-y-3 text-xs">
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">{isHi ? 'वापसी स्थिति' : 'Return Status'}</label>
+                <label className="block text-ink-body font-semibold mb-1">{isHi ? 'वापसी स्थिति' : 'Return Status'}</label>
                 <select
                   value={unassignTargetStatus}
                   onChange={(e) => setUnassignTargetStatus(e.target.value as ComponentStatus)}
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white"
+                  className="w-full px-3 py-2 bg-page border border-line rounded-control text-white"
                 >
                   <option value="AVAILABLE_IN_STORES">{isHi ? 'स्टोर्स डिपो (उपलब्ध)' : 'Stores Depot (Available)'}</option>
                   <option value="RECONDITIONED">{isHi ? 'पुनर्निर्मित' : 'Reconditioned'}</option>
@@ -2076,26 +2093,26 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
               </div>
 
               <div>
-                <label className="block text-slate-300 font-semibold mb-1">Reason for Removal *</label>
+                <label className="block text-ink-body font-semibold mb-1">Reason for Removal *</label>
                 <input
                   type="text"
                   required
                   value={unassignReason}
                   onChange={(e) => setUnassignReason(e.target.value)}
                   placeholder="e.g. Scheduled overhaul, flange wear..."
-                  className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-lg text-white"
+                  className="w-full px-3 py-2 bg-page border border-line rounded-control text-white"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-3 border-t border-slate-800">
+              <div className="flex justify-end gap-2 pt-3 border-t border-line">
                 <button
                   type="button"
                   onClick={() => setUnassignTarget(null)}
-                  className="px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-bold"
+                  className="px-4 py-2 bg-raised text-ink-body rounded-control font-bold"
                 >{isHi ? 'रद्द करें' : 'Cancel'}</button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white rounded-lg font-bold shadow"
+                  className="px-4 py-2 bg-bad hover:bg-bad text-white rounded-control font-bold shadow"
                 >{isHi ? 'हटाने की पुष्टि करें' : 'Confirm Removal'}</button>
               </div>
             </form>
@@ -2123,10 +2140,10 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
       {smartVisionModalTarget && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-4">
           {/* Backdrop */}
-          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm" onClick={() => setSmartVisionModalTarget(null)} />
+          <div className="absolute inset-0 bg-page backdrop-blur-sm" onClick={() => setSmartVisionModalTarget(null)} />
           
           {/* Modal Container */}
-          <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-700 shadow-2xl rounded-2xl overflow-hidden flex flex-col max-h-[95vh]">
+          <div className="relative w-full max-w-2xl bg-card border border-line rounded-card overflow-hidden flex flex-col max-h-[95vh]">
             <CaliperCamera
               lang={lang || 'en'}
               wagonNumber={wagonNumber}
@@ -2134,6 +2151,17 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
               condition="USED"
               initialTarget={smartVisionModalTarget.initialTarget || 'OUTER_SPRING'}
               measuredHeight={null}
+              /*
+               * Same as SpringBatchPage, which already had these and this call
+               * site did not: springs at Raipur are gauged by hand against a
+               * calibrated go/no-go post, not read off a digital display. The
+               * camera path exists to photograph a caliper LCD, so on this
+               * bench it asked the supervisor to "align caliper LCD here" in
+               * front of an instrument that has no display at all — which is
+               * how the shop's own officer found it.
+               */
+              defaultMode="manual"
+              hideCamera
               onClose={() => setSmartVisionModalTarget(null)}
               onMeasurementChange={(height, _source, confidence) => {
                 const componentType = smartVisionModalTarget.initialTarget || 'OUTER_SPRING';
@@ -2168,15 +2196,15 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
       {/* Supervisor Override Modal */}
       {showOverrideModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-850">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-page backdrop-blur-sm p-4">
+          <div className="bg-card border border-line rounded-card w-full max-w-lg overflow-hidden">
+            <div className="px-6 py-4 border-b border-line flex justify-between items-center bg-raised">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <span>⚙️</span> {t('actions.overrideStage')}
+                <GearIcon size={16} /> {t('actions.overrideStage')}
               </h3>
               <button
                 onClick={() => setShowOverrideModal(false)}
-                className="text-slate-400 hover:text-white p-1 text-lg"
+                className="text-ink-muted hover:text-white p-1 text-lg"
               >
                 ✕
               </button>
@@ -2184,17 +2212,17 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
             <form onSubmit={handleExecuteOverride} className="p-6 space-y-4">
               {overrideError && (
-                <div className="p-3 bg-rose-950/40 border border-rose-800 rounded-lg text-rose-300 text-xs">
+                <div className="p-3 bg-bad-soft border border-bad-line rounded-control text-bad-ink text-xs">
                   {overrideError}
                 </div>
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">{isHi ? 'लक्ष्य चरण' : 'Target Stage'}</label>
+                <label className="block text-xs font-semibold text-ink-body mb-1">{isHi ? 'लक्ष्य चरण' : 'Target Stage'}</label>
                 {/* Says so explicitly. Every stage is listed, earlier ones
                     included, but nothing on this screen said a wagon could go
                     back — so a supervisor concluded it could not. */}
-                <p className="text-[11px] text-slate-400 mb-2 leading-snug">
+                <p className="text-[11px] text-ink-muted mb-2 leading-snug">
                   {isHi
                     ? 'कोई भी चरण चुना जा सकता है — पिछला भी, यदि वैगन को वापस भेजना हो। कारण के साथ यह स्थायी रूप से दर्ज होता है।'
                     : 'Any stage, including an earlier one if the wagon has to go back. The move and your reason are recorded permanently against this wagon.'}
@@ -2202,7 +2230,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                 <select
                   value={overrideTargetStage}
                   onChange={(e) => setOverrideTargetStage(e.target.value as LifecycleStage)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-orange-500"
+                  className="w-full bg-raised border border-line rounded-control px-3 py-2.5 text-sm text-white focus:outline-none focus:border-accent-line"
                 >
                   {stageList.map((stg) => (
                     <option key={stg} value={stg}>
@@ -2213,7 +2241,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-ink-body mb-1">
                   Technical Justification (min 10 characters) *
                 </label>
                 <textarea
@@ -2222,30 +2250,83 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                   value={overrideJustification}
                   onChange={(e) => setOverrideJustification(e.target.value)}
                   placeholder={isHi ? 'ओवरराइड हेतु विस्तृत तकनीकी कारण दर्ज करें...' : 'Enter detailed technical justification for override...'}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
+                  className="w-full bg-raised border border-line rounded-control px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-line"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">{isHi ? 'पर्यवेक्षक क्रिया ओटीपी' : 'Supervisor Action OTP'}</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 123456"
-                  value={overrideOtp}
-                  onChange={(e) => setOverrideOtp(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-orange-500"
-                />
+                <label className="block text-xs font-semibold text-ink-body mb-1">{isHi ? 'पर्यवेक्षक क्रिया ओटीपी' : 'Supervisor Action OTP'}</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="e.g. 123456"
+                    value={overrideOtp}
+                    onChange={(e) => setOverrideOtp(e.target.value)}
+                    className="flex-1 bg-raised border border-line rounded-control px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-line"
+                  />
+                  {/*
+                    * Absent until now. An enrolled supervisor reads the code
+                    * from their authenticator and needs no button; everyone
+                    * else had no way to obtain one at all.
+                    */}
+                  {!totpEnrolled && (
+                    <button
+                      type="button"
+                      disabled={requestingOverrideOtp}
+                      onClick={async () => {
+                        setRequestingOverrideOtp(true);
+                        try {
+                          const res = await api.requestOtp('OVERRIDE');
+                          if (res.devOtpCode) setOverrideOtpIssued(res.devOtpCode);
+                        } catch {
+                          setOverrideOtpIssued(null);
+                        } finally {
+                          setRequestingOverrideOtp(false);
+                        }
+                      }}
+                      className="px-4 py-2 rounded-control border border-accent-line text-accent-ink hover:bg-raised text-xs font-bold whitespace-nowrap disabled:opacity-50"
+                    >
+                      {requestingOverrideOtp
+                        ? (isHi ? 'माँगा जा रहा है…' : 'Requesting…')
+                        : (isHi ? 'कोड भेजें' : 'Send code')}
+                    </button>
+                  )}
+                </div>
+
+                {totpEnrolled && (
+                  <p className="mt-1.5 text-[11px] text-ink-muted">
+                    {isHi
+                      ? 'अपने ऑथेंटिकेटर ऐप से छह अंकों का कोड दर्ज करें।'
+                      : 'Enter the six-digit code from your authenticator app.'}
+                  </p>
+                )}
+
+                {/*
+                  * Shown, not auto-filled. Filling it in would turn a
+                  * deliberate confirmation into a single click, which is the
+                  * one thing this step exists to prevent.
+                  */}
+                {!totpEnrolled && overrideOtpIssued && (
+                  <p className="mt-1.5 text-[11px] text-ink-muted">
+                    {isHi ? 'कोड: ' : 'Code: '}
+                    <strong className="font-mono text-warn-ink text-sm">{overrideOtpIssued}</strong>
+                    {isHi
+                      ? ' — यह दूसरा कारक नहीं, एक जानबूझकर दूसरा कदम है।'
+                      : ' — returned here rather than sent. A deliberate second step, not a second factor.'}
+                  </p>
+                )}
               </div>
 
-              <div className="pt-3 border-t border-slate-800 flex justify-end gap-3">
+              <div className="pt-3 border-t border-line flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setShowOverrideModal(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold"
+                  className="px-4 py-2 rounded-control border border-line text-ink-body hover:bg-raised text-xs font-semibold"
                 >{isHi ? 'रद्द करें' : 'Cancel'}</button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold shadow-lg"
+                  className="px-5 py-2 rounded-control bg-warn hover:bg-warn text-white text-xs font-bold"
                 >{isHi ? 'ओवरराइड की पुष्टि करें' : 'Confirm Override'}</button>
               </div>
             </form>
@@ -2255,14 +2336,14 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
       {/* Supervisor Digital Sign-off Modal */}
       {showSignoffModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-800 flex justify-between items-center bg-slate-850">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-page backdrop-blur-sm p-4">
+          <div className="bg-card border border-line rounded-card w-full max-w-lg overflow-hidden">
+            <div className="px-6 py-4 border-b border-line flex justify-between items-center bg-raised">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <span>🛡️</span>{isHi ? 'पर्यवेक्षक डिजिटल विमुक्ति हस्ताक्षर' : 'Supervisor Digital Release Sign-off'}</h3>
+                <ShieldIcon size={16} />{isHi ? 'पर्यवेक्षक डिजिटल विमुक्ति हस्ताक्षर' : 'Supervisor Digital Release Sign-off'}</h3>
               <button
                 onClick={() => setShowSignoffModal(false)}
-                className="text-slate-400 hover:text-white p-1 text-lg"
+                className="text-ink-muted hover:text-white p-1 text-lg"
               >
                 ✕
               </button>
@@ -2270,27 +2351,27 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
             <form onSubmit={handleGateSignoff} className="p-6 space-y-4">
               {signoffError && (
-                <div className="p-3 bg-rose-950/40 border border-rose-800 rounded-lg text-rose-300 text-xs">
+                <div className="p-3 bg-bad-soft border border-bad-line rounded-control text-bad-ink text-xs">
                   {signoffError}
                 </div>
               )}
 
-              <div className="p-3 bg-emerald-950/40 border border-emerald-800/60 rounded-xl text-xs text-emerald-300">
+              <div className="p-3 bg-good-soft border border-good-line rounded-control text-xs text-good-ink">
                 ✓ Zero-defect verification cleared. Ready for cryptographic signing and release certificate issuance.
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">{isHi ? 'हस्ताक्षर टिप्पणी व प्रमाणपत्र नोट' : 'Sign-off Remarks & Certificate Notes'}</label>
+                <label className="block text-xs font-semibold text-ink-body mb-1">{isHi ? 'हस्ताक्षर टिप्पणी व प्रमाणपत्र नोट' : 'Sign-off Remarks & Certificate Notes'}</label>
                 <textarea
                   rows={3}
                   value={signoffNotes}
                   onChange={(e) => setSignoffNotes(e.target.value)}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-raised border border-line rounded-control px-3 py-2 text-sm text-white focus:outline-none focus:border-good-line"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">{isHi ? 'पर्यवेक्षक क्रिया ओटीपी टोकन' : 'Supervisor Action OTP Token'}</label>
+                <label className="block text-xs font-semibold text-ink-body mb-1">{isHi ? 'पर्यवेक्षक क्रिया ओटीपी टोकन' : 'Supervisor Action OTP Token'}</label>
                 {/*
                   An enrolled supervisor uses the code on their own phone. The
                   inline flow below is the fallback for anyone not yet enrolled,
@@ -2309,18 +2390,18 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                           placeholder={isHi ? 'ऐप का 6-अंकीय कोड' : '6-digit code from your app'}
                           value={signoffOtp}
                           onChange={(e) => setSignoffOtp(e.target.value.replace(/\D/g, ''))}
-                          className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono tracking-widest focus:outline-none focus:border-emerald-500"
+                          className="flex-1 bg-raised border border-line rounded-control px-3 py-2 text-sm text-white font-mono tracking-widest focus:outline-none focus:border-good-line"
                         />
                         <button
                           type="button"
                           onClick={handleVerifyAuthenticator}
                           disabled={signoffOtpBusy || signoffOtp.trim().length !== 6}
-                          className="px-4 py-2 rounded-lg border border-emerald-600 text-emerald-300 hover:bg-emerald-950 disabled:opacity-40 text-xs font-bold whitespace-nowrap"
+                          className="px-4 py-2 rounded-control border border-good-line text-good-ink hover:bg-good-soft disabled:opacity-40 text-xs font-bold whitespace-nowrap"
                         >
                           {signoffOtpBusy ? '…' : (isHi ? 'सत्यापित करें' : 'Verify')}
                         </button>
                       </div>
-                      <p className="text-[11px] text-emerald-400/80">
+                      <p className="text-[11px] text-good-ink/80">
                         {isHi ? 'प्रमाणक ऐप से — इंटरनेट की आवश्यकता नहीं' : 'From your authenticator app — no network needed'}
                       </p>
                     </div>
@@ -2328,10 +2409,10 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                     <div className="space-y-1.5">
                       <div className="flex gap-2">
                         {shownSignoffOtp && (
-                          <p className="w-full text-xs text-amber-300 bg-amber-950/40 border border-amber-800/60 rounded-lg px-3 py-2 mb-2 leading-snug">
+                          <p className="w-full text-xs text-warn-ink bg-warn-soft border border-warn-line rounded-control px-3 py-2 mb-2 leading-snug">
                             {isHi ? 'पुष्टि कोड' : 'Confirmation code'}:{' '}
-                            <strong className="font-mono tracking-widest text-amber-200">{shownSignoffOtp}</strong>
-                            <span className="block text-amber-400/80 mt-1">
+                            <strong className="font-mono tracking-widest text-warn-ink">{shownSignoffOtp}</strong>
+                            <span className="block text-warn-ink/80 mt-1">
                               {isHi
                                 ? 'इसे नीचे टाइप करें। यह कहीं भेजा नहीं गया — यह एक सोच-समझकर लिया गया दूसरा कदम है, दूसरा कारक नहीं।'
                                 : 'Type it below. It is shown here rather than sent anywhere — a deliberate second step on releasing a wagon, not a second factor.'}
@@ -2345,13 +2426,13 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                           value={signoffOtp}
                           onChange={(e) => setSignoffOtp(e.target.value)}
                           disabled={!signoffOtpId}
-                          className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white disabled:opacity-50 focus:outline-none focus:border-emerald-500"
+                          className="flex-1 bg-raised border border-line rounded-control px-3 py-2 text-sm text-white disabled:opacity-50 focus:outline-none focus:border-good-line"
                         />
                         <button
                           type="button"
                           onClick={signoffOtpId ? handleVerifySignoffOtp : handleRequestSignoffOtp}
                           disabled={signoffOtpBusy}
-                          className="px-4 py-2 rounded-lg border border-emerald-600 text-emerald-300 hover:bg-emerald-950 disabled:opacity-40 text-xs font-bold whitespace-nowrap"
+                          className="px-4 py-2 rounded-control border border-good-line text-good-ink hover:bg-good-soft disabled:opacity-40 text-xs font-bold whitespace-nowrap"
                         >
                           {signoffOtpBusy
                             ? '…'
@@ -2360,7 +2441,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                               : (isHi ? 'ओटीपी भेजें' : 'Send OTP')}
                         </button>
                       </div>
-                      <p className="text-[11px] text-amber-400/90">
+                      <p className="text-[11px] text-warn-ink/90">
                         {isHi
                           ? 'कोई प्रमाणक सेट नहीं — यह कोड सर्वर देता है, इसलिए यह दूसरा प्रमाण नहीं है। खाता स्क्रीन से सेटअप करें।'
                           : 'No authenticator set up. This code is issued by the server, so it confirms intent but is not a second factor. Set one up from the User Accounts screen.'}
@@ -2368,7 +2449,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                     </div>
                   )
                 ) : (
-                  <p className="text-xs font-bold text-emerald-400">
+                  <p className="text-xs font-bold text-good-ink">
                     {isHi ? '✓ सत्यापित' : '✓ Verified'}
                   </p>
                 )}
@@ -2381,11 +2462,11 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                 is a decision on the record rather than something nobody read.
               */}
               {(gateStatus?.advisoryDetails || []).length > 0 && (
-                <div className="rounded-lg border border-amber-700/60 bg-amber-950/30 p-3 space-y-2">
-                  <p className="text-xs font-bold text-amber-300 uppercase tracking-wide">
+                <div className="rounded-control border border-warn-line bg-warn-soft p-3 space-y-2">
+                  <p className="text-xs font-bold text-warn-ink uppercase tracking-wide">
                     {isHi ? 'सलाहकार निष्कर्ष — स्वीकृति आवश्यक' : 'Advisory findings — your acceptance required'}
                   </p>
-                  <p className="text-[11px] text-amber-200/80">
+                  <p className="text-[11px] text-warn-ink/80">
                     {isHi
                       ? 'ये विमुक्ति को नहीं रोकते, पर प्रमाणपत्र पर आपके नाम से दर्ज होंगे।'
                       : 'These do not block release, but accepting them is recorded on the certificate in your name.'}
@@ -2413,11 +2494,11 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                 </div>
               )}
 
-              <div className="pt-3 border-t border-slate-800 flex justify-end gap-3">
+              <div className="pt-3 border-t border-line flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setShowSignoffModal(false)}
-                  className="px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:bg-slate-800 text-xs font-semibold"
+                  className="px-4 py-2 rounded-control border border-line text-ink-body hover:bg-raised text-xs font-semibold"
                 >{isHi ? 'रद्द करें' : 'Cancel'}</button>
                 <button
                   type="submit"
@@ -2426,7 +2507,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                     !signoffOtpToken ||
                     (gateStatus?.advisoryDetails || []).some((a: any) => !acknowledgedAdvisories.includes(a.id))
                   }
-                  className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white text-xs font-bold shadow-lg"
+                  className="px-5 py-2 rounded-control bg-good hover:bg-good disabled:opacity-40 text-white text-xs font-bold"
                 >
                   {signoffSubmitting ? 'Signing...' : 'Authorize & Issue Certificate'}
                 </button>

@@ -92,21 +92,21 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
-            <HistoryIcon size={24} className="text-blue-400" />
+          <h1 className="text-xl sm:text-2xl font-extrabold text-white flex items-center gap-2">
+            <HistoryIcon size={24} className="text-accent-ink" />
             <span>{dict.nav.history}</span>
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400">
+          <p className="text-xs sm:text-sm text-ink-muted">
             {lang === 'hi' ? 'आरडीएसओ जी-95 अपरिवर्तनीय ऑडिट ट्रेल' : 'RDSO G-95 Immutable Cryptographic Audit Log'}
           </p>
         </div>
 
         {mayReadLedger && (
-          <div className="flex rounded-xl border border-slate-700 overflow-hidden self-start" data-testid="history-view-switch">
+          <div className="flex rounded-control border border-line overflow-hidden self-start" data-testid="history-view-switch">
             <button
               onClick={() => setView('SPRINGS')}
               className={`min-h-[44px] px-4 text-xs font-bold transition-colors ${
-                view === 'SPRINGS' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                view === 'SPRINGS' ? 'bg-accent text-white' : 'bg-raised text-ink-body hover:bg-selected'
               }`}
               data-testid="view-springs"
             >
@@ -115,7 +115,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
             <button
               onClick={() => setView('ACTIVITY')}
               className={`min-h-[44px] px-4 text-xs font-bold transition-colors ${
-                view === 'ACTIVITY' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                view === 'ACTIVITY' ? 'bg-accent text-white' : 'bg-raised text-ink-body hover:bg-selected'
               }`}
               data-testid="view-activity"
             >
@@ -127,7 +127,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
         <button
           onClick={loadRecords}
           disabled={isLoading}
-          className="min-h-[44px] px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs rounded-xl flex items-center justify-center gap-2 border border-slate-700 transition-all self-start sm:self-auto"
+          className="min-h-[44px] px-4 py-2 bg-raised hover:bg-selected text-ink-body font-bold text-xs rounded-control flex items-center justify-center gap-2 border border-line transition-all self-start sm:self-auto"
         >
           <RefreshCwIcon size={16} className={isLoading ? 'animate-spin' : ''} />
           <span>{lang === 'hi' ? 'रिफ्रेश करें' : 'Refresh Logs'}</span>
@@ -137,11 +137,11 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
       {view === 'ACTIVITY' ? <ActivityLog /> : (
       <>
       {/* Multi-Criteria Filters (Glove-Friendly Touch Inputs) */}
-      <form onSubmit={handleSearchSubmit} className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-lg space-y-3">
+      <form onSubmit={handleSearchSubmit} className="bg-card border border-line rounded-control p-4 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Wagon Search */}
           <div>
-            <label className="block text-xs font-bold text-slate-400 mb-1">
+            <label className="block text-xs font-bold text-ink-muted mb-1">
               {dict.form.wagonNumber}
             </label>
             <input
@@ -149,19 +149,19 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
               value={filterWagon}
               onChange={(e) => setFilterWagon(e.target.value)}
               placeholder="e.g. SECR-BOXN-101"
-              className="w-full min-h-[44px] px-3 py-2 bg-slate-950 border border-slate-700 focus:border-blue-500 rounded-lg text-white font-mono text-sm uppercase outline-none"
+              className="w-full min-h-[44px] px-3 py-2 bg-page border border-line focus:border-accent-line rounded-control text-white font-mono text-sm uppercase outline-none"
             />
           </div>
 
           {/* Band Filter */}
           <div>
-            <label className="block text-xs font-bold text-slate-400 mb-1">
+            <label className="block text-xs font-bold text-ink-muted mb-1">
               {lang === 'hi' ? 'आरडीएसओ बैंड' : 'RDSO Band'}
             </label>
             <select
               value={filterBand}
               onChange={(e) => setFilterBand(e.target.value)}
-              className="w-full min-h-[44px] px-3 py-2 bg-slate-950 border border-slate-700 focus:border-blue-500 rounded-lg text-white text-sm outline-none"
+              className="w-full min-h-[44px] px-3 py-2 bg-page border border-line focus:border-accent-line rounded-control text-white text-sm outline-none"
             >
               <option value="">{lang === 'hi' ? 'सभी बैंड (All Bands)' : 'All Bands'}</option>
               {BANDS.map((b) => (
@@ -172,13 +172,13 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
 
           {/* Status Filter */}
           <div>
-            <label className="block text-xs font-bold text-slate-400 mb-1">
+            <label className="block text-xs font-bold text-ink-muted mb-1">
               {lang === 'hi' ? 'स्थिति (Status)' : 'Status'}
             </label>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="w-full min-h-[44px] px-3 py-2 bg-slate-950 border border-slate-700 focus:border-blue-500 rounded-lg text-white text-sm outline-none"
+              className="w-full min-h-[44px] px-3 py-2 bg-page border border-line focus:border-accent-line rounded-control text-white text-sm outline-none"
             >
               <option value="">{lang === 'hi' ? 'सभी स्थितियाँ (All Statuses)' : 'All Statuses'}</option>
               <option value="PASS">PASS / SERVICEABLE</option>
@@ -188,13 +188,13 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
 
           {/* Bogie Filter */}
           <div>
-            <label className="block text-xs font-bold text-slate-400 mb-1">
+            <label className="block text-xs font-bold text-ink-muted mb-1">
               {dict.form.bogieType}
             </label>
             <select
               value={filterBogie}
               onChange={(e) => setFilterBogie(e.target.value)}
-              className="w-full min-h-[44px] px-3 py-2 bg-slate-950 border border-slate-700 focus:border-blue-500 rounded-lg text-white text-sm outline-none"
+              className="w-full min-h-[44px] px-3 py-2 bg-page border border-line focus:border-accent-line rounded-control text-white text-sm outline-none"
             >
               <option value="">{lang === 'hi' ? 'सभी बोगी प्रकार (All Bogies)' : 'All Bogies'}</option>
               {BOGIE_TYPES.map((bg) => (
@@ -214,13 +214,13 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
               setFilterBogie('');
               loadRecords();
             }}
-            className="min-h-[40px] px-4 py-1.5 text-xs font-bold text-slate-400 hover:text-white"
+            className="min-h-[40px] px-4 py-1.5 text-xs font-bold text-ink-muted hover:text-white"
           >
             {dict.actions.resetFilter}
           </button>
           <button
             type="submit"
-            className="min-h-[40px] px-5 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs rounded-lg"
+            className="min-h-[40px] px-5 py-1.5 bg-accent hover:bg-accent text-white font-bold text-xs rounded-control"
           >
             {dict.actions.filter}
           </button>
@@ -229,12 +229,12 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
 
       {/* Record Cards List */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between text-xs text-slate-400 font-semibold px-1">
+        <div className="flex items-center justify-between text-xs text-ink-muted font-semibold px-1">
           <span>{lang === 'hi' ? `कुल रिकॉर्ड: ${totalCount}` : `Total Logs: ${totalCount}`}</span>
         </div>
 
         {records.length === 0 ? (
-          <div className="p-8 text-center bg-slate-900 border border-slate-800 rounded-xl text-slate-400">
+          <div className="p-8 text-center bg-card border border-line rounded-control text-ink-muted">
             <p className="text-sm font-semibold">{lang === 'hi' ? 'कोई निरीक्षण रिकॉर्ड नहीं मिला' : 'No inspection records found'}</p>
           </div>
         ) : (
@@ -242,15 +242,15 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
             <div
               key={r.id}
               onClick={() => setSelectedRecord(r)}
-              className="p-4 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl shadow-md space-y-3 cursor-pointer transition-all active:scale-[0.99]"
+              className="p-4 bg-card border border-line hover:border-line rounded-control shadow-md space-y-3 cursor-pointer transition-all active:scale-[0.99]"
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                 <div className="flex items-center gap-3">
-                  <span className="font-mono text-xs font-bold text-slate-400 bg-slate-950 px-2 py-1 rounded border border-slate-800">
+                  <span className="font-mono text-xs font-bold text-ink-muted bg-page px-2 py-1 rounded border border-line">
                     #{r.sequenceNumber || r.id.slice(0, 8)}
                   </span>
                   <span className="font-mono font-extrabold text-base text-white">{r.wagonNumber}</span>
-                  <span className="text-xs text-slate-400 font-medium">({getBogieTypeText(r.bogieType, lang)})</span>
+                  <span className="text-xs text-ink-muted font-medium">({getBogieTypeText(r.bogieType, lang)})</span>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -262,19 +262,19 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
                     isOverridden={r.isOverridden}
                     size="sm"
                   />
-                  <span className="font-mono font-black text-emerald-400 text-sm">
+                  <span className="font-mono font-extrabold text-good-ink text-sm">
                     {r.measuredFreeHeight?.toFixed(2)} mm
                   </span>
                 </div>
               </div>
 
               {/* Metadata Row */}
-              <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-slate-400 pt-1 border-t border-slate-800/60">
-                <span>Position: <strong className="text-slate-200">{getPositionText(r.springPosition, lang)}</strong></span>
-                <span>Inspector: <strong className="text-slate-200">{r.inspectorName || r.inspectorId}</strong></span>
-                <span>Time: <strong className="text-slate-200">{new Date(r.timestamp).toLocaleString()}</strong></span>
+              <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-ink-muted pt-1 border-t border-line">
+                <span>Position: <strong className="text-ink-body">{getPositionText(r.springPosition, lang)}</strong></span>
+                <span>Inspector: <strong className="text-ink-body">{r.inspectorName || r.inspectorId}</strong></span>
+                <span>Time: <strong className="text-ink-body">{new Date(r.timestamp).toLocaleString()}</strong></span>
                 {r.auditHash && (
-                  <span className="font-mono text-[10px] text-slate-500 truncate max-w-[160px]" title={r.auditHash}>
+                  <span className="font-mono text-[10px] text-ink-faint truncate max-w-[160px]" title={r.auditHash}>
                     Hash: {r.auditHash.slice(0, 16)}...
                   </span>
                 )}
@@ -287,38 +287,38 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
       {/* Inspection Detail Modal */}
       {selectedRecord && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
-            <div className="px-5 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+          <div className="bg-card border border-line rounded-card w-full max-w-lg overflow-hidden">
+            <div className="px-5 py-4 bg-page border-b border-line flex items-center justify-between">
               <h3 className="font-extrabold text-white text-base">
                 Inspection #{selectedRecord.sequenceNumber || selectedRecord.id}
               </h3>
               <button
                 onClick={() => setSelectedRecord(null)}
-                className="text-slate-400 hover:text-white text-xl font-bold p-1"
+                className="text-ink-muted hover:text-white text-xl font-bold p-1"
               >
                 &times;
               </button>
             </div>
 
             <div className="p-5 space-y-3 text-xs sm:text-sm">
-              <div className="grid grid-cols-2 gap-2 p-3 bg-slate-950 rounded-xl border border-slate-800">
+              <div className="grid grid-cols-2 gap-2 p-3 bg-page rounded-control border border-line">
                 <div>
-                  <span className="text-slate-400">Wagon:</span> <strong className="text-white font-mono">{selectedRecord.wagonNumber}</strong>
+                  <span className="text-ink-muted">Wagon:</span> <strong className="text-white font-mono">{selectedRecord.wagonNumber}</strong>
                 </div>
                 <div>
-                  <span className="text-slate-400">Bogie:</span> <strong className="text-white">{selectedRecord.bogieType}</strong>
+                  <span className="text-ink-muted">Bogie:</span> <strong className="text-white">{selectedRecord.bogieType}</strong>
                 </div>
                 <div>
-                  <span className="text-slate-400">Position:</span> <strong className="text-white">{selectedRecord.springPosition}</strong>
+                  <span className="text-ink-muted">Position:</span> <strong className="text-white">{selectedRecord.springPosition}</strong>
                 </div>
                 <div>
-                  <span className="text-slate-400">Height:</span> <strong className="text-emerald-400 font-mono">{selectedRecord.measuredFreeHeight} mm</strong>
+                  <span className="text-ink-muted">Height:</span> <strong className="text-good-ink font-mono">{selectedRecord.measuredFreeHeight} mm</strong>
                 </div>
               </div>
 
-              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1">
+              <div className="p-3 bg-page rounded-control border border-line space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Classification:</span>
+                  <span className="text-ink-muted">Classification:</span>
                   <ClassificationBadge
                     band={selectedRecord.classifiedBand}
                     bandRoman={selectedRecord.bandRoman}
@@ -328,15 +328,15 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
                     size="sm"
                   />
                 </div>
-                <div className="text-slate-400">
+                <div className="text-ink-muted">
                   Table: <span className="text-white font-mono">{selectedRecord.tableReference}</span>
                 </div>
               </div>
 
               {selectedRecord.isOverridden && (
-                <div className="p-3 bg-purple-950/60 border border-purple-800 rounded-xl space-y-1 text-purple-200">
+                <div className="p-3 bg-accent-soft border border-accent-line rounded-control space-y-1 text-accent-ink">
                   <div className="font-bold flex items-center gap-1.5">
-                    <ShieldIcon size={14} className="text-purple-400" />
+                    <ShieldIcon size={14} className="text-accent-ink" />
                     <span>{isHi ? 'पर्यवेक्षक ओवरराइड कारण' : 'Supervisor Override Justification'}</span>
                   </div>
                   <p>{selectedRecord.overrideReason}</p>
@@ -344,17 +344,17 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
               )}
 
               {selectedRecord.auditHash && (
-                <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 font-mono text-[11px] break-all">
-                  <span className="text-slate-400">Cryptographic SHA-256 Hash:</span>
-                  <div className="text-slate-300 mt-1">{selectedRecord.auditHash}</div>
+                <div className="p-3 bg-page rounded-control border border-line font-mono text-[11px] break-all">
+                  <span className="text-ink-muted">Cryptographic SHA-256 Hash:</span>
+                  <div className="text-ink-body mt-1">{selectedRecord.auditHash}</div>
                 </div>
               )}
             </div>
 
-            <div className="px-5 py-3 bg-slate-950 border-t border-slate-800 flex justify-end">
+            <div className="px-5 py-3 bg-page border-t border-line flex justify-end">
               <button
                 onClick={() => setSelectedRecord(null)}
-                className="min-h-[44px] px-5 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl"
+                className="min-h-[44px] px-5 py-2 bg-raised hover:bg-selected text-white font-bold text-xs rounded-control"
               >
                 {dict.actions.close}
               </button>
