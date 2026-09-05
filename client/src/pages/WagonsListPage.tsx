@@ -8,6 +8,7 @@ import { api } from '../services/api.ts';
 import { offlineDb } from '../services/offlineDb.ts';
 import { useI18n } from '../i18n/index.ts';
 import { WagonNumberCamera } from '../components/WagonNumberCamera.tsx';
+import { parseWagonNumber } from '../../../shared/wagons/wagonNumber.ts';
 import { TrainIcon, CameraIcon, PlusCircleIcon } from '../components/Icons.tsx';
 import { Button, Chip, inputClass } from '../components/ui/index.tsx';
 import type { WagonRecord, LifecycleStage } from '../../../shared/types.ts';
@@ -36,6 +37,18 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
   const [newEntryNotes, setNewEntryNotes] = useState<string>('');
   const [registering, setRegistering] = useState<boolean>(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
+  /*
+   * What the camera read, and what it derived from it. Kept so the supervisor
+   * sees where the pre-filled values came from and can correct them — and so
+   * the correction can be recorded, which is the only way this gets better.
+   */
+  const [readFromPhoto, setReadFromPhoto] = useState<{
+    digits: string;
+    wagonType?: string;
+    owningRailway?: string;
+    valid: boolean;
+    problem?: string;
+  } | null>(null);
 
   /*
    * The seven stages, in order, as the filter.
@@ -105,6 +118,45 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
           owningRailway: newOwningRailway,
           entryNotes: newEntryNotes
         });
+
+        /*
+         * If this registration began with a photograph, record what the
+         * camera read against what the supervisor actually filed.
+         *
+         * This is the part that makes it improve rather than merely work. The
+         * comparison is unusually trustworthy: the number carries a check
+         * digit, so a misread is normally caught at the moment it happens,
+         * and the supervisor's correction is ground truth rather than an
+         * opinion. Over a pilot this answers a question nobody can answer by
+         * impression — how often is reading the number off the wagon good
+         * enough to keep.
+         *
+         * Logged after the wagon is safely registered, and any failure here
+         * is swallowed: a ledger write must never cost somebody their wagon.
+         */
+        if (readFromPhoto) {
+          const filed = newWagonNumber.trim().toUpperCase();
+          const corrected = readFromPhoto.digits !== filed
+            || (readFromPhoto.wagonType && readFromPhoto.wagonType !== newWagonType)
+            || (readFromPhoto.owningRailway && readFromPhoto.owningRailway !== newOwningRailway);
+
+          api.recordLearningOutcome({
+            subsystem: 'WAGON_NUMBER_OCR',
+            machineOutput: {
+              digits: readFromPhoto.digits,
+              wagonType: readFromPhoto.wagonType ?? null,
+              owningRailway: readFromPhoto.owningRailway ?? null,
+              checkDigitValid: readFromPhoto.valid
+            },
+            humanOutput: {
+              wagonNumber: filed,
+              wagonType: newWagonType,
+              owningRailway: newOwningRailway
+            },
+            wasCorrected: Boolean(corrected),
+            context: { checkDigitValid: readFromPhoto.valid, problem: readFromPhoto.problem ?? null }
+          }).catch(() => undefined);
+        }
       } else {
         // Offline registration
         await offlineDb.enqueueChecklistItem({
@@ -118,6 +170,7 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
       setShowRegisterModal(false);
       setNewWagonNumber('');
       setNewEntryNotes('');
+      setReadFromPhoto(null);
       loadWagons();
     } catch (err: any) {
       setRegisterError(err.message || 'Failed to register wagon');
@@ -323,7 +376,32 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
         <WagonNumberCamera
           lang={isHi ? 'hi' : 'en'}
           onRead={(num) => {
+            /*
+             * An eleven-digit wagon number is not an opaque label — WMM 2.0
+             * §417 puts the type in C1-C2, the owning railway in C3-C4, the
+             * year in C5-C6, and a check digit that proves the read.
+             *
+             * So photographing the number does not just fill one box: it
+             * fills the form. Both pieces already existed — the camera and
+             * the parser — and nothing connected them, so a supervisor
+             * photographed the number and then typed the type and railway
+             * that number already stated.
+             *
+             * Everything derived stays editable. The check digit says whether
+             * the digits were read correctly, not whether the wagon in front
+             * of you is what the number claims.
+             */
+            const parsed = parseWagonNumber(num);
             setNewWagonNumber(num);
+            if (parsed.wagonType) setNewWagonType(parsed.wagonType);
+            if (parsed.owningRailway) setNewOwningRailway(parsed.owningRailway);
+            setReadFromPhoto({
+              digits: parsed.digits || num,
+              wagonType: parsed.wagonType,
+              owningRailway: parsed.owningRailway,
+              valid: parsed.valid,
+              problem: parsed.problem
+            });
             setShowNumberCamera(false);
           }}
           onClose={() => setShowNumberCamera(false)}

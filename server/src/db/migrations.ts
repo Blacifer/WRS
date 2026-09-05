@@ -1009,7 +1009,7 @@ export function runMigrations(db: DatabaseSync): void {
     .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='machine_learning_events'")
     .get() as { sql?: string } | undefined)?.sql || '';
 
-  if (mlTableSql && !mlTableSql.includes("'MEASUREMENT_ANOMALY'")) {
+  if (mlTableSql && !mlTableSql.includes("'WAGON_NUMBER_OCR'")) {
     const cols = (db.prepare('PRAGMA table_info(machine_learning_events)').all() as any[]).map(
       (c) => c.name
     );
@@ -1022,7 +1022,8 @@ export function runMigrations(db: DatabaseSync): void {
       .replace(
         /CHECK\s*\(\s*subsystem\s+IN\s*\([^)]*\)\s*\)/i,
         "CHECK(subsystem IN ('OCR_CALIPER', 'SPRING_CLASSIFICATION', 'VOICE_COMMAND', " +
-          "'ACOUSTIC_DIAGNOSTIC', 'DEFECT_SUGGESTION', 'MEASUREMENT_ANOMALY'))"
+          "'ACOUSTIC_DIAGNOSTIC', 'DEFECT_SUGGESTION', 'MEASUREMENT_ANOMALY', " +
+          "'WAGON_NUMBER_OCR'))"
       );
 
     db.exec('PRAGMA foreign_keys = OFF;');

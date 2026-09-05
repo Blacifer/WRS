@@ -10,6 +10,8 @@
  * reliably fails, and what it wants to change — with the evidence attached.
  */
 
+import { SUBSYSTEM_LABELS } from '../../../shared/learning/subsystems.ts';
+import type { LearningSubsystem } from '../../../shared/learning/subsystems.ts';
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api.ts';
 import type { LanguageCode } from '../i18n/index.ts';
@@ -21,14 +23,7 @@ interface LearningDashboardPageProps {
   user: User | null;
 }
 
-const SUBSYSTEM_LABELS: Record<string, string> = {
-  OCR_CALIPER: 'Caliper OCR',
-  SPRING_CLASSIFICATION: 'Spring Classification',
-  VOICE_COMMAND: 'Voice Commands',
-  ACOUSTIC_DIAGNOSTIC: 'Acoustic Diagnostics',
-  DEFECT_SUGGESTION: 'Defect Suggestions',
-  MEASUREMENT_ANOMALY: 'Unusual Readings'
-};
+
 
 export const LearningDashboardPage: React.FC<LearningDashboardPageProps> = ({ lang, user }) => {
   const isHi = lang === 'hi';
@@ -153,7 +148,7 @@ export const LearningDashboardPage: React.FC<LearningDashboardPageProps> = ({ la
             .map((a) => (
               <div key={a.subsystem} className="bg-card border border-line rounded-card p-4">
                 <p className="text-[11px] font-bold text-ink-muted uppercase tracking-[0.07em]">
-                  {SUBSYSTEM_LABELS[a.subsystem] || a.subsystem}
+                  {SUBSYSTEM_LABELS[a.subsystem as LearningSubsystem] || a.subsystem}
                 </p>
                 <p className="text-3xl font-extrabold text-white mt-1 tabular-nums">
                   {(a.acceptanceRate * 100).toFixed(0)}

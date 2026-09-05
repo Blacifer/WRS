@@ -3,6 +3,7 @@
  * Indian Railways Wagon Repair Shop Raipur
  */
 
+import type { LearningSubsystem } from '../../../shared/learning/subsystems.ts';
 import type {
   User,
   AuthLoginRequest,
@@ -231,7 +232,7 @@ export class ApiClient {
    * server/src/learning/learningService.ts.
    */
   public async recordLearningOutcome(payload: {
-    subsystem: 'OCR_CALIPER' | 'SPRING_CLASSIFICATION' | 'VOICE_COMMAND' | 'ACOUSTIC_DIAGNOSTIC' | 'DEFECT_SUGGESTION';
+    subsystem: LearningSubsystem;
     wagonNumber?: string;
     inspectionId?: string;
     machineOutput: unknown;
