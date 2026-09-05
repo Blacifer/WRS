@@ -601,10 +601,10 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
                   type="button"
                   disabled={wagonLocked}
                   onClick={() => setBogieType(type)}
-                  className={`px-3 py-2 rounded-full border text-xs font-medium transition-all disabled:opacity-60 ${
+                  className={`min-h-tap px-3 py-2 rounded-control border text-xs font-semibold transition-colors disabled:opacity-60 ${
                     bogieType === type
-                      ? 'bg-white text-black border-white'
-                      : 'bg-transparent border-white/10 text-neutral-400 hover:text-white hover:border-white/30'
+                      ? 'bg-selected text-ink border-accent-line'
+                      : 'bg-card border-line text-ink-muted hover:text-ink hover:border-line-strong'
                   }`}
                 >
                   {getBogieTypeText(type, lang)}
@@ -621,10 +621,10 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
                   type="button"
                   disabled={wagonLocked}
                   onClick={() => setCondition(c)}
-                  className={`px-3 py-2 rounded-full border text-xs font-medium transition-all disabled:opacity-60 ${
+                  className={`min-h-tap px-3 py-2 rounded-control border text-xs font-semibold transition-colors disabled:opacity-60 ${
                     condition === c
-                      ? 'bg-white text-black border-white'
-                      : 'bg-transparent border-white/10 text-neutral-400 hover:text-white hover:border-white/30'
+                      ? 'bg-selected text-ink border-accent-line'
+                      : 'bg-card border-line text-ink-muted hover:text-ink hover:border-line-strong'
                   }`}
                 >
                   {getConditionText(c, lang)}
@@ -647,10 +647,10 @@ export const SpringBatchPage: React.FC<SpringBatchPageProps> = ({ lang, user, on
                   type="button"
                   disabled={wagonLocked}
                   onClick={() => setAxleLoad(o.axleLoad)}
-                  className={`px-3 py-2 rounded-full border text-xs font-medium transition-all disabled:opacity-60 ${
+                  className={`min-h-tap px-3 py-2 rounded-control border text-xs font-semibold transition-colors disabled:opacity-60 ${
                     axleLoad === o.axleLoad
-                      ? 'bg-white text-black border-white'
-                      : 'bg-transparent border-white/10 text-neutral-400 hover:text-white hover:border-white/30'
+                      ? 'bg-selected text-ink border-accent-line'
+                      : 'bg-card border-line text-ink-muted hover:text-ink hover:border-line-strong'
                   }`}
                 >
                   {o.axleLoad}

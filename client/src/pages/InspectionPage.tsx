@@ -346,10 +346,10 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
                 key={type}
                 type="button"
                 onClick={() => setBogieType(type)}
-                className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                className={`min-h-tap px-4 py-2 rounded-control border text-sm font-semibold transition-colors ${
                   bogieType === type
-                    ? 'bg-white text-black border-white'
-                    : 'bg-transparent border-white/10 text-neutral-400 hover:text-white hover:border-white/30'
+                    ? 'bg-selected text-ink border-accent-line'
+                    : 'bg-card border-line text-ink-muted hover:text-ink hover:border-line-strong'
                 }`}
               >
                 {getBogieTypeText(type, lang)}
@@ -371,10 +371,10 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
                   key={c}
                   type="button"
                   onClick={() => setCondition(c)}
-                  className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                  className={`min-h-tap px-4 py-2 rounded-control border text-sm font-semibold transition-colors ${
                     condition === c
-                      ? 'bg-white text-black border-white'
-                      : 'bg-transparent border-white/10 text-neutral-400 hover:text-white hover:border-white/30'
+                      ? 'bg-selected text-ink border-accent-line'
+                      : 'bg-card border-line text-ink-muted hover:text-ink hover:border-line-strong'
                   }`}
                 >
                   {getConditionText(c, lang)}
@@ -394,10 +394,10 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
                   key={p}
                   type="button"
                   onClick={() => setPosition(p)}
-                  className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                  className={`min-h-tap px-4 py-2 rounded-control border text-sm font-semibold transition-colors ${
                     position === p
-                      ? 'bg-white text-black border-white'
-                      : 'bg-transparent border-white/10 text-neutral-400 hover:text-white hover:border-white/30'
+                      ? 'bg-selected text-ink border-accent-line'
+                      : 'bg-card border-line text-ink-muted hover:text-ink hover:border-line-strong'
                   }`}
                 >
                   {getPositionText(p, lang)}
@@ -417,10 +417,10 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
                   key={b}
                   type="button"
                   onClick={() => setBogiePosition(b)}
-                  className={`px-4 py-2 rounded-full border text-sm font-medium transition-all ${
+                  className={`min-h-tap px-4 py-2 rounded-control border text-sm font-semibold transition-colors ${
                     bogiePosition === b
-                      ? 'bg-white text-black border-white'
-                      : 'bg-transparent border-white/10 text-neutral-400 hover:text-white hover:border-white/30'
+                      ? 'bg-selected text-ink border-accent-line'
+                      : 'bg-card border-line text-ink-muted hover:text-ink hover:border-line-strong'
                   }`}
                 >
                   {lang === 'hi' ? (b === 'BOGIE_1' ? 'बोगी 1' : 'बोगी 2') : b === 'BOGIE_1' ? 'Bogie 1' : 'Bogie 2'}
@@ -610,7 +610,7 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
           type="button"
           onClick={handleSaveInspection}
           disabled={isSaving}
-          className="px-8 py-3 bg-white hover:bg-neutral-200 text-black font-semibold text-sm rounded-full flex items-center justify-center gap-2 transition-transform active:scale-95"
+          className="min-h-touch px-8 bg-accent hover:bg-accent-hover border border-accent-hover text-white font-bold text-base rounded-touch flex items-center justify-center gap-2 transition-colors active:scale-[0.98]"
         >
           {isSaving ? <RefreshCwIcon size={16} className="animate-spin" /> : <CheckCircleIcon size={16} />}
           <span>{isSaving ? dict.app.syncing : dict.actions.saveInspection}</span>
