@@ -690,11 +690,28 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
             ? 'INNER'
             : 'SNUBBER';
 
+        const springBogie: 'BOGIE_1' | 'BOGIE_2' | undefined =
+          bogiePosition === 'BOGIE_1' || bogiePosition === 'BOGIE_2' ? bogiePosition : undefined;
+
         const springPayload = {
           wagonNumber,
           bogieType: (wagon.wagonType.includes('HS') ? 'CASNUB_22_HS' : 'CASNUB_22_NLB') as BogieType,
           condition: 'USED' as SpringCondition,
           position: springPos,
+          /*
+           * The bogie is known here — it is the one the checklist item above
+           * was just written against — and it was being thrown away on both
+           * the online and offline paths. A spring recorded by the AR caliper
+           * arrived belonging to no bogie, so it counted towards neither
+           * bogie's twelve and grouped into a nest of its own.
+           *
+           * 'NONE' is a checklist position for parts that sit on the
+           * underframe rather than a bogie; a spring is never one of those,
+           * and the inspection record's own type admits only the two bogies
+           * or nothing, so anything else is passed as undefined rather than
+           * written through as a string the column does not mean.
+           */
+          bogiePosition: springBogie,
           measuredHeight: measurement.measuredValue,
           measuredFreeHeight: measurement.measuredValue,
           damageType: (measurement.status === 'CONDEMNED' ? 'OTHER' : 'NONE') as any,
@@ -725,6 +742,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
             bogieType: springPayload.bogieType,
             condition: springPayload.condition,
             springPosition: springPayload.position,
+            bogiePosition: springPayload.bogiePosition,
             measuredFreeHeight: springPayload.measuredFreeHeight,
             classifiedBand: measurement.band || null,
             bandRoman: (measurement.bandRoman as any) || null,

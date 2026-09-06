@@ -182,6 +182,21 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
           bogieType: inspectionPayload.bogieType,
           condition: inspectionPayload.condition,
           springPosition: inspectionPayload.position,
+          /*
+           * The bogie, which this used to drop.
+           *
+           * Online, the payload above carries it. Offline it did not, so the
+           * same spring measured with the tablet out of network landed with a
+           * null bogie — and a spring with no bogie is counted against neither
+           * of them. Twelve springs recorded offline read as twelve missing
+           * springs at the exit gate, and they group into a phantom nest of
+           * their own, which is where the 3 mm rule then reports a variation
+           * that does not exist on any real bogie.
+           *
+           * Nothing about a measurement should depend on whether there was
+           * signal in the shop when it was taken.
+           */
+          bogiePosition: inspectionPayload.bogiePosition,
           measuredFreeHeight: inspectionPayload.measuredFreeHeight,
           classifiedBand: overrideBand || classification?.band || null,
           bandRoman: classification?.bandRoman || null,
@@ -215,6 +230,9 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
         bogieType: inspectionPayload.bogieType,
         condition: inspectionPayload.condition,
         springPosition: inspectionPayload.position,
+        // Same reason as the enqueue above: the fallback path is the one that
+        // runs when the server is unreachable, so it must not record less.
+        bogiePosition: inspectionPayload.bogiePosition,
         measuredFreeHeight: inspectionPayload.measuredFreeHeight,
         classifiedBand: overrideBand || classification?.band || null,
         bandRoman: classification?.bandRoman || null,
