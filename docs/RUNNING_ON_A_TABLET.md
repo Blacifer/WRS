@@ -100,3 +100,26 @@ not acceptable as the way the pilot runs.
 For anything longer, use a named tunnel tied to a Cloudflare account with
 Access in front of it, or put the app behind a real certificate on a machine
 the workshop controls. `deploy/README.md` covers the hosting options.
+
+
+## Keeping it up
+
+The server handles SIGINT and SIGTERM: it stops accepting connections, folds
+the write-ahead log back into the database, closes it, and exits. Ctrl+C is
+the signal that actually arrives in a workshop, and it is handled — a second
+Ctrl+C will not race the first, and a held-open connection cannot delay the
+exit beyond five seconds.
+
+It also stops deliberately on an unhandled rejection or an uncaught
+exception, after logging the cause in full. That is a choice, not an
+oversight. The router awaits every request handler and routes a thrown error
+to the error middleware, so a failing request cannot bring the process down;
+what remains is background work, and continuing after an unknown failure in
+something that writes safety records risks writing them wrongly. A server
+that is plainly down is a better failure than one that is quietly unreliable.
+
+**Which means it needs something to restart it.** On a laptop, the simplest
+honest answer is to run it from a terminal somebody can see. For anything
+longer-lived, put it under whatever the host already has — `launchd` on
+macOS, `systemd` on Linux — with `Restart=always`. Without that, a stop is a
+stop, and the first anyone knows is an inspector saying the app will not load.
