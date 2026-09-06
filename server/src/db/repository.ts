@@ -27,16 +27,53 @@ export class InspectionRepository {
   /**
    * Monotonically increments and returns the next inspection sequence number
    */
+  /**
+   * The next inspection sequence number, allocated atomically.
+   *
+   * This read `last_val`, added one in JavaScript, and wrote the result back.
+   * Between the read and the write another writer could read the same value,
+   * and both callers would be handed the same number — so two inspections
+   * would carry the same sequence, which is the one field an inspector uses
+   * to refer to a reading out loud ("check seq 341").
+   *
+   * The same shape broke the audit chain: two writers each read the same
+   * "last hash" and both appended, and the chain forked. That was found by
+   * running the restore drill on the pilot database, where it had already
+   * happened twice. This is the same fault in the same file, and it is fixed
+   * the same way — by not doing the arithmetic outside the database.
+   *
+   * `UPDATE ... SET last_val = last_val + 1 ... RETURNING last_val` is one
+   * statement. SQLite serialises it against any other writer, in this process
+   * or another, so no two callers can be handed the same number. That is
+   * stronger than wrapping the old pair in a transaction, and simpler.
+   */
   public getNextSequenceNumber(): number {
     const row = this.db
-      .prepare("SELECT last_val FROM sequence_tracker WHERE name = 'inspection_seq'")
+      .prepare(`
+        UPDATE sequence_tracker
+        SET last_val = last_val + 1
+        WHERE name = 'inspection_seq'
+        RETURNING last_val
+      `)
       .get() as { last_val: number } | undefined;
 
-    const nextVal = (row?.last_val ?? 0) + 1;
+    if (row) return row.last_val;
+
+    /*
+     * No counter row at all. Migrations insert one, so this is a database
+     * that predates it or was built by hand. Seeded past whatever inspections
+     * already exist rather than restarting from 1, which would hand out
+     * numbers that are already in use.
+     */
+    const highest = this.db
+      .prepare('SELECT COALESCE(MAX(sequence_number), 0) AS n FROM inspections')
+      .get() as { n: number };
+
+    const next = (highest?.n ?? 0) + 1;
     this.db
-      .prepare("UPDATE sequence_tracker SET last_val = ? WHERE name = 'inspection_seq'")
-      .run(nextVal);
-    return nextVal;
+      .prepare("INSERT OR REPLACE INTO sequence_tracker (name, last_val) VALUES ('inspection_seq', ?)")
+      .run(next);
+    return next;
   }
 
   /**
