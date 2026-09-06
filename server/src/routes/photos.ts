@@ -278,6 +278,48 @@ photosRouter.get(
   }
 );
 
+/*
+ * Registered BEFORE '/:photoId'.
+ *
+ * The generic route matched first and its parameter swallowed the whole path,
+ * so GET /api/photos/wagon/SECR/BOXNHL/12345 was answered with "Photo with ID
+ * wagon/SECR/BOXNHL/12345 was not found" — this endpoint was unreachable.
+ *
+ * It went unnoticed because the wagon screen gets its photographs inline from
+ * the wagon detail; the first caller to use this route would have found it
+ * broken. Order matters here in the same way it does in any router that
+ * matches in sequence.
+ */
+photosRouter.get('/wagon/:wagonNumber', authMiddleware, async (req: Request, res: Response) => {
+  const repo = getRepo();
+  const wagonNumber = req.params?.wagonNumber;
+  const category = req.query?.category;
+  const stage = req.query?.stage;
+
+  if (!wagonNumber) {
+    res.status(400).json({
+      success: false,
+      error: 'MISSING_PARAM',
+      message: 'wagonNumber parameter is required',
+      statusCode: 400,
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
+
+  const photos = repo.getPhotosByWagon(wagonNumber, category, stage);
+
+  res.status(200).json({
+    success: true,
+    data: photos,
+    meta: {
+      wagonNumber,
+      totalPhotos: photos.length,
+      timestamp: new Date().toISOString()
+    }
+  });
+});
+
 photosRouter.get('/:photoId', authMiddleware, async (req: Request, res: Response) => {
   const repo = getRepo();
   const photoId = req.params?.photoId;
@@ -316,32 +358,3 @@ photosRouter.get('/:photoId', authMiddleware, async (req: Request, res: Response
 // 3. Retrieve Photos for a Wagon
 // -------------------------------------------------------------------------
 
-photosRouter.get('/wagon/:wagonNumber', authMiddleware, async (req: Request, res: Response) => {
-  const repo = getRepo();
-  const wagonNumber = req.params?.wagonNumber;
-  const category = req.query?.category;
-  const stage = req.query?.stage;
-
-  if (!wagonNumber) {
-    res.status(400).json({
-      success: false,
-      error: 'MISSING_PARAM',
-      message: 'wagonNumber parameter is required',
-      statusCode: 400,
-      timestamp: new Date().toISOString()
-    });
-    return;
-  }
-
-  const photos = repo.getPhotosByWagon(wagonNumber, category, stage);
-
-  res.status(200).json({
-    success: true,
-    data: photos,
-    meta: {
-      wagonNumber,
-      totalPhotos: photos.length,
-      timestamp: new Date().toISOString()
-    }
-  });
-});

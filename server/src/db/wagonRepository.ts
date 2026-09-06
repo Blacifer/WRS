@@ -2154,6 +2154,16 @@ export class WagonRepository {
       partName: row.part_name,
       part_name: row.part_name,
       stage: row.stage,
+      /*
+       * What the photograph shows — before work, after it, or the defect.
+       *
+       * Stored since the column existed and never mapped out, so every reader
+       * saw null no matter what had been written. A report cannot pair a
+       * before with an after if the rows come back unable to say which is
+       * which.
+       */
+      evidenceStage: row.evidence_stage ?? null,
+      evidence_stage: row.evidence_stage ?? null,
       fileName: row.file_name,
       file_name: row.file_name,
       mimeType: row.mime_type,

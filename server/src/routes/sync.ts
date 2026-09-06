@@ -315,6 +315,10 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
             checklistItemId: p.checklistItemId,
             category: p.partCategory || p.category,
             partName: p.partName,
+            // Sent by the live upload and dropped here, so a photograph taken
+            // with no network arrived unable to say whether it showed the
+            // defect or the repair.
+            evidenceStage: p.evidenceStage ?? null,
             imageData: p.imageBase64 || p.imageData,
             // Same rule as the rest: attributed to the authenticated user.
             inspectorId: actorId,

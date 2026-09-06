@@ -116,6 +116,8 @@ export interface PendingPhotoUpload {
   category: string;
   partName: string;
   stage: string;
+  /** Before work, after work, or the defect itself. */
+  evidenceStage?: string;
   imageBase64: string;
   tags?: string[];
   createdAt: string;

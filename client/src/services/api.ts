@@ -553,6 +553,17 @@ export class ApiClient {
     partCategory?: string;
     partName?: string;
     stage?: string;
+    /**
+     * What this photograph is evidence OF: the state before work, the state
+     * after it, or the defect itself.
+     *
+     * The server has validated and stored this from the beginning and no
+     * screen ever sent one, so every photograph in the database has a null
+     * evidence stage — which is why a condition report can show that a part
+     * was found cracked and repaired, and cannot show the two pictures that
+     * would settle it.
+     */
+    evidenceStage?: 'BEFORE' | 'AFTER' | 'DEFECT' | 'GENERAL';
     imageBase64: string;
     tags?: string[];
   }): Promise<{ success: boolean; data: WagonPhotoRecord }> {

@@ -122,9 +122,29 @@ export const WagonConditionReport: React.FC<WagonConditionReportProps> = ({
   /* A photograph is attached to a checklist row by id, so the finding it
    * belongs to can show it rather than the gallery being a separate place a
    * reader has to correlate by hand. */
-  const photoFor = (item: ChecklistItem) =>
-    photos.find((p) => p.checklistItemId === item.id)
-    || photos.find((p) => p.partName === item.partName && (p.category || p.partCategory) === item.category);
+  /*
+   * The photographs belonging to one finding, separated by what they show.
+   *
+   * A repair produces two pictures that mean different things, and a report
+   * that prints one of them at random settles nothing. Matched by checklist
+   * id where the photograph has one, and by part otherwise — an older
+   * photograph, or one taken before the link was carried offline, still finds
+   * its finding.
+   */
+  const photosFor = (item: ChecklistItem) => {
+    const mine = photos.filter(
+      (p) => p.checklistItemId === item.id
+        || (p.partName === item.partName && (p.category || p.partCategory) === item.category)
+    );
+    const stage = (s2: string) => mine.find((p) => (p as any).evidenceStage === s2);
+    return {
+      before: stage('BEFORE'),
+      after: stage('AFTER'),
+      // Anything not labelled still gets shown rather than hidden: every
+      // photograph taken before this field was wired has no stage at all.
+      any: stage('DEFECT') || mine.find((p) => !(p as any).evidenceStage) || mine[0]
+    };
+  };
 
   const released = wagon.currentStage === 'RELEASE';
   const condemnedSprings = springs.filter((s) => s.status === 'CONDEMNED');
@@ -152,7 +172,7 @@ export const WagonConditionReport: React.FC<WagonConditionReportProps> = ({
 
     const findingRows = findings.map((item) => {
       const a = arrivalByItem.get(item.id);
-      const photo = photoFor(item);
+      const shots = photosFor(item);
       return `
         <tr>
           <td><strong>${esc(item.partName)}</strong><br><span class="sub">${esc(CATEGORY_LABELS[item.category] || item.category)}${
@@ -166,7 +186,15 @@ export const WagonConditionReport: React.FC<WagonConditionReportProps> = ({
           }</td>
           <td>${item.reinspectedStatus ? esc(item.reinspectedStatus) : '<span class="muted">re-inspection not recorded</span>'}</td>
           <td class="sub">${esc(item.inspectedByName || '—')}<br>${esc(fmt(a?.at || item.updatedAt))}</td>
-          <td>${photo ? `<img class="ev" src="${esc(photo.imageBase64 || photo.imageData)}">` : ''}</td>
+          <td>${
+            [[shots.before, 'before'], [shots.after, 'after'],
+             [!shots.before && !shots.after ? shots.any : null, '']]
+              .map(([shot, label]) => shot
+                ? `<figure style="display:inline-block;margin:0 4px 0 0"><img class="ev" src="${esc((shot as any).imageBase64 || (shot as any).imageData)}">` +
+                  `${label ? `<figcaption class="sub">${label}</figcaption>` : ''}</figure>`
+                : '')
+              .join('')
+          }</td>
         </tr>`;
     }).join('');
 
@@ -342,7 +370,7 @@ export const WagonConditionReport: React.FC<WagonConditionReportProps> = ({
         ) : (
           <div className="space-y-3">
             {findings.map((item) => {
-              const photo = photoFor(item);
+              const shots = photosFor(item);
               const cleared = item.reinspectedStatus === 'PASS';
               const arrival = arrivalByItem.get(item.id);
               return (
@@ -415,12 +443,27 @@ export const WagonConditionReport: React.FC<WagonConditionReportProps> = ({
                       <p className="text-xs font-bold text-white mt-1">
                         {item.reinspectedStatus || t('re-inspection not recorded', 'पुनः जाँच दर्ज नहीं')}
                       </p>
-                      {photo && (
-                        <img
-                          src={photo.imageBase64 || photo.imageData}
-                          alt={item.partName}
-                          className="mt-2 rounded border border-line max-h-24 object-cover"
-                        />
+                      {(shots.after || shots.before || shots.any) && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {[
+                            [shots.before, t('before', 'पहले')],
+                            [shots.after, t('after', 'बाद')],
+                            [!shots.before && !shots.after ? shots.any : null, t('evidence', 'साक्ष्य')]
+                          ].map(([shot, label], i) =>
+                            shot ? (
+                              <figure key={i} className="m-0">
+                                <img
+                                  src={(shot as any).imageBase64 || (shot as any).imageData}
+                                  alt={`${item.partName} — ${label}`}
+                                  className="rounded border border-line max-h-24 object-cover"
+                                />
+                                <figcaption className="text-[9px] uppercase tracking-wide text-ink-muted mt-0.5">
+                                  {label as string}
+                                </figcaption>
+                              </figure>
+                            ) : null
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>

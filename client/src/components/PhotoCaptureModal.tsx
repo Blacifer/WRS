@@ -41,6 +41,17 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [tags, setTags] = useState<string>('QC, Workshop');
 
+  /*
+   * What this photograph is evidence of.
+   *
+   * A repair produces two pictures that mean different things, and until now
+   * they arrived indistinguishable — the database has had the field since the
+   * beginning and nothing ever set it. DEFECT is the default because the
+   * commonest reason to open this modal is that somebody has found something.
+   */
+  const [evidenceStage, setEvidenceStage] =
+    useState<'BEFORE' | 'AFTER' | 'DEFECT' | 'GENERAL'>('DEFECT');
+
   const user = api.getUser();
 
   useEffect(() => {
@@ -201,6 +212,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
           partCategory: category,
           partName,
           stage,
+          evidenceStage,
           imageBase64: capturedImage,
           tags: tagList
         });
@@ -212,6 +224,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
           // Sent online, dropped here. A photograph that cannot be tied to the
           // finding it evidences is a picture, not evidence.
           checklistItemId,
+          evidenceStage,
           category,
           partName,
           stage,
@@ -296,6 +309,34 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
           <div className="text-xs text-ink-muted bg-raised p-3 rounded-control border border-line flex items-start gap-2">
             <span className="text-warn-ink shrink-0"><AlertTriangleIcon size={16} /></span>
             <span>{t('photos.watermarkNotice')}</span>
+          </div>
+
+          {/* What this photograph is evidence of */}
+          <div>
+            <label className="block text-xs font-semibold text-ink-body mb-1">
+              What this photograph shows
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {([
+                ['DEFECT', 'The defect'],
+                ['BEFORE', 'Before work'],
+                ['AFTER', 'After work'],
+                ['GENERAL', 'General']
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setEvidenceStage(value)}
+                  className={`min-h-[40px] px-3 rounded-control border text-xs font-bold transition ${
+                    evidenceStage === value
+                      ? 'border-accent-line bg-accent-soft text-accent-ink'
+                      : 'border-line bg-raised text-ink-muted hover:text-ink-body'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Tags */}
