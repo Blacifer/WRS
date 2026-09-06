@@ -105,6 +105,25 @@ analyticsRouter.get('/parts', authMiddleware, requireCapability('analytics.read'
 });
 
 // -------------------------------------------------------------------------
+// 4b. Recurring Findings Across the Shop
+//
+// Which part keeps coming back, on how many different wagons. The category
+// breakdown above cannot answer it — it counts springs, not "Brake Block".
+// -------------------------------------------------------------------------
+
+analyticsRouter.get('/findings', authMiddleware, requireCapability('analytics.read'), async (req: Request, res: Response) => {
+  const repo = getRepo();
+  const raw = parseInt(String(req.query?.limit || '40'), 10);
+  const limit = Math.min(Math.max(Number.isFinite(raw) ? raw : 40, 1), 200);
+
+  res.status(200).json({
+    success: true,
+    data: repo.getAnalyticsFindings(limit),
+    meta: { timestamp: new Date().toISOString() }
+  });
+});
+
+// -------------------------------------------------------------------------
 // 5. Inspector Productivity & Quality Metrics
 // -------------------------------------------------------------------------
 

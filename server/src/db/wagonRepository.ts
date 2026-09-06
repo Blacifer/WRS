@@ -2027,6 +2027,7 @@ export class WagonRepository {
   public getAnalyticsThroughput(): any { return analytics.getAnalyticsThroughput(this.db); }
   public getAnalyticsParts(): any { return analytics.getAnalyticsParts(this.db); }
   public getAnalyticsInspectors(): any { return analytics.getAnalyticsInspectors(this.db); }
+  public getAnalyticsFindings(limit?: number): any { return analytics.getAnalyticsFindings(this.db, limit); }
   // Passed the repository rather than the handle: this one needs the exit
   // gate evaluated per wagon, which is not a query.
   public getAnalyticsBlockers(): any {

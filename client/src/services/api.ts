@@ -515,6 +515,11 @@ export class ApiClient {
     return this.request<{ success: boolean; data: any }>('/analytics/throughput');
   }
 
+  /** Which part keeps coming back, and on how many distinct wagons. */
+  public async getAnalyticsFindings(limit = 40): Promise<{ success: boolean; data: any }> {
+    return this.request<{ success: boolean; data: any }>(`/analytics/findings?limit=${limit}`);
+  }
+
   public async getAnalyticsParts(): Promise<{ success: boolean; data: any }> {
     return this.request<{ success: boolean; data: any }>('/analytics/parts');
   }

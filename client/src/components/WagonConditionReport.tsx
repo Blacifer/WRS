@@ -131,6 +131,143 @@ export const WagonConditionReport: React.FC<WagonConditionReportProps> = ({
 
   const t = (en: string, hi: string) => (isHi ? hi : en);
 
+  /*
+   * The printed report.
+   *
+   * A DRM or a receiving railway wants paper, and the screen is not paper —
+   * dark, scrollable, and dependent on a tablet being in the room. This
+   * builds the same content as a plain document in its own window.
+   *
+   * It is generated from the SAME derived arrays the screen renders, so the
+   * two cannot drift apart and print something the app does not show. Where a
+   * fact is unknown it prints the same words the screen uses — "not recorded"
+   * rather than a blank, because a blank cell on paper reads as nothing to
+   * report.
+   */
+  const printReport = () => {
+    const esc = (v: unknown) =>
+      String(v ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    const findingRows = findings.map((item) => {
+      const a = arrivalByItem.get(item.id);
+      const photo = photoFor(item);
+      return `
+        <tr>
+          <td><strong>${esc(item.partName)}</strong><br><span class="sub">${esc(CATEGORY_LABELS[item.category] || item.category)}${
+            item.bogiePosition && item.bogiePosition !== 'NONE' ? ' · ' + esc(item.bogiePosition) : ''
+          }</span></td>
+          <td>${a ? esc(a.status) : '<span class="muted">not recorded</span>'}${
+            a?.notes || item.conditionNotes ? `<br><span class="sub">“${esc(a?.notes || item.conditionNotes)}”</span>` : ''
+          }</td>
+          <td>${item.repairAction ? esc(item.repairAction) : '<span class="muted">not recorded</span>'}${
+            item.repairNotes ? `<br><span class="sub">“${esc(item.repairNotes)}”</span>` : ''
+          }</td>
+          <td>${item.reinspectedStatus ? esc(item.reinspectedStatus) : '<span class="muted">re-inspection not recorded</span>'}</td>
+          <td class="sub">${esc(item.inspectedByName || '—')}<br>${esc(fmt(a?.at || item.updatedAt))}</td>
+          <td>${photo ? `<img class="ev" src="${esc(photo.imageBase64 || photo.imageData)}">` : ''}</td>
+        </tr>`;
+    }).join('');
+
+    const springRows = springs.map((s2) => `
+      <tr>
+        <td>${esc(s2.springPosition)}</td>
+        <td>${esc(s2.bogiePosition || '—')}</td>
+        <td class="num">${esc(s2.measuredFreeHeight)}${s2.heightIsApproximate ? '≈' : ''} mm</td>
+        <td>${esc(s2.classifiedBand || '—')}</td>
+        <td><strong>${esc(s2.status)}</strong></td>
+        <td class="sub">${esc(s2.inspectorName || '—')}</td>
+      </tr>`).join('');
+
+    const html = `<!doctype html><html><head><meta charset="utf-8">
+<title>Condition Report ${esc(wagon.wagonNumber)}</title>
+<style>
+  body { font: 11px/1.45 system-ui, sans-serif; color: #111; margin: 24px; }
+  h1 { font-size: 17px; margin: 0 0 2px; }
+  h2 { font-size: 12px; margin: 18px 0 6px; border-bottom: 1.5px solid #111; padding-bottom: 3px; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start;
+          border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 12px; }
+  .mono { font-family: ui-monospace, monospace; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 9px; text-transform: uppercase; letter-spacing: .04em;
+       border-bottom: 1px solid #666; padding: 4px 6px 4px 0; }
+  td { border-bottom: 1px solid #ddd; padding: 5px 6px 5px 0; vertical-align: top; }
+  .sub { font-size: 9.5px; color: #555; }
+  .muted { color: #777; font-style: italic; }
+  /* Left, to sit under a left-aligned header: right-aligning the value alone
+     pushed the height against the band beside it on paper. */
+  .num { font-family: ui-monospace, monospace; white-space: nowrap; }
+  .ev { max-width: 90px; max-height: 62px; border: 1px solid #bbb; }
+  .stats { display: flex; gap: 18px; margin: 10px 0 4px; }
+  .stat b { display: block; font-size: 17px; }
+  .stat span { font-size: 9px; text-transform: uppercase; color: #555; }
+  .note { border: 1px solid #999; padding: 6px 8px; margin-top: 8px; font-size: 10px; }
+  @media print { body { margin: 12mm; } tr { break-inside: avoid; } }
+</style></head><body>
+  <div class="head">
+    <div>
+      <h1>Wagon Condition Report</h1>
+      <div class="sub">What arrived, what was done to it, and what left. Every line attributed to the person who recorded it.</div>
+    </div>
+    <div style="text-align:right">
+      <div class="mono"><strong>${esc(wagon.wagonNumber)}</strong></div>
+      <div class="sub">${esc(wagon.wagonType)} · ${esc(wagon.owningRailway)}</div>
+      <div class="sub">In ${esc(fmt(wagon.entryDate))}</div>
+      <div class="sub">Printed ${esc(fmt(new Date().toISOString()))}</div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><b>${allItems.length}</b><span>components checked</span></div>
+    <div class="stat"><b>${findings.length}</b><span>findings raised</span></div>
+    <div class="stat"><b>${springs.length}</b><span>springs measured</span></div>
+    <div class="stat"><b>${condemnedSprings.length}</b><span>springs condemned</span></div>
+    <div class="stat"><b>${notInspected.length}</b><span>not yet inspected</span></div>
+  </div>
+
+  <h2>1. Findings, and what was done about each</h2>
+  ${findings.length
+    ? `<table><thead><tr><th>Assembly / Part</th><th>Found as</th><th>Work done</th><th>Left as</th><th>Recorded by</th><th>Evidence</th></tr></thead><tbody>${findingRows}</tbody></table>`
+    : '<p class="muted">No component on this wagon was recorded as failed, condemned, repaired or replaced.</p>'}
+
+  <h2>2. Spring readings</h2>
+  ${springs.length
+    ? `<table><thead><tr><th>Position</th><th>Bogie</th><th>Height</th><th>Band</th><th>Verdict</th><th>Recorded by</th></tr></thead><tbody>${springRows}</tbody></table>`
+    : '<p class="muted">No spring free-height reading has been recorded against this wagon. This section makes no statement about its springs.</p>'}
+
+  <h2>3. Components cleared without a finding</h2>
+  <p>${clean.length} of ${allItems.length} checked components were passed with nothing recorded against them.</p>
+  <p class="sub">${clean.map((i) => esc(i.partName)).join(' · ') || '—'}</p>
+  ${notInspected.length
+    ? `<div class="note"><strong>${notInspected.length} component(s) have not been inspected.</strong> They are listed as pending, not as passed.<br>
+       <span class="sub">${notInspected.map((i) => esc(i.partName)).join(' · ')}</span></div>`
+    : ''}
+
+  <h2>4. Release</h2>
+  ${released
+    ? '<p>Released. The signed certificate records the findings accepted at sign-off.</p>'
+    : `<p>${gateStatus?.canRelease
+          ? 'The exit gate is clear. This wagon has not been signed off yet.'
+          : 'The exit gate is holding this wagon.'}</p>
+       ${(gateStatus?.blockers || []).length
+          ? '<ul>' + gateStatus.blockers.map((b: string) => `<li>${esc(b)}</li>`).join('') + '</ul>' : ''}
+       ${(gateStatus?.advisories || []).length
+          ? '<ul>' + gateStatus.advisories.map((a: string) => `<li>Advisory: ${esc(a)}</li>`).join('') + '</ul>' : ''}`}
+
+  <p class="sub" style="margin-top:18px;border-top:1px solid #999;padding-top:6px">
+    Generated by the WRS Raipur Bogie &amp; Wagon QC system. This report states what is recorded; it is not a release certificate.
+  </p>
+</body></html>`;
+
+    const w = window.open('', '_blank');
+    if (!w) return;   // pop-up blocked; nothing is lost, the screen still has it
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    w.print();
+  };
+
   const Stat = ({ label, value, tone }: { label: string; value: string | number; tone?: string }) => (
     <div className={`rounded-control border p-3 ${tone || 'border-line bg-raised'}`}>
       <p className="text-2xl font-black text-white tabular-nums leading-none">{value}</p>
@@ -154,11 +291,17 @@ export const WagonConditionReport: React.FC<WagonConditionReportProps> = ({
               )}
             </p>
           </div>
-          <div className="text-right">
+          <div className="text-right space-y-2">
             <p className="font-mono text-sm font-black text-white">{wagon.wagonNumber}</p>
             <p className="text-[11px] text-ink-muted">
               {wagon.wagonType} · {wagon.owningRailway} · {t('in', 'प्रवेश')} {fmt(wagon.entryDate)}
             </p>
+            <button
+              onClick={printReport}
+              className="min-h-[36px] px-3 rounded-control border border-line-strong text-xs font-bold text-ink-body hover:text-white"
+            >
+              🖨 {t('Print report', 'रिपोर्ट प्रिंट करें')}
+            </button>
           </div>
         </div>
 

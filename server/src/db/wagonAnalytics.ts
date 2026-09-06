@@ -350,3 +350,60 @@ export function getObservedCondemnationRates(
     condemned: Number(r.condemned ?? 0)
   }));
 }
+
+
+/**
+ * What keeps going wrong, across the whole shop.
+ *
+ * The parts breakdown above answers "how many springs failed" — a category
+ * total, useful for a chart and useless for a decision. The question a
+ * workshop manager actually asks is narrower and more awkward: WHICH part
+ * keeps coming back, on how many different wagons, and what did we do about
+ * it last time.
+ *
+ * That is a per-part-name question and nothing answered it, so it was being
+ * answered by memory — which is exactly the kind of thing memory is worst at,
+ * because a part that fails on one wagon in three is invisible to anyone who
+ * only sees one wagon at a time.
+ *
+ * Counted by DISTINCT wagon rather than by row. A part listed twice on the
+ * same wagon (two bogies) is one wagon's problem; a part listed on nine
+ * wagons is the shop's. Ordering by wagons affected rather than raw count is
+ * the whole point of the view.
+ */
+export function getAnalyticsFindings(db: DatabaseSync, limit = 40): any {
+  const rows = db.prepare(`
+    SELECT
+      part_name                                          AS partName,
+      category,
+      COUNT(DISTINCT wagon_number)                       AS wagonsAffected,
+      SUM(CASE WHEN status = 'FAIL'      THEN 1 ELSE 0 END) AS failed,
+      SUM(CASE WHEN status = 'CONDEMNED' THEN 1 ELSE 0 END) AS condemned,
+      SUM(CASE WHEN status = 'REPAIRED'  THEN 1 ELSE 0 END) AS repaired,
+      SUM(CASE WHEN status = 'REPLACED'  THEN 1 ELSE 0 END) AS replaced,
+      MAX(updated_at)                                    AS lastSeen
+    FROM checklist_items
+    WHERE status IN ('FAIL', 'CONDEMNED', 'REPAIRED', 'REPLACED')
+    GROUP BY part_name, category
+    ORDER BY wagonsAffected DESC, condemned DESC, part_name ASC
+    LIMIT ?
+  `).all(limit) as any[];
+
+  /*
+   * How many wagons the shop has seen at all, so a count can be read as a
+   * rate. "Condemned on 7 wagons" means one thing out of 9 and another out of
+   * 400, and the figure is worthless without the denominator beside it.
+   */
+  const totalWagons = (db.prepare('SELECT COUNT(*) AS c FROM wagons').get() as any)?.c || 0;
+
+  return {
+    totalWagons,
+    findings: rows.map((r) => ({
+      ...r,
+      /* Rounded to one decimal, never up: this drives a purchase decision. */
+      wagonsAffectedPct: totalWagons
+        ? Math.round((r.wagonsAffected / totalWagons) * 1000) / 10
+        : 0
+    }))
+  };
+}

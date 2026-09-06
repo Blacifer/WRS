@@ -26,6 +26,7 @@ import type { InspectionStats } from '../../../shared/types.ts';
 import { configuredCoverage } from '../../../shared/knowledge/raipurWorkload.ts';
 import { DAILY_PILE } from '../../../shared/sorting/throughput.ts';
 import { ShopFloorNow } from '../components/ShopFloorNow.tsx';
+import { RecurringFindings } from '../components/RecurringFindings.tsx';
 import { VisionReadiness } from '../components/VisionReadiness.tsx';
 import { ActivityIcon, BanIcon, BarChartIcon, CoilIcon, DownloadIcon, LayersIcon, SearchIcon, TrainIcon, UserIcon } from '../components/Icons.tsx';
 
@@ -219,6 +220,13 @@ export const DashboardPage: React.FC = () => {
         * moves it — rather than leaving the answer to a conversation.
         */}
       <VisionReadiness lang={lang} />
+
+      {/*
+        * Which part keeps coming back, across every wagon on record. Everyone
+        * in a workshop sees one wagon at a time, so a part failing on one
+        * wagon in three is invisible without this.
+        */}
+      <RecurringFindings lang={lang} />
 
       {/* Top Banner & Export Actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-card p-6 rounded-card border border-line">
