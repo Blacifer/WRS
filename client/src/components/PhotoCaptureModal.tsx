@@ -175,6 +175,9 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
         // Save to offline IndexedDB
         await offlineDb.enqueuePhoto({
           wagonNumber,
+          // Sent online, dropped here. A photograph that cannot be tied to the
+          // finding it evidences is a picture, not evidence.
+          checklistItemId,
           category,
           partName,
           stage,

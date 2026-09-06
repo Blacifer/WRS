@@ -36,9 +36,8 @@ const PAGES = import.meta.dirname;
  * Slices out each `offlineDb.enqueueInspection({ ... })` argument by walking
  * braces, so a nested object inside the payload does not end the match early.
  */
-function enqueuedPayloads(src: string): string[] {
+function enqueuedPayloads(src: string, marker = 'enqueueInspection({'): string[] {
   const payloads: string[] = [];
-  const marker = 'enqueueInspection({';
   let from = 0;
 
   for (;;) {
@@ -92,6 +91,40 @@ describe('The offline queue records everything the online post records', () => {
     expect(
       offenders,
       'a queued spring with no bogie counts towards neither bogie at the exit gate'
+    ).toEqual([]);
+  });
+
+  it('a photograph queued offline stays tied to the finding it evidences', () => {
+    /*
+     * The same defect in a different queue. `api.uploadPhoto` is called with
+     * `checklistItemId` and `enqueuePhoto` was not, so a defect photo taken
+     * with no signal arrived detached from the finding it exists to prove.
+     * The sync endpoint had always read the field off a queued photo; nothing
+     * ever put one there.
+     *
+     * The rule is conditional rather than absolute, because not every
+     * photograph belongs to a checklist item — a general wagon shot has no
+     * finding. What must not happen is a file passing the link online and
+     * dropping it offline.
+     */
+    const offenders: string[] = [];
+
+    for (const f of [...files, join(PAGES, '..', 'components', 'PhotoCaptureModal.tsx')]) {
+      let src: string;
+      try { src = readFileSync(f, 'utf8'); } catch { continue; }
+      if (!/enqueuePhoto\(\{/.test(src)) continue;
+      if (!/uploadPhoto\([\s\S]{0,400}?checklistItemId/.test(src)) continue;
+
+      for (const payload of enqueuedPayloads(src, 'enqueuePhoto({')) {
+        if (!present(payload, 'checklistItemId')) {
+          offenders.push(f.split('/').pop() as string);
+        }
+      }
+    }
+
+    expect(
+      offenders,
+      'a photo that cannot be tied to its finding is a picture, not evidence'
     ).toEqual([]);
   });
 

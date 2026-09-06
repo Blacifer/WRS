@@ -317,10 +317,41 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
     }
 
     try {
-      await api.transitionWagonStage(wagonNumber, {
-        targetStage: nextStage,
-        notes: `Advancing to ${nextStage}`
-      });
+      if (navigator.onLine) {
+        await api.transitionWagonStage(wagonNumber, {
+          targetStage: nextStage,
+          notes: `Advancing to ${nextStage}`
+        });
+      } else {
+        /*
+         * Queued, not refused.
+         *
+         * offlineDb has had a pending_stage_transitions store, the batch has
+         * had a `transitions` array, and the sync endpoint has had a handler
+         * that records them — and nothing ever called any of it, so moving a
+         * wagon to its next stage with no signal simply threw. Three layers
+         * of working machinery, dead because the one call was missing.
+         *
+         * The server still decides. A queued transition is validated when it
+         * lands — stage order, gate rules, everything — and a refusal comes
+         * back through the same conflict reporting that tells an inspector a
+         * queued verdict was rejected. What the device must not do is decide
+         * for itself that the move was legal.
+         *
+         * Only the normal advance is queued. A supervisor override is
+         * deliberately NOT: it is the action whose entire purpose is to move a
+         * wagon past the rules, it carries a one-time code that is valid for
+         * seconds, and it should happen where the server can refuse it in the
+         * moment rather than minutes later against a wagon somebody has since
+         * moved on.
+         */
+        await offlineDb.enqueueTransition({
+          wagonNumber,
+          fromStage: wagon!.currentStage,
+          toStage: nextStage,
+          notes: `Advancing to ${nextStage} (recorded offline)`
+        });
+      }
       loadWagonData();
     } catch (err: any) {
       alert(`Stage transition failed: ${err.message}`);
@@ -792,6 +823,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
         } else {
           await offlineDb.enqueuePhoto({
             wagonNumber,
+            checklistItemId: itemId,
             category: category as any,
             partName: `${partName} (caliper read by camera)`,
             stage: wagon.currentStage,

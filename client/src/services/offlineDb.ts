@@ -73,6 +73,19 @@ export interface PendingChecklistAction {
 export interface PendingPhotoUpload {
   clientTempId: string;
   wagonNumber: string;
+  /*
+   * Which checklist item this photograph is evidence FOR.
+   *
+   * Sent on the online path and absent from this queue, so a defect photo
+   * taken with no signal arrived at the server detached from the finding it
+   * exists to prove. The sync endpoint has always read `checklistItemId` off
+   * a queued photo; nothing ever put one there.
+   *
+   * It matters twice over: the condition report links a photograph to its
+   * finding by this id, and condemning a spring requires a defect photo — an
+   * evidence rule that a photo landing unlinked quietly weakens.
+   */
+  checklistItemId?: string;
   category: string;
   partName: string;
   stage: string;
