@@ -21,9 +21,14 @@
  *   npm run dev                      # in one terminal
  *   node scripts/offline-drill.mjs   # in another, with playwright installed
  *
- * What good looks like: "12 pending" after sorting, "0 pending" after
- * reconnecting, and a delta of exactly 12 live records with no duplicate
- * sync ids.
+ * What good looks like: queued 12 after sorting, still 12 after closing and
+ * reopening the tab offline, 0 after reconnecting — and exactly 12 new rows
+ * server-side with 12 distinct sync ids.
+ *
+ * Run it against a BUILT client, not `npm run dev`. vite-plugin-pwa has no
+ * devOptions here, so the dev server registers no service worker and the
+ * reopen-while-offline step cannot pass — the tab simply fails to load.
+ * `scripts/pilot-tunnel.sh` builds first, which is the topology to drill.
  */
 
 import { chromium } from 'playwright';
@@ -36,6 +41,30 @@ import { chromium } from 'playwright';
  * right band — and that the condemned one still says why.
  */
 
+/*
+ * The queue depth, read from IndexedDB rather than off the screen.
+ *
+ * The badge was scraped with /(\d+)\s*pending/ and disappears at zero, so a
+ * fully drained queue and a drill that had failed to find the badge at all
+ * both printed "(not shown)" — on the one step the drill exists to check.
+ * An ambiguous pass is worse than a failure, because it is the reading
+ * somebody takes to mean everything worked.
+ */
+async function queueDepth(p) {
+  return p.evaluate(() => new Promise((resolve) => {
+    const req = indexedDB.open('wrs_raipur_pwa_offline_db_v2');
+    req.onerror = () => resolve('unreadable');
+    req.onsuccess = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('pending_sorted_springs')) return resolve(0);
+      const c = db.transaction('pending_sorted_springs', 'readonly')
+        .objectStore('pending_sorted_springs').count();
+      c.onsuccess = () => resolve(c.result);
+      c.onerror = () => resolve('unreadable');
+    };
+  }));
+}
+
 const b = await chromium.launch();
 const ctx = await b.newContext({ viewport: { width: 1440, height: 950 } });
 const page = await ctx.newPage();
@@ -43,10 +72,17 @@ const errs = [];
 page.on('console', m => m.type() === 'error' && errs.push(m.text()));
 page.on('pageerror', e => errs.push('PAGEERROR: ' + e.message));
 
+/*
+ * Sorting is one click from the header.
+ *
+ * This used to open a "Springs" menu and then pick "Spring Sorting" out of
+ * it. The nav was flattened in the design refresh and the drill was not run
+ * again, so it sat broken — which is the failure mode of any check that is
+ * not part of `npm test`: it does not report that it has stopped working, it
+ * just stops being run. Worth remembering the next time the nav moves.
+ */
 async function openSorting(p) {
-  await p.locator('button').filter({ hasText: /Springs/ }).first().click();
-  await p.waitForTimeout(1500);
-  await p.getByText('Spring Sorting', { exact: true }).first().click();
+  await p.getByRole('button', { name: /^Sorting$/ }).first().click();
   await p.waitForTimeout(2500);
 }
 
@@ -77,9 +113,7 @@ await page.waitForTimeout(400);
 await page.locator('[data-testid="condemn-crack"]').click();
 await page.waitForTimeout(900);
 
-const pendingText = await page.locator('body').innerText();
-const pendingMatch = pendingText.match(/(\d+)\s*(?:Pending|pending)/);
-console.log('after sorting 12 offline, pending shows:', pendingMatch ? pendingMatch[1] : '(not shown)');
+console.log('after sorting 12 offline, queued:', await queueDepth(page));
 
 // --- close the tab entirely, reopen still offline ---
 await page.close();
@@ -87,15 +121,14 @@ const page2 = await ctx.newPage();
 page2.on('pageerror', e => errs.push('PAGEERROR(2): ' + e.message));
 await page2.goto('http://localhost:5173', { waitUntil: 'domcontentloaded' }).catch(() => {});
 await page2.waitForTimeout(3000);
-const survived = (await page2.locator('body').innerText()).match(/(\d+)\s*(?:Pending|pending)/);
-console.log('after closing and reopening the tab, still offline:', survived ? survived[1] + ' pending' : '(not shown)');
+console.log('after closing and reopening the tab, still offline, queued:', await queueDepth(page2));
 
 // --- back online, let it drain ---
 await ctx.setOffline(false);
 await page2.reload({ waitUntil: 'networkidle' }).catch(() => {});
 await page2.waitForTimeout(9000);
-const afterDrain = (await page2.locator('body').innerText()).match(/(\d+)\s*(?:Pending|pending)/);
-console.log('after reconnecting:', afterDrain ? afterDrain[1] + ' pending' : '(not shown)');
+const drained = await queueDepth(page2);
+console.log('after reconnecting, queued:', drained, drained === 0 ? '— drained' : '— STILL QUEUED');
 
 console.log('batch:', batchId);
 console.log('ERRORS:', errs.length ? errs.slice(0, 4).join(' ;; ') : 'none');

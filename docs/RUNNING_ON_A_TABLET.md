@@ -13,8 +13,21 @@ On a tablet, or anywhere that isn't the laptop itself:
 
 ```
 nvm use
-npm run demo                # seeds, starts both servers, and opens a tunnel
+bash scripts/pilot-tunnel.sh   # builds the client, serves it, opens a tunnel
 ```
+
+Use `scripts/pilot-tunnel.sh`, not `npm run demo`, for anything that has to
+behave like the real thing. `npm run demo` runs the Vite **dev** server, and
+`vite-plugin-pwa` is configured here without `devOptions` — so in dev **no
+service worker is registered at all**. Measured, not assumed: registrations
+under the dev server, 0; under the built client, 1.
+
+What that costs is the half of offline-first that people actually notice.
+The IndexedDB queue still works in dev, so sorting survives a dropped
+connection — but close the tab while offline and the app cannot reload,
+because nothing is cached to serve it. `scripts/pilot-tunnel.sh` builds the
+client first and serves it from the API server, which is the production
+topology and the one to demonstrate.
 
 `npm run demo` prints a line like:
 
@@ -35,7 +48,7 @@ themselves:
 |---|---|---|---|
 | Secure context | yes | **no** | yes |
 | Camera API exists | yes | **no** | yes |
-| Service worker (install to home screen) | yes | **no** | yes |
+| Service worker (install to home screen) | built client only | **no** | built client only |
 | Offline sorting queue | yes | yes | yes |
 
 Measured, not assumed. On a plain-HTTP address that isn't localhost,
@@ -50,10 +63,15 @@ cannot photograph anything.
 
 ## What the tunnel actually carries
 
-One tunnel is enough for the whole app. It points at the Vite dev server on
-:5173, and Vite proxies `/api` onward to the API on :3000 from inside the
-machine — so the API rides the same HTTPS connection without a second tunnel
-and without any CORS configuration.
+One tunnel is enough for the whole app, either way it is served.
+
+Under `scripts/pilot-tunnel.sh` the API server serves the built client itself,
+so the app and `/api` are one origin behind one tunnel — nothing to proxy and
+no CORS to configure.
+
+Under `npm run demo` the tunnel points at the Vite dev server on :5173 and Vite
+proxies `/api` onward to the API on :3000 from inside the machine, which gets
+the same single-connection result — but with no service worker, as above.
 
 `client/vite.config.ts` already allows `.trycloudflare.com` in `allowedHosts`.
 Without that entry Vite answers a tunnelled request with "Blocked request.

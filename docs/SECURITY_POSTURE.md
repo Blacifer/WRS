@@ -18,7 +18,7 @@ nothing to stop someone who obtains the database file from reading it.
 | Session tokens | JWT, HS256 over the server secret | Sound for a single server. |
 | Record integrity | SHA-256 hash chain over every audit event, covering actor and role; release certificates signed with Ed25519 | Strong. The chain is verifiable in the app (Audit Chain screen, supervisor and above) or at `GET /api/audit/verify`, and holds under concurrent writes. Certificates are verifiable by anyone holding the published public key at `GET /api/audit/certificate-key` — which cannot issue one. |
 | Record immutability | 16 database-level `RAISE(ABORT)` triggers | Strong. Enforced by the storage engine, not the application. |
-| Release certificates | Keyed HMAC-SHA256 over canonical contents, re-derivable from the stored record | Strong as an integrity proof. **Not** a legal digital signature — see below. |
+| Release certificates | Ed25519 signature over canonical contents; public key published, signed bytes stored | Verifiable by a third party who cannot forge one. **Not** a legal digital signature under the IT Act — see below. |
 | One-time codes | `crypto.randomInt`, stored as a keyed HMAC, constant-time comparison, 5-minute expiry, single use | Sound as a confirmation step. Not a second factor — see below. |
 | Login abuse | 5 failures locks that username-and-address pair for 15 minutes; identical response whether or not the user exists | Sound. |
 | Injection | Bound parameters throughout; no interpolated user input in SQL | Sound. |
@@ -80,14 +80,29 @@ deliberate, audited, two-step confirmation — genuinely useful for preventing a
 careless release — but it is not multi-factor authentication and should not be
 described as such. `OTP_DELIVERY` in the environment makes the posture explicit.
 
-### 4. The certificate HMAC is not a legal signature
+### 4. The certificate signature is not a *legal* digital signature
 
-It proves the certificate has not been altered and that this server produced
-it. Under the IT Act 2000, a legally recognised digital signature needs a
-certificate from a CCA-licensed Certifying Authority. If release certificates
-are ever to carry legal weight outside the workshop, that is the gap — and it
-is an integration rather than a rewrite, since the canonical content already
-being HMAC'd is exactly what a DSC would sign.
+Certificates are signed with Ed25519. That gives the property an HMAC could
+not: the public key is published, so a CRIS reviewer, an auditor or a railway
+receiving the wagon verifies a certificate independently, while remaining
+unable to issue one. The signed bytes are stored alongside the signature, so
+verification does not depend on reconstructing a serialisation correctly.
+
+What it is still not is a legally recognised digital signature. Under the IT
+Act 2000 that requires a certificate from a CCA-licensed Certifying Authority
+binding the key to an identity. Here the key is the workshop's own. If release
+certificates are ever to carry legal weight outside the workshop, that binding
+is the gap — an integration rather than a rewrite, since the canonical content
+already being signed is exactly what a DSC would sign.
+
+**Operational consequence, worth knowing before the pilot:** the signing key is
+derived from `JWT_SECRET` by HKDF, so the same secret always yields the same
+key and restarts are safe. But rotating `JWT_SECRET` rotates the signing key
+with it, and every certificate issued under the old secret then fails
+verification — the documents stay in the database and read correctly, but their
+signatures no longer check out. Once certificates have been issued, treat
+`JWT_SECRET` as non-rotatable, or plan to publish the retired public key
+alongside the current one.
 
 ### 5. There is no encryption of data in transit to backups or exports
 
