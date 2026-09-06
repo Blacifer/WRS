@@ -171,6 +171,47 @@ jobs:
         run: npm test
 
   # ---------------------------------------------------------------------------
+  # The fault the test suites structurally cannot reach.
+  #
+  # Every suite writes from a single process, and within one process
+  # node:sqlite is synchronous, so a read and a write cannot interleave. The
+  # audit chain fork that broke the pilot database happens only ACROSS
+  # processes — which is how a workshop actually runs: several tablets, one
+  # server, one file.
+  #
+  # This drill starts four processes against one database and drives whole
+  # wagon lifecycles through them, then checks the chain, the sequence
+  # numbers and the certificates. It needs neither a browser nor a running
+  # server, which is why it can live here while the other two drills cannot.
+  #
+  # Reverting the atomic append makes it fail with over a hundred forked
+  # parents, so it is a guard rather than a decoration. The offline drill went
+  # stale precisely because nothing ran it.
+  # ---------------------------------------------------------------------------
+  concurrency-drill:
+    name: Concurrent lifecycle drill
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix server
+
+      - name: Drive concurrent wagon lifecycles
+        run: node --experimental-strip-types scripts/concurrent-lifecycle-drill.mjs
+
+  # ---------------------------------------------------------------------------
   # Proves the thing that actually ships still builds. `npm run build` runs the
   # type check first by design, so this also guards the root build wiring.
   # ---------------------------------------------------------------------------
