@@ -671,7 +671,7 @@ wagonsRouter.post('/:wagonNumber/transition', authMiddleware, async (req: Reques
        * Tests that need to exercise this path mint a real action token, which
        * is what the rest of the suite already does.
        */
-      const consumed = otpService.consumeActionToken(tokenToVerify, 'OVERRIDE');
+      const consumed = otpService.consumeActionToken(tokenToVerify, 'OVERRIDE', req.user?.id);
       if (!consumed) {
         res.status(401).json({
           success: false,
@@ -977,7 +977,7 @@ wagonsRouter.post('/:wagonNumber/gate/signoff', authMiddleware, requireCapabilit
       return;
     }
 
-    if (!otpService.consumeActionToken(tokenToVerify, 'OVERRIDE')) {
+    if (!otpService.consumeActionToken(tokenToVerify, 'OVERRIDE', req.user?.id)) {
       res.status(401).json({
         success: false,
         error: 'INVALID_OTP_TOKEN',

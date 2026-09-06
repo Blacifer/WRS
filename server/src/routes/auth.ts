@@ -381,7 +381,7 @@ function requireUserMgmtToken(req: AuthenticatedRequest, res: Response): boolean
     });
     return false;
   }
-  if (!otpService.consumeActionToken(String(token), 'USER_MGMT')) {
+  if (!otpService.consumeActionToken(String(token), 'USER_MGMT', req.user?.id)) {
     res.status(401).json({
       success: false,
       error: 'INVALID_OTP_TOKEN',
@@ -567,7 +567,7 @@ authRouter.post('/totp/verify', authMiddleware, (req: AuthenticatedRequest, res:
 
   res.status(200).json({
     success: true,
-    data: { otpToken: otpService.issueActionToken(req.user.id, action), action },
+    data: { otpToken: otpService.issueActionToken(req.user.id, action, 'TOTP'), action },
     timestamp: new Date().toISOString()
   });
 });

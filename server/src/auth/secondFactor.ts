@@ -33,6 +33,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import { TotpService } from './totpService.ts';
 import type { OtpAction } from '../../../shared/types.ts';
+import { otpService } from './otpService.ts';
 
 export interface SecondFactorResult {
   ok: boolean;
@@ -81,6 +82,29 @@ export function verifySecondFactor(
      * than accepted as a fallback — otherwise enrolling would add a step
      * without removing the weaker path, which is not an improvement.
      */
+    /*
+     * A token minted BY an authenticator counts as the authenticator.
+     *
+     * The screens verify the six-digit code first — POST /auth/totp/verify —
+     * and carry the action token it returns into the action itself. That
+     * token can only exist because a code from a device the server never sees
+     * was checked for this user moments earlier, so refusing it demanded the
+     * stronger factor and then rejected the stronger factor for arriving in
+     * the wrong shape.
+     *
+     * The effect was that enrolling an authenticator made a supervisor unable
+     * to release a wagon or override a stage at all. The security improvement
+     * locked people out of the two actions it existed to protect, and it did
+     * so silently: every refusal read as a wrong code.
+     *
+     * The provenance is what is checked, not the string. An INLINE_OTP token
+     * is still refused for an enrolled user, and a TOTP token belonging to
+     * somebody else proves nothing about the person holding this one.
+     */
+    if (!totpCode && otpToken && otpService.isTotpToken(otpToken, userId)) {
+      return { ok: true, factorUsed: 'TOTP' };
+    }
+
     if (!totpCode) {
       return {
         ok: false,

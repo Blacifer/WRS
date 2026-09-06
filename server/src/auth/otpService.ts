@@ -27,6 +27,21 @@ export interface ActiveActionToken {
   action: OtpAction;
   expiresAt: number; // timestamp in ms
   isUsed: boolean;
+  /**
+   * Which factor produced this token.
+   *
+   * The distinction is the whole point of enrolling an authenticator. An
+   * INLINE_OTP token proves possession of the session and nothing more — the
+   * server handed the code to whoever asked. A TOTP token can only exist
+   * because a code from a device the server never sees was verified for this
+   * user moments earlier.
+   *
+   * Recorded here so a caller can tell them apart. Without it the two are the
+   * same opaque string, which is why an enrolled supervisor's authenticator
+   * code, once exchanged for a token, was refused by the very check that
+   * demanded it.
+   */
+  factor: 'TOTP' | 'INLINE_OTP';
 }
 
 
@@ -137,7 +152,10 @@ export class OtpService {
       userId: record.userId,
       action: record.action,
       expiresAt: Date.now() + 600 * 1000, // 10 minutes
-      isUsed: false
+      isUsed: false,
+      // The server issued the code that produced this, so it is the weaker
+      // factor by construction.
+      factor: 'INLINE_OTP'
     });
 
     return {
@@ -159,19 +177,55 @@ export class OtpService {
    * that design is worth keeping whichever factor proved the supervisor's
    * identity. This is the seam between the two.
    */
-  public issueActionToken(userId: string, action: OtpAction): string {
+  public issueActionToken(
+    userId: string,
+    action: OtpAction,
+    factor: 'TOTP' | 'INLINE_OTP' = 'INLINE_OTP'
+  ): string {
     const otpToken = `otp_tok_${crypto.randomBytes(16).toString('hex')}`;
     this.actionTokens.set(otpToken, {
       token: otpToken,
       userId,
       action,
       expiresAt: Date.now() + 600 * 1000,
-      isUsed: false
+      isUsed: false,
+      factor
     });
     return otpToken;
   }
 
-  public consumeActionToken(otpToken: string, requiredAction: OtpAction): boolean {
+  /**
+   * Whether this token was minted by an authenticator, for this user.
+   *
+   * Deliberately does NOT consume it: the caller checks the factor first and
+   * consumes afterwards, so a token is not burnt by a check that then refuses
+   * for some other reason.
+   *
+   * The user is compared as well as the factor. A TOTP token belonging to
+   * somebody else proves nothing about the person holding it.
+   */
+  public isTotpToken(otpToken: string, userId: string): boolean {
+    if (!otpToken) return false;
+    const rec = this.actionTokens.get(otpToken);
+    if (!rec || rec.isUsed) return false;
+    if (Date.now() > rec.expiresAt) return false;
+    return rec.factor === 'TOTP' && rec.userId === userId;
+  }
+
+  /**
+   * Spends a one-time action token.
+   *
+   * `userId` binds the token to the person presenting it. Without it the
+   * token was pure bearer: one minted for a supervisor cleared any other
+   * supervisor's gate, so a code confirmed by one person authorised an
+   * override by somebody else entirely — on the two actions whose entire
+   * purpose is to record who authorised them.
+   *
+   * Optional so that callers which genuinely have no authenticated user
+   * behind them are unchanged, but every call site in this codebase passes
+   * it. When supplied, a token minted for anyone else is refused.
+   */
+  public consumeActionToken(otpToken: string, requiredAction: OtpAction, userId?: string): boolean {
     if (!otpToken) return false;
 
     // Fixed bypass tokens for development and the automated suites.
@@ -201,6 +255,12 @@ export class OtpService {
     }
 
     if (tokenRecord.action !== requiredAction) {
+      return false;
+    }
+
+    // The token names who confirmed it. Somebody else presenting it proves
+    // nothing about themselves.
+    if (userId && tokenRecord.userId !== userId) {
       return false;
     }
 

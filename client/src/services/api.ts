@@ -433,6 +433,8 @@ export class ApiClient {
     supervisorOverride?: boolean;
     overrideJustification?: string;
     otpToken?: string;
+    /** As above: an enrolled supervisor's override needs the raw code. */
+    totpCode?: string;
   }): Promise<{ success: boolean; data: { wagon: WagonRecord; transition: WagonTransition } }> {
     return this.request<{ success: boolean; data: { wagon: WagonRecord; transition: WagonTransition } }>(
       `/wagons/${wagonNumber}/transition`,
@@ -513,6 +515,16 @@ export class ApiClient {
 
   public async signoffExitGate(wagonNumber: string, payload: {
     otpToken?: string;
+    /**
+     * The six-digit code from the supervisor's authenticator.
+     *
+     * Sent raw rather than exchanged for an action token first. The server
+     * requires this field once a supervisor is enrolled and refuses an
+     * otpToken from them — "enrolled means enrolled" — so exchanging the code
+     * produced a token the sign-off would not accept, and burnt the code's
+     * 30-second window doing it.
+     */
+    totpCode?: string;
     notes?: string;
     /** Advisory ids the supervisor accepted; the server refuses without them. */
     acknowledgedAdvisoryIds?: string[];

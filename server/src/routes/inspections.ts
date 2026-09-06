@@ -317,7 +317,7 @@ inspectionsRouter.get('/export', authMiddleware, (req: AuthenticatedRequest, res
         }
 
         // Not enrolled: the inline confirmation code is what authorises this.
-        if (factor.deferredToCaller && !otpService.consumeActionToken(otpToken, 'EXPORT')) {
+        if (factor.deferredToCaller && !otpService.consumeActionToken(otpToken, 'EXPORT', req.user?.id)) {
           res.status(403).json({
             success: false,
             error: 'FORBIDDEN',
