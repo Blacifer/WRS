@@ -81,6 +81,30 @@ export class ApiClient {
     }
   }
 
+  /*
+   * Told when the server stops accepting this session.
+   *
+   * A token lasts a day, so on a shop-floor tablet that is left signed in,
+   * expiry mid-shift is a certainty rather than an edge case. Nothing handled
+   * it: every request simply began failing. The work itself was safe — a
+   * failed write falls back to the IndexedDB queue, and the sync keeps
+   * anything the server did not accept — but the queue then never drained,
+   * the pending badge climbed, and the only thing the inspector was told was
+   * that things were failing.
+   *
+   * An inspector who is not told their session ended has no reason to think
+   * signing in again would fix it, and every reason to think the app has lost
+   * their work.
+   */
+  private sessionExpiredListeners: Array<() => void> = [];
+
+  public onSessionExpired(cb: () => void): () => void {
+    this.sessionExpiredListeners.push(cb);
+    return () => {
+      this.sessionExpiredListeners = this.sessionExpiredListeners.filter((l) => l !== cb);
+    };
+  }
+
   public clearSession() {
     this.token = null;
     this.user = null;
@@ -114,6 +138,30 @@ export class ApiClient {
     }
 
     const json = await res.json().catch(() => ({}));
+
+    /*
+     * 401 while holding a token means the token is no longer good — expired,
+     * or the account has been deactivated since it was issued. The session is
+     * dropped and the app told, so the person is returned to a sign-in screen
+     * that explains itself instead of a screen that quietly stops working.
+     *
+     * Deliberately not 403. That is the server refusing an action this user
+     * is not allowed to take — a supervisor reaching for the divisional
+     * analytics — and signing out over it would be both wrong and infuriating.
+     *
+     * The login route is excluded: a 401 there is a wrong password, and the
+     * form already says so.
+     */
+    if (res.status === 401 && this.token && !path.startsWith('/auth/login')) {
+      this.clearSession();
+      for (const cb of this.sessionExpiredListeners) {
+        try { cb(); } catch { /* one bad listener must not swallow the rest */ }
+      }
+      throw new Error(
+        json.message || 'Your session has ended. Sign in again — nothing you recorded has been lost.'
+      );
+    }
+
     if (!res.ok) {
       throw new Error(json.message || json.error || `HTTP error ${res.status}`);
     }

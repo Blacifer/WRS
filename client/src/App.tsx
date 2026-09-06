@@ -169,8 +169,25 @@ export const App: React.FC = () => {
 
   const handleLoginSuccess = (loggedInUser: User) => {
     setUser(loggedInUser);
+    setSessionEndedNotice(null);
     setActiveTab(landingTabFor(loggedInUser.role));
   };
+
+  /*
+   * Returned to the sign-in screen when the server stops accepting the
+   * session, with a line saying why. Without this the app simply stopped
+   * working mid-shift and the inspector had no reason to think signing in
+   * again would help.
+   */
+  const [sessionEndedNotice, setSessionEndedNotice] = useState<string | null>(null);
+
+  useEffect(() => api.onSessionExpired(() => {
+    setUser(null);
+    setSessionEndedNotice(
+      'Your session ended and you have been signed out. Nothing you recorded has been lost — '
+      + 'anything not yet sent is still on this device and will sync once you sign in again.'
+    );
+  }), []);
 
   const handleLogout = () => {
     api.clearSession();
@@ -204,6 +221,7 @@ export const App: React.FC = () => {
         lang={currentLang}
         onToggleLang={handleToggleLang}
         onLoginSuccess={handleLoginSuccess}
+        notice={sessionEndedNotice}
       />
     );
   }

@@ -15,17 +15,36 @@ interface LoginPageProps {
   lang: LanguageCode;
   onToggleLang: () => void;
   onLoginSuccess: (user: User) => void;
+  /**
+   * Why the person is looking at this screen, when they did not ask to be.
+   * Shown when a session ended underneath them rather than leaving them to
+   * guess whether their work survived.
+   */
+  notice?: string | null;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({
   lang,
   onToggleLang,
-  onLoginSuccess
+  onLoginSuccess,
+  notice
 }) => {
   const dict = getDictionary(lang);
   const isHi = lang === 'hi';
-  const [username, setUsername] = useState<string>('inspector1');
-  const [password, setPassword] = useState<string>('password123');
+  /*
+   * The demo credentials are development scaffolding, and they were shipped.
+   *
+   * A production build refuses these accounts anyway, so the only thing a
+   * pre-filled form achieved on a real deployment was to invite a fitter to
+   * press sign-in and be rejected by credentials nobody had told them about.
+   * On a workshop tablet it also advertises a username and password that
+   * exist on every developer machine.
+   *
+   * Empty in a real build; still filled in development, where typing them a
+   * hundred times a day is its own kind of friction.
+   */
+  const [username, setUsername] = useState<string>(import.meta.env.DEV ? 'inspector1' : '');
+  const [password, setPassword] = useState<string>(import.meta.env.DEV ? 'password123' : '');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -67,6 +86,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           {dict.app.title}
         </h1>
         <p className="mt-2 text-sm font-medium text-ink-muted leading-relaxed">{dict.app.subtitle}</p>
+
+        {notice && (
+          <div className="mt-4 rounded-control border border-warn-line bg-warn-soft px-3 py-2">
+            <p className="text-xs font-bold text-warn-ink leading-snug">{notice}</p>
+          </div>
+        )}
 
         <div className="mt-4">
           <Chip tone="accent">
