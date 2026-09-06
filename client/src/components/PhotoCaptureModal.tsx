@@ -132,7 +132,27 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
     ctx.fillStyle = '#e2e8f0';
     ctx.fillText(`WAGON: ${wagonNumber}  |  CAT: ${category}  |  PART: ${partName}`, 16, height - bannerHeight + 48);
 
-    const timestampStr = new Date().toISOString().replace('T', ' ').substring(0, 19) + ' IST';
+    /*
+     * The time this was taken, in the timezone the label claims.
+     *
+     * This read `new Date().toISOString()` — which is UTC — and appended
+     * " IST". Every evidence photograph was therefore stamped five and a half
+     * hours before it was taken: a frame captured at 14:30 in the shop said
+     * 09:00 IST, burnt into the image, on a record somebody may have to
+     * defend.
+     *
+     * Formatted explicitly in Asia/Kolkata rather than trusting the device's
+     * own zone, so the label stays true on a tablet whose clock was set up
+     * wrong and on a laptop reviewing the same evidence from anywhere else.
+     */
+    const timestampStr = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false
+    })
+      .format(new Date())
+      .replace(',', '') + ' IST';
     const inspectorStr = `INSP: ${user?.name || 'Inspector'} (${user?.employeeId || 'WRS-INSP'})`;
     ctx.fillText(`${timestampStr}  |  ${inspectorStr}`, 16, height - bannerHeight + 72);
 

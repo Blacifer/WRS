@@ -436,7 +436,8 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
         await api.updateChecklistItem(wagonNumber, item.id, {
           status: item.status,
           repairAction: action,
-          repairNotes: notes.trim() || undefined
+          repairNotes: notes.trim() || undefined,
+          expectedUpdatedAt: item.updatedAt
         });
       } else {
         await offlineDb.enqueueChecklistItem({
@@ -462,7 +463,10 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
     if (!trimmed) return;
     try {
       if (navigator.onLine) {
-        await api.updateChecklistItem(wagonNumber, item.id, { conditionNotes: trimmed });
+        await api.updateChecklistItem(wagonNumber, item.id, {
+          conditionNotes: trimmed,
+          expectedUpdatedAt: item.updatedAt
+        });
       } else {
         await offlineDb.enqueueChecklistItem({
           wagonNumber,
@@ -484,7 +488,13 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
       if (navigator.onLine) {
         await api.updateChecklistItem(wagonNumber, item.id, {
           status: newStatus,
-          reinspectedStatus: newStatus === 'PASS' ? 'PASS' : undefined
+          reinspectedStatus: newStatus === 'PASS' ? 'PASS' : undefined,
+          /*
+           * The version this verdict was formed against. If somebody else has
+           * touched the part since this screen last loaded, the server refuses
+           * rather than letting one verdict quietly replace the other.
+           */
+          expectedUpdatedAt: item.updatedAt
         });
       } else {
         await offlineDb.enqueueChecklistItem({
@@ -517,7 +527,14 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
         });
       }
     } catch (err: any) {
-      alert(`Update failed: ${err.message}`);
+      /*
+       * A refusal here is usually not a failure — it is another inspector
+       * having reached the same part first. Their verdict stands and this one
+       * is reloaded on top of it, so the person sees what actually happened
+       * rather than believing their tap was recorded.
+       */
+      loadWagonData();
+      alert(err.message || 'Update failed.');
     }
   };
 

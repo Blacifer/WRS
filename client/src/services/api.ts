@@ -478,6 +478,16 @@ export class ApiClient {
     repairNotes?: string;
     reinspectedStatus?: string;
     conditionNotes?: string;
+    /**
+     * The version of the row this verdict was formed against.
+     *
+     * The server has always accepted it and refused a write when the row moved
+     * underneath the caller — and no screen ever sent it, so the protection
+     * existed and never once engaged. Two inspectors working the same wagon
+     * still overwrote each other silently, which is the exact failure the
+     * check was written to stop.
+     */
+    expectedUpdatedAt?: string;
     photoId?: string;
   }): Promise<{ success: boolean; data: ChecklistItem }> {
     return this.request<{ success: boolean; data: ChecklistItem }>(`/wagons/${wagonNumber}/checklist/items/${itemId}`, {
