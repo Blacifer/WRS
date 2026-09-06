@@ -409,7 +409,9 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
           category: item.category,
           partName: item.partName,
           bogiePosition: item.bogiePosition,
-          status: newStatus
+          status: newStatus,
+          // Sent online, omitted here. The queue has always carried the field.
+          reinspectedStatus: newStatus === 'PASS' ? 'PASS' : undefined
         });
       }
       loadWagonData();
@@ -492,7 +494,21 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
               category: targetItem.category,
               partName: targetItem.partName,
               bogiePosition: targetItem.bogiePosition,
-              status: result.status
+              status: result.status,
+              /*
+               * The reason, which this dropped.
+               *
+               * Spoken online, "condemn brake block, visible crack" records
+               * the verdict and the defect. Spoken offline it recorded the
+               * verdict alone, so a condemnation arrived with no evidence
+               * behind it — and a condemnation without a reason is the one
+               * thing a supervisor cannot act on.
+               *
+               * The transcript and the confidence have no home in this queue
+               * and are still lost offline; the note is the part that matters
+               * to the person reading the record afterwards.
+               */
+              conditionNotes: result.defectNotes || targetItem.conditionNotes || undefined
             });
           }
           loadWagonData();

@@ -158,12 +158,25 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
           }).catch(() => undefined);
         }
       } else {
-        // Offline registration
-        await offlineDb.enqueueChecklistItem({
+        /*
+         * Offline registration.
+         *
+         * This used to queue a checklist item called "Intake Inspection" on a
+         * wagon number the server had never heard of — so the sync created an
+         * orphan row against an invented wagon id, and the registration
+         * itself was never sent at all. The wagon type, the owning railway
+         * and whatever the person at the gate had typed about its condition
+         * were simply lost, and nothing said so.
+         *
+         * The entry gate is where signal is worst, which makes this the queue
+         * most likely to be used and the one it was least affordable to get
+         * wrong.
+         */
+        await offlineDb.enqueueWagon({
           wagonNumber: newWagonNumber.trim().toUpperCase(),
-          category: 'SPRINGS',
-          partName: 'Intake Inspection',
-          status: 'PENDING'
+          wagonType: newWagonType,
+          owningRailway: newOwningRailway,
+          entryNotes: newEntryNotes
         });
       }
 

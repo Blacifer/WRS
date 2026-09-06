@@ -17,8 +17,9 @@ import type {
 export type SyncConflict = NonNullable<SyncResponse['conflicts']>[number];
 
 const DB_NAME = 'wrs_raipur_pwa_offline_db_v2';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
+const STORE_PENDING_WAGONS = 'pending_wagons';
 const STORE_PENDING_INSPECTIONS = 'pending_inspections';
 const STORE_PENDING_CHECKLIST = 'pending_checklist_items';
 const STORE_PENDING_PHOTOS = 'pending_photos';
@@ -34,6 +35,17 @@ export interface PendingInspection extends Omit<InspectionRecord, 'id' | 'sequen
   syncId: string;
   syncStatus: 'LOCAL';
   localCreatedAt: string;
+}
+
+export interface PendingWagon {
+  clientTempId: string;
+  wagonNumber: string;
+  wagonType: string;
+  owningRailway: string;
+  /** What the person at the gate saw. Lost entirely before this store existed. */
+  entryNotes?: string;
+  entryDate?: string;
+  createdAt: string;
 }
 
 export interface PendingChecklistAction {
@@ -157,6 +169,10 @@ class MultiEntityOfflineDbManager {
         const db = (event.target as IDBOpenDBRequest).result;
 
         // Pending stores
+        if (!db.objectStoreNames.contains(STORE_PENDING_WAGONS)) {
+          const s = db.createObjectStore(STORE_PENDING_WAGONS, { keyPath: 'clientTempId' });
+          s.createIndex('wagonNumber', 'wagonNumber', { unique: false });
+        }
         if (!db.objectStoreNames.contains(STORE_PENDING_INSPECTIONS)) {
           const s = db.createObjectStore(STORE_PENDING_INSPECTIONS, { keyPath: 'clientTempId' });
           s.createIndex('localCreatedAt', 'localCreatedAt', { unique: false });
@@ -205,6 +221,47 @@ class MultiEntityOfflineDbManager {
     });
 
     return this.dbPromise;
+  }
+
+  // -------------------------------------------------------------------------
+  // 0. Pending Wagon Registrations
+  //
+  // A wagon is registered at the entry gate, which is the part of the shop
+  // with the worst signal — so this is the queue most likely to be used, and
+  // it was the one that did not exist.
+  //
+  // Registering offline enqueued a checklist item called "Intake Inspection"
+  // against a wagon number the server had never heard of. On sync the
+  // checklist row was created pointing at a wagon id invented on the spot,
+  // and the registration itself — the type, the owning railway, the entry
+  // notes, the fact that a wagon had arrived at all — was never sent
+  // anywhere. The wagon simply did not exist, and the orphan row was the only
+  // trace that anyone had tried.
+  //
+  // The sync endpoint has always accepted a `wagons` array. Nothing ever put
+  // anything in it.
+  // -------------------------------------------------------------------------
+
+  public async enqueueWagon(wagon: Omit<PendingWagon, 'clientTempId' | 'createdAt'>): Promise<string> {
+    const db = await this.openDb();
+    const clientTempId = `wgn-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+    const pendingItem: PendingWagon = {
+      ...wagon,
+      wagonNumber: wagon.wagonNumber.trim().toUpperCase(),
+      clientTempId,
+      createdAt: new Date().toISOString()
+    };
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_PENDING_WAGONS, 'readwrite');
+      const req = tx.objectStore(STORE_PENDING_WAGONS).put(pendingItem);
+      req.onsuccess = () => {
+        this.notifyPendingCountChange();
+        resolve(clientTempId);
+      };
+      req.onerror = () => reject(req.error);
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -461,7 +518,8 @@ class MultiEntityOfflineDbManager {
       const count3 = await this.countStore(db, STORE_PENDING_PHOTOS);
       const count4 = await this.countStore(db, STORE_PENDING_TRANSITIONS);
       const count5 = await this.countStore(db, STORE_PENDING_SORTING);
-      return count1 + count2 + count3 + count4 + count5;
+      const count6 = await this.countStore(db, STORE_PENDING_WAGONS);
+      return count1 + count2 + count3 + count4 + count5 + count6;
     } catch {
       return 0;
     }
@@ -482,18 +540,20 @@ class MultiEntityOfflineDbManager {
   }
 
   public async getAllPending(): Promise<{
+    wagons: PendingWagon[];
     inspections: PendingInspection[];
     checklist: PendingChecklistAction[];
     photos: PendingPhotoUpload[];
     transitions: PendingTransition[];
   }> {
     const db = await this.openDb();
+    const wagons = await this.getAllFromStore<PendingWagon>(db, STORE_PENDING_WAGONS);
     const inspections = await this.getAllFromStore<PendingInspection>(db, STORE_PENDING_INSPECTIONS);
     const checklist = await this.getAllFromStore<PendingChecklistAction>(db, STORE_PENDING_CHECKLIST);
     const photos = await this.getAllFromStore<PendingPhotoUpload>(db, STORE_PENDING_PHOTOS);
     const transitions = await this.getAllFromStore<PendingTransition>(db, STORE_PENDING_TRANSITIONS);
 
-    return { inspections, checklist, photos, transitions };
+    return { wagons, inspections, checklist, photos, transitions };
   }
 
   private getAllFromStore<T>(db: IDBDatabase, storeName: string): Promise<T[]> {
@@ -569,7 +629,8 @@ class MultiEntityOfflineDbManager {
     const sorting = await this.syncPendingSorting(apiBaseUrl, token);
 
     const pending = await this.getAllPending();
-    const totalCount = pending.inspections.length + pending.checklist.length + pending.photos.length + pending.transitions.length;
+    const totalCount = pending.wagons.length + pending.inspections.length + pending.checklist.length +
+      pending.photos.length + pending.transitions.length;
 
     if (totalCount === 0) {
       return {
@@ -582,6 +643,12 @@ class MultiEntityOfflineDbManager {
     }
 
     const payload = {
+      /*
+       * Wagons are listed first for readability; the endpoint creates them
+       * before it processes checklist items either way, so an item queued
+       * alongside its own registration lands on a wagon that exists.
+       */
+      wagons: pending.wagons,
       records: pending.inspections,
       checklistItems: pending.checklist,
       photos: pending.photos,
@@ -646,6 +713,7 @@ class MultiEntityOfflineDbManager {
         }
       };
 
+      await settle(STORE_PENDING_WAGONS, pending.wagons);
       await settle(STORE_PENDING_INSPECTIONS, pending.inspections);
       await settle(STORE_PENDING_CHECKLIST, pending.checklist);
       await settle(STORE_PENDING_PHOTOS, pending.photos);
