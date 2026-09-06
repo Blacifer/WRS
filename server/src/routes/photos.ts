@@ -11,6 +11,7 @@ import { requireCapability } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
 import { logAuditEvent } from '../db/auditLog.ts';
+import { MAX_STORED_PHOTO_BYTES } from '../../../shared/media/imageLimits.ts';
 
 export const photosRouter = Router();
 
@@ -68,6 +69,37 @@ photosRouter.post('/upload', authMiddleware, async (req: Request, res: Response)
       error: 'MISSING_REQUIRED_FIELDS',
       message: 'wagonNumber and imageBase64 (or imageData) are required.',
       statusCode: 400,
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
+
+  /*
+   * A ceiling on one stored photograph.
+   *
+   * Two of the four capture screens used to encode the camera's full frame,
+   * so an evidence photograph could be several megabytes of base64 in the
+   * same SQLite file that holds the audit chain — at roughly seven hundred
+   * springs a shift on the sorting bench alone. Those screens now downscale,
+   * but the server must not depend on that: a tablet running an older bundle,
+   * or any caller that is not the app, would otherwise still be able to put a
+   * fifty megabyte row into the evidence table.
+   *
+   * Refused with the actual figures rather than a generic rejection, because
+   * the person who hits this needs to know whether their device is out of
+   * date or their image is genuinely unusual.
+   */
+  const imageBytes = Buffer.byteLength(String(effectiveImageData), 'utf8');
+  if (imageBytes > MAX_STORED_PHOTO_BYTES) {
+    res.status(413).json({
+      success: false,
+      error: 'PHOTO_TOO_LARGE',
+      message:
+        `This photograph is ${(imageBytes / (1024 * 1024)).toFixed(1)} MB, over the ` +
+        `${(MAX_STORED_PHOTO_BYTES / (1024 * 1024)).toFixed(0)} MB limit for one stored image. ` +
+        `The app downscales captures before sending them, so a photograph this large usually ` +
+        `means the device is running an older version of the app.`,
+      statusCode: 413,
       timestamp: new Date().toISOString()
     });
     return;

@@ -8,6 +8,7 @@ import { useI18n } from '../i18n/index.ts';
 import { api } from '../services/api.ts';
 import { offlineDb } from '../services/offlineDb.ts';
 import { AlertTriangleIcon, CameraIcon, UploadIcon } from './Icons.tsx';
+import { fitToStoredSize, STORED_QUALITY } from '../services/imageSizing.ts';
 
 interface PhotoCaptureModalProps {
   wagonNumber: string;
@@ -89,8 +90,21 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const width = sourceImage instanceof HTMLVideoElement ? sourceImage.videoWidth || 1280 : sourceImage.width;
-    const height = sourceImage instanceof HTMLVideoElement ? sourceImage.videoHeight || 720 : sourceImage.height;
+    const sourceWidth = sourceImage instanceof HTMLVideoElement ? sourceImage.videoWidth || 1280 : sourceImage.width;
+    const sourceHeight = sourceImage instanceof HTMLVideoElement ? sourceImage.videoHeight || 720 : sourceImage.height;
+
+    /*
+     * Drawn at the stored size, not the camera's.
+     *
+     * This encoded whatever the sensor produced — around twelve megapixels on
+     * a workshop tablet — so one evidence photograph was megabytes of base64
+     * in the same SQLite file as the audit chain. Two of the four capture
+     * screens already downscaled; this was not one of them.
+     *
+     * Scaling before the watermark rather than after also keeps the banner
+     * text sharp: drawn at full size and then shrunk, it would be resampled.
+     */
+    const { width, height } = fitToStoredSize(sourceWidth, sourceHeight);
 
     canvas.width = width;
     canvas.height = height;
@@ -122,7 +136,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
     const inspectorStr = `INSP: ${user?.name || 'Inspector'} (${user?.employeeId || 'WRS-INSP'})`;
     ctx.fillText(`${timestampStr}  |  ${inspectorStr}`, 16, height - bannerHeight + 72);
 
-    const watermarkedData = canvas.toDataURL('image/jpeg', 0.88);
+    const watermarkedData = canvas.toDataURL('image/jpeg', STORED_QUALITY);
     setCapturedImage(watermarkedData);
     stopCamera();
   };

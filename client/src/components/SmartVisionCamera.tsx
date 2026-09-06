@@ -24,6 +24,7 @@ import {
   type VisionResult,
   type Detection
 } from '../services/objectDetection.ts';
+import { fitToStoredSize, STORED_QUALITY } from '../services/imageSizing.ts';
 
 interface SmartVisionCameraProps {
   lang: 'en' | 'hi';
@@ -185,6 +186,24 @@ export const SmartVisionCamera: React.FC<SmartVisionCameraProps> = ({ lang, onCa
     }
   }, [draw, isHi]);
 
+  /*
+   * The cropped evidence frame, brought inside the stored-photo limit.
+   *
+   * cropToTarget cuts a region out of the source at its native resolution, so
+   * on a twelve-megapixel camera the crop is still several megapixels. The
+   * annotated frame beside it goes through the same rule.
+   */
+  const downscaleCanvas = (source: HTMLCanvasElement): HTMLCanvasElement => {
+    const { width, height } = fitToStoredSize(source.width, source.height);
+    if (width === source.width && height === source.height) return source;
+
+    const out = document.createElement('canvas');
+    out.width = width;
+    out.height = height;
+    out.getContext('2d')?.drawImage(source, 0, 0, width, height);
+    return out;
+  };
+
   const capture = useCallback(() => {
     const video = videoRef.current;
     if (!video || !result) return;
@@ -197,11 +216,11 @@ export const SmartVisionCamera: React.FC<SmartVisionCameraProps> = ({ lang, onCa
      * annotated frame from a different moment would prove nothing about the
      * photograph beside it.
      */
-    const marked = annotateFrame(video, result, video.videoWidth, video.videoHeight)
-      .toDataURL('image/jpeg', 0.85);
+    const marked = downscaleCanvas(annotateFrame(video, result, video.videoWidth, video.videoHeight))
+      .toDataURL('image/jpeg', STORED_QUALITY);
     setAnnotated(marked);
 
-    onCapture?.(canvas.toDataURL('image/jpeg', 0.9), result, {
+    onCapture?.(downscaleCanvas(canvas).toDataURL('image/jpeg', STORED_QUALITY), result, {
       annotatedDataUrl: marked,
       exclusionNote: describeExclusions(result, isHi),
       exclusionTags: exclusionTags(result)

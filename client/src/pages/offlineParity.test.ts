@@ -151,3 +151,64 @@ describe('The offline queue records everything the online post records', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+/**
+ * Every capture path caps what it stores
+ * Indian Railways WRS Raipur
+ *
+ * Four screens take a photograph and two of them encoded whatever the camera
+ * gave them. A workshop tablet is around twelve megapixels, so those two
+ * produced megabytes of base64 per image, into the same SQLite file as the
+ * audit chain, at roughly seven hundred springs a shift.
+ *
+ * The two that were correct were the two somebody had tested on a real phone
+ * — exactly how the hard facingMode constraint survived in half the cameras.
+ * A shared helper fixes the instances; this fixes the class, so the fifth
+ * camera cannot get it wrong.
+ */
+describe('Photographs are bounded before they are stored', () => {
+  const COMPONENTS = join(PAGES, '..', 'components');
+
+  it('no component encodes a frame at the camera resolution', () => {
+    const offenders: string[] = [];
+
+    for (const f of readdirSync(COMPONENTS).filter((n) => /\.tsx$/.test(n))) {
+      const src = readFileSync(join(COMPONENTS, f), 'utf8');
+
+      if (!/toDataURL\(/.test(src)) continue;
+      if (!/getUserMedia|videoWidth/.test(src)) continue;
+
+      /*
+       * Only frames that are actually KEPT are in scope.
+       *
+       * CaliperCamera draws the video to a canvas at full resolution and
+       * encodes it as PNG, which looks like the worst offender here and is
+       * correct: that frame is handed to OCR and shown as an on-screen
+       * preview, and is never uploaded or queued. Downscaling it would cost
+       * digit recognition to save bytes nothing ever writes.
+       *
+       * So the rule is about persistence, not about capture. A component is
+       * in scope once its frame reaches an upload, a queue, or a callback
+       * that carries it out of the component.
+       */
+      const persists = /uploadPhoto|enqueuePhoto|onPhotoChange|imageBase64|imageData\s*:|onCapture/.test(src);
+      if (!persists) continue;
+
+      /*
+       * Either the shared helper, or a local cap with its own explicit
+       * maximum — SpringEvidenceCamera targets 640 px deliberately, because
+       * the sorting bench runs at a volume nothing else does.
+       */
+      const capped =
+        /fitToStoredSize|MAX_STORED_EDGE/.test(src) ||
+        /MAX_EDGE|targetWidth/.test(src);
+
+      if (!capped) offenders.push(f);
+    }
+
+    expect(
+      offenders,
+      'a full-resolution capture is megabytes of base64 in the file that holds the audit chain'
+    ).toEqual([]);
+  });
+});
