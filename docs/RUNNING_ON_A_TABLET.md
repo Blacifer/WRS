@@ -123,3 +123,19 @@ honest answer is to run it from a terminal somebody can see. For anything
 longer-lived, put it under whatever the host already has — `launchd` on
 macOS, `systemd` on Linux — with `Restart=always`. Without that, a stop is a
 stop, and the first anyone knows is an inspector saying the app will not load.
+
+
+## Two drills to run before a deployment
+
+Neither is part of `npm test` — both need Playwright, a running server and a
+real browser — so both have to be run deliberately. The offline one had
+already gone stale once by not being run, which is the failure mode of every
+check that lives outside the suite.
+
+```
+node scripts/offline-drill.mjs      # sort offline, close the tab, reconnect
+node scripts/role-walkthrough.mjs   # every role, every screen
+```
+
+The first needs a BUILT client, for the service worker. The second runs
+against either.

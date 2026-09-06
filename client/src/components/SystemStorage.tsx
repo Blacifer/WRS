@@ -30,6 +30,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '../services/api.ts';
+import { can } from '../../../shared/auth/permissions.ts';
 
 interface SystemStorageProps {
   lang: 'en' | 'hi';
@@ -70,6 +71,22 @@ export const SystemStorage: React.FC<SystemStorageProps> = ({ lang }) => {
 
   useEffect(() => {
     let cancelled = false;
+
+    /*
+     * Asked only by someone allowed to ask.
+     *
+     * This fetched unconditionally and relied on the refusal to hide itself,
+     * which worked and was still wrong: every DRM dashboard load fired a
+     * request that could only ever be refused, and put a 403 in the console
+     * of the one person most likely to open the developer tools during a
+     * demonstration. A screen should not ask questions it knows the answer
+     * to.
+     *
+     * The server check is untouched and remains the one that matters — this
+     * is about not making a pointless request, not about access control.
+     */
+    if (!can(api.getUser()?.role, 'system.configure')) return;
+
     api.getSystemStorage()
       .then((res: any) => { if (!cancelled) setS(res?.data || null); })
       // A refusal is the expected answer for everyone but an administrator,
