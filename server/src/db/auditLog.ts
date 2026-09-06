@@ -79,27 +79,71 @@ export function logAuditEvent(db: DatabaseSync, event: Partial<AuditLogEntry>): 
   const payloadJson = JSON.stringify(event.payload || {});
   const createdAt = event.createdAt || new Date().toISOString();
 
-  const prevRow = db.prepare(`
-    SELECT hash FROM inspection_audit_log ORDER BY rowid DESC LIMIT 1
-  `).get() as { hash: string } | undefined;
-  const previousHash = prevRow?.hash || GENESIS_HASH;
+  /*
+   * Reading the last hash and appending must be ONE atomic step.
+   *
+   * Found by running the restore drill, not by a test. The pilot database's
+   * chain reported BROKEN, and the restored copy reported the same break at
+   * the same row — so the backup was faithful and the damage was already
+   * there. Rows 152 and 153 carried the same previous_hash and the same
+   * millisecond timestamp: two writers had each read the same "last hash" and
+   * each appended their own entry. The chain forked.
+   *
+   * Nothing had been tampered with. Two people signed in at the same moment,
+   * which in a workshop with several tablets is an ordinary Tuesday.
+   *
+   * The consequence was worse than a wrong figure. The audit chain is this
+   * system's central claim — that the record cannot be altered without
+   * detection — and a chain that reports tampering because two logins
+   * coincided cries wolf. After the first false break, a real one is
+   * indistinguishable from the noise, and an auditor is entitled to treat the
+   * whole mechanism as unreliable.
+   *
+   * BEGIN IMMEDIATE takes the write lock before the read, so a second writer
+   * — including one in another process, which is how this happened — waits
+   * rather than reading a hash that is about to be superseded. busy_timeout
+   * is already 5s on the connection, so the wait is handled rather than
+   * failing outright.
+   *
+   * When a caller is already inside a transaction, that transaction holds the
+   * write lock and starting another would throw; the read and insert are then
+   * already serialised and are done directly.
+   */
+  const ownTransaction = !db.isTransaction;
+  if (ownTransaction) db.exec('BEGIN IMMEDIATE');
 
-  const hash = computeAuditHash({
-    previousHash,
-    id,
-    inspectionId,
-    eventType,
-    userId,
-    userRole,
-    ipAddress,
-    payloadJson,
-    createdAt
-  });
+  try {
+    const prevRow = db.prepare(`
+      SELECT hash FROM inspection_audit_log ORDER BY rowid DESC LIMIT 1
+    `).get() as { hash: string } | undefined;
+    const previousHash = prevRow?.hash || GENESIS_HASH;
 
-  db.prepare(`
-    INSERT INTO inspection_audit_log (id, inspection_id, event_type, user_id, user_role, ip_address, payload_json, previous_hash, hash, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(id, inspectionId, eventType, userId, userRole, ipAddress, payloadJson, previousHash, hash, createdAt);
+    const hash = computeAuditHash({
+      previousHash,
+      id,
+      inspectionId,
+      eventType,
+      userId,
+      userRole,
+      ipAddress,
+      payloadJson,
+      createdAt
+    });
+
+    db.prepare(`
+      INSERT INTO inspection_audit_log (id, inspection_id, event_type, user_id, user_role, ip_address, payload_json, previous_hash, hash, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, inspectionId, eventType, userId, userRole, ipAddress, payloadJson, previousHash, hash, createdAt);
+
+    if (ownTransaction) db.exec('COMMIT');
+  } catch (err) {
+    // Leaving a transaction open would wedge every later write on this
+    // connection behind a lock nobody holds a reason for.
+    if (ownTransaction && db.isTransaction) {
+      try { db.exec('ROLLBACK'); } catch { /* the commit already failed; nothing more to do */ }
+    }
+    throw err;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -111,6 +155,12 @@ export type AuditBreakReason =
   | 'CONTENT_ALTERED'
   /** This row does not point at the previous row — an entry was removed or inserted. */
   | 'BROKEN_LINK'
+  /**
+   * This row's parent is present, and so is another row claiming the same
+   * parent. Two writers appended at the same moment and the chain forked.
+   * Nothing is missing.
+   */
+  | 'CONCURRENT_APPEND'
   /** The first entry does not start from the genesis seed. */
   | 'GENESIS_MISMATCH'
   /** The row carries no hash at all, so nothing about it can be attested. */
@@ -165,6 +215,12 @@ export function verifyAuditChain(db: DatabaseSync): AuditChainVerification {
   const breaks: AuditChainBreak[] = [];
   let expectedPrevious = GENESIS_HASH;
 
+  /*
+   * Every hash in the log, so a mismatched link can be asked the question
+   * that actually matters: is the entry this one claims to follow still here?
+   */
+  const seenHashes = new Set<string>(rows.map((r) => r.hash).filter(Boolean));
+
   for (const row of rows) {
     const base = {
       rowid: row.rowid as number,
@@ -209,15 +265,42 @@ export function verifyAuditChain(db: DatabaseSync): AuditChainVerification {
           `its own signature — its contents were changed after it was written.`
       });
     } else if (row.previous_hash !== expectedPrevious) {
-      // 2. Contents are intact, so a mismatched link means the sequence itself
-      //    was disturbed rather than this entry's data.
+      /*
+       * 2. Contents are intact, so the SEQUENCE was disturbed rather than this
+       *    entry's data. Two very different things produce that, and calling
+       *    them by the same name was a false accusation.
+       *
+       *    If this row's parent is still in the log, nothing was removed:
+       *    another row already claimed that parent, and both are present. That
+       *    is what two writers appending at the same instant produce — the
+       *    fault this codebase had until the append was made atomic, and the
+       *    reason the pilot database reported tampering when two people had
+       *    simply signed in together.
+       *
+       *    If the parent is nowhere in the log, an entry really is gone.
+       *
+       *    The distinction is not an excuse. A fork says both entries and
+       *    their parent are present; it does not say nothing was inserted,
+       *    and it is reported as a break either way so the chain still fails
+       *    verification and somebody still has to look.
+       */
+      const parentPresent = row.previous_hash && seenHashes.has(row.previous_hash);
+
       breaks.push({
         ...base,
-        reason: expectedPrevious === GENESIS_HASH ? 'GENESIS_MISMATCH' : 'BROKEN_LINK',
+        reason:
+          expectedPrevious === GENESIS_HASH ? 'GENESIS_MISMATCH'
+          : parentPresent ? 'CONCURRENT_APPEND'
+          : 'BROKEN_LINK',
         detail:
           expectedPrevious === GENESIS_HASH
             ? `The log does not begin at the genesis seed — earlier entries were removed.`
-            : `Entry ${row.id} does not follow the entry before it — an entry was removed or inserted.`
+            : parentPresent
+            ? `Entry ${row.id} shares its parent with another entry: two were appended at the ` +
+              `same moment and the chain forked. Both are present and the entry they follow is ` +
+              `present, so nothing has been removed here.`
+            : `Entry ${row.id} does not follow the entry before it, and the entry it claims to ` +
+              `follow is not in the log — an entry was removed.`
       });
     }
 
