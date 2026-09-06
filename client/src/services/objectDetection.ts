@@ -268,3 +268,129 @@ export function cropToTarget(
   }
   return canvas;
 }
+
+/**
+ * The frame with everything the model found drawn on it.
+ *
+ * WHY THIS IS SEPARATE FROM THE EVIDENCE PHOTOGRAPH
+ * -------------------------------------------------
+ * `cropToTarget` above produces what gets STORED against the inspection: the
+ * component, with people and clutter cut out of the pixels. That is
+ * deliberate — an inspection record should not quietly accumulate photographs
+ * of the people who took it.
+ *
+ * This produces something different and equally necessary: proof that the
+ * camera saw what it says it saw. A chair, a person, a bottle on the bench —
+ * boxed, named, with the model's own confidence, on the frame itself. Without
+ * it, "one person was excluded" is a claim the inspector has to take on faith,
+ * and an exclusion nobody can see is indistinguishable from the detector
+ * having done nothing at all.
+ *
+ * So the annotated frame is what the inspector is shown and what a supervisor
+ * can be handed; the cropped frame is what the record keeps.
+ */
+export function annotateFrame(
+  frame: HTMLVideoElement | HTMLCanvasElement,
+  result: VisionResult,
+  frameWidth: number,
+  frameHeight: number
+): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(frameWidth));
+  canvas.height = Math.max(1, Math.round(frameHeight));
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return canvas;
+
+  ctx.drawImage(frame as CanvasImageSource, 0, 0, canvas.width, canvas.height);
+
+  /* The region that survives, drawn under the exclusions so the exclusions
+   * remain legible where the two overlap. */
+  if (result.targetRegion) {
+    const r = result.targetRegion;
+    ctx.strokeStyle = '#34d399';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([10, 6]);
+    ctx.strokeRect(r.x, r.y, r.width, r.height);
+    ctx.setLineDash([]);
+  }
+
+  for (const d of result.detections) {
+    const [x, y, w, h] = d.bbox;
+    const colour = d.role === 'PERSON' ? '#f87171' : d.role === 'BACKGROUND' ? '#fbbf24' : '#a3a3a3';
+
+    ctx.strokeStyle = colour;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x, y, w, h);
+
+    /*
+     * The model's own class name and its own score. Neither is rounded up,
+     * relabelled, or mapped onto a component name — the whole value of this
+     * overlay is that every word on it came from the detector.
+     */
+    const label = `${d.className.toUpperCase()} ${(d.score * 100).toFixed(0)}%`;
+    ctx.font = 'bold 14px system-ui, sans-serif';
+    const tw = ctx.measureText(label).width;
+    ctx.fillStyle = colour;
+    ctx.fillRect(x, Math.max(0, y - 22), tw + 12, 22);
+    ctx.fillStyle = '#0b0f14';
+    ctx.fillText(label, x + 6, Math.max(14, y - 6));
+  }
+
+  return canvas;
+}
+
+/**
+ * What was in frame and is not in the stored photograph, in a sentence.
+ *
+ * This goes into the record beside the image. A photograph that has had
+ * things cut out of it should say so in words a person reads six months
+ * later, rather than leaving a cropped frame that looks like the whole
+ * scene.
+ *
+ * Counts are grouped by class so five bottles read as "5 bottles" rather
+ * than five separate clauses.
+ */
+export function describeExclusions(result: VisionResult, isHi = false): string | null {
+  if (!result.detections.length) return null;
+
+  const counts = new Map<string, number>();
+  for (const d of result.detections) {
+    counts.set(d.className, (counts.get(d.className) || 0) + 1);
+  }
+
+  const parts = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([name, n]) => (n === 1 ? `1 ${name}` : `${n} ${name}s`));
+
+  const list = parts.length === 1
+    ? parts[0]
+    : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+
+  return isHi
+    ? `कैमरे ने फ़्रेम में ${list} देखा। यह संग्रहीत तस्वीर में शामिल नहीं है।`
+    : `The camera detected ${list} in frame. Not included in the stored photograph.`;
+}
+
+/**
+ * The exclusions as tags, for the stored record.
+ *
+ * `wagon_photos` has no free-text notes column and it sits behind append-only
+ * triggers, so adding one is a migration rather than a field — not something
+ * to do casually to a table that already holds evidence. Tags carry the same
+ * information in a form the gallery already displays and a query can filter
+ * on, and `describeExclusions` can rebuild the sentence from them wherever a
+ * person needs to read it.
+ *
+ * Shape is `EXCLUDED:<class>:<count>` — the model's own class name, never a
+ * component name it does not know.
+ */
+export function exclusionTags(result: VisionResult): string[] {
+  const counts = new Map<string, number>();
+  for (const d of result.detections) {
+    counts.set(d.className, (counts.get(d.className) || 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([name, n]) => `EXCLUDED:${name}:${n}`);
+}

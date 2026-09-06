@@ -15,7 +15,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { detectFrame, MIN_SCORE, type Detection } from './objectDetection.ts';
+import {
+  detectFrame,
+  describeExclusions,
+  exclusionTags,
+  MIN_SCORE,
+  type Detection
+} from './objectDetection.ts';
 
 const W = 640;
 const H = 480;
@@ -148,5 +154,98 @@ describe('Smart Vision — what is recognised, and what is kept', () => {
     const res = await detectFrame(fakeModel([]), frame, W, H);
     expect(typeof res.inferenceMs).toBe('number');
     expect(res.inferenceMs).toBeGreaterThanOrEqual(0);
+  });
+});
+
+/**
+ * Anything in frame that is not a component must be visible on the image, not
+ * silently dropped.
+ *
+ * The requirement, in the shop's words: if the camera sees a chair, a person,
+ * or anything else that is not on the list, it should show it on the image and
+ * box it out. Two halves — box it (the annotated frame) and say so (the record
+ * beside it) — and the second is the one that survives to an audit six months
+ * later, when nobody can re-run the camera.
+ */
+describe('Smart Vision — what was excluded is stated, not silently dropped', () => {
+  it('names every recognised object in the sentence that goes with the record', async () => {
+    const res = await detectFrame(
+      fakeModel([
+        { class: 'person', score: 0.94, bbox: [0, 0, 100, 400] },
+        { class: 'chair', score: 0.81, bbox: [400, 100, 120, 160] }
+      ]),
+      frame, W, H
+    );
+
+    const note = describeExclusions(res);
+    expect(note).toContain('person');
+    expect(note).toContain('chair');
+    expect(note).toContain('Not included in the stored photograph');
+  });
+
+  it('groups repeats by count rather than listing them one by one', async () => {
+    const res = await detectFrame(
+      fakeModel([
+        { class: 'bottle', score: 0.7, bbox: [10, 10, 20, 40] },
+        { class: 'bottle', score: 0.7, bbox: [40, 10, 20, 40] },
+        { class: 'bottle', score: 0.7, bbox: [70, 10, 20, 40] }
+      ]),
+      frame, W, H
+    );
+    expect(describeExclusions(res)).toContain('3 bottles');
+  });
+
+  it('reports an object the shop has no rule about, by the model\'s own name', async () => {
+    /*
+     * The point of the requirement. A cricket bat on the bench is not a
+     * person and not on the clutter list, and the honest thing is to name it
+     * as the model named it rather than quietly ignoring it or inventing a
+     * component label for it.
+     */
+    const res = await detectFrame(
+      fakeModel([{ class: 'baseball bat', score: 0.77, bbox: [200, 200, 80, 40] }]),
+      frame, W, H
+    );
+
+    expect(res.detections[0].role).toBe('OTHER');
+    expect(res.detections[0].className).toBe('baseball bat');
+    expect(describeExclusions(res)).toContain('baseball bat');
+    expect(exclusionTags(res)).toEqual(['EXCLUDED:baseball bat:1']);
+  });
+
+  it('says nothing rather than something vague when nothing was recognised', async () => {
+    const res = await detectFrame(fakeModel([]), frame, W, H);
+    expect(describeExclusions(res)).toBeNull();
+    expect(exclusionTags(res)).toEqual([]);
+  });
+
+  it('carries the counts into the tags that reach the stored record', async () => {
+    const res = await detectFrame(
+      fakeModel([
+        { class: 'person', score: 0.9, bbox: [0, 0, 50, 400] },
+        { class: 'person', score: 0.88, bbox: [60, 0, 50, 400] },
+        { class: 'chair', score: 0.75, bbox: [400, 100, 120, 160] }
+      ]),
+      frame, W, H
+    );
+
+    // Sorted by class so the same scene always produces the same tags.
+    expect(exclusionTags(res)).toEqual(['EXCLUDED:chair:1', 'EXCLUDED:person:2']);
+  });
+
+  it('never names a component, because the model has no component class', async () => {
+    /*
+     * The guard that matters most. If a future edit ever maps a COCO class
+     * onto a spring, this fails — a photograph labelled SPRING by a model
+     * with no spring class is a fabrication on an inspection record.
+     */
+    const res = await detectFrame(
+      fakeModel([{ class: 'donut', score: 0.9, bbox: [10, 10, 60, 60] }]),
+      frame, W, H
+    );
+    const note = (describeExclusions(res) || '').toUpperCase();
+    for (const word of ['SPRING', 'OUTER', 'INNER', 'SNUBBER', 'BOGIE', 'WAGON']) {
+      expect(note).not.toContain(word);
+    }
   });
 });

@@ -335,12 +335,18 @@ export const App: React.FC = () => {
               <div className="px-4 pb-4">
                 <SmartVisionCamera
                   lang={currentLang}
-                  onCapture={(dataUrl) => {
+                  onCapture={(dataUrl, result, extras) => {
                     /*
                      * The image stored is already cropped to the target
                      * region, so a recognised person is not in the bytes that
                      * reach the audit trail — which is what the requirement
                      * means by "strictly record the target component".
+                     *
+                     * What the camera saw is recorded in words alongside it.
+                     * A cropped frame looks like the whole scene, so without
+                     * this the record cannot say that anything was removed —
+                     * and an exclusion nobody can see afterwards is
+                     * indistinguishable from the detector never having run.
                      */
                     void api
                       .uploadPhoto({
@@ -348,7 +354,13 @@ export const App: React.FC = () => {
                         partCategory: 'SPRINGS',
                         partName: 'Smart Vision capture',
                         imageBase64: dataUrl,
-                        tags: ['SMART_VISION', 'FILTERED']
+                        tags: [
+                          'SMART_VISION',
+                          'FILTERED',
+                          ...(result.personCount > 0 ? ['PERSON_EXCLUDED'] : []),
+                          ...(result.backgroundCount > 0 ? ['CLUTTER_EXCLUDED'] : []),
+                          ...(extras?.exclusionTags || [])
+                        ]
                       })
                       .catch(() => undefined);
                   }}

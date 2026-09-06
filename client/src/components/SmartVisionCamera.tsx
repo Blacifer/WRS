@@ -18,14 +18,26 @@ import {
   loadDetector,
   detectFrame,
   cropToTarget,
+  annotateFrame,
+  describeExclusions,
+  exclusionTags,
   type VisionResult,
   type Detection
 } from '../services/objectDetection.ts';
 
 interface SmartVisionCameraProps {
   lang: 'en' | 'hi';
-  /** Receives the cropped capture — people and clutter already removed. */
-  onCapture?: (dataUrl: string, result: VisionResult) => void;
+  /**
+   * Receives the cropped capture — people and clutter already removed — plus
+   * the annotated frame showing WHAT was removed, and the sentence describing
+   * it for the record. The cropped image is the evidence; the annotated one is
+   * the proof that the exclusion happened at all.
+   */
+  onCapture?: (
+    dataUrl: string,
+    result: VisionResult,
+    extras?: { annotatedDataUrl: string; exclusionNote: string | null; exclusionTags: string[] }
+  ) => void;
   onClose?: () => void;
 }
 
@@ -48,6 +60,10 @@ export const SmartVisionCamera: React.FC<SmartVisionCameraProps> = ({ lang, onCa
   const [loadState, setLoadState] = useState<LoadState>('IDLE');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<VisionResult | null>(null);
+  /* The last annotated frame, held so the inspector can see what the camera
+   * boxed out at the moment of capture rather than only in the live view,
+   * where it is gone the next frame. */
+  const [annotated, setAnnotated] = useState<string | null>(null);
 
   // ---------------------------------------------------------------------
   // Camera
@@ -173,8 +189,24 @@ export const SmartVisionCamera: React.FC<SmartVisionCameraProps> = ({ lang, onCa
     const video = videoRef.current;
     if (!video || !result) return;
     const canvas = cropToTarget(video, result.targetRegion, video.videoWidth, video.videoHeight);
-    onCapture?.(canvas.toDataURL('image/jpeg', 0.9), result);
-  }, [onCapture, result]);
+
+    /*
+     * Both frames are produced from the same instant. The annotated one keeps
+     * every box and label the model reported; the cropped one keeps only the
+     * component. Producing them together is what makes them comparable — an
+     * annotated frame from a different moment would prove nothing about the
+     * photograph beside it.
+     */
+    const marked = annotateFrame(video, result, video.videoWidth, video.videoHeight)
+      .toDataURL('image/jpeg', 0.85);
+    setAnnotated(marked);
+
+    onCapture?.(canvas.toDataURL('image/jpeg', 0.9), result, {
+      annotatedDataUrl: marked,
+      exclusionNote: describeExclusions(result, isHi),
+      exclusionTags: exclusionTags(result)
+    });
+  }, [onCapture, result, isHi]);
 
   const blocked = result !== null && result.targetRegion === null;
 
@@ -242,6 +274,25 @@ export const SmartVisionCamera: React.FC<SmartVisionCameraProps> = ({ lang, onCa
                 ? `${result.personCount} व्यक्ति, ${result.backgroundCount} पृष्ठभूमि वस्तुएँ बाहर रखी गईं।`
                 : `${result.personCount} person(s) and ${result.backgroundCount} background object(s) excluded from the capture.`}
             </p>
+          )}
+
+          {annotated && (
+            <div className="pt-2 border-t border-line space-y-1.5">
+              <p className="text-[11px] font-black uppercase tracking-wide text-ink-muted">
+                {isHi ? 'कैमरे ने क्या देखा' : 'What the camera saw'}
+              </p>
+              <img
+                src={annotated}
+                alt={isHi ? 'चिह्नित फ़्रेम' : 'Annotated frame'}
+                className="w-full rounded border border-line"
+              />
+              <p className="text-[11px] text-ink-muted leading-snug">
+                {describeExclusions(result!, isHi)
+                  || (isHi
+                    ? 'कैमरे ने फ़्रेम में कुछ भी पहचाना नहीं।'
+                    : 'The camera recognised nothing in frame.')}
+              </p>
+            </div>
           )}
 
           {blocked && (
