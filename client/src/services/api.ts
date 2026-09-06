@@ -563,6 +563,11 @@ export class ApiClient {
     return this.request<{ success: boolean; data: any }>('/analytics/throughput');
   }
 
+  /** Whether this installation is backed up, and how large it has become. */
+  public async getSystemStorage(): Promise<{ success: boolean; data: any }> {
+    return this.request<{ success: boolean; data: any }>('/system/storage');
+  }
+
   /** Which part keeps coming back, and on how many distinct wagons. */
   public async getAnalyticsFindings(limit = 40): Promise<{ success: boolean; data: any }> {
     return this.request<{ success: boolean; data: any }>(`/analytics/findings?limit=${limit}`);
