@@ -133,9 +133,20 @@ already gone stale once by not being run, which is the failure mode of every
 check that lives outside the suite.
 
 ```
-node scripts/offline-drill.mjs      # sort offline, close the tab, reconnect
-node scripts/role-walkthrough.mjs   # every role, every screen
+node scripts/offline-drill.mjs                # sort offline, close the tab, reconnect
+node scripts/role-walkthrough.mjs             # every role, every screen
+node scripts/concurrent-lifecycle-drill.mjs   # several inspectors, one database
 ```
 
 The first needs a BUILT client, for the service worker. The second runs
-against either.
+against either. The third needs neither a browser nor a running server — it
+starts its own processes against a temporary database — so it is the cheapest
+of the three to run and the one that found the most.
+
+The third exists because the suite cannot reach what it tests. Every test
+writes from a single process, and within one process node:sqlite is
+synchronous, so a read and a write cannot interleave. The audit chain fork
+that broke the pilot database only happens across processes, which is exactly
+how a workshop runs: several tablets, one server, one file. Reverting the fix
+and running the drill reproduces it — 173 breaks, 124 forked parents — and it
+exits non-zero.
