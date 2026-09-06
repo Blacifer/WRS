@@ -10,6 +10,7 @@ import { offlineDb } from '../services/offlineDb.ts';
 import { useI18n } from '../i18n/index.ts';
 import { PhotoCaptureModal } from '../components/PhotoCaptureModal.tsx';
 import { PhotoGallery } from '../components/PhotoGallery.tsx';
+import { WagonConditionReport } from '../components/WagonConditionReport.tsx';
 import { ReleaseCertificateModal } from '../components/ReleaseCertificateModal.tsx';
 import { SoundDiagnosticTool } from '../components/SoundDiagnosticTool.tsx';
 import { VoiceInspectionToolbar } from '../components/VoiceInspectionToolbar.tsx';
@@ -67,7 +68,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
    * still exactly what happened — reported a second time, correctly. The tab
    * within the wagon is the part somebody is actually looking at.
    */
-  const [activeTab, setActiveTab] = useState<'CHECKLIST' | 'GATE' | 'PHOTOS' | 'TIMELINE' | 'ACOUSTIC' | 'COMPONENTS' | 'SWT'>(() => {
+  const [activeTab, setActiveTab] = useState<'CHECKLIST' | 'GATE' | 'PHOTOS' | 'TIMELINE' | 'ACOUSTIC' | 'COMPONENTS' | 'SWT' | 'REPORT'>(() => {
     try {
       const saved = sessionStorage.getItem('wrs-wagon-tab');
       const known = ['CHECKLIST', 'GATE', 'PHOTOS', 'TIMELINE', 'ACOUSTIC', 'COMPONENTS', 'SWT'];
@@ -1002,6 +1003,17 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
         </button>
 
         <button
+          onClick={() => setActiveTab('REPORT')}
+          className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
+            activeTab === 'REPORT'
+              ? 'border-accent-line text-accent-ink'
+              : 'border-transparent text-ink-muted hover:text-ink-body'
+          }`}
+        >
+          <ClipboardIcon size={16} />{isHi ? 'स्थिति रिपोर्ट' : 'Condition Report'}
+        </button>
+
+        <button
           onClick={() => setActiveTab('GATE')}
           className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
             activeTab === 'GATE'
@@ -1569,6 +1581,16 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
       })()}
 
       {/* Tab 3: Photo Evidence Gallery */}
+      {activeTab === 'REPORT' && wagon && (
+        <WagonConditionReport
+          wagon={wagon}
+          categories={categories}
+          photos={photos}
+          gateStatus={gateStatus}
+          lang={lang}
+        />
+      )}
+
       {activeTab === 'PHOTOS' && (
         <PhotoGallery
           photos={photos}

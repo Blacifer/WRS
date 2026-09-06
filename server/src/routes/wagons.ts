@@ -202,6 +202,92 @@ wagonsRouter.get('/:wagonNumber/timeline', authMiddleware, async (req: Request, 
 // 4. CASNUB Bogie Parts Checklist for Wagon
 // -------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// GET /api/wagons/:wagonNumber/checklist/history
+//
+// What each component was found as, before anybody worked on it.
+//
+// checklist_items is updated in place, so its `status` column ends up holding
+// the OUTCOME — a part found cracked and then repaired reads REPAIRED, with
+// no trace in that row of what it was found as. Any report built from the
+// table alone therefore prints the same value under "found" and under "work
+// done", which is not a before-and-after at all.
+//
+// The arrival state is in the audit log, which records previousStatus and
+// newStatus on every checklist write. This reads it back per item, oldest
+// first, so a caller can take the first recorded transition as the finding.
+//
+// Guarded by authMiddleware alone, like the checklist and wagon-detail routes
+// beside it: this is the same information the checklist already shows, with
+// its history attached. It is deliberately NOT behind audit.read — that
+// capability gates the record of who did what across the whole workshop, and
+// an inspector being unable to see what a part was found as would leave the
+// report printing "not recorded" for the one role most likely to be standing
+// at the wagon.
+// ---------------------------------------------------------------------------
+wagonsRouter.get('/:wagonNumber/checklist/history', authMiddleware, (req: Request, res: Response) => {
+  const wagonNumber = (req.params?.wagonNumber || '').trim().toUpperCase();
+
+  if (!wagonNumber) {
+    res.status(400).json({
+      success: false,
+      error: 'MISSING_PARAM',
+      message: 'wagonNumber parameter is required',
+      statusCode: 400,
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
+
+  try {
+    const db = getDatabase();
+    const rows = db.prepare(`
+      SELECT payload_json, created_at, user_id
+      FROM inspection_audit_log
+      WHERE event_type = 'CHECKLIST_ITEM_INSPECTED'
+      ORDER BY created_at ASC
+    `).all() as any[];
+
+    /*
+     * The wagon number lives inside the payload rather than in a column, so
+     * the filter happens here. Parsing is defensive: one malformed payload
+     * must not cost the whole history.
+     */
+    const events: any[] = [];
+    for (const r of rows) {
+      let p: any;
+      try { p = JSON.parse(r.payload_json); } catch { continue; }
+      if (!p || String(p.wagonNumber || '').toUpperCase() !== wagonNumber) continue;
+      events.push({
+        itemId: p.itemId,
+        partName: p.partName,
+        category: p.category,
+        previousStatus: p.previousStatus ?? null,
+        newStatus: p.newStatus ?? null,
+        repairAction: p.repairAction ?? null,
+        reinspectedStatus: p.reinspectedStatus ?? null,
+        conditionNotes: p.conditionNotes ?? null,
+        at: r.created_at,
+        byUserId: r.user_id
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: { wagonNumber, events },
+      meta: { timestamp: new Date().toISOString(), count: events.length }
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      error: 'HISTORY_FAILED',
+      message: err.message || 'Failed to read checklist history',
+      statusCode: 500,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 wagonsRouter.get('/:wagonNumber/checklist', authMiddleware, async (req: Request, res: Response) => {
   const { wagonRepo } = getRepos();
   const wagonNumber = req.params?.wagonNumber;

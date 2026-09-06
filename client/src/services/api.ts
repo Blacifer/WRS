@@ -296,6 +296,20 @@ export class ApiClient {
     return res.data || res;
   }
 
+  /**
+   * What each component on this wagon was FOUND as, before it was worked on.
+   *
+   * The checklist row holds the outcome, so a part found cracked and then
+   * repaired reads REPAIRED with no trace of the finding. The history comes
+   * from the audit log, which records every transition.
+   */
+  public async getChecklistHistory(wagonNumber: string): Promise<{ events: any[] }> {
+    const res = await this.request<{ success: boolean; data: { events: any[] } }>(
+      `/wagons/${encodeURIComponent(wagonNumber)}/checklist/history`
+    );
+    return { events: res?.data?.events || [] };
+  }
+
   public async queryInspections(filter: InspectionFilter = {}): Promise<{ records: InspectionRecord[]; totalCount: number }> {
     const params = new URLSearchParams();
     if (filter.wagonNumber) params.set('wagonNumber', filter.wagonNumber);
