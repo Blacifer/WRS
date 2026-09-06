@@ -561,6 +561,30 @@ CREATE INDEX IF NOT EXISTS idx_transitions_wagon_number ON wagon_transitions(wag
 CREATE INDEX IF NOT EXISTS idx_transitions_performer ON wagon_transitions(performed_by, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_checklist_wagon_cat ON checklist_items(wagon_number, category);
 CREATE INDEX IF NOT EXISTS idx_checklist_wagon_status ON checklist_items(wagon_number, status, is_mandatory);
+
+-- The two shop-wide questions, which read every checklist row rather than one
+-- wagon's. Both existing indexes lead with wagon_number and so are no help to
+-- a query that spans the whole workshop.
+--
+-- Measured on a year of records — 2,000 wagons, 82,000 checklist rows:
+--   "what keeps coming back"  469 ms -> 30 ms
+--   the category breakdown    161 ms -> 19 ms
+-- for about 4 MB on a 59 MB database. These are DRM dashboard panels, so
+-- the cost of leaving them is a screen that gets slower every month with
+-- nothing appearing to change.
+--
+-- The findings index is partial: most components pass, and a query about what
+-- went wrong has no use for the rows where nothing did.
+-- Covering: the query also counts each status and takes MAX(updated_at), so
+-- without those columns in the index SQLite still fetches every matching row.
+-- Measured on the real query: 469 ms with no index, 121 ms with the narrow
+-- form, 30 ms with this one.
+CREATE INDEX IF NOT EXISTS idx_checklist_findings
+  ON checklist_items(part_name, category, wagon_number, status, updated_at)
+  WHERE status IN ('FAIL', 'CONDEMNED', 'REPAIRED', 'REPLACED');
+
+CREATE INDEX IF NOT EXISTS idx_checklist_cat_status
+  ON checklist_items(category, status);
 CREATE INDEX IF NOT EXISTS idx_gate_signoffs_wagon ON gate_signoffs(wagon_id);
 CREATE INDEX IF NOT EXISTS idx_gate_signoffs_wagon_num ON gate_signoffs(wagon_number);
 CREATE INDEX IF NOT EXISTS idx_gate_signoffs_cert ON gate_signoffs(certificate_number);

@@ -45,6 +45,33 @@ describe('Checklist history at volume', () => {
     assert.match(row.sql, /json_extract/);
   });
 
+  test('TC-HSC-03: the shop-wide findings query is answered from an index', () => {
+    /*
+     * "What keeps coming back" reads every checklist row rather than one
+     * wagon's, so the two existing indexes — both led by wagon_number — are
+     * no help to it. It also counts each status and takes MAX(updated_at), so
+     * an index without those columns still fetches every matching row.
+     *
+     * Measured on a year of records, 82,000 checklist rows: 469 ms with no
+     * index, 121 ms with the narrow form, 30 ms covering. This pins the
+     * covering plan, because the narrow one looks correct and is four times
+     * slower.
+     */
+    const plan = db.prepare(`
+      EXPLAIN QUERY PLAN
+      SELECT part_name, category,
+             COUNT(DISTINCT wagon_number) AS wagonsAffected,
+             SUM(CASE WHEN status = 'CONDEMNED' THEN 1 ELSE 0 END) AS condemned,
+             MAX(updated_at) AS lastSeen
+      FROM checklist_items
+      WHERE status IN ('FAIL', 'CONDEMNED', 'REPAIRED', 'REPLACED')
+      GROUP BY part_name, category
+    `).all() as any[];
+
+    const detail = plan.map((p) => p.detail).join(' | ');
+    assert.match(detail, /COVERING INDEX idx_checklist_findings/, `plan was: ${detail}`);
+  });
+
   test('TC-HSC-02: the history query searches the index rather than scanning', () => {
     const plan = db.prepare(`
       EXPLAIN QUERY PLAN
