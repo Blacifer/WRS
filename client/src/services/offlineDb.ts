@@ -17,9 +17,10 @@ import type {
 export type SyncConflict = NonNullable<SyncResponse['conflicts']>[number];
 
 const DB_NAME = 'wrs_raipur_pwa_offline_db_v2';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 const STORE_PENDING_WAGONS = 'pending_wagons';
+const STORE_PENDING_VOICE = 'pending_voice_actions';
 const STORE_PENDING_INSPECTIONS = 'pending_inspections';
 const STORE_PENDING_CHECKLIST = 'pending_checklist_items';
 const STORE_PENDING_PHOTOS = 'pending_photos';
@@ -45,6 +46,32 @@ export interface PendingWagon {
   /** What the person at the gate saw. Lost entirely before this store existed. */
   entryNotes?: string;
   entryDate?: string;
+  createdAt: string;
+}
+
+/**
+ * A verdict somebody spoke, with the words that produced it.
+ *
+ * Queued as its own thing rather than flattened into a checklist action,
+ * because the transcript is the provenance. Offline, a spoken condemnation
+ * used to arrive as a bare status: the verdict survived and the evidence for
+ * it did not, so nobody could afterwards check that "condemn brake block,
+ * visible crack" was what was actually said.
+ */
+export interface PendingVoiceAction {
+  clientTempId: string;
+  wagonNumber: string;
+  itemId?: string | null;
+  itemName?: string | null;
+  category?: string | null;
+  bogiePosition?: string | null;
+  status: string;
+  defectNotes?: string | null;
+  /** What the recogniser heard. The reason this store exists. */
+  transcript: string;
+  language?: string;
+  confidence?: number;
+  /** When it was spoken, not when it synced. */
   createdAt: string;
 }
 
@@ -186,6 +213,10 @@ class MultiEntityOfflineDbManager {
           const s = db.createObjectStore(STORE_PENDING_WAGONS, { keyPath: 'clientTempId' });
           s.createIndex('wagonNumber', 'wagonNumber', { unique: false });
         }
+        if (!db.objectStoreNames.contains(STORE_PENDING_VOICE)) {
+          const s = db.createObjectStore(STORE_PENDING_VOICE, { keyPath: 'clientTempId' });
+          s.createIndex('wagonNumber', 'wagonNumber', { unique: false });
+        }
         if (!db.objectStoreNames.contains(STORE_PENDING_INSPECTIONS)) {
           const s = db.createObjectStore(STORE_PENDING_INSPECTIONS, { keyPath: 'clientTempId' });
           s.createIndex('localCreatedAt', 'localCreatedAt', { unique: false });
@@ -269,6 +300,34 @@ class MultiEntityOfflineDbManager {
     return new Promise((resolve, reject) => {
       const tx = db.transaction(STORE_PENDING_WAGONS, 'readwrite');
       const req = tx.objectStore(STORE_PENDING_WAGONS).put(pendingItem);
+      req.onsuccess = () => {
+        this.notifyPendingCountChange();
+        resolve(clientTempId);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // 0b. Pending Voice Actions
+  // -------------------------------------------------------------------------
+
+  public async enqueueVoiceAction(
+    action: Omit<PendingVoiceAction, 'clientTempId' | 'createdAt'>
+  ): Promise<string> {
+    const db = await this.openDb();
+    const clientTempId = `voi-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+    const pendingItem: PendingVoiceAction = {
+      ...action,
+      wagonNumber: action.wagonNumber.trim().toUpperCase(),
+      clientTempId,
+      createdAt: new Date().toISOString()
+    };
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_PENDING_VOICE, 'readwrite');
+      const req = tx.objectStore(STORE_PENDING_VOICE).put(pendingItem);
       req.onsuccess = () => {
         this.notifyPendingCountChange();
         resolve(clientTempId);
@@ -532,7 +591,8 @@ class MultiEntityOfflineDbManager {
       const count4 = await this.countStore(db, STORE_PENDING_TRANSITIONS);
       const count5 = await this.countStore(db, STORE_PENDING_SORTING);
       const count6 = await this.countStore(db, STORE_PENDING_WAGONS);
-      return count1 + count2 + count3 + count4 + count5 + count6;
+      const count7 = await this.countStore(db, STORE_PENDING_VOICE);
+      return count1 + count2 + count3 + count4 + count5 + count6 + count7;
     } catch {
       return 0;
     }
@@ -554,6 +614,7 @@ class MultiEntityOfflineDbManager {
 
   public async getAllPending(): Promise<{
     wagons: PendingWagon[];
+    voiceActions: PendingVoiceAction[];
     inspections: PendingInspection[];
     checklist: PendingChecklistAction[];
     photos: PendingPhotoUpload[];
@@ -561,12 +622,13 @@ class MultiEntityOfflineDbManager {
   }> {
     const db = await this.openDb();
     const wagons = await this.getAllFromStore<PendingWagon>(db, STORE_PENDING_WAGONS);
+    const voiceActions = await this.getAllFromStore<PendingVoiceAction>(db, STORE_PENDING_VOICE);
     const inspections = await this.getAllFromStore<PendingInspection>(db, STORE_PENDING_INSPECTIONS);
     const checklist = await this.getAllFromStore<PendingChecklistAction>(db, STORE_PENDING_CHECKLIST);
     const photos = await this.getAllFromStore<PendingPhotoUpload>(db, STORE_PENDING_PHOTOS);
     const transitions = await this.getAllFromStore<PendingTransition>(db, STORE_PENDING_TRANSITIONS);
 
-    return { wagons, inspections, checklist, photos, transitions };
+    return { wagons, voiceActions, inspections, checklist, photos, transitions };
   }
 
   private getAllFromStore<T>(db: IDBDatabase, storeName: string): Promise<T[]> {
@@ -642,8 +704,8 @@ class MultiEntityOfflineDbManager {
     const sorting = await this.syncPendingSorting(apiBaseUrl, token);
 
     const pending = await this.getAllPending();
-    const totalCount = pending.wagons.length + pending.inspections.length + pending.checklist.length +
-      pending.photos.length + pending.transitions.length;
+    const totalCount = pending.wagons.length + pending.voiceActions.length + pending.inspections.length +
+      pending.checklist.length + pending.photos.length + pending.transitions.length;
 
     if (totalCount === 0) {
       return {
@@ -662,6 +724,7 @@ class MultiEntityOfflineDbManager {
        * alongside its own registration lands on a wagon that exists.
        */
       wagons: pending.wagons,
+      voiceActions: pending.voiceActions,
       records: pending.inspections,
       checklistItems: pending.checklist,
       photos: pending.photos,
@@ -727,6 +790,7 @@ class MultiEntityOfflineDbManager {
       };
 
       await settle(STORE_PENDING_WAGONS, pending.wagons);
+      await settle(STORE_PENDING_VOICE, pending.voiceActions);
       await settle(STORE_PENDING_INSPECTIONS, pending.inspections);
       await settle(STORE_PENDING_CHECKLIST, pending.checklist);
       await settle(STORE_PENDING_PHOTOS, pending.photos);

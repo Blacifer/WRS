@@ -11,7 +11,7 @@ import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { requireCapability } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
-import { logAuditEvent } from '../db/auditLog.ts';
+import { applyVoiceAction } from '../voice/action.ts';
 import type {
   VoiceActionRequest,
   VoiceActionResponse,
@@ -228,69 +228,35 @@ checklistRouter.post('/voice-action', authMiddleware, async (req: Request, res: 
       }
     }
 
-    let updatedItem: any = null;
-
-    if (targetItem) {
-      let effectiveRepairAction = repairAction || targetItem.repairAction || null;
-      if (normalizedStatus === 'REPAIRED' && !effectiveRepairAction) {
-        effectiveRepairAction = 'REPAIRED';
-      } else if (normalizedStatus === 'REPLACED' && !effectiveRepairAction) {
-        effectiveRepairAction = 'REPLACED_NEW';
-      }
-
-      updatedItem = repo.updateChecklistItem(targetItem.id, {
-        status: normalizedStatus,
-        conditionNotes: defectNotes !== undefined ? defectNotes : targetItem.conditionNotes,
-        repairAction: effectiveRepairAction,
-        repairNotes: repairNotes !== undefined ? repairNotes : targetItem.repairNotes,
-        reinspectedStatus: ['REPAIRED', 'REPLACED'].includes(normalizedStatus) ? 'PASS' : null
-      });
-    } else {
-      const effectiveCategory: CASNUBCategory = (category as CASNUBCategory) || 'SPRINGS';
-      const effectivePartName = itemName || `Component (${effectiveCategory})`;
-
-      updatedItem = repo.upsertChecklistItem({
+    /*
+     * Applied through the shared writer, which the offline sync also uses.
+     *
+     * This route had its own copy of "what a spoken verdict records", and the
+     * offline path had a poorer one that dropped the transcript entirely. Two
+     * implementations of the same rule drift, and the one that drifts is the
+     * offline one, because it is the one nobody watches.
+     */
+    const { item: updatedItem, auditLogId } = applyVoiceAction(
+      getDatabase(),
+      repo,
+      {
         wagonNumber: normalizedWagonNumber,
-        category: effectiveCategory,
-        partName: effectivePartName,
-        bogiePosition: (bogiePosition as any) || 'BOGIE_1',
+        itemId,
+        itemName,
+        category,
+        bogiePosition,
         status: normalizedStatus,
-        conditionNotes: defectNotes || null,
-        repairAction: normalizedStatus === 'REPAIRED' ? 'REPAIRED' : (normalizedStatus === 'REPLACED' ? 'REPLACED_NEW' : null),
-        repairNotes: repairNotes || null,
-        inspectorId,
-        inspectorName
-      });
-    }
-
-    // 3. Insert into immutable audit log
-    const db = getDatabase();
-    const auditId = `audit_voice_${crypto.randomUUID().replace(/-/g, '')}`;
-    const auditPayload = {
-      wagonNumber: normalizedWagonNumber,
-      wagonId: wagonId || updatedItem.wagonId || null,
-      itemId: updatedItem.id,
-      itemName: updatedItem.partName,
-      category: updatedItem.category,
-      status: normalizedStatus,
-      defectNotes: defectNotes || null,
-      repairAction: updatedItem.repairAction || null,
-      transcript,
-      language,
-      confidence: typeof confidence === 'number' ? confidence : 1.0,
-      inputSource: 'VOICE_DICTATION',
-      recordedAt: timestamp
-    };
-
-    logAuditEvent(db, {
-      id: auditId,
-      inspectionId: inspectionId || null,
-      eventType: 'CHECKLIST_ITEM_INSPECTED',
-      userId: inspectorId,
-      userRole,
-      payload: auditPayload,
-      createdAt: timestamp
-    });
+        defectNotes,
+        repairAction,
+        repairNotes,
+        transcript,
+        language,
+        confidence,
+        timestamp,
+        inspectionId
+      },
+      { inspectorId, inspectorName, userRole }
+    );
 
     const statusMapEn: Record<PartInspectionStatus, string> = {
       PENDING: 'PENDING',
@@ -316,7 +282,7 @@ checklistRouter.post('/voice-action', authMiddleware, async (req: Request, res: 
       messageHi: `${updatedItem.partName} के लिए स्थिति ${statusMapHi[normalizedStatus]} के साथ ध्वनि निरीक्षण दर्ज किया गया।`,
       data: {
         item: updatedItem,
-        auditLogId: auditId,
+        auditLogId,
         actionRecorded: {
           wagonNumber: normalizedWagonNumber,
           itemId: updatedItem.id,

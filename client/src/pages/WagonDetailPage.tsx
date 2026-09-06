@@ -585,26 +585,31 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
               confidence: result.confidence || 0.95
             });
           } else {
-            await offlineDb.enqueueChecklistItem({
+            /*
+             * Queued as a voice action, not as a bare checklist change.
+             *
+             * Spoken online, "condemn brake block, visible crack" records the
+             * verdict, the defect note AND the transcript, in the append-only
+             * log. Offline this used to queue the status alone — so the
+             * verdict survived and the evidence for it did not, and nobody
+             * could afterwards check that the words were what was actually
+             * said. On a spoken instruction the transcript is the whole
+             * provenance.
+             *
+             * The sync applies it through the same function the live route
+             * uses, so an offline verdict lands as the same record.
+             */
+            await offlineDb.enqueueVoiceAction({
               wagonNumber,
+              itemId: targetItem.id,
+              itemName: targetItem.partName,
               category: targetItem.category,
-              partName: targetItem.partName,
               bogiePosition: targetItem.bogiePosition,
               status: result.status,
-              /*
-               * The reason, which this dropped.
-               *
-               * Spoken online, "condemn brake block, visible crack" records
-               * the verdict and the defect. Spoken offline it recorded the
-               * verdict alone, so a condemnation arrived with no evidence
-               * behind it — and a condemnation without a reason is the one
-               * thing a supervisor cannot act on.
-               *
-               * The transcript and the confidence have no home in this queue
-               * and are still lost offline; the note is the part that matters
-               * to the person reading the record afterwards.
-               */
-              conditionNotes: result.defectNotes || targetItem.conditionNotes || undefined
+              defectNotes: result.defectNotes || targetItem.conditionNotes || null,
+              transcript: result.transcript || result.rawTranscript || '',
+              language: 'en-IN',
+              confidence: result.confidence || 0.95
             });
           }
           loadWagonData();

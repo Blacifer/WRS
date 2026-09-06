@@ -10,6 +10,7 @@ import { InspectionRepository } from '../db/repository.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
 import { authMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
+import { applyVoiceAction } from '../voice/action.ts';
 
 export const syncRouter = Router();
 
@@ -46,6 +47,7 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
       wagons = [],
       transitions = [],
       checklistItems = [],
+      voiceActions = [],
       photos = [],
       deviceId,
       syncTimestamp
@@ -60,6 +62,7 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
     let syncedWagons = 0;
     let syncedTransitions = 0;
     let syncedChecklistItems = 0;
+    let syncedVoiceActions = 0;
     let syncedPhotos = 0;
 
     const syncedRecords: Array<{ clientTempId?: string; serverId: string; sequenceNumber?: number }> = [];
@@ -229,6 +232,49 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
       }
     }
 
+    // 3b. Process Voice Actions
+    //
+    // A spoken verdict captured with no network. Queued as its own entity
+    // rather than flattened into a checklist item, because the transcript is
+    // the provenance: without it nobody can afterwards check that "condemn
+    // brake block, visible crack" is what was actually said. Applied through
+    // the same function the live route uses, so the two cannot drift.
+    if (Array.isArray(voiceActions)) {
+      for (const va of voiceActions) {
+        try {
+          if (!va?.wagonNumber || !va?.status || !va?.transcript) {
+            throw new Error('A queued voice action needs a wagon, a status and the transcript.');
+          }
+          applyVoiceAction(
+            getDatabase(),
+            wagonRepo,
+            {
+              wagonNumber: va.wagonNumber,
+              itemId: va.itemId ?? null,
+              itemName: va.itemName ?? null,
+              category: va.category ?? null,
+              bogiePosition: va.bogiePosition ?? null,
+              status: va.status,
+              defectNotes: va.defectNotes ?? null,
+              transcript: va.transcript,
+              language: va.language,
+              confidence: va.confidence,
+              // The moment it was spoken, not the moment it synced.
+              timestamp: va.createdAt || va.timestamp
+            },
+            { inspectorId: actorId, inspectorName: actorName, userRole: actorRole }
+          );
+          syncedVoiceActions++;
+        } catch (err: any) {
+          errors.push({
+            clientTempId: va?.clientTempId,
+            entity: 'VOICE_ACTION',
+            error: err.message || 'Failed to sync voice action'
+          });
+        }
+      }
+    }
+
     // 4. Process Transitions
     if (Array.isArray(transitions)) {
       for (const tr of transitions) {
@@ -295,6 +341,7 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
       syncedWagons,
       syncedTransitions,
       syncedChecklistItems,
+      syncedVoiceActions,
       syncedPhotos,
       failedCount: errors.length,
       // Surfaced so the device can tell the inspector which of their offline
