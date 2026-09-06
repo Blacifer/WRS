@@ -37,7 +37,8 @@ import type {
   VoiceParseResult,
   SerializedComponent,
   ComponentStatus,
-  ComponentHealthStatus
+  ComponentHealthStatus,
+  RepairActionType
 } from '../../../shared/types.ts';
 
 
@@ -405,6 +406,56 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
    */
   const [noteDraft, setNoteDraft] = useState<{ itemId: string; text: string } | null>(null);
 
+  /*
+   * What was actually done to a part.
+   *
+   * repair_action and repair_notes have been in the database, in the API's
+   * accepted fields, in the sync payload and on this page's own display —
+   * "Action: REPAIRED (new component fitted)" — since the beginning. Nothing
+   * ever set them. So the shop could record that a part was found cracked and
+   * that it later passed, and had nowhere to say what was done in between.
+   *
+   * That is the middle of what came in / what we did / what left, and its
+   * absence is why a condition report reads "work done: not recorded" on real
+   * wagons. It is also the question a receiving railway asks first about a
+   * part that was replaced: replaced with what — new, or reconditioned?
+   *
+   * Asked the same way the condemnation reason is: after the verdict is
+   * already saved, never as a modal. A part is not held hostage to somebody
+   * finishing a sentence, which on a shop floor is how notes stop being
+   * written at all.
+   */
+  const [repairDraft, setRepairDraft] = useState<
+    { itemId: string; action: RepairActionType; notes: string } | null
+  >(null);
+
+  const saveRepair = async (item: ChecklistItem, action: RepairActionType, notes: string) => {
+    setRepairDraft(null);
+    try {
+      if (navigator.onLine) {
+        await api.updateChecklistItem(wagonNumber, item.id, {
+          status: item.status,
+          repairAction: action,
+          repairNotes: notes.trim() || undefined
+        });
+      } else {
+        await offlineDb.enqueueChecklistItem({
+          wagonNumber,
+          category: item.category,
+          partName: item.partName,
+          bogiePosition: item.bogiePosition,
+          status: item.status,
+          repairAction: action,
+          repairNotes: notes.trim() || undefined,
+          reinspectedStatus: item.reinspectedStatus || undefined
+        });
+      }
+      loadWagonData();
+    } catch {
+      // The verdict stands regardless; a failed note must not undo it.
+    }
+  };
+
   const saveNote = async (item: ChecklistItem, text: string) => {
     const trimmed = text.trim();
     setNoteDraft(null);
@@ -451,6 +502,19 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
       // the verdicts where "why" is the whole point.
       if (newStatus === 'CONDEMNED' || newStatus === 'FAIL') {
         setNoteDraft({ itemId: item.id, text: '' });
+      }
+      /*
+       * A repair verdict needs to say what the repair was. REPLACED in
+       * particular is not one fact but two — a new component and a
+       * reconditioned one carry different service lives, and the record
+       * cannot tell them apart afterwards if it was never asked.
+       */
+      if (newStatus === 'REPAIRED' || newStatus === 'REPLACED') {
+        setRepairDraft({
+          itemId: item.id,
+          action: newStatus === 'REPAIRED' ? 'REPAIRED' : 'REPLACED_NEW',
+          notes: ''
+        });
       }
     } catch (err: any) {
       alert(`Update failed: ${err.message}`);
@@ -1343,6 +1407,47 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                           </button>
                         </div>
                       )}
+                      {repairDraft?.itemId === item.id && (
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                          <select
+                            value={repairDraft.action}
+                            onChange={(e) =>
+                              setRepairDraft({ ...repairDraft, action: e.target.value as RepairActionType })
+                            }
+                            className="min-h-[44px] bg-raised border border-accent-line rounded-control px-3 text-sm text-white"
+                          >
+                            <option value="REPAIRED">{isHi ? 'मरम्मत की गई' : 'Repaired'}</option>
+                            <option value="REPLACED_NEW">{isHi ? 'नया लगाया' : 'Replaced — new'}</option>
+                            <option value="REPLACED_RECONDITIONED">
+                              {isHi ? 'रिकंडीशन्ड लगाया' : 'Replaced — reconditioned'}
+                            </option>
+                          </select>
+                          <input
+                            autoFocus
+                            data-testid="repair-note"
+                            value={repairDraft.notes}
+                            onChange={(e) => setRepairDraft({ ...repairDraft, notes: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') void saveRepair(item, repairDraft.action, repairDraft.notes);
+                            }}
+                            placeholder={isHi ? 'क्या किया गया?' : 'What was done? e.g. “new spring from stores, batch 41”'}
+                            className="flex-1 min-w-[240px] min-h-[44px] bg-raised border border-accent-line rounded-control px-3 text-sm text-white"
+                          />
+                          <button
+                            onClick={() => void saveRepair(item, repairDraft.action, repairDraft.notes)}
+                            className="min-h-[44px] px-4 rounded-control bg-white text-black text-xs font-extrabold"
+                          >
+                            {isHi ? 'कार्रवाई सहेजें' : 'Save action'}
+                          </button>
+                          <button
+                            onClick={() => setRepairDraft(null)}
+                            className="min-h-[44px] px-3 rounded-control border border-line text-ink-muted text-xs font-bold"
+                          >
+                            {isHi ? 'छोड़ें' : 'Skip'}
+                          </button>
+                        </div>
+                      )}
+
                       {/* A measurement that condemns a part somebody recorded
                           as serviceable. It is deliberately not applied — a
                           person who looked at the part is not overruled by a
