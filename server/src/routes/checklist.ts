@@ -10,6 +10,7 @@ import { authMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { requireCapability } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
+import { logAuditEvent } from '../db/auditLog.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
 import { applyVoiceAction } from '../voice/action.ts';
 import type {
@@ -84,6 +85,35 @@ checklistRouter.post('/config', authMiddleware, requireCapability('checklist.con
     return;
   }
 
+  /*
+   * Every check must be able to say where it came from.
+   *
+   * This was optional, and that is how fourteen MANDATORY Mark-50 coupler
+   * items were once built from photographs of a gauge board — for a draft gear
+   * the shop had stopped overhauling, using gauge numbers it no longer held.
+   * Every one was permanently incompletable, so every wagon's exit gate was
+   * permanently blocked. The note in db/checklistTemplate.ts records it.
+   *
+   * A source does not make a check correct. It makes it answerable: somebody
+   * can go and read the clause, and disagree with it. A check nobody can trace
+   * is one nobody can challenge, which on a safety list is worse than not
+   * having it.
+   */
+  const source = typeof standardReference === 'string' ? standardReference.trim() : '';
+  if (!source) {
+    res.status(400).json({
+      success: false,
+      error: 'MISSING_STANDARD_REFERENCE',
+      message:
+        'Every checklist item must cite where it comes from — the manual clause, the ' +
+        'RDSO specification, or the shop gauge board it is taken from. An item with no ' +
+        'source cannot be checked against anything, and cannot be challenged by anyone.',
+      statusCode: 400,
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
+
   try {
     repo.setChecklistConfig({
       wagonType,
@@ -91,7 +121,32 @@ checklistRouter.post('/config', authMiddleware, requireCapability('checklist.con
       partName,
       bogiePosition: bogiePosition || 'NONE',
       isMandatory: Boolean(isMandatory),
-      standardReference: standardReference || null
+      standardReference: source
+    });
+
+    /*
+     * Who changed what every future wagon is checked against.
+     *
+     * Recorded under CHECKLIST_ITEM_UPDATED rather than a dedicated event type
+     * because the audit log's CHECK constraint cannot be extended on databases
+     * that already exist — SQLite would require rebuilding the table, and that
+     * table is append-only and hash-chained. The payload says plainly that
+     * this is a configuration change rather than a verdict on a part.
+     */
+    logAuditEvent(getDatabase(), {
+      eventType: 'CHECKLIST_ITEM_UPDATED',
+      userId: req.user?.id || 'usr_system',
+      userRole: req.user?.role || 'SYSTEM',
+      payload: {
+        scope: 'CHECKLIST_CONFIG',
+        action: 'UPSERT',
+        wagonType,
+        category,
+        partName,
+        bogiePosition: bogiePosition || 'NONE',
+        isMandatory: Boolean(isMandatory),
+        standardReference: source
+      }
     });
 
     res.status(200).json({
@@ -127,6 +182,89 @@ checklistRouter.post('/config', authMiddleware, requireCapability('checklist.con
  * Spoken input is the least deliberate way to record a verdict, which makes
  * it the last place that should have accepted an unnamed one.
  */
+// -------------------------------------------------------------------------
+// 2b. Retire a configured rule
+//
+// Removes one line from a wagon type's checklist, so wagons registered
+// afterwards are not checked against it. Wagons already registered keep the
+// checklist they were given — a wagon is inspected against the rules that
+// applied when it arrived, and rewriting that afterwards would change what a
+// released wagon was certified against.
+//
+// This exists because the checklist has to be correctable by the people who
+// do the work. When a shop stops overhauling a component, the checks for it
+// must be removable by them, on the day, without a code change — which is
+// exactly the situation the Mark-50 items were stuck in for five days.
+// -------------------------------------------------------------------------
+
+checklistRouter.delete('/config', authMiddleware, requireCapability('checklist.configure'), async (req: AuthenticatedRequest, res: Response) => {
+  const repo = getRepo();
+  const { wagonType, category, partName, bogiePosition } = (req.body || {}) as Record<string, string>;
+
+  if (!wagonType || !category || !partName) {
+    res.status(400).json({
+      success: false,
+      error: 'MISSING_REQUIRED_FIELDS',
+      message: 'wagonType, category and partName identify the rule to retire.',
+      statusCode: 400,
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
+
+  try {
+    const removed = repo.deleteChecklistConfig({
+      wagonType, category, partName, bogiePosition: bogiePosition || 'NONE'
+    });
+
+    if (!removed) {
+      /*
+       * Nothing was removed. Usually this is a default template line, which
+       * lives in code rather than in the table — saying "retired" would be a
+       * lie, and the person would go on believing a check had been withdrawn.
+       */
+      res.status(404).json({
+        success: false,
+        error: 'RULE_NOT_CONFIGURED',
+        message:
+          `No saved rule matches "${partName}" for ${wagonType}. Standard template items ` +
+          `are part of the application's default checklist and cannot be retired here.`,
+        statusCode: 404,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    logAuditEvent(getDatabase(), {
+      eventType: 'CHECKLIST_ITEM_UPDATED',
+      userId: req.user?.id || 'usr_system',
+      userRole: req.user?.role || 'SYSTEM',
+      payload: {
+        scope: 'CHECKLIST_CONFIG',
+        action: 'RETIRE',
+        wagonType,
+        category,
+        partName,
+        bogiePosition: bogiePosition || 'NONE'
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `"${partName}" retired from the ${wagonType} checklist. Wagons already registered keep it.`,
+      meta: { timestamp: new Date().toISOString() }
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      error: 'CONFIG_RETIRE_FAILED',
+      message: err.message || 'Failed to retire checklist rule',
+      statusCode: 500,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 checklistRouter.post('/voice-action', authMiddleware, async (req: Request, res: Response) => {
   const repo = getRepo();
   const {

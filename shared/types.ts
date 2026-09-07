@@ -1484,7 +1484,8 @@ export type NavigationTab =
   | 'users'
   | 'learning'
   | 'audit'
-  | 'manual';
+  | 'manual'
+  | 'checklist_config';
 
 export interface AdminUserRecord {
   id: string;
@@ -1541,6 +1542,12 @@ const TAB_CAPABILITY: Record<string, Capability> = {
   admin: 'certificate.export',
   // Administration
   users: 'users.manage',
+  /*
+   * The shop's own checklist. Held by the administrator, not the supervisor:
+   * changing it changes what EVERY future wagon is judged against, which is a
+   * wider act than certifying any one of them.
+   */
+  checklist_config: 'checklist.configure',
   inventory: 'stores.manage'
 };
 

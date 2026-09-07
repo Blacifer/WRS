@@ -596,6 +596,53 @@ export class ApiClient {
     return this.request<{ success: boolean; data: any }>('/analytics/throughput');
   }
 
+  // =========================================================================
+  // Checklist configuration — the shop's own list
+  //
+  // The API has existed from the start and had no screen. That gap is why,
+  // when fourteen coupler items turned out to be for a draft gear the shop no
+  // longer overhauls, the only remedy was a code change and it took five days.
+  // =========================================================================
+
+  /** The configured checklist for a wagon type, or the standard template if none is saved. */
+  public async getChecklistConfig(wagonType?: string): Promise<{ success: boolean; data: any[] }> {
+    const qs = wagonType ? `?wagonType=${encodeURIComponent(wagonType)}` : '';
+    return this.request<{ success: boolean; data: any[] }>(`/checklist/config${qs}`);
+  }
+
+  /**
+   * Adds or updates one line.
+   *
+   * `standardReference` is required by the server, not optional: a check that
+   * cannot say where it comes from cannot be challenged by anyone.
+   */
+  public async upsertChecklistConfig(payload: {
+    wagonType: string;
+    category: string;
+    partName: string;
+    bogiePosition?: string;
+    isMandatory: boolean;
+    standardReference: string;
+  }): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>('/checklist/config', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  /** Retires one line. Wagons already registered keep the checklist they were given. */
+  public async retireChecklistConfig(payload: {
+    wagonType: string;
+    category: string;
+    partName: string;
+    bogiePosition?: string;
+  }): Promise<{ success: boolean; message: string }> {
+    return this.request<{ success: boolean; message: string }>('/checklist/config', {
+      method: 'DELETE',
+      body: JSON.stringify(payload)
+    });
+  }
+
   /** Whether this installation is backed up, and how large it has become. */
   public async getSystemStorage(): Promise<{ success: boolean; data: any }> {
     return this.request<{ success: boolean; data: any }>('/system/storage');

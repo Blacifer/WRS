@@ -19,6 +19,7 @@ import { WagonDetailPage } from './pages/WagonDetailPage.tsx';
 import { InspectorLandingView } from './components/InspectorLandingView.tsx';
 import { PassportQRScannerModal } from './components/PassportQRScannerModal.tsx';
 import { ManualSearchPage } from './pages/ManualSearchPage.tsx';
+import { can } from '../../shared/auth/permissions.ts';
 
 /*
  * Screens split out of the first download.
@@ -50,6 +51,9 @@ const ComponentPassportsPage = lazy(() =>
 );
 const UserManagementPage = lazy(() =>
   import('./pages/UserManagementPage.tsx').then((m) => ({ default: m.UserManagementPage }))
+);
+const ChecklistConfigPage = lazy(() =>
+  import('./pages/ChecklistConfigPage.tsx').then((m) => ({ default: m.ChecklistConfigPage }))
 );
 const LearningDashboardPage = lazy(() =>
   import('./pages/LearningDashboardPage.tsx').then((m) => ({ default: m.LearningDashboardPage }))
@@ -431,6 +435,14 @@ export const App: React.FC = () => {
         {activeTab === 'history' && !isInspector && <HistoryPage lang={currentLang} />}
         {activeTab === 'analytics' && !isInspector && <AnalyticsPage lang={currentLang} user={user} />}
         {activeTab === 'users' && user.role?.toUpperCase() === 'ADMIN' && <UserManagementPage lang={currentLang} />}
+        {/*
+          * The shop's own checklist. Gated on the capability rather than the
+          * role name, because what matters is who may change what every future
+          * wagon is judged against.
+          */}
+        {activeTab === 'checklist_config' && can(user.role, 'checklist.configure') && (
+          <ChecklistConfigPage lang={currentLang} />
+        )}
         </Suspense>
       </main>
 

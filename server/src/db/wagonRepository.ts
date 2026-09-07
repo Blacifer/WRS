@@ -997,6 +997,15 @@ export class WagonRepository {
     `).all() as any[];
   }
 
+  /**
+   * Adds or updates one line of a wagon type's checklist.
+   *
+   * `standardReference` is required by the route above, not optional as the
+   * signature once implied. A safety check with no cited source is how
+   * fourteen Mark-50 items came to be built from photographs of a gauge board
+   * for a draft gear the shop had stopped overhauling — see the note in
+   * checklistTemplate.ts. Every line must be able to say where it came from.
+   */
   public setChecklistConfig(entry: {
     wagonType: string;
     category: string;
@@ -1005,8 +1014,46 @@ export class WagonRepository {
     isMandatory: boolean;
     standardReference?: string;
   }): void {
-    const id = `cfg_${crypto.randomUUID()}`;
     const now = new Date().toISOString();
+
+    /*
+     * Materialise the standard template before accepting the first custom line.
+     *
+     * applyChecklistTemplate (above) uses the config table INSTEAD of the code
+     * template whenever any row exists for a wagon type — not in addition to
+     * it. So saving a single coupler item for BOXNHL would have replaced all
+     * forty-one mandatory checks with that one line, and every BOXNHL
+     * registered afterwards would have arrived with one check on it. Silently:
+     * nothing fails, the wagon just stops being inspected.
+     *
+     * Copying the template in first means the shop starts from the full list
+     * and edits it, which is what "configure the checklist" should mean. The
+     * trade is real and worth stating: once a wagon type is configured here it
+     * is the shop's list, so later improvements to the code template no longer
+     * reach it. That is the right way round — a shop that has taken ownership
+     * of its own safety checklist should not have lines appear in it from a
+     * software update.
+     */
+    const existing = (this.db
+      .prepare('SELECT COUNT(*) AS c FROM checklist_config WHERE wagon_type = ?')
+      .get(entry.wagonType) as { c: number }).c;
+
+    if (existing === 0) {
+      const seed = this.db.prepare(`
+        INSERT OR IGNORE INTO checklist_config (
+          id, wagon_type, category, part_name, bogie_position, is_mandatory,
+          standard_reference, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const it of CASNUB_CHECKLIST_TEMPLATE) {
+        seed.run(
+          `cfg_${crypto.randomUUID()}`, entry.wagonType, it.category, it.partName,
+          it.bogiePosition, it.isMandatory, it.std, now, now
+        );
+      }
+    }
+
+    const id = `cfg_${crypto.randomUUID()}`;
     this.db.prepare(`
       INSERT INTO checklist_config (
         id, wagon_type, category, part_name, bogie_position, is_mandatory, standard_reference, created_at, updated_at
@@ -1017,6 +1064,40 @@ export class WagonRepository {
       id, entry.wagonType, entry.category, entry.partName, entry.bogiePosition || 'NONE',
       entry.isMandatory ? 1 : 0, entry.standardReference || null, now, now
     );
+  }
+
+  /**
+   * Retires one configured line, so wagons registered afterwards are not
+   * checked against it.
+   *
+   * Wagons already registered keep the checklist they were given: their
+   * checklist_items rows are untouched. A wagon is inspected against the rules
+   * that applied when it arrived, and rewriting that retrospectively would
+   * change what a released wagon was certified against.
+   *
+   * Returns whether a row was actually removed, so the caller can tell the
+   * difference between retiring something and retiring nothing.
+   */
+  public deleteChecklistConfig(entry: {
+    wagonType: string;
+    category: string;
+    partName: string;
+    bogiePosition?: string;
+  }): boolean {
+    const before = (this.db
+      .prepare('SELECT COUNT(*) AS c FROM checklist_config')
+      .get() as { c: number }).c;
+
+    this.db.prepare(`
+      DELETE FROM checklist_config
+      WHERE wagon_type = ? AND category = ? AND part_name = ? AND bogie_position = ?
+    `).run(entry.wagonType, entry.category, entry.partName, entry.bogiePosition || 'NONE');
+
+    const after = (this.db
+      .prepare('SELECT COUNT(*) AS c FROM checklist_config')
+      .get() as { c: number }).c;
+
+    return after < before;
   }
 
   // -------------------------------------------------------------------------
