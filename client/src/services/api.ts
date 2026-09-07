@@ -1296,6 +1296,28 @@ export class ApiClient {
    * spring set is counted per class; an assembly set is counted per BOGIE,
    * since one side of a CASNUB cannot answer whether a pocket was left empty.
    */
+  /**
+   * Whether this installation is actually ready to be used.
+   *
+   * Every item comes back measured rather than declared — the Zapheit row is
+   * a live call, the audit row recomputes the chain, the password row hashes
+   * real passwords — so this can be slower than an ordinary read. That is the
+   * cost of a tick meaning something.
+   */
+  public async getSystemReadiness(): Promise<{
+    success: boolean;
+    data: {
+      ready: boolean;
+      environment: string;
+      passed: number;
+      warned: number;
+      failed: number;
+      checks: Array<{ id: string; label: string; state: 'PASS' | 'WARN' | 'FAIL'; detail: string }>;
+    };
+  }> {
+    return this.request('/system/readiness');
+  }
+
   public async getAssemblyDataset(limit?: number): Promise<{
     success: boolean;
     data: {

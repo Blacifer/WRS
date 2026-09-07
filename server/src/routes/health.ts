@@ -12,6 +12,12 @@ import { authMiddleware } from '../middleware/auth.ts';
 import { requireCapability } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { config } from '../config/index.ts';
+import { verifyPassword } from '../auth/password.ts';
+import { verifyAuditChain } from '../db/auditLog.ts';
+import { isZapheitConfigured, askZapheit } from '../ai/zapheit.ts';
+
+/** The password published in the README. Login refuses it in production. */
+const DEMO_PASSWORD = 'password123';
 
 export const healthRouter = Router();
 
@@ -145,6 +151,238 @@ healthRouter.get(
            */
           state: !newest ? 'NEVER' : (ageHours as number) <= 48 ? 'RECENT' : 'STALE'
         }
+      },
+      meta: { timestamp: new Date().toISOString() }
+    });
+  }
+);
+
+// ---------------------------------------------------------------------------
+// GET /api/system/readiness — is this installation actually ready to be used
+//
+// WHY THIS EXISTS
+// ---------------
+// Everything below was already knowable and none of it was anywhere on a
+// screen. Whether the JWT secret is still the one published in this source,
+// whether CORS is still open to any website, whether an account is still on
+// the demonstration password, whether a backup has ever run: all answerable in
+// a line of code each, and all discovered by asking somebody rather than by
+// looking.
+//
+// Every item here is MEASURED, never declared. A tick means this server just
+// checked and found it true — the Zapheit row is a live call, not the presence
+// of a key; the audit row recomputes the chain; the password row hashes real
+// passwords. A readiness panel that reported its own configuration back to
+// itself would tick green on a deployment with none of this done, which is the
+// deployment that most needs to be told.
+//
+// system.configure — the administrator's, like the storage panel. This is the
+// state of the installation, not of the workshop's work.
+// ---------------------------------------------------------------------------
+
+type ReadinessState = 'PASS' | 'WARN' | 'FAIL';
+
+interface ReadinessCheck {
+  id: string;
+  label: string;
+  state: ReadinessState;
+  detail: string;
+}
+
+/*
+ * How many accounts the demonstration-password check will hash before it
+ * stops.
+ *
+ * Each verification is a deliberate ~50 ms of PBKDF2 — that slowness is the
+ * point of the hash — and this server is one process. Left unbounded on a
+ * shop with fifty accounts it would block every other request for two and a
+ * half seconds. It yields between accounts so nothing stalls, and stops at
+ * this many, reporting how many it actually reached rather than implying it
+ * checked them all.
+ */
+const MAX_PASSWORD_CHECKS = 40;
+
+healthRouter.get(
+  '/system/readiness',
+  authMiddleware,
+  requireCapability('system.configure'),
+  async (_req: AuthenticatedRequest, res: Response): Promise<void> => {
+    const db = getDatabase();
+    const checks: ReadinessCheck[] = [];
+    const isProd = process.env.NODE_ENV === 'production';
+
+    // --- the three that decide whether this is a deployment or a laptop ---
+    checks.push({
+      id: 'node-env',
+      label: 'Running in production mode',
+      state: isProd ? 'PASS' : 'WARN',
+      detail: isProd
+        ? 'NODE_ENV=production. The demonstration accounts are refused and the startup guards are active.'
+        : `NODE_ENV is "${process.env.NODE_ENV || 'development'}". Safe for a laptop; on the workshop PC set it to production so the credential guards switch on.`
+    });
+
+    const secretIsDefault = !process.env.JWT_SECRET;
+    checks.push({
+      id: 'jwt-secret',
+      label: 'Signing secret is this installation’s own',
+      state: secretIsDefault ? 'FAIL' : 'PASS',
+      detail: secretIsDefault
+        ? 'JWT_SECRET is unset, so the built-in development secret is in use. It is published in this source code, and anyone holding it can forge a token for any user including an administrator. It also signs release certificates.'
+        : 'JWT_SECRET is set from the environment. Keep a copy somewhere other than this machine: changing it invalidates every certificate signed with it.'
+    });
+
+    const corsOpen = !process.env.CORS_ORIGIN || process.env.CORS_ORIGIN === '*';
+    checks.push({
+      id: 'cors-origin',
+      label: 'API answers only the workshop’s own address',
+      state: corsOpen ? (isProd ? 'FAIL' : 'WARN') : 'PASS',
+      detail: corsOpen
+        ? 'CORS_ORIGIN is open to any origin, so any website a signed-in person visits can call this API with their browser. Set it to the exact address the tablets load the app from.'
+        : `Pinned to ${process.env.CORS_ORIGIN}.`
+    });
+
+    // --- credentials: the check that needed the password routes to exist ---
+    const accounts = db.prepare(
+      'SELECT username, password_hash FROM users WHERE is_active = 1 AND username != ?'
+    ).all('system') as Array<{ username: string; password_hash: string }>;
+
+    const onDemoPassword: string[] = [];
+    let checkedAccounts = 0;
+    for (const a of accounts.slice(0, MAX_PASSWORD_CHECKS)) {
+      // Yield first, so a slow scan never holds the event loop against the
+      // shop floor. The bench matters more than this panel does.
+      await new Promise((r) => setImmediate(r));
+      checkedAccounts += 1;
+      if (verifyPassword(DEMO_PASSWORD, a.password_hash)) onDemoPassword.push(a.username);
+    }
+    const unchecked = Math.max(0, accounts.length - checkedAccounts);
+
+    checks.push({
+      id: 'demo-passwords',
+      label: 'No account is still on the demonstration password',
+      state: onDemoPassword.length ? (isProd ? 'FAIL' : 'WARN') : 'PASS',
+      detail: onDemoPassword.length
+        ? `${onDemoPassword.length} account(s) still use it: ${onDemoPassword.slice(0, 6).join(', ')}` +
+          `${onDemoPassword.length > 6 ? '…' : ''}. Production logins refuse this password, so these accounts cannot sign in there. ` +
+          'Set a password for each from the User Accounts screen.' +
+          (unchecked ? ` ${unchecked} further account(s) were not checked.` : '')
+        : `Checked ${checkedAccounts} active account(s).` +
+          (unchecked ? ` ${unchecked} further account(s) were not checked.` : '')
+    });
+
+    // --- the record, and whether a copy of it exists ---
+    const backupDir = path.resolve(path.dirname(config.dbPath), 'backups');
+    let newestBackupMs: number | null = null;
+    let backupCount = 0;
+    try {
+      for (const f of fs.readdirSync(backupDir)) {
+        if (!f.endsWith('.enc')) continue;
+        backupCount += 1;
+        const m = fs.statSync(path.join(backupDir, f)).mtimeMs;
+        if (newestBackupMs === null || m > newestBackupMs) newestBackupMs = m;
+      }
+    } catch { /* no directory yet is the same as no backup */ }
+
+    const backupAgeHours = newestBackupMs === null ? null : (Date.now() - newestBackupMs) / 3_600_000;
+    checks.push({
+      id: 'backup',
+      label: 'A recent encrypted backup exists',
+      state: backupAgeHours === null ? 'FAIL' : backupAgeHours <= 24 * 8 ? 'PASS' : 'WARN',
+      detail: backupAgeHours === null
+        ? 'No backup has ever been taken. server/scripts/backup-db.sh encrypts and verifies one; nothing schedules it. A weekly cron line on this host is enough.'
+        : `${backupCount} backup(s) retained, newest ${Math.floor(backupAgeHours)} hour(s) ago.`
+    });
+
+    const chain = verifyAuditChain(db);
+    checks.push({
+      id: 'audit-chain',
+      label: 'The audit chain verifies',
+      state: chain.verified ? 'PASS' : 'FAIL',
+      detail: chain.verified
+        ? `${chain.entriesChecked} entries, hashes intact. This says no record was altered after it was written — not that every reading was correct.`
+        : 'The chain does not verify. Open Audit Chain for where it breaks.'
+    });
+
+    // --- the instruments ---
+    const gaugeRows = db.prepare(
+      'SELECT gauge_code, applies_to, valid_upto FROM gauges WHERE is_active = 1'
+    ).all() as Array<{ gauge_code: string; applies_to: string | null; valid_upto: string | null }>;
+
+    const today = new Date().toISOString().slice(0, 10);
+    const inCalibration = gaugeRows.filter((g) => g.valid_upto && g.valid_upto >= today);
+    /*
+     * Scope rather than count. WMM 2.0 Chapter 6 gives a separate strip per
+     * spring position — outer 260, inner 262, snubber 294 mm nominal — so one
+     * gauge cannot serve the bench however well calibrated it is.
+     */
+    const scopes = new Set(
+      inCalibration.map((g) => (g.applies_to || '').toUpperCase()).filter(Boolean)
+    );
+    const covered = scopes.has('ALL')
+      ? ['OUTER', 'INNER', 'SNUBBER']
+      : ['OUTER', 'INNER', 'SNUBBER'].filter((p) => scopes.has(p));
+    const missing = ['OUTER', 'INNER', 'SNUBBER'].filter((p) => !covered.includes(p));
+
+    checks.push({
+      id: 'gauges',
+      label: 'A calibrated gauge for every spring position',
+      state: gaugeRows.length === 0 ? 'FAIL' : missing.length ? 'WARN' : 'PASS',
+      detail: gaugeRows.length === 0
+        ? 'No gauges in the register, so no reading can name the instrument it was taken with.'
+        : missing.length
+          ? `${inCalibration.length} of ${gaugeRows.length} gauge(s) in calibration. Nothing covers: ${missing.join(', ').toLowerCase()}. Each spring position has its own strip, so one gauge cannot stand in for another.`
+          : `${inCalibration.length} gauge(s) in calibration, covering outer, inner and snubber.`
+    });
+
+    // --- the manual, which is the citation behind every refusal ---
+    let manualPassages = 0;
+    try {
+      manualPassages = (db.prepare('SELECT COUNT(*) AS c FROM manual_passages').get() as { c: number }).c;
+    } catch { /* table absent means not indexed */ }
+    checks.push({
+      id: 'manual',
+      label: 'The manual is indexed and searchable',
+      state: manualPassages > 0 ? 'PASS' : 'WARN',
+      detail: manualPassages > 0
+        ? `${manualPassages} passages indexed. Ask the Manual quotes them with page and chapter.`
+        : 'No passages indexed. Run server/scripts/index-manual.ts so refusals can cite a clause.'
+    });
+
+    /*
+     * Zapheit is asked, not assumed.
+     *
+     * A key in the environment proves somebody pasted a key. Whether the model
+     * answers from this machine is a different question, and it is the one
+     * that matters on a shop LAN that may have no route out at all. This is
+     * also the only row here that is allowed to be absent without fault: every
+     * feature it touches falls back to what works today.
+     */
+    let zapheitState: ReadinessState = 'WARN';
+    let zapheitDetail = 'No ZAPHEIT_API_KEY set. Ask the Manual, voice entry and summaries all work without it — search stays keyword-based and voice uses the built-in parser.';
+    if (isZapheitConfigured()) {
+      const reply = await askZapheit('Reply with the single word: ready.', 'Are you reachable?', { maxTokens: 5 });
+      if (reply) {
+        zapheitState = 'PASS';
+        zapheitDetail = `Answered from this machine using ${config.zapheitModel}.`;
+      } else {
+        zapheitState = 'WARN';
+        zapheitDetail = `A key is set but ${config.zapheitBaseUrl} did not answer — no route out of this LAN, a wrong base URL or model name, or the key is not accepted. Everything falls back to working without it.`;
+      }
+    }
+    checks.push({ id: 'zapheit', label: 'Zapheit answers from this machine', state: zapheitState, detail: zapheitDetail });
+
+    const failed = checks.filter((c) => c.state === 'FAIL').length;
+    const warned = checks.filter((c) => c.state === 'WARN').length;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ready: failed === 0 && warned === 0,
+        environment: process.env.NODE_ENV || 'development',
+        passed: checks.length - failed - warned,
+        warned,
+        failed,
+        checks
       },
       meta: { timestamp: new Date().toISOString() }
     });

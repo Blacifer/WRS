@@ -27,6 +27,7 @@ import { configuredCoverage } from '../../../shared/knowledge/raipurWorkload.ts'
 import { DAILY_PILE } from '../../../shared/sorting/throughput.ts';
 import { ShopFloorNow } from '../components/ShopFloorNow.tsx';
 import { SystemStorage } from '../components/SystemStorage.tsx';
+import DeploymentReadiness from '../components/DeploymentReadiness.tsx';
 import { RecurringFindings } from '../components/RecurringFindings.tsx';
 import { VisionReadiness } from '../components/VisionReadiness.tsx';
 import { ActivityIcon, BanIcon, BarChartIcon, CoilIcon, DownloadIcon, LayersIcon, SearchIcon, TrainIcon, UserIcon } from '../components/Icons.tsx';
@@ -233,6 +234,12 @@ export const DashboardPage: React.FC = () => {
         * Administrator only, and silent for everyone else. A backup job that
         * stops running produces no error — only an absence.
         */}
+      {/*
+        * Beside the installation panel, because both answer questions about
+        * this machine rather than about the workshop's work.
+        */}
+      <DeploymentReadiness lang={lang} />
+
       <SystemStorage lang={lang} />
 
       {/* Top Banner & Export Actions */}
