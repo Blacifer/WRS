@@ -42,6 +42,17 @@ export interface VoiceActionInput {
   confidence?: number;
   /** When the words were spoken, not when they reached the server. */
   timestamp?: string;
+  /*
+   * Who read the sentence.
+   *
+   * The device's own parser handles clean phrasing and produces a verdict
+   * deterministically. When it cannot, the sentence is read by a model
+   * instead, and the resulting verdict is a different kind of claim — it
+   * carries a reading step that could be wrong in ways a regular expression
+   * cannot be. Both are recorded; an auditor should be able to tell them
+   * apart without having to reason about which phrasings the parser handles.
+   */
+  statusSource?: 'DEVICE_PARSER' | 'MODEL';
   inspectionId?: string | null;
 }
 
@@ -65,9 +76,29 @@ export function resolveVoiceTarget(allItems: any[], input: VoiceActionInput): an
     if (byId) return byId;
   }
 
+  /*
+   * The bogie the speaker named, honoured rather than discarded.
+   *
+   * A CASNUB wagon has two bogies carrying parts with identical names, so
+   * matching on the name alone returns whichever of the two happens to come
+   * first. "The second inner on bogie two looks cracked" was resolving to the
+   * inner spring on BOGIE 1 — a verdict recorded against the wrong component,
+   * which is worse than no verdict at all, because it is silently plausible.
+   *
+   * When a bogie is named, the search is confined to it and does NOT fall back
+   * to the other one. Falling back is precisely the behaviour that produced
+   * the wrong answer: if the part the speaker described is not on the bogie
+   * they said, the honest outcome is to record nothing and tell them, while
+   * they are still standing at the wagon.
+   */
+  const candidates =
+    input.bogiePosition
+      ? allItems.filter((it: any) => it.bogiePosition === input.bogiePosition)
+      : allItems;
+
   if (input.itemName) {
     const wanted = input.itemName.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const byName = allItems.find((it: any) => {
+    const byName = candidates.find((it: any) => {
       const name = it.partName.toLowerCase().replace(/[^a-z0-9]/g, '');
       return name.includes(wanted) || wanted.includes(name);
     });
@@ -75,7 +106,7 @@ export function resolveVoiceTarget(allItems: any[], input: VoiceActionInput): an
   }
 
   if (input.category) {
-    return allItems.find((it: any) => it.category === input.category) || null;
+    return candidates.find((it: any) => it.category === input.category) || null;
   }
 
   return null;
@@ -182,6 +213,7 @@ export function applyVoiceAction(
       language: input.language || 'en-IN',
       confidence: typeof input.confidence === 'number' ? input.confidence : 1.0,
       inputSource: 'VOICE_DICTATION',
+      statusSource: input.statusSource || 'DEVICE_PARSER',
       recordedAt: timestamp
     },
     createdAt: timestamp

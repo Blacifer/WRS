@@ -1390,7 +1390,16 @@ export interface VoiceActionRequest {
   itemName?: string;
   category?: CASNUBCategory;
   bogiePosition?: string;
-  status: PartInspectionStatus;
+  /*
+   * Optional, because the server can read the transcript when the device
+   * could not.
+   *
+   * This said `status: PartInspectionStatus` while the route had already been
+   * written to accept a sentence with no status and interpret it. The type
+   * made the rescue path uncallable from typed client code, which is a large
+   * part of why nothing ever called it.
+   */
+  status?: PartInspectionStatus;
   defectNotes?: string | null;
   repairAction?: RepairActionType | null;
   repairNotes?: string | null;

@@ -164,6 +164,25 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
       labelHi: 'पूर्ववत (Undo)',
       phrase: 'Undo',
       intent: 'UNDO'
+    },
+    /*
+     * The sentence this parser cannot read.
+     *
+     * Every chip above is phrasing the parser was written for, so together
+     * they only ever demonstrate the path that already worked. This one is how
+     * a fitter with his hands on a gauge actually says it, and the parser
+     * returns UNKNOWN — which is the whole reason the server can read a
+     * sentence itself.
+     *
+     * Kept alongside the others rather than hidden behind a flag: an inspector
+     * finding that this phrasing also works is the point, not a side effect.
+     */
+    {
+      id: 'chip_unparsed',
+      label: 'Spoken plainly (read by the server)',
+      labelHi: 'सामान्य बोलचाल (सर्वर पढ़ेगा)',
+      phrase: 'the second inner on bogie two looks cracked',
+      intent: 'UNKNOWN'
     }
   ];
 
@@ -344,9 +363,23 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
         onUndo();
       }
 
-      // 5. Notify Page integration callback
-      onCommandParsed(result);
     }
+
+    /*
+     * 5. Tell the page what was said — matched or not.
+     *
+     * This used to sit inside the branch above, so a sentence this parser
+     * could not read was swallowed here and the page never learned it had been
+     * spoken. The server has been able to read such a sentence for some time
+     * and never received one, because it was stopped at this line.
+     *
+     * The cue, the announcement and the undo above stay inside the branch:
+     * those act on a verdict, and there is no verdict here. Reporting is not
+     * acting. What to do with an unread sentence is the page's decision, and
+     * it has more to decide with — it knows the wagon and whether there is a
+     * network.
+     */
+    onCommandParsed(result);
 
     setTimeout(() => {
       if (shouldKeepListeningRef.current) {
@@ -589,6 +622,33 @@ export const VoiceInspectionToolbar: React.FC<VoiceInspectionToolbarProps> = ({
           )}
         </div>
       )}
+
+      {/*
+        * The simulation chips.
+        *
+        * These were fully defined and never rendered, while the status line
+        * directly above told the inspector to "click simulation chips". The
+        * app was naming a control that did not exist — and on a bench where a
+        * microphone may be refused, unavailable, or simply too loud to use,
+        * this is the only way to drive the same path by hand.
+        *
+        * They go through handleProcessTranscript, which is the identical entry
+        * point the recogniser uses. A chip is not a shortcut past the parser;
+        * it is a phrase, spoken by another means.
+        */}
+      <div className="flex flex-wrap gap-2" data-testid="voice-chips">
+        {simulationChips.map((chip) => (
+          <button
+            key={chip.id}
+            data-testid={`voice-chip-${chip.id}`}
+            onClick={() => { playActionTap(); setMicStatus('SIMULATION'); handleProcessTranscript(chip.phrase); }}
+            title={chip.phrase}
+            className="px-3 py-1.5 rounded-control border border-line bg-raised text-ink-body hover:bg-selected hover:text-ink text-[11px] font-bold transition-colors min-h-[36px]"
+          >
+            {voiceLang.startsWith('hi') ? chip.labelHi : chip.label}
+          </button>
+        ))}
+      </div>
 
       {/* Error / Fallback Notice */}
       {errorMessage && (

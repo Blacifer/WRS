@@ -252,7 +252,46 @@ describe('Voice — a sentence the device could not parse', () => {
     );
     assert.equal(voice.status, 'CONDEMNED');
 
+    /*
+     * Which reader produced the verdict.
+     *
+     * The device's parser is a regular expression and fails visibly. A model
+     * fails plausibly — it can turn a word this system does not know into one
+     * it does, which is how "scrapped" becomes CONDEMNED. That is usually the
+     * right reading and it is never a reading anybody chose, so the record has
+     * to say which of the two read the sentence. Without it an auditor cannot
+     * tell a matched phrase from an inferred one.
+     */
+    assert.equal(voice.statusSource, 'MODEL', 'a verdict the model read must say so');
+
     globalThis.fetch = originalFetch;
+  });
+
+  test('TC-ZAP-08b: a verdict the device parsed is not marked as the model’s', async () => {
+    // The other half. If everything were marked MODEL the field would say
+    // nothing, and a field that never varies is one nobody can act on.
+    (config as any).zapheitApiKey = 'test-key';
+
+    const res = await app.dispatch({
+      method: 'POST', url: '/api/checklist/voice-action', headers: auth(),
+      body: {
+        wagonNumber,
+        status: 'PASS',
+        itemName: 'Side Frame',
+        transcript: 'side frame passed'
+      }
+    });
+    assert.equal(res.status, 200, `refused: ${res.body?.message}`);
+
+    const rows = getDatabase().prepare(`
+      SELECT payload_json FROM inspection_audit_log
+      WHERE event_type = 'CHECKLIST_ITEM_INSPECTED'
+    `).all() as any[];
+
+    const parsedRows = rows.map((r) => JSON.parse(r.payload_json));
+    const mine = parsedRows.filter((p: any) => p.transcript === 'side frame passed');
+    assert.ok(mine.length > 0, 'the action should have been recorded');
+    assert.equal(mine[mine.length - 1].statusSource, 'DEVICE_PARSER');
   });
 
   test('TC-ZAP-09: a verdict the model invents cannot get in', async () => {

@@ -117,6 +117,14 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
   // Voice UI Highlighting & Undo Stack
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
+  /*
+   * What happened to a spoken sentence, said on screen.
+   *
+   * A sentence the device could not read used to vanish without a word. The
+   * inspector had no way to tell "not understood" from "understood and
+   * recorded", which on a checklist are opposite outcomes.
+   */
+  const [voiceNote, setVoiceNote] = useState<{ tone: 'good' | 'warn' | 'busy'; text: string } | null>(null);
   const [voiceUndoStack, setVoiceUndoStack] = useState<
     Array<{
       itemId: string;
@@ -541,6 +549,16 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
     }
   };
 
+  /*
+   * The words, whichever field the parser put them in.
+   *
+   * `transcript` is set when the parser matched something and cleaned it up;
+   * `rawTranscript` is what the recogniser heard. On the branch that matters
+   * here the parser matched nothing, so only the raw form exists.
+   */
+  const transcriptOf = (r: VoiceParseResult): string =>
+    ((r as any).transcript || (r as any).rawTranscript || '').trim();
+
   const handleVoiceCommand = async (result: VoiceParseResult) => {
     if (result.actionType === 'UPDATE_STATUS' && result.status) {
       const allChecklistItems = Object.values(categories).flat();
@@ -641,6 +659,57 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
       setSelectedCategory(result.categoryToSwitch);
     } else if (result.actionType === 'UNDO') {
       handleVoiceUndo();
+    } else if (transcriptOf(result)) {
+      /*
+       * The sentence the device could not read.
+       *
+       * The server can ask a model to read it, and has been able to for some
+       * time — but nothing ever sent it one. This branch did not exist, so a
+       * sentence the parser did not match was dropped where it stood: no
+       * request, no message, nothing on screen. The whole rescue path was
+       * built on both ends and joined in the middle by nobody.
+       *
+       * Online only, deliberately. There is no model on this device, so
+       * queueing an unread sentence would store something nobody can act on
+       * and hand the inspector a false impression that it was taken down.
+       * Better to say plainly that it was not understood, while they are
+       * still standing at the part.
+       */
+      const spoken = transcriptOf(result);
+      if (!navigator.onLine) {
+        setVoiceNote({ tone: 'warn', text: (isHi ? 'यह वाक्य समझ नहीं आया, और ऑफ़लाइन में इसे पढ़ा नहीं जा सकता। कृपया टैप करके दर्ज करें।' : "That sentence was not understood, and it cannot be read offline. Please tap it in.") });
+        return;
+      }
+      try {
+        setVoiceNote({ tone: 'busy', text: (isHi ? 'वाक्य पढ़ा जा रहा है…' : 'Reading that sentence…') });
+        const res = await api.recordVoiceAction({
+          wagonNumber,
+          transcript: spoken,
+          language: 'en-IN',
+          confidence: result.confidence || 0.9
+        });
+
+        const item = res?.data?.item;
+        if (item?.id) {
+          setHighlightedItemId(item.id);
+          if (item.category && item.category !== selectedCategory) setSelectedCategory(item.category);
+          setTimeout(() => setHighlightedItemId((cur) => (cur === item.id ? null : cur)), 3500);
+        }
+        /*
+         * Named, not silent. A verdict recorded from a sentence the device
+         * could not read is exactly the one the inspector should glance at
+         * before walking away.
+         */
+        setVoiceNote({
+          tone: 'good',
+          text: item?.partName
+            ? `${(isHi ? 'दर्ज किया गया —' : 'Recorded against')} ${item.partName}: ${item.status}`
+            : (isHi ? 'दर्ज कर लिया गया।' : 'Recorded.')
+        });
+        loadWagonData();
+      } catch (err: any) {
+        setVoiceNote({ tone: 'warn', text: err?.message || (isHi ? 'यह वाक्य समझ नहीं आया। कृपया टैप करके दर्ज करें।' : 'That sentence was not understood. Please tap it in.') });
+      }
     }
   };
 
@@ -1232,6 +1301,35 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
             onCategoryChange={(cat) => setSelectedCategory(cat)}
             onUndo={handleVoiceUndo}
           />
+
+          {/*
+            * What became of the last spoken sentence.
+            *
+            * Directly under the microphone, because the question it answers —
+            * "did that go in?" — is asked while looking at the microphone.
+            */}
+          {voiceNote && (
+            <div
+              data-testid="voice-note"
+              data-tone={voiceNote.tone}
+              className={`rounded-control border p-3 flex items-start justify-between gap-3 ${
+                voiceNote.tone === 'good'
+                  ? 'border-good-line bg-good-soft'
+                  : voiceNote.tone === 'busy'
+                    ? 'border-line bg-raised'
+                    : 'border-warn-line bg-warn-soft'
+              }`}
+            >
+              <p className="text-xs font-bold text-ink-body leading-snug">{voiceNote.text}</p>
+              <button
+                onClick={() => setVoiceNote(null)}
+                className="text-ink-muted hover:text-ink text-xs shrink-0"
+                aria-label={isHi ? 'बंद करें' : 'Dismiss'}
+              >
+                ✕
+              </button>
+            </div>
+          )}
 
           {/* Inspect by exception — the fast path.
               Flag what's wrong individually, then declare the rest serviceable

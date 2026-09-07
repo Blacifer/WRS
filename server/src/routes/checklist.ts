@@ -323,10 +323,14 @@ checklistRouter.post('/voice-action', authMiddleware, async (req: Request, res: 
    * dropped. And the transcript is stored unaltered either way, so what an
    * auditor reads is what was said, not what a model made of it.
    */
+  let statusSource: 'DEVICE_PARSER' | 'MODEL' = 'DEVICE_PARSER';
   if ((!status || typeof status !== 'string') && typeof transcript === 'string' && transcript.trim()) {
     const guessed = await parseVoiceIntent(transcript.trim());
     if (guessed?.status) {
       status = guessed.status;
+      // Marked here rather than inferred later. Once the field is filled in,
+      // nothing downstream can tell where the verdict came from.
+      statusSource = 'MODEL';
       if (!itemName && guessed.partName) itemName = guessed.partName;
       if (!defectNotes && guessed.defectNotes) defectNotes = guessed.defectNotes;
       if (!bogiePosition && guessed.bogiePosition) bogiePosition = guessed.bogiePosition;
@@ -427,7 +431,8 @@ checklistRouter.post('/voice-action', authMiddleware, async (req: Request, res: 
         language,
         confidence,
         timestamp,
-        inspectionId
+        inspectionId,
+        statusSource
       },
       { inspectorId, inspectorName, userRole }
     );
