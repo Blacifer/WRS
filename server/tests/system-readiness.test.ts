@@ -81,15 +81,31 @@ describe('Deployment readiness', () => {
     assert.doesNotMatch(demo.detail, /inspector1(,|\b)/, 'inspector1 no longer uses the demo password');
   });
 
-  it('TC-RDY-04: Zapheit is reported as absent rather than failed when no key is set', async () => {
-    // Absence is the ordinary case on a shop LAN, and every feature falls back.
-    // Reporting it as a failure would push somebody to "fix" a working system.
+  it('TC-RDY-04: Zapheit is never reported as a failure, configured or not', async () => {
+    /*
+     * The invariant, not the state.
+     *
+     * This first asserted WARN outright, and went red the moment a real key
+     * was put in the environment — the test was reading the developer's own
+     * .env and calling a working integration a failure. What actually matters
+     * holds either way: absence is the ordinary case on a shop LAN, every
+     * feature falls back, and a red row would push somebody to "fix" a system
+     * that is working.
+     */
     const token = await signIn(app, 'admin1');
     const res = await call(app, 'GET', '/api/system/readiness', undefined, { authorization: `Bearer ${token}` });
 
     const z = findCheck(res.body, 'zapheit');
-    assert.strictEqual(z.state, 'WARN');
-    assert.match(z.detail, /work(s)? without it|fall(s)? back|ZAPHEIT_API_KEY/i);
+    assert.notStrictEqual(z.state, 'FAIL', 'Zapheit must never be a hard failure — everything falls back without it');
+
+    if (z.state === 'WARN') {
+      // Either no key, or a key that did not answer. Both must say what the
+      // reader can do, and both must say that nothing is broken meanwhile.
+      assert.match(z.detail, /work(s)? without it|fall(s)? back|falls back|ZAPHEIT_API_KEY|did not answer/i);
+    } else {
+      // Green only ever means it actually answered from this machine.
+      assert.match(z.detail, /answered/i);
+    }
   });
 
   it('TC-RDY-05: the audit row reflects a real chain walk', async () => {

@@ -228,7 +228,7 @@ export class ComponentRepository {
       const historyRows = this.db.prepare(`
         SELECT * FROM component_history
         WHERE UPPER(TRIM(serial_number)) = ? OR component_id = ?
-        ORDER BY created_at DESC
+        ORDER BY created_at DESC, rowid DESC
       `).all(normalized, component.id) as Record<string, unknown>[];
 
       history = historyRows.map(r => this.mapHistoryRow(r));
@@ -266,7 +266,7 @@ export class ComponentRepository {
       const historyRows = this.db.prepare(`
         SELECT * FROM component_history
         WHERE component_id = ? OR UPPER(TRIM(serial_number)) = ?
-        ORDER BY created_at DESC
+        ORDER BY created_at DESC, rowid DESC
       `).all(component.id, component.serialNumber.toUpperCase()) as Record<string, unknown>[];
 
       history = historyRows.map(r => this.mapHistoryRow(r));
@@ -330,7 +330,7 @@ export class ComponentRepository {
       const historyRows = this.db.prepare(`
         SELECT * FROM component_history
         WHERE component_id = ? OR UPPER(TRIM(serial_number)) = ?
-        ORDER BY created_at DESC
+        ORDER BY created_at DESC, rowid DESC
       `).all(component.id, component.serialNumber.toUpperCase()) as Record<string, unknown>[];
 
       history = historyRows.map(r => this.mapHistoryRow(r));

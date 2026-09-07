@@ -2013,7 +2013,7 @@ export class WagonRepository {
   public getSwtHistory(wagonNumber: string): any[] {
     return (this.db.prepare(`
       SELECT id, pipe_type, load_condition, passed, failed_refs, tester_name, created_at
-      FROM swt_tests WHERE wagon_number = ? ORDER BY created_at DESC
+      FROM swt_tests WHERE wagon_number = ? ORDER BY created_at DESC, rowid DESC
     `).all(wagonNumber.trim().toUpperCase()) as any[]).map((r) => ({ ...r, passed: r.passed === 1 }));
   }
 
@@ -2075,7 +2075,7 @@ export class WagonRepository {
     }
 
     const rows = this.db.prepare(`
-      SELECT * FROM wagon_photos WHERE ${whereClauses.join(' AND ')} ORDER BY created_at DESC
+      SELECT * FROM wagon_photos WHERE ${whereClauses.join(' AND ')} ORDER BY created_at DESC, rowid DESC
     `).all(...bindParams) as any[];
 
     return rows.map(r => this.mapPhotoRow(r));
@@ -2083,7 +2083,7 @@ export class WagonRepository {
 
   public getPhotosByChecklistItem(checklistItemId: string): any[] {
     const rows = this.db.prepare(`
-      SELECT * FROM wagon_photos WHERE checklist_item_id = ? ORDER BY created_at DESC
+      SELECT * FROM wagon_photos WHERE checklist_item_id = ? ORDER BY created_at DESC, rowid DESC
     `).all(checklistItemId) as any[];
 
     return rows.map(r => this.mapPhotoRow(r));
@@ -2436,12 +2436,12 @@ export class WagonRepository {
       rows = this.db.prepare(`
         SELECT * FROM acoustic_diagnostics
         WHERE wagon_number = ?
-        ORDER BY created_at DESC
+        ORDER BY created_at DESC, rowid DESC
       `).all(wagonNumber.trim().toUpperCase()) as any[];
     } else {
       rows = this.db.prepare(`
         SELECT * FROM acoustic_diagnostics
-        ORDER BY created_at DESC
+        ORDER BY created_at DESC, rowid DESC
         LIMIT 100
       `).all() as any[];
     }

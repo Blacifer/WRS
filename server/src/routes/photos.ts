@@ -228,7 +228,7 @@ photosRouter.get(
                inspector_name${includeImages ? ', image_data' : ''}
         FROM wagon_photos
         WHERE tags_json LIKE '%DEFECT_EVIDENCE%'
-        ORDER BY created_at DESC
+        ORDER BY created_at DESC, rowid DESC
         LIMIT ?
       `).all(limit) as any[];
 
@@ -316,7 +316,7 @@ photosRouter.get(
                inspector_name${includeImages ? ', image_data' : ''}
         FROM wagon_photos
         WHERE tags_json LIKE '%${ASSEMBLY_EVIDENCE_TAG}%'
-        ORDER BY created_at DESC
+        ORDER BY created_at DESC, rowid DESC
         LIMIT ?
       `).all(limit) as any[];
 
