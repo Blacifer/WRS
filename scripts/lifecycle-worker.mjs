@@ -9,8 +9,16 @@
  */
 /** One process, driving wagons through the whole lifecycle to release. */
 process.env.DB_PATH = process.argv[2];
-const { createApp } = await import('/Users/patty/Desktop/WRS_Raipur/server/src/app.ts');
-const { generateToken } = await import('/Users/patty/Desktop/WRS_Raipur/server/src/auth/jwt.ts');
+/*
+ * Relative to this file, not to the machine it was written on.
+ *
+ * These were absolute paths into a developer's home directory. Locally that
+ * works and hides itself; on CI the imports resolved to nothing, every worker
+ * died before printing anything, and the drill reported "worker produced no
+ * result" — true, and useless.
+ */
+const { createApp } = await import('../server/src/app.ts');
+const { generateToken } = await import('../server/src/auth/jwt.ts');
 
 const [, , dbPath, tag, countStr] = process.argv;
 const app = createApp(dbPath);

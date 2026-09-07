@@ -54,12 +54,24 @@ console.log(`  database: ${dbPath}`);
 const run = (tag, count) => new Promise((resolve) => {
   const p = spawn(process.execPath,
     ['--experimental-strip-types', path.join(HERE, 'lifecycle-worker.mjs'), dbPath, tag, String(count)],
-    { stdio: ['ignore', 'pipe', 'ignore'] });
+    // stderr was 'ignore', so a worker that failed to start took its reason
+    // with it and this printed "worker produced no result". That is the same
+    // silent failure this drill exists to catch, committed by the drill.
+    { stdio: ['ignore', 'pipe', 'pipe'] });
+
   let out = '';
+  let err = '';
   p.stdout.on('data', (c) => { out += c; });
-  p.on('close', () => {
-    try { resolve(JSON.parse(out.trim().split('\n').pop())); }
-    catch { resolve({ tag, released: [], failures: ['worker produced no result'] }); }
+  p.stderr.on('data', (c) => { err += c; });
+
+  p.on('close', (code) => {
+    try {
+      resolve(JSON.parse(out.trim().split('\n').pop()));
+    } catch {
+      const why = err.split('\n').filter((l) => l && !/ExperimentalWarning|trace-warnings/.test(l))
+        .slice(0, 3).join(' | ') || `exit ${code} with no output`;
+      resolve({ tag, released: [], failures: [`worker ${tag} did not run: ${why}`] });
+    }
   });
 });
 
@@ -78,6 +90,14 @@ console.log(`  ${WORKERS} processes, ${PER_WORKER} wagons each, in ${seconds}s`)
 console.log('  wagons released        :', released.length, 'of', WORKERS * PER_WORKER);
 console.log('  distinct certificates  :', new Set(released).size);
 if (failures.length) console.log('  failures               :', failures.slice(0, 3).join(' ;; '));
+
+if (!fs.existsSync(dbPath)) {
+  // Nothing ran, so there is nothing to verify. Opening it here produced
+  // "unable to open database file", which buried the actual reason printed
+  // three lines earlier.
+  console.log('\n  FAIL — no database was created; the workers never ran. See the reasons above.');
+  process.exit(1);
+}
 
 const db = new DatabaseSync(dbPath, { readOnly: true });
 
