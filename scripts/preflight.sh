@@ -78,6 +78,12 @@ step "Production build"           npm run build
 # cross-process fault no suite can reach, so it is not optional.
 step "Concurrent lifecycle drill" node --experimental-strip-types scripts/concurrent-lifecycle-drill.mjs
 
+# The backup path, which had never been run by anybody. It needs no browser
+# and no server — only sqlite3 and openssl — and it works in a temporary
+# directory with a throwaway key, so it is safe to run every time and there is
+# no reason to make it optional. See scripts/backup-drill.sh.
+step "Backup and restore drill"      bash scripts/backup-drill.sh
+
 # ---------------------------------------------------------------------------
 # The two that need a browser. Reported honestly rather than skipped silently.
 #

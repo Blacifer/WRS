@@ -289,7 +289,7 @@ healthRouter.get(
       label: 'A recent encrypted backup exists',
       state: backupAgeHours === null ? 'FAIL' : backupAgeHours <= 24 * 8 ? 'PASS' : 'WARN',
       detail: backupAgeHours === null
-        ? 'No backup has ever been taken. server/scripts/backup-db.sh encrypts and verifies one; nothing schedules it. A weekly cron line on this host is enough.'
+        ? 'No backup has ever been taken. server/scripts/backup-db.sh encrypts and verifies one; nothing schedules it. A weekly cron line on this host is enough, and scripts/backup-drill.sh proves the whole round trip — backup, restore, and refusal of a tampered file — before you need it.'
         : `${backupCount} backup(s) retained, newest ${Math.floor(backupAgeHours)} hour(s) ago.`
     });
 
