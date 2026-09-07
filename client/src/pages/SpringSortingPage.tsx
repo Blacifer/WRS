@@ -136,7 +136,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
    * whatever that gauge's calibration was worth at the moment it was taken.
    */
   const [gauges, setGauges] = useState<Array<{
-    gaugeCode: string; description: string;
+    gaugeCode: string; description: string; appliesTo: string | null;
     calibrationState: 'VALID' | 'EXPIRED' | 'UNRECORDED' | 'NO_GAUGE_NAMED';
     calibrationSummary: string;
   }>>([]);
@@ -167,6 +167,29 @@ export function SpringSortingPage({ lang, onClose }: Props) {
   }, [gaugeCode]);
 
   const selectedGauge = gauges.find(g => g.gaugeCode === gaugeCode) || null;
+
+  /*
+   * A gauge that cannot measure the spring being sorted.
+   *
+   * One gauge on the bench is pre-selected, being the only one — so an
+   * inspector who moves from snubbers to outers keeps SSG-02 named against
+   * every reading, and SSG-02 is a snubber gauge. The bands are not close:
+   * WMM 2.0 Chapter 6 puts outer springs at 260-245 mm and snubbers at
+   * 294-279 mm, so the reading is not slightly wrong, it is from a different
+   * instrument entirely.
+   *
+   * Said rather than enforced. The shop may have a reason this system has not
+   * been told, and inventing a rule from a label is the mistake that put
+   * fourteen Mark-50 checks on every wagon. What the app can honestly do is
+   * put the gauge's own stated scope next to the spring in hand and let the
+   * person decide.
+   */
+  const gaugeMismatch =
+    selectedGauge?.appliesTo &&
+    selectedGauge.appliesTo !== 'ALL' &&
+    !String(position).startsWith(selectedGauge.appliesTo)
+      ? selectedGauge
+      : null;
 
   /*
    * Why a spring was condemned, not merely that it was.
@@ -1026,6 +1049,14 @@ export function SpringSortingPage({ lang, onClose }: Props) {
                 ))}
               </select>
             </div>
+
+            {gaugeMismatch && (
+              <p className="text-[11px] text-warn-ink/90 mt-1.5 font-semibold" data-testid="gauge-scope-warning">
+                {isHi
+                  ? `${gaugeMismatch.gaugeCode} ${gaugeMismatch.appliesTo} स्प्रिंग के लिए है, और अभी ${position} छँट रही है।`
+                  : `${gaugeMismatch.gaugeCode} is a ${gaugeMismatch.appliesTo?.toLowerCase()} gauge and you are sorting ${String(position).toLowerCase().replace(/_/g, ' ')} springs. It will still be recorded against these readings.`}
+              </p>
+            )}
 
             {selectedGauge && selectedGauge.calibrationState !== 'VALID' && (
               <p className="text-[11px] text-warn-ink/90 mt-1.5 font-semibold" data-testid="gauge-calibration-warning">
