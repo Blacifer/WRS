@@ -80,22 +80,55 @@ step "Concurrent lifecycle drill" node --experimental-strip-types scripts/concur
 
 # ---------------------------------------------------------------------------
 # The two that need a browser. Reported honestly rather than skipped silently.
+#
+# Both need the API as well as a page to load, and the API is checked
+# separately: when :3000 was down, both drills failed with a browser timeout
+# and a SecurityError, neither of which says "the server is not running". A
+# check that fails for a reason it cannot name costs more time than no check.
+#
+# The offline drill is then run against a PREVIEW OF THE BUILT CLIENT that
+# this script starts itself. vite-plugin-pwa registers no service worker in
+# dev, so against :5173 the reopen-while-offline step can never pass — which
+# meant the drill was skipped in every ordinary run. Skipping it every time is
+# how it went stale in the first place, so the gate now makes its own
+# conditions rather than waiting for someone to arrange them.
 # ---------------------------------------------------------------------------
+PREVIEW_PID=""
+stop_preview() {
+  if [ -n "$PREVIEW_PID" ]; then kill "$PREVIEW_PID" 2>/dev/null; PREVIEW_PID=""; fi
+}
+trap stop_preview EXIT
+
 if ! node -e "import('playwright')" >/dev/null 2>&1; then
   skip "Role walkthrough" "playwright not installed"
   skip "Offline drill"    "playwright not installed"
-elif ! curl -s -o /dev/null --max-time 2 http://localhost:5173; then
-  skip "Role walkthrough" "nothing serving on :5173"
-  skip "Offline drill"    "nothing serving on :5173"
+elif ! curl -s -o /dev/null --max-time 2 http://localhost:3000/api/health; then
+  skip "Role walkthrough" "the API is not answering on :3000"
+  skip "Offline drill"    "the API is not answering on :3000"
 else
-  step "Role walkthrough" node scripts/role-walkthrough.mjs
-  # The offline drill needs the BUILT client for its service worker; against a
-  # dev server the reopen-while-offline step cannot pass, so it is reported as
-  # not run rather than failed.
-  if curl -s http://localhost:5173 | grep -q "/@vite/client"; then
-    skip "Offline drill" "dev server has no service worker — needs the built client"
+  if curl -s -o /dev/null --max-time 2 http://localhost:5173; then
+    step "Role walkthrough" node scripts/role-walkthrough.mjs
   else
-    step "Offline drill" node scripts/offline-drill.mjs
+    skip "Role walkthrough" "nothing serving on :5173"
+  fi
+
+  # The production build ran above, so client/dist is current.
+  if [ -f client/dist/sw.js ]; then
+    npm run preview --prefix client >/tmp/wrs_preflight_preview.log 2>&1 &
+    PREVIEW_PID=$!
+    preview_up=0
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      if curl -s -o /dev/null --max-time 2 http://localhost:4173; then preview_up=1; break; fi
+      sleep 1
+    done
+    if [ "$preview_up" -eq 1 ]; then
+      DRILL_URL=http://localhost:4173 step "Offline drill" node scripts/offline-drill.mjs
+    else
+      skip "Offline drill" "the preview server did not come up on :4173"
+    fi
+    stop_preview
+  else
+    skip "Offline drill" "client/dist/sw.js missing — the production build did not produce a service worker"
   fi
 fi
 

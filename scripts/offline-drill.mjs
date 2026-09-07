@@ -50,7 +50,27 @@ import { chromium } from 'playwright';
  * An ambiguous pass is worse than a failure, because it is the reading
  * somebody takes to mean everything worked.
  */
+/*
+ * Where to drive.
+ *
+ * Defaults to the dev server, but the reopen-while-offline step below can
+ * only pass against the BUILT app: vite-plugin-pwa does not register the
+ * service worker in dev, so a tab reopened offline against `npm run dev` gets
+ * nothing at all. Point this at a `vite preview` of the production bundle to
+ * exercise the configuration the shop actually runs.
+ */
+const BASE = process.env.DRILL_URL || 'http://localhost:5173';
+
 async function queueDepth(p) {
+  /*
+   * IndexedDB belongs to an origin, so a page sitting on about:blank cannot
+   * read it and throws SecurityError. That happens for one specific reason —
+   * the tab was reopened offline and no service worker served the shell — and
+   * saying that is far more use than a stack trace about IDBFactory.
+   */
+  if (!p.url().startsWith('http')) {
+    return 'no page — the tab could not reopen offline (no service worker served the shell)';
+  }
   return p.evaluate(() => new Promise((resolve) => {
     const req = indexedDB.open('wrs_raipur_pwa_offline_db_v2');
     req.onerror = () => resolve('unreadable');
@@ -86,7 +106,7 @@ async function openSorting(p) {
   await p.waitForTimeout(2500);
 }
 
-await page.goto('http://localhost:5173', { waitUntil: 'networkidle' });
+await page.goto(BASE, { waitUntil: 'networkidle' });
 await page.fill('input[type="text"]', 'inspector1');
 await page.fill('input[type="password"]', 'password123');
 await page.click('button[type="submit"]');
@@ -119,7 +139,7 @@ console.log('after sorting 12 offline, queued:', await queueDepth(page));
 await page.close();
 const page2 = await ctx.newPage();
 page2.on('pageerror', e => errs.push('PAGEERROR(2): ' + e.message));
-await page2.goto('http://localhost:5173', { waitUntil: 'domcontentloaded' }).catch(() => {});
+await page2.goto(BASE, { waitUntil: 'domcontentloaded' }).catch(() => {});
 await page2.waitForTimeout(3000);
 console.log('after closing and reopening the tab, still offline, queued:', await queueDepth(page2));
 
@@ -130,6 +150,8 @@ await page2.waitForTimeout(9000);
 const drained = await queueDepth(page2);
 console.log('after reconnecting, queued:', drained, drained === 0 ? '— drained' : '— STILL QUEUED');
 
-console.log('batch:', batchId);
+// Context only — nothing here asserts on it, and a shift with no open batch
+// is a normal state. Said plainly so "batch: null" is not read as a fault.
+console.log('batch on screen:', batchId || 'none open (not a failure — informational)');
 console.log('ERRORS:', errs.length ? errs.slice(0, 4).join(' ;; ') : 'none');
 await b.close();

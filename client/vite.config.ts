@@ -124,6 +124,31 @@ export default defineConfig({
       }
     }
   },
+  /*
+   * The built app, served locally.
+   *
+   * `server.proxy` does not apply to `vite preview`, so without this the
+   * production bundle could not reach the API at all and could only be
+   * exercised by deploying it. That matters more than it sounds: the service
+   * worker is NOT registered by vite-plugin-pwa in dev, so `npm run dev` can
+   * never demonstrate that the app survives a closed tab offline — the one
+   * thing the shop floor depends on when the LAN drops. Only the built app
+   * can, and only if it can be run.
+   *
+   * Found by the offline drill, which reopened a tab offline against the dev
+   * server, got a blank page because no worker was there to serve the shell,
+   * and failed reading IndexedDB on about:blank.
+   */
+  preview: {
+    port: 4173,
+    allowedHosts: ['.trycloudflare.com', '.ngrok-free.app', '.ngrok.io', 'localhost'],
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true
+      }
+    }
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,
