@@ -11,6 +11,7 @@ import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { requireCapability } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { logAuditEvent } from '../db/auditLog.ts';
+import { parseVoiceIntent } from '../ai/zapheit.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
 import { applyVoiceAction } from '../voice/action.ts';
 import type {
@@ -267,16 +268,23 @@ checklistRouter.delete('/config', authMiddleware, requireCapability('checklist.c
 
 checklistRouter.post('/voice-action', authMiddleware, async (req: Request, res: Response) => {
   const repo = getRepo();
+  /*
+   * `let` rather than `const` because four of these can be filled in below
+   * from the transcript when the device could not parse the sentence itself.
+   * Nothing else about them changes.
+   */
+  let {
+    itemName,
+    bogiePosition,
+    status,
+    defectNotes
+  } = req.body as VoiceActionRequest;
   const {
     wagonNumber,
     wagonId,
     inspectionId,
     itemId,
-    itemName,
     category,
-    bogiePosition,
-    status,
-    defectNotes,
     repairAction,
     repairNotes,
     transcript,
@@ -295,6 +303,34 @@ checklistRouter.post('/voice-action', authMiddleware, async (req: Request, res: 
       timestamp: new Date().toISOString()
     });
     return;
+  }
+
+  /*
+   * A sentence the device could not parse.
+   *
+   * The client's parser handles clean phrasing — "brake block condemned". It
+   * does not handle how people actually talk with their hands on a gauge:
+   * "the second inner on bogie two looks cracked". Rather than refuse that
+   * and send the inspector back to typing, the sentence is read here.
+   *
+   * Strictly a rescue, not a route. When the device already worked out the
+   * status, nothing is sent anywhere — no latency and no dependency on the
+   * ordinary path. When Zapheit is unconfigured or unreachable, this returns
+   * nothing and the refusal below stands exactly as it did before.
+   *
+   * The model may fill in the fields. It may not invent a verdict: a status it
+   * returns is checked against the five this system has, and anything else is
+   * dropped. And the transcript is stored unaltered either way, so what an
+   * auditor reads is what was said, not what a model made of it.
+   */
+  if ((!status || typeof status !== 'string') && typeof transcript === 'string' && transcript.trim()) {
+    const guessed = await parseVoiceIntent(transcript.trim());
+    if (guessed?.status) {
+      status = guessed.status;
+      if (!itemName && guessed.partName) itemName = guessed.partName;
+      if (!defectNotes && guessed.defectNotes) defectNotes = guessed.defectNotes;
+      if (!bogiePosition && guessed.bogiePosition) bogiePosition = guessed.bogiePosition;
+    }
   }
 
   if (!status || typeof status !== 'string') {

@@ -39,6 +39,22 @@ export interface AppConfig {
   corsOrigin: string;
   otpDelivery: 'INLINE' | 'SMS';
   nodeEnv: string;
+
+  /*
+   * Zapheit, if this deployment has it. All three are optional and the server
+   * must run without them.
+   *
+   * That is not politeness — it is the design. This app's core property is
+   * that it works with no network, and a workshop LAN may have no route to the
+   * internet at all. If the manual became unavailable whenever the link
+   * dropped, it would be missing at exactly the moment an inspector holding a
+   * component most needs it. Every AI path here degrades to what already
+   * works: full-text search over the indexed manual, and the existing voice
+   * parser.
+   */
+  zapheitApiKey: string | null;
+  zapheitBaseUrl: string;
+  zapheitModel: string;
 }
 
 const nodeEnv = process.env.NODE_ENV || 'development';
@@ -91,5 +107,11 @@ export const config: AppConfig = {
   // 'SMS' requires a delivery integration and is not implemented; selecting it
   // makes the server refuse to start rather than pretend.
   otpDelivery: (process.env.OTP_DELIVERY || 'INLINE') as 'INLINE' | 'SMS',
+
+  // Absent by default. Nothing in the system requires them to be set.
+  zapheitApiKey: process.env.ZAPHEIT_API_KEY || null,
+  zapheitBaseUrl: process.env.ZAPHEIT_BASE_URL || 'https://api.zapheit.com/v1',
+  zapheitModel: process.env.ZAPHEIT_MODEL || 'gpt-4o-mini',
+
   nodeEnv
 };

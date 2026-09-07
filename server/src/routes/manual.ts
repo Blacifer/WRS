@@ -10,6 +10,7 @@
 import { Router } from '../framework/index.ts';
 import type { Response } from '../framework/index.ts';
 import { getDatabase } from '../db/connection.ts';
+import { suggestManualQuery } from '../ai/zapheit.ts';
 import { searchManual, getManualStats } from '../manual/manualIndex.ts';
 import { searchFacts } from '../../../shared/knowledge/facts.ts';
 import { authMiddleware } from '../middleware/auth.ts';
@@ -31,7 +32,7 @@ manualRouter.get('/status', authMiddleware, (_req: AuthenticatedRequest, res: Re
 // ---------------------------------------------------------------------------
 // GET /api/manual/search?q=... — find the clause that answers a question
 // ---------------------------------------------------------------------------
-manualRouter.get('/search', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+manualRouter.get('/search', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   const q = String(req.query?.q || '').trim();
   const limit = Math.min(Number(req.query?.limit) || 5, 20);
 
@@ -65,11 +66,50 @@ manualRouter.get('/search', authMiddleware, (req: AuthenticatedRequest, res: Res
      */
     const facts = searchFacts(q, 4);
 
-    const result = searchManual(getDatabase(), q, limit);
+    let result = searchManual(getDatabase(), q, limit);
+
+    /*
+     * Only when the shop's own words did not match the manual's.
+     *
+     * The index matches words. An inspector asks for the "throw-out size on a
+     * brake block"; the manual says "condemning limit" and "brake block
+     * thickness". That gap is vocabulary, which is the one thing a language
+     * model is unambiguously good at — and it is a search problem, not an
+     * answering one.
+     *
+     * Deliberately a fallback rather than a first step. When the plain search
+     * finds the clause, nothing is sent anywhere and the behaviour is
+     * identical to before: no latency, no dependency, no call. The model is
+     * asked only when the alternative is telling somebody holding a component
+     * that the manual has nothing for them.
+     *
+     * What comes back is search terms, never an answer. The passages are still
+     * the manual's own words with their page cited, and `reinterpretedAs` says
+     * plainly which terms were used, so nobody has to wonder why they got
+     * these passages for that question.
+     */
+    let reinterpretedAs: string | null = null;
+    if (result.hits.length === 0 && facts.length === 0) {
+      const terms = await suggestManualQuery(q);
+      if (terms && terms.toLowerCase() !== q.toLowerCase()) {
+        const retry = searchManual(getDatabase(), terms, limit);
+        if (retry.hits.length > 0) {
+          result = retry;
+          reinterpretedAs = terms;
+        }
+      }
+    }
+
     res.status(200).json({
       success: true,
       data: {
         ...result,
+        /*
+         * Null whenever the plain search answered, which is the ordinary case.
+         * When it is set, the screen should show it: the inspector asked one
+         * thing and is being shown passages found under different words.
+         */
+        reinterpretedAs,
         answers: facts.map((h) => ({
           subject: h.fact.subject,
           answer: h.fact.answer,
@@ -84,6 +124,7 @@ manualRouter.get('/search', authMiddleware, (req: AuthenticatedRequest, res: Res
       meta: {
         answerCount: facts.length,
         resultCount: result.hits.length,
+        reinterpreted: Boolean(reinterpretedAs),
         timestamp: new Date().toISOString()
       }
     });
