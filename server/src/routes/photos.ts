@@ -12,6 +12,14 @@ import { getDatabase } from '../db/connection.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
 import { logAuditEvent } from '../db/auditLog.ts';
 import { MAX_STORED_PHOTO_BYTES } from '../../../shared/media/imageLimits.ts';
+import {
+  ASSEMBLY_EVIDENCE_TAG,
+  ASSEMBLY_NEGATIVES_WARNING,
+  assemblyReadiness,
+  parseAssemblyTags,
+  summariseAssemblyCoverage
+} from '../../../shared/assembly/assemblyCapture.ts';
+import { getWagonSpringConfig, springsPerBogie } from '../../../shared/classification/wagonTypes.ts';
 
 export const photosRouter = Router();
 
@@ -271,6 +279,103 @@ photosRouter.get(
         success: false,
         error: 'DATASET_QUERY_FAILED',
         message: err?.message || 'Could not build the defect dataset',
+        statusCode: 500,
+        timestamp: new Date().toISOString()
+      });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// GET /api/photos/dataset/assembly — accumulated bogie assembly evidence
+//
+// Sibling to /dataset/defects, and deliberately a sibling rather than a
+// parameter on it: the two sets answer different questions and their readiness
+// is judged on different things. A defect set is judged on class balance across
+// damage types. This one is judged on whether whole BOGIES are covered, because
+// a bogie photographed from one side only cannot answer "was a pocket empty" —
+// no single frame shows every pocket on a CASNUB.
+//
+// Nothing here counts springs or produces a verdict. It reports what the shop
+// has actually accumulated, so the decision about whether a model is worth
+// attempting rests on the real numbers. See docs/ASSEMBLY_COMPLETENESS.md.
+// ---------------------------------------------------------------------------
+photosRouter.get(
+  '/dataset/assembly',
+  authMiddleware,
+  // Divisional reading, as with the defect export — not shop-floor work.
+  requireCapability('analytics.read'),
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const db = getDatabase();
+      const includeImages = String(req.query?.includeImages || '').toLowerCase() === 'true';
+      const limit = Math.min(Number(req.query?.limit) || 500, 2000);
+
+      const rows = db.prepare(`
+        SELECT id, wagon_number, category, part_name, tags_json, created_at,
+               inspector_name${includeImages ? ', image_data' : ''}
+        FROM wagon_photos
+        WHERE tags_json LIKE '%${ASSEMBLY_EVIDENCE_TAG}%'
+        ORDER BY created_at DESC
+        LIMIT ?
+      `).all(limit) as any[];
+
+      const samples: any[] = [];
+      // A row carrying the marker tag but missing a field is not a usable
+      // sample. Counted separately rather than silently dropped, because a
+      // capture screen writing malformed tags would otherwise look like a shop
+      // that simply is not photographing.
+      let unusable = 0;
+
+      for (const r of rows) {
+        let tags: string[] = [];
+        try {
+          tags = JSON.parse(r.tags_json || '[]');
+        } catch {
+          tags = [];
+        }
+        const capture = parseAssemblyTags(tags);
+        if (!capture) {
+          unusable += 1;
+          continue;
+        }
+        const config = getWagonSpringConfig(capture.designation);
+        samples.push({
+          id: r.id,
+          wagonNumber: r.wagon_number,
+          designation: capture.designation,
+          bogiePosition: capture.bogiePosition,
+          side: capture.side,
+          // Derived here, every time, from the registry — never read from the
+          // stored tags. See shared/assembly/assemblyCapture.ts.
+          expectedSprings: config ? config.counts : null,
+          expectedPerBogie: config ? springsPerBogie(config) : null,
+          capturedAt: r.created_at,
+          capturedBy: r.inspector_name,
+          ...(includeImages ? { imageBase64: r.image_data } : {})
+        });
+      }
+
+      // The unit of coverage is the bogie, not the photograph. The arithmetic
+      // lives in shared/assembly so it can be tested without standing up HTTP.
+      const coverage = summariseAssemblyCoverage(samples);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          ...coverage,
+          unusablePhotos: unusable,
+          readiness: assemblyReadiness(coverage.completeBogies),
+          negativesWarning: ASSEMBLY_NEGATIVES_WARNING,
+          samples
+        },
+        meta: { includeImages, timestamp: new Date().toISOString() }
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        success: false,
+        error: 'DATASET_QUERY_FAILED',
+        message: err?.message || 'Could not build the assembly dataset',
         statusCode: 500,
         timestamp: new Date().toISOString()
       });

@@ -1236,6 +1236,31 @@ export class ApiClient {
     return this.request('/sorting/dataset');
   }
 
+  /**
+   * Bogie assembly coverage — how many bogies have been photographed from
+   * every side, not how many photographs exist.
+   *
+   * A separate call from getSortingDataset() because the unit differs. A
+   * spring set is counted per class; an assembly set is counted per BOGIE,
+   * since one side of a CASNUB cannot answer whether a pocket was left empty.
+   */
+  public async getAssemblyDataset(limit?: number): Promise<{
+    success: boolean;
+    data: {
+      totalPhotos: number;
+      completeBogies: number;
+      partialBogies: number;
+      photosByDesignation: Record<string, number>;
+      unusablePhotos: number;
+      readiness: string;
+      negativesWarning: string;
+    };
+  }> {
+    // Coverage is summarised over the rows the route returns, so the caller
+    // decides the window rather than silently accepting the route's default.
+    return this.request(`/photos/dataset/assembly${limit ? `?limit=${limit}` : ''}`);
+  }
+
   public async getSortingThroughput(date?: string): Promise<{ success: boolean; data: { date: string; total: number; passed: number; condemned: number; firstAt: string | null; lastAt: string | null } }> {
     const params = date ? `?date=${encodeURIComponent(date)}` : '';
     return this.request(`/sorting/throughput${params}`);

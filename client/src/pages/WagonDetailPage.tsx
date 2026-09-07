@@ -10,6 +10,8 @@ import { offlineDb } from '../services/offlineDb.ts';
 import { useI18n } from '../i18n/index.ts';
 import { PhotoCaptureModal } from '../components/PhotoCaptureModal.tsx';
 import { PhotoGallery } from '../components/PhotoGallery.tsx';
+import { AssemblyEvidenceCapture } from '../components/AssemblyEvidenceCapture.tsx';
+import { parseAssemblyTags } from '../../../shared/assembly/assemblyCapture.ts';
 import { WagonConditionReport } from '../components/WagonConditionReport.tsx';
 import { ReleaseCertificateModal } from '../components/ReleaseCertificateModal.tsx';
 import { SoundDiagnosticTool } from '../components/SoundDiagnosticTool.tsx';
@@ -110,6 +112,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
   } | null>(null);
 
   // Certificate Modal State
+  const [showAssemblyCapture, setShowAssemblyCapture] = useState<boolean>(false);
   const [showCertificateModal, setShowCertificateModal] = useState<boolean>(false);
 
   // Voice UI Highlighting & Undo Stack
@@ -1751,22 +1754,71 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
       )}
 
       {activeTab === 'PHOTOS' && (
-        <PhotoGallery
-          photos={photos}
-          onAddPhotoClick={() =>
-            setPhotoModalTarget({
-              category: 'GENERAL_WAGON',
-              partName: 'Workshop Quality Audit'
-            })
-          }
-          onSmartVisionClick={() =>
-            setSmartVisionModalTarget({
-              category: 'SPRINGS',
-              partName: 'Workshop AR Inspection',
-              initialTarget: 'OUTER_SPRING'
-            })
-          }
-        />
+        <div className="space-y-4">
+          {/*
+            * Assembly evidence, kept separate from the general gallery.
+            *
+            * These four photographs answer one specific question — whether a
+            * pocket was empty when the bogie was closed up — and they only
+            * answer it as a set. Mixed in with the general photographs they
+            * would be four pictures among forty, and nobody could tell at a
+            * glance that two were still missing.
+            *
+            * Shown at every stage rather than only at REASSEMBLY: the capture
+            * happens there, but a supervisor at the gate needs to see whether
+            * it happened at all.
+            */}
+          {(() => {
+            const done = new Set<string>();
+            for (const photo of photos) {
+              const parsed = parseAssemblyTags(photo.tags);
+              if (parsed) done.add(`${parsed.bogiePosition}::${parsed.side}`);
+            }
+            const complete = done.size === 4;
+            return (
+              <div className="bg-card border border-line rounded-card p-4 flex items-center justify-between gap-4">
+                <div>
+                  <h4 className="text-sm font-bold text-ink-body">
+                    {isHi ? 'बोगी असेंबली साक्ष्य' : 'Bogie assembly evidence'}
+                  </h4>
+                  <p className="text-xs text-ink-muted mt-1">
+                    {complete
+                      ? isHi
+                        ? 'चारों स्थितियाँ रिकॉर्ड हैं। इनकी जाँच स्वतः नहीं होती — देखना किसी व्यक्ति का काम है।'
+                        : 'All four positions recorded. Nothing is checked automatically — reading them is a person’s job.'
+                      : isHi
+                      ? `${done.size} / 4 स्थितियाँ ली गई हैं। स्प्रिंग रखने के बाद, फ़्रेम नीचे करने से पहले लें।`
+                      : `${done.size} of 4 positions taken. Capture after spring placement, before the frame is lowered.`}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAssemblyCapture(true)}
+                  className="shrink-0 min-h-[44px] px-4 rounded-control border border-accent-line bg-accent-soft text-accent-ink text-xs font-bold"
+                >
+                  {isHi ? 'खोलें' : 'Open'}
+                </button>
+              </div>
+            );
+          })()}
+
+          <PhotoGallery
+            photos={photos}
+            onAddPhotoClick={() =>
+              setPhotoModalTarget({
+                category: 'GENERAL_WAGON',
+                partName: 'Workshop Quality Audit'
+              })
+            }
+            onSmartVisionClick={() =>
+              setSmartVisionModalTarget({
+                category: 'SPRINGS',
+                partName: 'Workshop AR Inspection',
+                initialTarget: 'OUTER_SPRING'
+              })
+            }
+          />
+        </div>
       )}
 
       {/* Tab 4: Timeline & Dwell Times */}
@@ -2346,6 +2398,21 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
           onClose={() => setPhotoModalTarget(null)}
           onUploaded={() => {
             setPhotoModalTarget(null);
+            loadWagonData();
+          }}
+        />
+      )}
+
+      {/* Bogie assembly evidence */}
+      {showAssemblyCapture && (
+        <AssemblyEvidenceCapture
+          wagonNumber={wagonNumber}
+          designation={wagon?.wagonType}
+          existingPhotos={photos}
+          onClose={() => setShowAssemblyCapture(false)}
+          onUploaded={() => {
+            // Reload rather than close: the four positions are a set, and the
+            // inspector is usually about to take the next one.
             loadWagonData();
           }}
         />

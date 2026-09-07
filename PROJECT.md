@@ -50,13 +50,20 @@ record of how the work was broken up, not as a plan of outstanding work — see
 ### Client ↔ Server: `/api/cv/measure`
 - `POST /api/cv/measure`: body `{ wagonId?, wagonNumber?, componentType, measuredValue, wireDiameter?, nominalValue?, bogieType?, condition?, bogiePosition?, damageType?, damageNotes?, imageSnapshot?, metadata? }` -> returns `{ success: true, verdict, componentType, measuredValue, delta, toleranceRange, band, bandRoman, colorHex, rdsoTable, wireDiameterCheck?, condemnationReason?, auditLogId, auditHash, checklistUpdated, photoRecorded, timestamp }`
 
-> **Known defect (2 Sep 2026):** `checklistUpdated` is always returned as
-> `false`. In `server/src/routes/cv.ts` the guard reads
-> `getChecklistItems(wagonNumber, category)` and then tests `catItems.length`,
-> but that method takes one argument and returns `{ categories, allItems }` —
-> an object with no `length` — so the branch never runs and an AR-caliper
-> reading is never written to the checklist. Verified against a live wagon
-> holding 6 SPRINGS items.
+> **Resolved — fixed in `4766f7e`.** `checklistUpdated` was always returned as
+> `false`. The guard in `server/src/routes/cv.ts` called
+> `getChecklistItems(wagonNumber, category)` and tested `catItems.length`, but
+> that method takes one argument and returns
+> `{ wagonNumber, categories, allItems }` — an object with no `length` — so the
+> branch never ran and an AR-caliper reading never reached the checklist. It now
+> reads `categories[category]` off the returned object.
+>
+> Kept on the record rather than deleted, because this fault masked a second one
+> beneath it: `updateChecklistItem` was being called as
+> `(wagonNumber, targetItem.id, updates)` against a `(itemId, updates)`
+> signature, putting the wagon number in the itemId slot. That bug could not
+> surface while nothing reached the line, and fixing only the outer one would
+> have produced a branch that ran and still wrote nothing.
 
 ### Client ↔ Server: `/api/acoustic/diagnose`
 - `POST /api/acoustic/diagnose`: body `{ wagonNumber, dominantFrequencyHz, peakDb, anomalyType, confidence?, details?, targetCategory?, targetPartName?, inspectorId? }` -> returns `{ success: true, data: { diagnosticResult, diagnosticRecord, checklistItem, gateBlocked, blockers } }`

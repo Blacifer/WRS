@@ -16,6 +16,19 @@ interface PhotoCaptureModalProps {
   category: string;
   partName: string;
   stage?: string;
+  /**
+   * Tags decided by the caller, replacing the free-text field.
+   *
+   * Some evidence sets are only a dataset if every row is tagged identically —
+   * assembly completeness is one, and its shape is built by
+   * shared/assembly/assemblyCapture.ts. A typed field cannot be trusted for
+   * that: `wagon_photos` is append-only, so one inspector typing "BOGIE 1"
+   * where the shape wants "BOGIE:BOGIE_1" is a permanently mislabelled row.
+   * When this is supplied the tags are shown but not editable.
+   */
+  fixedTags?: string[];
+  /** Locks what the photograph is evidence of, hiding the picker. */
+  fixedEvidenceStage?: 'BEFORE' | 'AFTER' | 'DEFECT' | 'GENERAL';
   onClose: () => void;
   onUploaded: (photo: any) => void;
 }
@@ -26,6 +39,8 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
   category,
   partName,
   stage = 'COMPONENT_INSPECTION',
+  fixedTags,
+  fixedEvidenceStage,
   onClose,
   onUploaded
 }) => {
@@ -50,7 +65,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
    * commonest reason to open this modal is that somebody has found something.
    */
   const [evidenceStage, setEvidenceStage] =
-    useState<'BEFORE' | 'AFTER' | 'DEFECT' | 'GENERAL'>('DEFECT');
+    useState<'BEFORE' | 'AFTER' | 'DEFECT' | 'GENERAL'>(fixedEvidenceStage ?? 'DEFECT');
 
   const user = api.getUser();
 
@@ -202,7 +217,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
     if (!capturedImage) return;
 
     setIsUploading(true);
-    const tagList = tags.split(',').map((t) => t.trim()).filter(Boolean);
+    const tagList = fixedTags ?? tags.split(',').map((t) => t.trim()).filter(Boolean);
 
     try {
       if (navigator.onLine) {
@@ -312,7 +327,7 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
           </div>
 
           {/* What this photograph is evidence of */}
-          <div>
+          <div hidden={Boolean(fixedEvidenceStage)}>
             <label className="block text-xs font-semibold text-ink-body mb-1">
               What this photograph shows
             </label>
@@ -342,15 +357,31 @@ export const PhotoCaptureModal: React.FC<PhotoCaptureModalProps> = ({
           {/* Tags */}
           <div>
             <label className="block text-xs font-semibold text-ink-body mb-1">
-              Metadata Tags (comma separated)
+              {fixedTags ? 'Labels stored with this photograph' : 'Metadata Tags (comma separated)'}
             </label>
-            <input
-              type="text"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              placeholder="e.g. CBC, Defect, Wear"
-              className="w-full bg-raised border border-line rounded-control px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-line"
-            />
+            {fixedTags ? (
+              /* Shown rather than hidden: these are permanent once written, and
+                 the inspector should be able to see what is being filed under
+                 their name before they file it. */
+              <div className="flex flex-wrap gap-2">
+                {fixedTags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="px-2 py-1 rounded-control border border-line bg-raised text-[11px] font-mono text-ink-muted"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <input
+                type="text"
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+                placeholder="e.g. CBC, Defect, Wear"
+                className="w-full bg-raised border border-line rounded-control px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-line"
+              />
+            )}
           </div>
         </div>
 

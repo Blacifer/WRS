@@ -56,11 +56,28 @@ interface Capability {
 const ATTEMPT_AT = 200;
 const TRUST_AT = 1000;
 
+/** The row ceiling GET /photos/dataset/assembly enforces. */
+const ASSEMBLY_LIMIT = 2000;
+
 export const VisionReadiness: React.FC<VisionReadinessProps> = ({ lang }) => {
   const isHi = lang === 'hi';
   const [caps, setCaps] = useState<Capability[] | null>(null);
   const [total, setTotal] = useState(0);
   const [thinnest, setThinnest] = useState<string | null>(null);
+  /*
+   * Assembly coverage is fetched separately and allowed to fail on its own.
+   * A shop that has photographed springs but never a bogie is the normal
+   * starting state, and it must not blank the spring figures beside it.
+   */
+  const [assembly, setAssembly] = useState<{
+    completeBogies: number;
+    partialBogies: number;
+    totalPhotos: number;
+    unusablePhotos: number;
+    readiness: string;
+    negativesWarning: string;
+    capped: boolean;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -124,6 +141,30 @@ export const VisionReadiness: React.FC<VisionReadinessProps> = ({ lang }) => {
         ]);
       })
       .catch(() => { if (!cancelled) setCaps([]); });
+
+    /*
+     * ASSEMBLY_LIMIT is the ceiling the route itself enforces. Coverage is
+     * summarised over the rows actually fetched, so asking for fewer would
+     * quietly understate how many bogies are covered. When the count comes
+     * back at the ceiling the figures are a floor, not a total, and the panel
+     * says so rather than letting a truncated number read as complete.
+     */
+    api.getAssemblyDataset(ASSEMBLY_LIMIT)
+      .then((res: any) => {
+        if (cancelled) return;
+        const d = res?.data;
+        if (!d) return;
+        setAssembly({
+          completeBogies: d.completeBogies || 0,
+          partialBogies: d.partialBogies || 0,
+          totalPhotos: d.totalPhotos || 0,
+          unusablePhotos: d.unusablePhotos || 0,
+          readiness: d.readiness || '',
+          negativesWarning: d.negativesWarning || '',
+          capped: (d.totalPhotos || 0) + (d.unusablePhotos || 0) >= ASSEMBLY_LIMIT
+        });
+      })
+      .catch(() => { /* no assembly evidence yet, or not permitted — say nothing */ });
 
     return () => { cancelled = true; };
   }, [isHi]);
@@ -205,6 +246,54 @@ export const VisionReadiness: React.FC<VisionReadinessProps> = ({ lang }) => {
           </p>
         )}
       </div>
+
+      {/*
+        * A second, different question, kept visibly separate from the three
+        * above. Those ask what a photograph can say about ONE SPRING. This asks
+        * whether a pocket was left empty, and it is counted per bogie rather
+        * than per photograph — one side of a CASNUB cannot answer it, so a
+        * bogie shot from one side is a partial, not a sample.
+        *
+        * Rendered only once some assembly evidence exists. A row of zeroes on
+        * a shop that has not started this capture teaches nobody anything.
+        */}
+      {assembly && assembly.totalPhotos > 0 && (
+        <div className="rounded-control border border-line bg-raised p-4 space-y-1.5" data-testid="assembly-coverage">
+          <p className="text-sm font-bold text-white">
+            {isHi ? 'बोगी असेंबली — कितनी बोगी पूरी तरह फ़ोटो में हैं' : 'Bogie assembly — how many bogies are covered from every side'}
+          </p>
+          <p className="text-2xl font-black text-white tabular-nums leading-none">
+            {assembly.completeBogies}
+            <span className="text-xs font-bold text-ink-muted">
+              {isHi ? ' पूरी' : ' complete'}
+            </span>
+            <span className="text-xs font-bold text-ink-muted">
+              {' · '}{assembly.partialBogies}{isHi ? ' अधूरी' : ' partial'}
+            </span>
+          </p>
+          {/*
+            * The server's own sentence, not a second opinion computed here.
+            * Two places deciding what a count means is how they end up
+            * disagreeing in front of the person who has to act on it.
+            */}
+          <p className="text-xs text-ink-body leading-relaxed">{assembly.readiness}</p>
+          <p className="text-[11px] text-warn-ink leading-snug">{assembly.negativesWarning}</p>
+          {assembly.unusablePhotos > 0 && (
+            <p className="text-[11px] font-mono text-ink-muted">
+              {isHi
+                ? `${assembly.unusablePhotos} तस्वीरें टैग अधूरा होने से गिनी नहीं गईं`
+                : `${assembly.unusablePhotos} photograph(s) carry the marker tag but are missing a field, so they are not counted as samples`}
+            </p>
+          )}
+          {assembly.capped && (
+            <p className="text-[11px] font-mono text-ink-muted">
+              {isHi
+                ? `सबसे हाल की ${ASSEMBLY_LIMIT} तस्वीरों पर आधारित — यह न्यूनतम है, कुल नहीं।`
+                : `Counted over the most recent ${ASSEMBLY_LIMIT} photographs — these figures are a floor, not a total.`}
+            </p>
+          )}
+        </div>
+      )}
     </section>
   );
 };
