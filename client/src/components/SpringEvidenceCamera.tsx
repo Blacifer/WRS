@@ -44,11 +44,25 @@ export interface SpringEvidenceHandle {
 interface Props {
   lang: 'en' | 'hi';
   active: boolean;
+  /**
+   * The gauge in the inspector's hand, when one is selected.
+   *
+   * Named on screen so the frame is asked to contain it. Everything a camera
+   * could ever say about a spring's size depends on there being something of
+   * known size beside it, and on this bench that something is the gauge post —
+   * SSG-02 and its siblings, each with its own calibration certificate.
+   *
+   * A shift of photographs without the post in them is a shift that cannot
+   * answer the question they were collected to answer. It is one sentence on
+   * screen and no extra tap, and it is the difference between two weeks of
+   * usable evidence and two weeks of pictures.
+   */
+  gaugeCode?: string;
   onUnavailable?: (reason: string) => void;
 }
 
 export const SpringEvidenceCamera = forwardRef<SpringEvidenceHandle, Props>(
-  function SpringEvidenceCamera({ lang, active, onUnavailable }, ref) {
+  function SpringEvidenceCamera({ lang, active, gaugeCode, onUnavailable }, ref) {
     const isHi = lang === 'hi';
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
@@ -165,10 +179,29 @@ export const SpringEvidenceCamera = forwardRef<SpringEvidenceHandle, Props>(
             </div>
           )}
         </div>
-        <p className="px-4 py-2.5 text-[11px] text-ink-muted leading-snug">
+        <p className="px-4 pt-2.5 text-[11px] text-ink-muted leading-snug">
           {isHi
             ? 'स्प्रिंग को दिखाते रहें और सामान्य रूप से बैंड दबाएँ — फ़ोटो अपने आप उसी बैंड के साथ सुरक्षित हो जाएगी। कैमरा बैंड तय नहीं करता।'
             : 'Keep the spring in view and tap the band as usual — the photo is saved against whatever you tap. The camera does not decide the band.'}
+        </p>
+
+        {/*
+          * The one thing that makes these photographs worth taking.
+          *
+          * A spring photographed alone carries no scale, and the bands are 2
+          * to 3 mm on a component 245 to 290 mm tall. The gauge post is the
+          * only object on this bench whose size is known and certified, so a
+          * frame containing it can one day be measured and a frame without it
+          * never can.
+          */}
+        <p className="px-4 pb-2.5 text-[11px] font-bold text-accent-ink leading-snug">
+          {gaugeCode
+            ? (isHi
+                ? `${gaugeCode} गेज को भी फ़्रेम में रखें — उसी से बाद में नाप संभव होगी।`
+                : `Keep ${gaugeCode} in the frame too — it is the only thing in the picture whose size is known.`)
+            : (isHi
+                ? 'गेज पोस्ट को भी फ़्रेम में रखें — उसी से बाद में नाप संभव होगी।'
+                : 'Keep the gauge post in the frame too — it is the only thing in the picture whose size is known.')}
         </p>
         {problem && (
           <p className="px-4 pb-3 text-[11px] text-warn-ink">{problem}</p>

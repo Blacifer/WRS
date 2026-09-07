@@ -1162,6 +1162,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           ref={cameraRef}
           lang={lang}
           active={capturePhotos}
+          gaugeCode={gaugeCode || undefined}
           onUnavailable={() => { /* sorting is unaffected; the component says so */ }}
         />
         {dataset && dataset.total > 0 && (
