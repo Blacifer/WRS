@@ -689,6 +689,28 @@ export class InspectionRepository {
   }
 
   /**
+   * Replace an account's password hash.
+   *
+   * Separate from setUserActive rather than folded into a general user update,
+   * because a password is the one field that must never be readable back and
+   * must never be settable as a side effect of editing a name. The caller
+   * hashes; this stores.
+   */
+  public setUserPassword(id: string, passwordHash: string): any {
+    const now = new Date().toISOString();
+    const result = this.db.prepare('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?')
+      .run(passwordHash, now, id);
+    if (result.changes === 0) {
+      const err: any = new Error(`User "${id}" not found.`);
+      err.name = 'ValidationError';
+      throw err;
+    }
+    return this.db.prepare(`
+      SELECT id, username, role, full_name, employee_id, is_active, created_at, updated_at FROM users WHERE id = ?
+    `).get(id);
+  }
+
+  /**
    * Log an audit event — delegates to the shared chained writer so this
    * repository's events participate in the same hash chain as every other
    * subsystem (see server/src/db/auditLog.ts).

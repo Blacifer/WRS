@@ -11,11 +11,12 @@ import type { LanguageCode } from '../i18n/index.ts';
 import { offlineDb } from '../services/offlineDb.ts';
 import { api } from '../services/api.ts';
 import {
-  GlobeIcon, RefreshCwIcon, LogOutIcon, ShieldIcon,
+  GlobeIcon, RefreshCwIcon, LogOutIcon, ShieldIcon, KeyIcon,
   HomeIcon, TrainIcon, CoilIcon, CaliperIcon, BookIcon, LinkIcon, UserIcon, IdCardIcon,
   CpuIcon, BarChartIcon, PackageIcon, HistoryIcon, ActivityIcon, SparklesIcon, ClipboardIcon
 } from './Icons.tsx';
 import { TotpEnrolment } from './TotpEnrolment.tsx';
+import ChangeOwnPassword from './ChangeOwnPassword.tsx';
 import { isInPilotNav } from '../config/pilotScope.ts';
 import { canAccessTab } from '../../../shared/types.ts';
 import { can } from '../../../shared/auth/permissions.ts';
@@ -70,6 +71,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   /* Whether this person already has an authenticator, for the header marker. */
   const [isTotpOpen, setIsTotpOpen] = useState(false);
+  const [isPasswordOpen, setIsPasswordOpen] = useState(false);
   const [enrolled, setEnrolled] = useState(false);
 
   useEffect(() => {
@@ -349,6 +351,20 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <ShieldIcon size={18} />
               </IconButton>
+              {/*
+                * Beside the authenticator, and for the same reason it was moved
+                * here: a password belongs to a person, and an inspector cannot
+                * open the screen where account settings otherwise live. Left on
+                * the admin screen, only administrators could change their own.
+                */}
+              <IconButton
+                variant="quiet"
+                onClick={() => setIsPasswordOpen(true)}
+                label={currentLang === 'hi' ? 'अपना पासवर्ड बदलें' : 'Change your password'}
+                data-testid="header-password"
+              >
+                <KeyIcon size={18} />
+              </IconButton>
               <IconButton
                 variant="quiet"
                 onClick={onLogout}
@@ -369,6 +385,17 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <div className="mt-16 w-full max-w-lg" onClick={e => e.stopPropagation()}>
             <TotpEnrolment lang={currentLang} onClose={() => setIsTotpOpen(false)} />
+          </div>
+        </div>
+      )}
+
+      {isPasswordOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/70 flex items-start justify-center p-4 overflow-y-auto"
+          onClick={() => setIsPasswordOpen(false)}
+        >
+          <div className="mt-16 w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <ChangeOwnPassword lang={currentLang} onClose={() => setIsPasswordOpen(false)} />
           </div>
         </div>
       )}

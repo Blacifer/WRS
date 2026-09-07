@@ -46,6 +46,21 @@ import type {
 
 const BASE_URL = '/api';
 
+
+/*
+ * 401s that are about something the person just typed, not about their
+ * session. See the auto-logout in request() below.
+ */
+const NOT_A_SESSION_PROBLEM = new Set([
+  'INVALID_CREDENTIALS',  // a wrong password at sign-in
+  'WRONG_PASSWORD',       // the current password on the change-password form
+  'OTP_REQUIRED',         // an action that needs a confirmation code, without one
+  'INVALID_OTP_TOKEN',    // a confirmation token that is not valid for this action
+  'TOTP_REQUIRED',        // an authenticator code is needed
+  'INVALID_TOTP',         // the authenticator code is wrong
+  'INCORRECT_CODE'        // the emailed/inline OTP digits are wrong
+]);
+
 export class ApiClient {
   private token: string | null = null;
   private user: User | null = null;
@@ -151,8 +166,23 @@ export class ApiClient {
      *
      * The login route is excluded: a 401 there is a wrong password, and the
      * form already says so.
+     *
+     * So are the codes in NOT_A_SESSION_PROBLEM. Excluding by path was not
+     * enough, because a 401 can mean two entirely different things: "your
+     * session is over" and "what you just typed is wrong". Treating the second
+     * as the first meant an inspector who mistyped their current password on
+     * the change-password form was signed out instead of being told, and an
+     * administrator who mistyped an authenticator code while confirming an
+     * account change was signed out mid-change. Both were found by driving the
+     * screens; neither shows up as an error anywhere, because signing out is
+     * what this code is supposed to do.
+     *
+     * Listed by reason rather than by route on purpose. Any endpoint that
+     * checks a credential the person just entered will 401 for the same
+     * reason, and a list of paths would have to be remembered every time one
+     * is added.
      */
-    if (res.status === 401 && this.token && !path.startsWith('/auth/login')) {
+    if (res.status === 401 && this.token && !path.startsWith('/auth/login') && !NOT_A_SESSION_PROBLEM.has(json?.error)) {
       this.clearSession();
       for (const cb of this.sessionExpiredListeners) {
         try { cb(); } catch { /* one bad listener must not swallow the rest */ }
@@ -317,6 +347,28 @@ export class ApiClient {
   // Account changes carry an action token: creating an account is how someone
   // would grant themselves supervisor rights, and deactivating one is how they
   // would lock out whoever might notice.
+  /**
+   * Set an account's password, as an administrator.
+   *
+   * The remedy the production login guard names when it refuses an account
+   * still on the demonstration password. No current password is asked for —
+   * this exists precisely for the inspector who cannot supply one.
+   */
+  public async setUserPassword(id: string, password: string, otpToken: string): Promise<{ success: boolean; data: AdminUserRecord }> {
+    return this.request(`/auth/users/${encodeURIComponent(id)}/password`, {
+      method: 'POST',
+      body: JSON.stringify({ password, otpToken })
+    });
+  }
+
+  /** Change your own password. The current one is the authority for the change. */
+  public async changeOwnPassword(currentPassword: string, newPassword: string): Promise<{ success: boolean; data: { changed: boolean } }> {
+    return this.request('/auth/password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
+  }
+
   public async deactivateUser(id: string, otpToken: string): Promise<{ success: boolean; data: AdminUserRecord }> {
     return this.request(`/auth/users/${id}/deactivate`, { method: 'PATCH', body: JSON.stringify({ otpToken }) });
   }

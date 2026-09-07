@@ -157,7 +157,6 @@ authRouter.post('/login', (req: Request, res: Response, next: NextFunction): voi
      * a supervised demonstration on a production build. It has to be typed on
      * purpose.
      */
-    const DEMO_PASSWORD = 'password123';
     /*
      * Read from the environment at request time rather than from the config
      * singleton, which is resolved once at import. seed.ts makes the same
@@ -449,6 +448,166 @@ authRouter.post('/users', authMiddleware, requireCapability('users.manage'), (re
     });
 
     res.status(201).json({ success: true, data: user });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/*
+ * Password rules, in one place so the two routes below cannot disagree about
+ * what a valid password is.
+ *
+ * Eight characters matches what account creation already enforces. The demo
+ * password is refused outright: login already refuses it in production, and a
+ * "change your password" flow that accepts the exact password being escaped
+ * from would be theatre.
+ */
+const MIN_PASSWORD_LENGTH = 8;
+/*
+ * Also read by the login handler above. Declared here rather than there
+ * because three places now care what the demo password is — login refuses it,
+ * and neither password route may set it — and three copies of a literal is
+ * three chances for one of them to be updated alone.
+ */
+const DEMO_PASSWORD = 'password123';
+
+function rejectWeakPassword(password: unknown, res: Response): boolean {
+  if (typeof password !== 'string' || password.length < MIN_PASSWORD_LENGTH) {
+    res.status(400).json({
+      success: false,
+      error: 'VALIDATION_ERROR',
+      message: `password must be at least ${MIN_PASSWORD_LENGTH} characters`,
+      statusCode: 400,
+      timestamp: new Date().toISOString()
+    });
+    return true;
+  }
+  if (password === DEMO_PASSWORD) {
+    res.status(400).json({
+      success: false,
+      error: 'VALIDATION_ERROR',
+      message:
+        'That is the demonstration password published in the README. Production ' +
+        'logins refuse it, so setting it here would lock the account out.',
+      statusCode: 400,
+      timestamp: new Date().toISOString()
+    });
+    return true;
+  }
+  return false;
+}
+
+/**
+ * POST /api/auth/users/:id/password — Admin-only: set an account's password.
+ *
+ * This is the screen the production login guard points at. Refusing the demo
+ * password at login told the administrator to "set a real password for it from
+ * the User Accounts screen" — and no route existed to do that, so the only way
+ * out of a refused login was to create a second account and abandon the first.
+ * An error message that names a remedy the app does not have is worse than one
+ * that names none.
+ *
+ * The old password is not required here: an inspector who has forgotten theirs
+ * cannot supply it, and that is the case this exists for. Authority comes from
+ * users.manage plus the same OTP confirmation as creating an account, and the
+ * event is logged against the administrator who did it.
+ */
+authRouter.post('/users/:id/password', authMiddleware, requireCapability('users.manage'), (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  if (!requireUserMgmtToken(req, res)) return;
+  try {
+    const { password } = req.body || {};
+    if (rejectWeakPassword(password, res)) return;
+
+    const db = getDatabase();
+    const repo = new InspectionRepository(db);
+    const user = repo.setUserPassword(req.params.id, hashPassword(String(password)));
+
+    /*
+     * The password itself never reaches the log, obviously — but neither does
+     * a hash, a length or a prefix. An audit row says an administrator set a
+     * password for an account and when; anything more is a clue.
+     */
+    logAuditEvent(db, {
+      eventType: 'SECURITY_ALERT',
+      userId: req.user?.id || 'usr_system',
+      userRole: req.user?.role || 'SYSTEM',
+      payload: {
+        action: 'PASSWORD_SET_BY_ADMIN',
+        targetUserId: req.params.id,
+        targetUsername: user?.username || null
+      }
+    });
+
+    res.status(200).json({ success: true, data: user });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/auth/password — anyone signed in: change your own password.
+ *
+ * The current password is required, and it is the whole authority for the
+ * change: a bearer token can be lifted from a tablet left on the bench, and
+ * without this a lifted token would be enough to lock the real owner out of
+ * their own account permanently.
+ *
+ * No OTP. The account holder proving they know the current password is the
+ * second factor here, and requiring an authenticator as well would mean an
+ * inspector whose password has been seen cannot change it until an
+ * administrator is free.
+ */
+authRouter.post('/password', authMiddleware, (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+    const db = getDatabase();
+
+    const row = db.prepare('SELECT id, username, password_hash FROM users WHERE id = ?')
+      .get(req.user?.id || '') as { id: string; username: string; password_hash: string } | undefined;
+
+    if (!row || !currentPassword || !verifyPassword(String(currentPassword), row.password_hash)) {
+      // Logged, because repeated failures here are somebody working on an
+      // unattended tablet rather than a person mistyping their own password.
+      logAuditEvent(db, {
+        eventType: 'SECURITY_ALERT',
+        userId: req.user?.id || 'usr_system',
+        userRole: req.user?.role || 'SYSTEM',
+        payload: { action: 'PASSWORD_CHANGE_REFUSED', reason: 'WRONG_CURRENT_PASSWORD' }
+      });
+      res.status(401).json({
+        success: false,
+        error: 'WRONG_PASSWORD',
+        message: 'That is not your current password.',
+        statusCode: 401,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    if (rejectWeakPassword(newPassword, res)) return;
+
+    if (String(newPassword) === String(currentPassword)) {
+      res.status(400).json({
+        success: false,
+        error: 'VALIDATION_ERROR',
+        message: 'The new password is the same as the current one.',
+        statusCode: 400,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    const repo = new InspectionRepository(db);
+    repo.setUserPassword(row.id, hashPassword(String(newPassword)));
+
+    logAuditEvent(db, {
+      eventType: 'SECURITY_ALERT',
+      userId: row.id,
+      userRole: req.user?.role || 'SYSTEM',
+      payload: { action: 'PASSWORD_CHANGED_BY_OWNER', username: row.username }
+    });
+
+    res.status(200).json({ success: true, data: { changed: true } });
   } catch (error) {
     next(error);
   }

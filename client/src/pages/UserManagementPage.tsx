@@ -186,7 +186,15 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
    * passed because they minted tokens directly. This is the interface half.
    */
   const [pendingAction, setPendingAction] = useState<
-    { kind: 'CREATE' } | { kind: 'TOGGLE'; user: AdminUserRecord } | null
+    | { kind: 'CREATE' }
+    | { kind: 'TOGGLE'; user: AdminUserRecord }
+    /*
+     * The generated password is held on the pending action rather than in its
+     * own state, so it cannot outlive the confirmation it belongs to. A
+     * cancelled reset leaves nothing behind.
+     */
+    | { kind: 'SET_PASSWORD'; user: AdminUserRecord; password: string }
+    | null
   >(null);
 
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
@@ -291,6 +299,33 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
     setPendingAction({ kind: 'TOGGLE', user: u });
   };
 
+  /*
+   * Setting a password, rather than asking for one.
+   *
+   * The administrator does not choose it: a password typed by whoever is at
+   * the keyboard is the one most likely to be reused across the four
+   * inspectors they set up that afternoon. The same generator that produces
+   * the password at account creation produces this one, and it is shown once
+   * on the same card, to be handed over directly.
+   */
+  const handleSetPassword = (u: AdminUserRecord) => {
+    setPendingAction({ kind: 'SET_PASSWORD', user: u, password: generateStrongPassword() });
+  };
+
+  const setPasswordWithToken = async (u: AdminUserRecord, password: string, otpToken: string) => {
+    setBusyUserId(u.id);
+    try {
+      await api.setUserPassword(u.id, password, otpToken);
+      setJustCreated({ username: u.username, password, fullName: u.full_name });
+      await loadUsers();
+    } catch (err: any) {
+      setLoadError(err?.message || 'Failed to set the password.');
+    } finally {
+      setPendingAction(null);
+      setBusyUserId(null);
+    }
+  };
+
   const toggleWithToken = async (u: AdminUserRecord, otpToken: string) => {
     setBusyUserId(u.id);
     try {
@@ -326,23 +361,31 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
           title={
             pendingAction.kind === 'CREATE'
               ? (isHi ? 'नया खाता बनाने की पुष्टि' : 'Confirm creating an account')
-              : pendingAction.user.is_active
-                ? (isHi ? 'खाता निष्क्रिय करने की पुष्टि' : 'Confirm deactivating this account')
-                : (isHi ? 'खाता पुनः सक्रिय करने की पुष्टि' : 'Confirm reactivating this account')
+              : pendingAction.kind === 'SET_PASSWORD'
+                ? (isHi ? 'पासवर्ड बदलने की पुष्टि' : 'Confirm setting a new password')
+                : pendingAction.user.is_active
+                  ? (isHi ? 'खाता निष्क्रिय करने की पुष्टि' : 'Confirm deactivating this account')
+                  : (isHi ? 'खाता पुनः सक्रिय करने की पुष्टि' : 'Confirm reactivating this account')
           }
           description={
             pendingAction.kind === 'CREATE'
               ? (isHi
                   ? 'नया खाता बनाना अधिकार देने के बराबर है, इसलिए इसकी पुष्टि आवश्यक है।'
                   : 'Creating an account grants access, so it needs the same confirmation a release does.')
-              : (isHi
-                  ? `${pendingAction.user.full_name} — यह निर्णय दर्ज किया जाएगा।`
-                  : `${pendingAction.user.full_name} — this decision is recorded against your name.`)
+              : pendingAction.kind === 'SET_PASSWORD'
+                ? (isHi
+                    ? `${pendingAction.user.full_name} का पुराना पासवर्ड तुरंत बेकार हो जाएगा। नया पासवर्ड एक ही बार दिखेगा।`
+                    : `${pendingAction.user.full_name}'s existing password stops working immediately. The new one is shown once, to hand over directly.`)
+                : (isHi
+                    ? `${pendingAction.user.full_name} — यह निर्णय दर्ज किया जाएगा।`
+                    : `${pendingAction.user.full_name} — this decision is recorded against your name.`)
           }
           onCancel={() => setPendingAction(null)}
           onConfirmed={async (token) => {
             if (pendingAction.kind === 'CREATE') await createWithToken(token);
-            else await toggleWithToken(pendingAction.user, token);
+            else if (pendingAction.kind === 'SET_PASSWORD') {
+              await setPasswordWithToken(pendingAction.user, pendingAction.password, token);
+            } else await toggleWithToken(pendingAction.user, token);
           }}
         />
       )}
@@ -400,7 +443,7 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
         <div className="p-5 bg-emerald-950/40 border border-emerald-500/40 rounded-card shadow-xl space-y-3">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h3 className="text-sm font-black text-emerald-300">Account created for {justCreated.fullName}</h3>
+              <h3 className="text-sm font-black text-emerald-300">Credentials for {justCreated.fullName}</h3>
               <p className="text-xs text-emerald-400/80 mt-0.5">
                 Copy these credentials now and hand them to this person directly — the password will not be shown again.
               </p>
@@ -584,6 +627,17 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
                         className="min-h-[36px] px-3 py-1.5 mr-1.5 rounded-control text-xs font-bold border border-line-strong bg-raised text-ink-body hover:bg-selected hover:text-ink transition-colors disabled:opacity-50"
                       >
                         {isHi ? 'प्रमाणक रीसेट' : 'Reset authenticator'}
+                      </button>
+                      {/* The remedy the production login guard names when it
+                          refuses an account still on the demonstration
+                          password. Without it that message pointed at nothing. */}
+                      <button
+                        onClick={() => handleSetPassword(u)}
+                        disabled={busyUserId === u.id}
+                        title={isHi ? 'नया पासवर्ड बनाकर सौंपें' : 'Generate a new password to hand over'}
+                        className="min-h-[36px] px-3 py-1.5 mr-1.5 rounded-control text-xs font-bold border border-line-strong bg-raised text-ink-body hover:bg-selected hover:text-ink transition-colors disabled:opacity-50"
+                      >
+                        {isHi ? 'पासवर्ड बदलें' : 'Set password'}
                       </button>
                       <button
                         onClick={() => handleToggleActive(u)}
