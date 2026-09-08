@@ -14,7 +14,7 @@
  * confident on the installation that most needs telling.
  */
 
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it, beforeEach, after } from 'node:test';
 import assert from 'node:assert';
 import { createApp } from '../src/app.ts';
 import { getDatabase } from '../src/db/connection.ts';
@@ -35,9 +35,33 @@ const findCheck = (body: any, id: string) =>
 
 describe('Deployment readiness', () => {
   let app: ExpressApp;
+  const realFetch = globalThis.fetch;
 
+  /*
+   * No live calls to Zapheit from the test suite.
+   *
+   * The readiness route asks the model whether it answers, which is the whole
+   * point of that row — a key in the environment proves somebody pasted a key.
+   * In tests it made the suite depend on an external service being reachable:
+   * nine tests at three to eight seconds each, thirty-three seconds of network,
+   * a real API call billed on every run, and under load the whole file was
+   * cancelled rather than failed. That is how a green suite becomes a suite
+   * nobody can trust.
+   *
+   * Stubbed rather than disabled, so the branch still executes and still has to
+   * produce a sensible row.
+   */
   beforeEach(() => {
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ choices: [{ message: { content: 'ready.' } }] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })) as any;
     app = createApp(':memory:');
+  });
+
+  after(() => {
+    globalThis.fetch = realFetch;
   });
 
   it('TC-RDY-01: an administrator gets every check, each with a state and a reason', async () => {
