@@ -81,6 +81,21 @@ app rather than about the inspector.
 | Register, one wagon, all springs | |
 | App, one wagon, all springs | |
 
+> **Time the register, not the app.** The app's side is computed from its own
+> timestamps by `scripts/shadow-report.mjs`, which reports worked time with idle
+> gaps over fifteen minutes excluded, and refuses to print a rate faster than a
+> person can work. The register has no timestamps and nobody can reconstruct it
+> afterwards — so if the supervisor only has time to record one thing, record
+> the paper minutes.
+>
+> **One wagon a day for five days is five paired observations.** That is enough
+> to notice a large difference and not enough to defend a precise one. If the
+> gap turns out to be small, say so and extend the run rather than reporting a
+> figure the sample cannot carry. A number that does not survive being asked
+> "out of how many?" is worse than no number.
+
+    node --experimental-strip-types scripts/shadow-report.mjs 7
+
 **Three questions, answered in a sentence each:**
 
 1. What did the app get wrong today?
