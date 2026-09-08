@@ -12,7 +12,7 @@
 import { Router } from '../framework/index.ts';
 import type { Response } from '../framework/index.ts';
 import { getDatabase } from '../db/connection.ts';
-import { verifyAuditChain } from '../db/auditLog.ts';
+import { verifyAuditChain, verifyAuditChainTail } from '../db/auditLog.ts';
 import {
   certificatePublicKeyPem,
   certificateKeyFingerprint,
@@ -31,6 +31,53 @@ export const auditRouter = Router();
 // itself sensitive: an inspector who could poll this would learn immediately
 // whether an alteration had been noticed.
 // ---------------------------------------------------------------------------
+/*
+ * GET /audit/verify/tail — the recent end of the log, for a dashboard
+ *
+ * The full walk re-derives every hash. At 750,000 entries that took eight
+ * seconds on a developer's machine and would take half a minute on the shop
+ * PC — and it was running on every dashboard load, on a single-threaded
+ * server, so nobody else was served while it ran.
+ *
+ * This checks the most recent entries and says so. It is a weaker claim and
+ * the response carries `scope: 'TAIL'` plus the total, so no screen can
+ * render it as "the chain is intact" without saying what was actually walked.
+ * On this very database the tail verifies while the full walk finds two real
+ * breaks from September, which is the whole reason the distinction is carried
+ * rather than assumed.
+ */
+auditRouter.get(
+  '/verify/tail',
+  authMiddleware,
+  requireCapability('audit.read'),
+  (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const entries = Math.min(Math.max(Number(req.query?.entries) || 500, 50), 5000);
+      const result = verifyAuditChainTail(getDatabase(), entries);
+      res.status(200).json({
+        success: true,
+        data: {
+          ...result,
+          summary: result.scope === 'FULL'
+            ? (result.verified
+                ? `Audit chain verified — ${result.entriesChecked} entries, unbroken.`
+                : `Audit chain BROKEN — ${result.breaksFound} of ${result.entriesChecked} entries fail verification.`)
+            : (result.verified
+                ? `The most recent ${result.entriesChecked} of ${result.totalEntries} entries verify. Earlier entries were not walked — open Audit Chain to check the whole log.`
+                : `The most recent ${result.entriesChecked} entries include ${result.breaksFound} that fail verification.`)
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (err: any) {
+      res.status(500).json({
+        success: false, error: 'AUDIT_VERIFY_FAILED',
+        message: err?.message || 'Could not verify the audit chain',
+        statusCode: 500, timestamp: new Date().toISOString()
+      });
+    }
+  }
+);
+
 auditRouter.get(
   '/verify',
   authMiddleware,

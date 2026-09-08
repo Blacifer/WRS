@@ -781,6 +781,20 @@ export class ApiClient {
    * happened, so it needs to be answerable by the supervisor who signs
    * releases, not only by someone with a terminal and a hand-minted token.
    */
+  /**
+   * The recent end of the audit chain, at dashboard cost.
+   *
+   * A weaker claim than verifyAuditChain: `scope` is 'TAIL' whenever fewer
+   * entries were walked than the log holds, and a screen must say so rather
+   * than reporting the record intact.
+   */
+  public async verifyAuditChainTail(entries = 500): Promise<{
+    success: boolean;
+    data: { verified: boolean; entriesChecked: number; totalEntries: number; breaksFound: number; scope: 'FULL' | 'TAIL'; summary: string };
+  }> {
+    return this.request(`/audit/verify/tail?entries=${entries}`);
+  }
+
   public async verifyAuditChain(): Promise<{
     success: boolean;
     data: {

@@ -80,7 +80,13 @@ export const ShopFloorNow: React.FC<ShopFloorNowProps> = ({ lang }) => {
         api.getNestAllocation('CASNUB_22_NLB', 'USED', 'BOXNHL').catch(() => null),
         api.getConsumptionForecast(14).catch(() => null),
         api.getAnalyticsBlockers().catch(() => null),
-        api.verifyAuditChain().catch(() => null)
+        /*
+         * The tail, not the whole log. The full walk re-derives every hash —
+         * eight seconds at 750,000 entries here, half a minute on the shop
+         * PC — and this panel loads on every visit to the landing screen.
+         * The answer below says which end of the log it looked at.
+         */
+        api.verifyAuditChainTail(500).catch(() => null)
       ]);
 
       if (cancelled) return;
@@ -196,13 +202,27 @@ export const ShopFloorNow: React.FC<ShopFloorNowProps> = ({ lang }) => {
       if (au) {
         next.push({
           question: isHi ? 'क्या रिकॉर्ड अक्षुण्ण है?' : 'Is the record intact?',
+          /*
+           * A tail pass proves the recent end links up. It cannot see an
+           * entry altered last year, so it must not be reported as though it
+           * had looked. On this very database the tail verifies while the
+           * full walk finds two breaks from September.
+           */
           answer: au.verified
-            ? (isHi ? `हाँ — ${au.entriesChecked} प्रविष्टियाँ, अखंडित` : `Yes — ${au.entriesChecked} entries, unbroken`)
+            ? au.scope === 'TAIL'
+              ? (isHi
+                  ? `हाल की ${au.entriesChecked} प्रविष्टियाँ ठीक (कुल ${au.totalEntries})`
+                  : `The most recent ${au.entriesChecked} of ${au.totalEntries} entries verify`)
+              : (isHi ? `हाँ — ${au.entriesChecked} प्रविष्टियाँ, अखंडित` : `Yes — ${au.entriesChecked} entries, unbroken`)
             : (isHi ? `नहीं — ${au.breaksFound} प्रविष्टियाँ विफल` : `No — ${au.breaksFound} of ${au.entriesChecked} entries fail verification`),
           action: au.verified
-            ? (isHi
-                ? 'यह सिद्ध करता है कि कोई प्रविष्टि बदली नहीं गई — यह नहीं कि हर माप सही था।'
-                : 'This proves no entry was altered after it was written. It does not prove every measurement was correct.')
+            ? au.scope === 'TAIL'
+              ? (isHi
+                  ? 'केवल हाल का हिस्सा जाँचा गया। पूरी शृंखला के लिए ऑडिट चेन खोलें।'
+                  : 'Only the recent end was walked. Open Audit Chain to verify the whole log.')
+              : (isHi
+                  ? 'यह सिद्ध करता है कि कोई प्रविष्टि बदली नहीं गई — यह नहीं कि हर माप सही था।'
+                  : 'This proves no entry was altered after it was written. It does not prove every measurement was correct.')
             : (isHi ? 'ऑडिट श्रृंखला स्क्रीन पहली टूटी प्रविष्टि बताती है।' : 'The Audit Chain screen names the first broken entry.'),
           tone: au.verified ? 'good' : 'stop'
         });
