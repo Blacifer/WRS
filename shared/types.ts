@@ -675,6 +675,10 @@ export interface ChecklistItem {
   status: PartInspectionStatus;
   criticality: PartCriticality;
   isMandatory?: boolean;
+  /** True when somebody added this row to this wagon rather than the template. */
+  shopAdded?: boolean;
+  /** Why it was added. Required when adding; null on template rows. */
+  addedReason?: string | null;
   bogiePosition?: 'BOGIE_1' | 'BOGIE_2' | 'UNDERFRAME' | 'BODY' | 'NONE';
   conditionNotes?: string | null;
   repairAction?: RepairActionType | null;

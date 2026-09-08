@@ -699,6 +699,36 @@ export function runMigrations(db: DatabaseSync): void {
   }
 
 
+  /*
+   * Whether a checklist row was added on this wagon, or came from the template.
+   *
+   * The distinction decides whether a row may be withdrawn. A template row is
+   * the standard and is not negotiable on a single vehicle; a row somebody
+   * added to this wagon is a judgement about this wagon, and a judgement that
+   * turns out to be wrong has to be reversible.
+   *
+   * That is the whole Mark-50 lesson written into a column. Fourteen MANDATORY
+   * coupler items were added in August, every one of them permanently
+   * incompletable, and because nothing could distinguish them from the
+   * standard nothing could take them out — every wagon's exit gate stayed shut
+   * until the code was edited.
+   *
+   * Defaults to 0, so every row that existed before this column did is treated
+   * as part of the standard. That is the safe direction: the alternative would
+   * make the entire existing checklist look withdrawable.
+   */
+  const checklistCols = db.prepare("PRAGMA table_info(checklist_items)").all() as any[];
+  if (checklistCols.length > 0 && !checklistCols.some((c) => c.name === 'shop_added')) {
+    db.exec("ALTER TABLE checklist_items ADD COLUMN shop_added INTEGER NOT NULL DEFAULT 0;");
+  }
+  /*
+   * Why it was added. Required by the route, so a row that changes what the
+   * gate enforces always carries the reason somebody thought it should.
+   */
+  if (checklistCols.length > 0 && !checklistCols.some((c) => c.name === 'added_reason')) {
+    db.exec("ALTER TABLE checklist_items ADD COLUMN added_reason TEXT DEFAULT NULL;");
+  }
+
   // Photo evidence stage — see the column comment in schema.sql.
   const photoCols = db.prepare("PRAGMA table_info(wagon_photos)").all() as any[];
   if (photoCols.length > 0 && !photoCols.some((c) => c.name === 'evidence_stage')) {

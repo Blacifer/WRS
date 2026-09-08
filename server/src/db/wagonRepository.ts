@@ -79,6 +79,10 @@ export interface ChecklistItemData {
   inspectorName: string;
   photoId?: string | null;
   phase1InspectionId?: string | null;
+  /** True when a person added this row to this wagon rather than the template. */
+  shopAdded?: boolean;
+  /** Why they added it. Required by the route that lets them. */
+  addedReason?: string | null;
 }
 
 /**
@@ -711,19 +715,60 @@ export class WagonRepository {
           id, wagon_id, wagon_number, category, part_name, bogie_position,
           status, is_mandatory, condition_notes, repair_action, repair_notes,
           reinspected_status, inspector_id, inspector_name, photo_id,
-          phase1_inspection_id, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          phase1_inspection_id, shop_added, added_reason, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         id, wagonId, normalizedWagonNumber, data.category, data.partName,
         data.bogiePosition || 'NONE', data.status || 'PENDING',
-        data.isMandatory !== undefined ? (data.isMandatory ? 1 : 0) : 1,
+        /*
+         * Advisory unless somebody says otherwise.
+         *
+         * This defaulted to MANDATORY, so any row created through this path
+         * silently became something the exit gate enforces — and a mandatory
+         * row left PENDING is a CRITICAL_BLOCKER. A wagon could be sealed shut
+         * by a call that did not mention the gate at all.
+         */
+        data.isMandatory === true ? 1 : 0,
         data.conditionNotes || null, data.repairAction || null, data.repairNotes || null,
         data.reinspectedStatus || null, data.inspectorId, data.inspectorName,
-        data.photoId || null, data.phase1InspectionId || null, now, now
+        data.photoId || null, data.phase1InspectionId || null,
+        data.shopAdded ? 1 : 0, data.addedReason || null, now, now
       );
 
       return this.getChecklistItemById(id);
     }
+  }
+
+  /**
+   * Withdraw a row somebody added to this wagon.
+   *
+   * The escape hatch the Mark-50 episode did not have. Fourteen MANDATORY
+   * coupler items were added from photographs of a gauge board in August; none
+   * of them could ever be completed, every wagon's exit gate stayed shut, and
+   * there was no way out of it but editing the source and redeploying.
+   *
+   * Two rules keep this from becoming its own hazard:
+   *
+   *   - only rows with shop_added = 1. A template row is the standard, and the
+   *     standard is not something one person waves away on one vehicle.
+   *   - the row is deleted outright rather than marked withdrawn, because a
+   *     lingering row that no longer counts is exactly the sort of thing that
+   *     gets counted again later. What happened is preserved in the audit
+   *     chain by the caller, which is where the history belongs.
+   */
+  public withdrawShopAddedItem(itemId: string): { withdrawn: boolean; item: any | null } {
+    const item = this.getChecklistItemById(itemId);
+    if (!item) return { withdrawn: false, item: null };
+    if (!item.shopAdded) {
+      const err: any = new Error(
+        `"${item.partName}" comes from the checklist template for this wagon type and cannot be withdrawn ` +
+        'from a single wagon. Change it in Checklist Rules if the shop no longer does it.'
+      );
+      err.name = 'ValidationError';
+      throw err;
+    }
+    this.db.prepare('DELETE FROM checklist_items WHERE id = ? AND shop_added = 1').run(itemId);
+    return { withdrawn: true, item };
   }
 
   public updateChecklistItem(
@@ -2182,6 +2227,10 @@ export class WagonRepository {
       isMandatory: row.is_mandatory === 1,
       is_mandatory: row.is_mandatory,
       criticality: row.is_mandatory === 1 ? 'MANDATORY' : 'ADVISORY',
+      // Where the row came from, so a screen can offer to withdraw the ones
+      // that may be withdrawn and no others.
+      shopAdded: row.shop_added === 1,
+      addedReason: row.added_reason ?? null,
       conditionNotes: row.condition_notes,
       condition_notes: row.condition_notes,
       repairAction: row.repair_action as RepairActionType | null,

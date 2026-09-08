@@ -176,6 +176,18 @@ export function applyVoiceAction(
       partName: input.itemName || `Component (${category})`,
       bogiePosition: input.bogiePosition || 'BOGIE_1',
       status,
+      /*
+       * Stated rather than inherited.
+       *
+       * This relied on upsertChecklistItem defaulting to MANDATORY, and that
+       * default has been changed to advisory — a row created by a call that
+       * never mentions the gate should not silently start gating. A spoken
+       * verdict is the one case where mandatory is right: "condemn the brake
+       * block" on a part not in the checklist must hold the wagon, and it
+       * cannot become the permanent kind of blocker because a spoken row
+       * always carries a verdict rather than PENDING.
+       */
+      isMandatory: true,
       conditionNotes: input.defectNotes || null,
       repairAction: status === 'REPAIRED' ? 'REPAIRED' : status === 'REPLACED' ? 'REPLACED_NEW' : null,
       repairNotes: input.repairNotes || null,

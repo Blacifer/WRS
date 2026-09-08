@@ -511,11 +511,20 @@ export class ApiClient {
     );
   }
 
+  /**
+   * Add a part to one wagon's checklist.
+   *
+   * `addedReason` is required by the server: a row added to a single vehicle
+   * has to say why it is there, because it may be enforcing the exit gate.
+   * `isMandatory` needs checklist.configure — deciding a wagon cannot leave
+   * without a part is a different act from noting that the part is there.
+   */
   public async upsertChecklistItem(wagonNumber: string, payload: {
     category: string;
     partName: string;
+    addedReason: string;
     bogiePosition?: string;
-    status: string;
+    status?: string;
     isMandatory?: boolean;
     conditionNotes?: string;
     photoId?: string;
@@ -523,6 +532,14 @@ export class ApiClient {
     return this.request<{ success: boolean; data: ChecklistItem }>(`/wagons/${wagonNumber}/checklist/items`, {
       method: 'POST',
       body: JSON.stringify(payload)
+    });
+  }
+
+  /** Withdraw a row somebody added to this wagon. Template rows are refused. */
+  public async withdrawChecklistItem(wagonNumber: string, itemId: string, reason: string): Promise<{ success: boolean; data: { withdrawn: boolean; itemId: string }; message?: string }> {
+    return this.request(`/wagons/${wagonNumber}/checklist/items/${itemId}/withdraw`, {
+      method: 'POST',
+      body: JSON.stringify({ reason })
     });
   }
 

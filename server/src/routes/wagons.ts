@@ -9,6 +9,7 @@ import type { Request, Response } from '../framework/index.ts';
 import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { requireCapability } from '../middleware/rbac.ts';
+import { can } from '../../../shared/auth/permissions.ts';
 import { getDatabase } from '../db/connection.ts';
 import { logAuditEvent } from '../db/auditLog.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
@@ -794,13 +795,126 @@ wagonsRouter.put('/:wagonNumber/checklist/items/:itemId', authMiddleware, async 
 });
 
 // -------------------------------------------------------------------------
+// 10b. Withdraw a row somebody added to this wagon
+//
+// The way out that the Mark-50 episode did not have. Fourteen MANDATORY
+// coupler checks were added in August from a photograph of a gauge board;
+// every one of them was permanently incompletable, so every wagon's exit gate
+// stayed shut, and the only remedy was to edit the source and redeploy.
+//
+// Template rows are refused here. They are the standard for the wagon type,
+// and one person deciding a standard does not apply to one vehicle is the
+// failure this whole gate exists to prevent. Changing the standard is what
+// Checklist Rules is for.
+// -------------------------------------------------------------------------
+/*
+ * POST rather than DELETE, for a reason the browser found and the tests could
+ * not: express.json() in this framework skips body parsing for DELETE, so the
+ * required reason never arrived and every real withdrawal returned 400. The
+ * server tests passed throughout, because dispatch() hands the body straight
+ * to the route and never goes through the parser.
+ *
+ * It also reads better. This is an audited act that must carry a
+ * justification, which is what every other consequential POST here does —
+ * gate sign-off, override, condemnation — rather than a bare deletion.
+ */
+wagonsRouter.post('/:wagonNumber/checklist/items/:itemId/withdraw', authMiddleware, async (req: Request, res: Response) => {
+  const { wagonRepo } = getRepos();
+  const { itemId } = req.params;
+  const reason = req.body?.reason;
+
+  try {
+    const existing = wagonRepo.getChecklistItemById(itemId);
+    if (!existing) {
+      res.status(404).json({
+        success: false, error: 'NOT_FOUND', message: 'No such checklist item.',
+        statusCode: 404, timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    /*
+     * Withdrawing a MANDATORY row changes what the gate enforces, in the
+     * direction that lets a wagon out. That is the heavier direction, so it
+     * needs the heavier authority — the same one it took to make it mandatory.
+     * An advisory row gates nothing, and the person who added it can take it
+     * back.
+     */
+    const needed = existing.isMandatory ? 'checklist.configure' : 'wagon.inspect';
+    if (!can(req.user?.role, needed as any)) {
+      res.status(403).json({
+        success: false,
+        error: 'FORBIDDEN',
+        message: existing.isMandatory
+          ? 'Withdrawing a MANDATORY item changes what the exit gate enforces, which needs checklist.configure.'
+          : 'Withdrawing a checklist item needs wagon.inspect.',
+        statusCode: 403,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    if (!reason || typeof reason !== 'string' || reason.trim().length < 4) {
+      res.status(400).json({
+        success: false,
+        error: 'MISSING_REASON',
+        message: 'A reason is required — say why this item no longer applies to this wagon.',
+        statusCode: 400,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+
+    const result = wagonRepo.withdrawShopAddedItem(itemId);
+
+    /*
+     * Recorded before anything else can happen to the wagon. A row that once
+     * held a wagon and no longer exists is precisely the history somebody will
+     * want when they ask why this vehicle passed.
+     */
+    logAuditEvent(getDatabase(), {
+      eventType: 'CHECKLIST_ITEM_UPDATED',
+      userId: req.user!.id,
+      userRole: req.user?.role || 'INSPECTOR',
+      payload: {
+        action: 'WITHDRAWN_FROM_WAGON',
+        wagonNumber: existing.wagonNumber,
+        itemId,
+        category: existing.category,
+        partName: existing.partName,
+        wasMandatory: existing.isMandatory,
+        gateAffecting: existing.isMandatory,
+        addedReason: existing.addedReason ?? null,
+        withdrawnReason: reason.trim().slice(0, 500)
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `"${existing.partName}" withdrawn from ${existing.wagonNumber}.`,
+      data: { withdrawn: result.withdrawn, itemId },
+      meta: { timestamp: new Date().toISOString() }
+    });
+  } catch (err: any) {
+    const isRule = err?.name === 'ValidationError';
+    res.status(isRule ? 409 : 500).json({
+      success: false,
+      error: isRule ? 'TEMPLATE_ITEM' : 'WITHDRAW_FAILED',
+      message: err?.message || 'Failed to withdraw the checklist item',
+      statusCode: isRule ? 409 : 500,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// -------------------------------------------------------------------------
 // 10. Log Part Inspection Record in Checklist
 // -------------------------------------------------------------------------
 
 wagonsRouter.post('/:wagonNumber/checklist/items', authMiddleware, async (req: Request, res: Response) => {
   const { wagonRepo } = getRepos();
   const wagonNumber = req.params?.wagonNumber;
-  const { category, partName, bogiePosition, status, conditionNotes, isMandatory, photoId } = req.body;
+  const { category, partName, bogiePosition, status, conditionNotes, isMandatory, photoId, addedReason } = req.body;
 
   if (!wagonNumber || !category || !partName) {
     res.status(400).json({
@@ -813,22 +927,133 @@ wagonsRouter.post('/:wagonNumber/checklist/items', authMiddleware, async (req: R
     return;
   }
 
-  const inspectorId = req.user?.id || 'usr_insp_001';
-  const inspectorName = req.user?.name || 'Inspector';
+  /*
+   * A row added to a wagon has to say why it is there.
+   *
+   * The same rule the checklist template editor enforces, for the same
+   * reason. In August fourteen coupler checks were added from a photograph of
+   * a gauge board and nobody afterwards could say what they were for. A reason
+   * recorded at the time is what makes a row reviewable later — and this row
+   * may be enforcing the exit gate.
+   */
+  if (!addedReason || typeof addedReason !== 'string' || addedReason.trim().length < 4) {
+    res.status(400).json({
+      success: false,
+      error: 'MISSING_REASON',
+      message: 'addedReason is required — say why this part is being added to this wagon.',
+      statusCode: 400,
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
+
+  /*
+   * Making it MANDATORY is a different act from noting it.
+   *
+   * A mandatory row left PENDING is a CRITICAL_BLOCKER, so this is precisely
+   * "change what the exit gate enforces" — the words checklist.configure is
+   * defined by. An inspector may record a part they found; deciding the wagon
+   * cannot leave without it belongs with the authority that already governs
+   * the gate.
+   */
+  /*
+   * Checked per case rather than as a blanket requirement on the route.
+   *
+   * A first attempt required wagon.inspect for the whole endpoint, which
+   * locked out the only role permitted to make a row mandatory: an
+   * administrator holds checklist.configure and deliberately holds no
+   * shop-floor capabilities at all — they may create the account that
+   * certifies a wagon and may not certify one themselves.
+   *
+   * The two acts are genuinely different and want different authority.
+   * Noting a part found on this wagon is inspection. Deciding the wagon may
+   * not leave without it is the gate.
+   */
+  const wantsMandatory = isMandatory === true;
+  const needed = wantsMandatory ? 'checklist.configure' : 'wagon.inspect';
+  if (!can(req.user?.role, needed as any)) {
+    res.status(403).json({
+      success: false,
+      error: 'FORBIDDEN',
+      message: wantsMandatory
+        ? 'Adding a MANDATORY item changes what the exit gate enforces for this wagon, which needs ' +
+          'checklist.configure. Add it as an advisory item, or ask an administrator.'
+        : 'Recording a checklist item needs wagon.inspect.',
+      statusCode: 403,
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
+
+  // From the token. The previous fallback filed an unattributed addition
+  // against a real seeded inspector who had not made it.
+  const inspectorId = req.user?.id;
+  const inspectorName = req.user?.name || req.user?.username || 'Inspector';
+  if (!inspectorId) {
+    res.status(401).json({
+      success: false,
+      error: 'UNAUTHORIZED',
+      message: 'Sign in first.',
+      statusCode: 401,
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
 
   try {
+    const existing = wagonRepo
+      .getChecklistItems(wagonNumber)
+      .find?.((it: any) => it.category === category && it.partName === partName);
+
     const item = wagonRepo.upsertChecklistItem({
       wagonNumber,
       category,
       partName,
       bogiePosition: bogiePosition || 'NONE',
       status: status || 'PENDING',
-      isMandatory: isMandatory !== undefined ? Boolean(isMandatory) : true,
+      isMandatory: wantsMandatory,
       conditionNotes,
       inspectorId,
       inspectorName,
-      photoId: photoId || null
+      photoId: photoId || null,
+      shopAdded: true,
+      addedReason: String(addedReason).trim().slice(0, 500)
     });
+
+    /*
+     * Audited, because it can change whether a wagon may leave.
+     *
+     * Only on creation. An update through this path is an ordinary inspection
+     * verdict and is already recorded as one; logging it here as a gate change
+     * would put a second, differently-shaped event in the chain for the same
+     * act.
+     */
+    if (!existing) {
+      /*
+       * CHECKLIST_ITEM_UPDATED with an explicit action, rather than a new
+       * event type. inspection_audit_log constrains event_type with a CHECK,
+       * and widening it in SQLite means rebuilding the table — which is the
+       * append-only, hash-chained one. Rebuilding that to add an enum value
+       * would be a large risk for a small tidiness, so the distinction lives
+       * in the payload where it is just as searchable.
+       */
+      logAuditEvent(getDatabase(), {
+        eventType: 'CHECKLIST_ITEM_UPDATED',
+        userId: inspectorId,
+        userRole: req.user?.role || 'INSPECTOR',
+        payload: {
+          action: 'ADDED_TO_WAGON',
+          wagonNumber: String(wagonNumber).trim().toUpperCase(),
+          itemId: item.id,
+          category,
+          partName,
+          bogiePosition: bogiePosition || 'NONE',
+          isMandatory: wantsMandatory,
+          gateAffecting: wantsMandatory,
+          addedReason: String(addedReason).trim().slice(0, 500)
+        }
+      });
+    }
 
     res.status(200).json({
       success: true,

@@ -76,9 +76,6 @@ const REDUNDANT: Record<string, string> = {
  * five features that shipped unreachable because nobody was counting.
  */
 const NO_INTERFACE_YET: Record<string, string> = {
-  upsertChecklistItem:
-    'adding an item to a wagon MANDATORY checklist changes what the exit gate enforces for ' +
-    'that vehicle, so it needs a designed, audited flow rather than a form bolted on',
 };
 
 const EXEMPT = { ...REDUNDANT, ...NO_INTERFACE_YET };

@@ -5,6 +5,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { api } from '../services/api.ts';
+import { can } from '../../../shared/auth/permissions.ts';
+import { CASNUB_CATEGORIES } from '../../../shared/types.ts';
 import { BanIcon, CaliperIcon, CameraIcon, ClipboardIcon, ClockIcon, CoilIcon, FileTextIcon, GearIcon, HeadphonesIcon, IdCardIcon, RefreshCwIcon, ShieldIcon, SparklesIcon, WindIcon, WrenchIcon } from '../components/Icons.tsx';
 import { offlineDb } from '../services/offlineDb.ts';
 import { useI18n } from '../i18n/index.ts';
@@ -125,6 +127,22 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
    * recorded", which on a checklist are opposite outcomes.
    */
   const [voiceNote, setVoiceNote] = useState<{ tone: 'good' | 'warn' | 'busy'; text: string } | null>(null);
+
+  /*
+   * A part that is on this wagon and not on the list.
+   *
+   * The endpoint for this shipped with no screen, no capability check, and
+   * isMandatory defaulting to true — so it could seal a wagon shut. It is now
+   * advisory unless somebody with gate authority says otherwise, and it can be
+   * taken back out, which is what August's fourteen coupler checks could not.
+   */
+  const [addOpen, setAddOpen] = useState(false);
+  const [addCategory, setAddCategory] = useState<string>('BOGIE_FRAME_BOLSTER');
+  const [addPartName, setAddPartName] = useState('');
+  const [addReason, setAddReason] = useState('');
+  const [addMandatory, setAddMandatory] = useState(false);
+  const [addBusy, setAddBusy] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
   const [voiceUndoStack, setVoiceUndoStack] = useState<
     Array<{
       itemId: string;
@@ -183,6 +201,13 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
   const [signoffSubmitting, setSignoffSubmitting] = useState<boolean>(false);
 
   const user = api.getUser();
+  /*
+   * Whether this person may make an added row MANDATORY. Declared here rather
+   * than beside the other add-item state, which sits above `user` — reading it
+   * up there is a temporal dead zone, not a value.
+   */
+  const mayGate = can(user?.role, 'checklist.configure');
+  const mayInspect = can(user?.role, 'wagon.inspect');
   // Compared after normalising, like everywhere else. This line alone checked
   // only the uppercase spellings while AnalyticsPage and InspectionPage
   // checked both, so a user stored as "Supervisor" lost their supervisor
@@ -710,6 +735,51 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
       } catch (err: any) {
         setVoiceNote({ tone: 'warn', text: err?.message || (isHi ? 'यह वाक्य समझ नहीं आया। कृपया टैप करके दर्ज करें।' : 'That sentence was not understood. Please tap it in.') });
       }
+    }
+  };
+
+  const handleAddItem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAddError(null);
+    setAddBusy(true);
+    try {
+      await api.upsertChecklistItem(wagonNumber, {
+        category: addCategory,
+        partName: addPartName.trim(),
+        addedReason: addReason.trim(),
+        // Only ever sent true by someone who may set it; the server checks
+        // again, because a client is not an authority on its own permissions.
+        isMandatory: mayGate ? addMandatory : false
+      });
+      setAddOpen(false);
+      setAddPartName('');
+      setAddReason('');
+      setAddMandatory(false);
+      loadWagonData();
+    } catch (err: any) {
+      setAddError(err?.message || (isHi ? 'जोड़ा नहीं जा सका।' : 'It could not be added.'));
+    } finally {
+      setAddBusy(false);
+    }
+  };
+
+  const handleWithdrawItem = async (item: ChecklistItem) => {
+    /*
+     * The reason is asked for, not optional, and the prompt says what the row
+     * is. Withdrawing a mandatory row lets a wagon out that was being held,
+     * and "why" is the first question anybody will ask afterwards.
+     */
+    const reason = window.prompt(
+      isHi
+        ? `"${item.partName}" को इस वैगन से हटाने का कारण लिखें:`
+        : `Why does "${item.partName}" no longer apply to this wagon?`
+    );
+    if (!reason || !reason.trim()) return;
+    try {
+      await api.withdrawChecklistItem(wagonNumber, item.id, reason.trim());
+      loadWagonData();
+    } catch (err: any) {
+      alert(err?.message || 'Could not withdraw that item.');
     }
   };
 
@@ -1331,6 +1401,123 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
             </div>
           )}
 
+          {/*
+            * A part on this wagon that is not on the list.
+            *
+            * Advisory by default and deliberately so: a MANDATORY row left
+            * PENDING is a critical blocker, and a row added without anyone
+            * mentioning the gate must not start enforcing it. Making it
+            * mandatory needs checklist.configure, and either way the row can
+            * be withdrawn again — which is precisely what the fourteen Mark-50
+            * checks added in August could not be.
+            */}
+          {!isReleased && (
+            <div className="bg-card border border-line rounded-card p-5 space-y-3" data-testid="add-item-panel">
+              <div className="flex items-center justify-between gap-3">
+                <h4 className="text-sm font-bold text-white">
+                  {isHi ? 'सूची में न होने वाला पुर्जा' : 'A part that is not on the list'}
+                </h4>
+                <button
+                  data-testid="add-item-toggle"
+                  onClick={() => { setAddOpen((v) => !v); setAddError(null); }}
+                  className="min-h-[36px] px-3 py-1.5 rounded-control border border-line-strong bg-raised text-ink-body hover:bg-selected hover:text-ink text-xs font-bold"
+                >
+                  {addOpen ? (isHi ? 'बंद करें' : 'Close') : (isHi ? 'पुर्जा जोड़ें' : 'Add a part')}
+                </button>
+              </div>
+
+              {addOpen && (
+                <form onSubmit={handleAddItem} className="space-y-3 pt-1">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="block">
+                      <span className="text-[11px] font-bold uppercase tracking-wide text-ink-muted">
+                        {isHi ? 'श्रेणी' : 'Category'}
+                      </span>
+                      <select
+                        value={addCategory}
+                        onChange={(e) => setAddCategory(e.target.value)}
+                        className="w-full mt-1 bg-page border border-line rounded-control px-3 py-2 text-xs text-white"
+                      >
+                        {CASNUB_CATEGORIES.map((c: string) => (
+                          <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="text-[11px] font-bold uppercase tracking-wide text-ink-muted">
+                        {isHi ? 'पुर्जे का नाम' : 'Part name'}
+                      </span>
+                      <input
+                        data-testid="add-item-name"
+                        required
+                        value={addPartName}
+                        onChange={(e) => setAddPartName(e.target.value)}
+                        className="w-full mt-1 bg-page border border-line rounded-control px-3 py-2 text-xs text-white"
+                      />
+                    </label>
+                  </div>
+
+                  <label className="block">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-ink-muted">
+                      {isHi ? 'कारण — यह क्यों जोड़ा जा रहा है' : 'Why this is being added'}
+                    </span>
+                    <input
+                      data-testid="add-item-reason"
+                      required
+                      minLength={4}
+                      value={addReason}
+                      onChange={(e) => setAddReason(e.target.value)}
+                      placeholder={isHi ? 'निरीक्षण में मिला…' : 'Found during visual inspection…'}
+                      className="w-full mt-1 bg-page border border-line rounded-control px-3 py-2 text-xs text-white"
+                    />
+                  </label>
+
+                  {/*
+                    * Offered only to somebody who may set it. Showing a control
+                    * that always fails would be worse than not showing one.
+                    */}
+                  {mayGate ? (
+                    <label className="flex items-start gap-2 cursor-pointer">
+                      <input
+                        data-testid="add-item-mandatory"
+                        type="checkbox"
+                        checked={addMandatory}
+                        onChange={(e) => setAddMandatory(e.target.checked)}
+                        className="mt-0.5"
+                      />
+                      <span className="text-[11px] text-ink-body leading-snug">
+                        {isHi
+                          ? 'अनिवार्य बनाएँ — तब यह वैगन बिना इसके बाहर नहीं जा सकेगा।'
+                          : 'Make it mandatory — the wagon then cannot leave until this is recorded.'}
+                      </span>
+                    </label>
+                  ) : (
+                    <p className="text-[11px] text-ink-muted leading-snug">
+                      {isHi
+                        ? 'यह सलाहकारी के रूप में जुड़ेगा। इसे अनिवार्य बनाना गेट को बदलता है, जिसके लिए प्रशासक चाहिए।'
+                        : 'This is added as advisory. Making it mandatory changes the exit gate, which needs an administrator.'}
+                    </p>
+                  )}
+
+                  {addError && (
+                    <div className="rounded-control border border-bad-line bg-bad-soft p-3" data-testid="add-item-error">
+                      <p className="text-xs font-bold text-bad-ink leading-snug">{addError}</p>
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    data-testid="add-item-submit"
+                    disabled={addBusy || !addPartName.trim() || addReason.trim().length < 4}
+                    className="min-h-[40px] px-4 py-2 rounded-control bg-accent text-white text-xs font-bold disabled:opacity-40 disabled:pointer-events-none"
+                  >
+                    {addBusy ? (isHi ? 'जोड़ा जा रहा है…' : 'Adding…') : (isHi ? 'जोड़ें' : 'Add to this wagon')}
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
+
           {/* Inspect by exception — the fast path.
               Flag what's wrong individually, then declare the rest serviceable
               in one attested action instead of tapping 50+ items to say "fine".
@@ -1497,7 +1684,45 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                             {item.bogiePosition}
                           </span>
                         )}
+                        {/*
+                          * Marked, so nobody has to guess whether a row is the
+                          * standard for this wagon type or a judgement somebody
+                          * made about this vehicle. In August nothing carried
+                          * that distinction and nothing could be taken back.
+                          */}
+                        {item.shopAdded && (
+                          <span
+                            data-testid={`shop-added-${item.id}`}
+                            className="text-[9px] font-extrabold tracking-wider px-2 py-0.5 rounded bg-raised text-ink-muted border border-line"
+                            title={item.addedReason || undefined}
+                          >
+                            {isHi ? 'इस वैगन पर जोड़ा' : 'ADDED HERE'}
+                          </span>
+                        )}
+                        {/*
+                          * Offered only where it can actually work. Withdrawing
+                          * a mandatory row needs checklist.configure; an
+                          * advisory one needs wagon.inspect — and an
+                          * administrator holds the first and not the second, so
+                          * an unconditional button gave them a control that
+                          * could only return 403.
+                          */}
+                        {item.shopAdded && !isReleased && (item.isMandatory ? mayGate : mayInspect) && (
+                          <button
+                            data-testid={`withdraw-${item.id}`}
+                            onClick={() => handleWithdrawItem(item)}
+                            title={isHi ? 'इस वैगन से हटाएँ' : 'Withdraw from this wagon'}
+                            className="text-[10px] font-bold text-ink-muted hover:text-bad-ink underline underline-offset-2"
+                          >
+                            {isHi ? 'हटाएँ' : 'Withdraw'}
+                          </button>
+                        )}
                       </div>
+                      {item.shopAdded && item.addedReason && (
+                        <p className="text-[11px] text-ink-faint">
+                          {isHi ? 'जोड़ने का कारण: ' : 'Added because: '}{item.addedReason}
+                        </p>
+                      )}
                       {item.conditionNotes && (
                         <p className="text-xs text-ink-muted italic">“{item.conditionNotes}”</p>
                       )}
