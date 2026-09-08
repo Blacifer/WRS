@@ -1085,6 +1085,8 @@ export interface AcousticDiagnosticRecord {
   targetPartName?: string | null;
   checklistItemId?: string | null;
   inspectorId?: string | null;
+  /** Resolved from users on read; null when the reading carried no inspector. */
+  inspectorName?: string | null;
   createdAt: string;
 }
 

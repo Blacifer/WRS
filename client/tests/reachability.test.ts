@@ -83,9 +83,6 @@ const NO_INTERFACE_YET: Record<string, string> = {
   reservePart:
     'reserving stores against a wagon needs a stores workflow that does not exist yet — ' +
     'issuing and restocking are reachable, reserving is the part with no home',
-  getAcousticHistory:
-    'past acoustic runs are recorded and never shown; the genuine remaining gap of the four, ' +
-    'and the cheapest to close once someone wants it',
 };
 
 const EXEMPT = { ...REDUNDANT, ...NO_INTERFACE_YET };

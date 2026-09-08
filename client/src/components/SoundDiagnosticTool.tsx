@@ -14,7 +14,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { useI18n } from '../i18n/index.ts';
 import { acousticEngine, AcousticAnalysisFrame, EqualizerBand } from '../utils/acousticEngine.ts';
 import { api } from '../services/api.ts';
-import type { AcousticAnomalyType, CASNUBCategory } from '../../../shared/types.ts';
+import type { AcousticAnomalyType, CASNUBCategory, AcousticDiagnosticRecord } from '../../../shared/types.ts';
 import { tunable, loadTunables } from '../services/tunables.ts';
 import { ActivityIcon, AlertTriangleIcon } from './Icons.tsx';
 
@@ -58,6 +58,20 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
   const [crestFactor, setCrestFactor] = useState<number>(1.5);
   const [highFreqRatio, setHighFreqRatio] = useState<number>(0.05);
   const [details, setDetails] = useState<string>('');
+
+  /*
+   * What this wagon has sounded like before.
+   *
+   * Readings were recorded from the moment this tool shipped and shown to
+   * nobody. A bearing flagged three weeks ago and flagged again today is a
+   * different fact from a bearing flagged once, and the tool that recorded
+   * both could not tell an inspector which they were looking at.
+   *
+   * Null while it has not been fetched, [] when the wagon genuinely has none —
+   * the two say different things and the panel says them differently.
+   */
+  const [history, setHistory] = useState<AcousticDiagnosticRecord[] | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const [recommendedAction, setRecommendedAction] = useState<string>('');
 
   // Target defect assignment
@@ -342,6 +356,25 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
     loadTunables();
   }, []);
 
+  const loadHistory = useCallback(async () => {
+    if (!wagonNumber) return;
+    setHistoryError(null);
+    try {
+      const res = await api.getAcousticHistory(wagonNumber);
+      setHistory(res.data || []);
+    } catch (err: any) {
+      /*
+       * Reported, not swallowed. An empty list and a failed fetch look
+       * identical on screen unless one of them says so, and "this wagon has
+       * never been listened to" is a conclusion an inspector might act on.
+       */
+      setHistory(null);
+      setHistoryError(err?.message || (isHi ? 'पिछली रीडिंग नहीं मिल सकीं।' : 'Previous readings could not be loaded.'));
+    }
+  }, [wagonNumber, isHi]);
+
+  useEffect(() => { loadHistory(); }, [loadHistory]);
+
   // Log Defect to Exit Gate Blockers
   /*
     Shown when something was heard but was too marginal to raise. Silently
@@ -386,6 +419,9 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
           t('acoustic.defectLoggedSuccess') ||
           `Defect successfully logged against ${targetPartName}! Active exit gate blockers updated.`
         );
+        // The reading just filed belongs in the list below it immediately;
+        // otherwise the panel contradicts the message above it until a reload.
+        loadHistory();
         if (onDefectLogged) {
           onDefectLogged();
         }
@@ -779,6 +815,99 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
           </div>
         </div>
       )}
+
+      {/*
+        * Previous readings on this wagon.
+        *
+        * Recorded since this tool shipped and shown to nobody. The question it
+        * answers is the one an inspector actually has standing at the bogie:
+        * has this been heard before? A bearing flagged three weeks ago and
+        * flagged again today is a different fact from one flagged once.
+        */}
+      <div className="bg-page p-4 rounded-control border border-line space-y-3" data-testid="acoustic-history">
+        <div className="flex items-center justify-between gap-3">
+          <h5 className="text-xs font-bold text-ink-body">
+            {isHi ? 'इस वैगन की पिछली रीडिंग' : 'Previous readings on this wagon'}
+          </h5>
+          <button
+            onClick={loadHistory}
+            className="text-[11px] font-bold text-ink-muted hover:text-ink"
+          >
+            {isHi ? 'ताज़ा करें' : 'Refresh'}
+          </button>
+        </div>
+
+        {historyError && (
+          <p className="text-[11px] font-bold text-bad-ink" data-testid="acoustic-history-error">{historyError}</p>
+        )}
+
+        {!historyError && history === null && (
+          <p className="text-[11px] text-ink-muted">{isHi ? 'लोड हो रहा है…' : 'Loading…'}</p>
+        )}
+
+        {/*
+          * An empty list is stated rather than left blank. "Nothing has been
+          * recorded" and "this failed to load" are opposite conclusions, and a
+          * blank space is indistinguishable from either.
+          */}
+        {!historyError && history !== null && history.length === 0 && (
+          <p className="text-[11px] text-ink-muted" data-testid="acoustic-history-empty">
+            {isHi
+              ? 'इस वैगन पर अभी तक कोई ध्वनि रीडिंग दर्ज नहीं हुई।'
+              : 'No acoustic reading has been recorded on this wagon yet.'}
+          </p>
+        )}
+
+        {!historyError && history !== null && history.length > 0 && (
+          <ul className="space-y-2 max-h-64 overflow-y-auto">
+            {history.map((r) => {
+              const tone =
+                r.anomalyType === 'NONE'
+                  ? 'border-good-line bg-good-soft'
+                  : 'border-warn-line bg-warn-soft';
+              const label =
+                r.anomalyType === 'AIR_LEAK'
+                  ? (isHi ? 'हवा रिसाव' : 'Air leak')
+                  : r.anomalyType === 'BEARING_DEFECT'
+                    ? (isHi ? 'बेयरिंग दोष' : 'Bearing defect')
+                    : (isHi ? 'सामान्य' : 'Nominal');
+              return (
+                <li
+                  key={r.id}
+                  className={`rounded-control border p-2.5 ${tone}`}
+                  data-testid="acoustic-history-row"
+                  data-anomaly={r.anomalyType}
+                >
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                    <span className="text-xs font-black text-white">{label}</span>
+                    <span className="text-[10px] font-mono text-ink-muted">
+                      {new Date(r.createdAt).toLocaleString(isHi ? 'hi-IN' : 'en-IN')}
+                    </span>
+                  </div>
+                  <p className="text-[11px] font-mono text-ink-body mt-1">
+                    {Math.round(r.dominantFrequencyHz)} Hz · {r.peakDb.toFixed(1)} dB
+                    {typeof r.confidence === 'number' ? ` · ${Math.round(r.confidence * 100)}%` : ''}
+                  </p>
+                  {r.targetPartName && (
+                    <p className="text-[11px] text-ink-muted">{r.targetPartName}</p>
+                  )}
+                  {r.details && <p className="text-[11px] text-ink-muted leading-snug">{r.details}</p>}
+                  {/*
+                    * The name when there is one, and nothing invented when
+                    * there is not — a reading attributed to a person who did
+                    * not take it is worse than one attributed to nobody.
+                    */}
+                  <p className="text-[10px] text-ink-faint mt-0.5">
+                    {r.inspectorName
+                      ? `${isHi ? 'रिकॉर्ड किया' : 'Recorded by'} ${r.inspectorName}`
+                      : (isHi ? 'नाम दर्ज नहीं' : 'No name recorded')}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
     </div>
   );
 };

@@ -2434,14 +2434,18 @@ export class WagonRepository {
     let rows: any[];
     if (wagonNumber) {
       rows = this.db.prepare(`
-        SELECT * FROM acoustic_diagnostics
-        WHERE wagon_number = ?
-        ORDER BY created_at DESC, rowid DESC
+        SELECT a.*, u.full_name AS inspector_name
+        FROM acoustic_diagnostics a
+        LEFT JOIN users u ON u.id = a.inspector_id
+        WHERE a.wagon_number = ?
+        ORDER BY a.created_at DESC, a.rowid DESC
       `).all(wagonNumber.trim().toUpperCase()) as any[];
     } else {
       rows = this.db.prepare(`
-        SELECT * FROM acoustic_diagnostics
-        ORDER BY created_at DESC, rowid DESC
+        SELECT a.*, u.full_name AS inspector_name
+        FROM acoustic_diagnostics a
+        LEFT JOIN users u ON u.id = a.inspector_id
+        ORDER BY a.created_at DESC, a.rowid DESC
         LIMIT 100
       `).all() as any[];
     }
@@ -2458,6 +2462,15 @@ export class WagonRepository {
       targetPartName: r.target_part_name,
       checklistItemId: r.checklist_item_id,
       inspectorId: r.inspector_id,
+      /*
+       * The name, not just the id.
+       *
+       * A reading nobody can attribute is hard to follow up: the question a
+       * week later is "who heard that", and an id does not answer it. LEFT
+       * JOIN rather than an inner one, because inspector_id is nullable and a
+       * reading with no name attached should still appear.
+       */
+      inspectorName: r.inspector_name ?? null,
       createdAt: r.created_at
     }));
   }
