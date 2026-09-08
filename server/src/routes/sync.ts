@@ -198,6 +198,26 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
               Date.parse(capturedAt) < Date.parse(existing.updatedAt);
 
             if (downgradesCondemnation || isStale) {
+              /*
+               * Who actually judged it, not who created the row.
+               *
+               * inspectorName on a checklist row is whoever the row was
+               * created for — and initializeDefaultChecklist creates every
+               * template line under the literal name "Intake Inspector". So
+               * this message named a person who does not exist, on every
+               * conflict, and an inspector told their work was rejected would
+               * have gone looking for them.
+               *
+               * The verdict's author is manual_verdict_by, resolved here to a
+               * name. Falls back to the honest indefinite phrase rather than
+               * to the row's creator, because naming the wrong colleague is
+               * worse than naming nobody.
+               */
+              const verdictBy = (existing as any).manualVerdictBy ?? null;
+              const judgedBy = verdictBy
+                ? (getDatabase().prepare('SELECT full_name AS n FROM users WHERE id = ?').get(verdictBy) as { n?: string } | undefined)?.n
+                : null;
+
               conflicts.push({
                 clientTempId: chk.clientTempId || chk.id,
                 entity: 'CHECKLIST',
@@ -206,9 +226,9 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
                 attempted: chk.status,
                 kept: existing.status,
                 reason: downgradesCondemnation
-                  ? `"${chk.partName}" was condemned by ${existing.inspectorName || 'another inspector'} ` +
+                  ? `"${chk.partName}" was condemned by ${judgedBy || 'another inspector'} ` +
                     `after this was recorded. The condemnation stands — record a repair instead if it was fixed.`
-                  : `"${chk.partName}" was updated by ${existing.inspectorName || 'someone else'} ` +
+                  : `"${chk.partName}" was updated by ${judgedBy || 'someone else'} ` +
                     `after this was recorded offline, so it was not overwritten.`
               });
               continue;
