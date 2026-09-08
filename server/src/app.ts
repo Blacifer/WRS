@@ -9,8 +9,10 @@ import { apiRouter } from './routes/index.ts';
 import { requestLogger } from './middleware/requestLogger.ts';
 import { requestContext } from './middleware/requestContext.ts';
 import { rateLimit } from './middleware/rateLimit.ts';
+import { securityHeaders } from './middleware/securityHeaders.ts';
 import { errorHandler } from './middleware/errorHandler.ts';
 import { getDatabase } from './db/connection.ts';
+import { config } from './config/index.ts';
 import { runMigrations } from './db/migrations.ts';
 import { seedUsers } from './db/seed.ts';
 
@@ -34,7 +36,8 @@ export function createApp(dbPath?: string): ExpressApp {
   // Opened first, so every later handler — and every audit write beneath it —
   // can see who the request came from.
   app.use(requestContext);
-  app.use(cors());
+  app.use(securityHeaders());
+  app.use(cors({ origin: config.corsOrigin }));
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
   app.use(requestLogger);

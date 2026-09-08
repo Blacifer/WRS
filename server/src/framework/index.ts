@@ -598,9 +598,40 @@ express.urlencoded = (options?: { extended?: boolean; limit?: string }) => {
   };
 };
 
-export function cors(options?: any) {
+/**
+ * Which origins may call this API from a browser.
+ *
+ * This used to set Access-Control-Allow-Origin: * unconditionally and ignore
+ * its options entirely. config.corsOrigin existed, the production startup
+ * warned when it was left open, and the readiness panel reported "Pinned to
+ * <address>" — none of which reached this function. Every response told
+ * every browser that any website could read it, whatever an administrator
+ * had configured. A green tick on the panel described a header that was never
+ * sent.
+ *
+ * Now a configured origin is enforced: the request's Origin is checked against
+ * the allowed list and echoed back only when it matches. Anything else gets no
+ * Allow-Origin header at all, which is how a browser is told no. A comma-
+ * separated list is accepted, because two tablets on two LAN addresses is an
+ * ordinary shop, and '*' keeps the open behaviour for a laptop pilot.
+ */
+export function cors(options?: { origin?: string }) {
+  const configured = (options?.origin || '*').trim();
+  const allowed = configured === '*'
+    ? null
+    : configured.split(',').map((s) => s.trim()).filter(Boolean);
+
   return (req: Request, res: Response, next: NextFunction): void => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    const requestOrigin = req.headers['origin'] as string | undefined;
+
+    if (allowed === null) {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    } else if (requestOrigin && allowed.includes(requestOrigin)) {
+      res.setHeader('Access-Control-Allow-Origin', requestOrigin);
+      // Caches must not serve one origin's permitted response to another.
+      res.setHeader('Vary', 'Origin');
+    }
+
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-OTP-Token, X-Request-ID');
 
