@@ -47,6 +47,18 @@ export const StoresInventoryPage: React.FC = () => {
   const [reservationStatusFilter, setReservationStatusFilter] = useState<string>('ALL');
 
   // Modals
+  /*
+   * Reserving a part against a wagon.
+   *
+   * The cycle was restock and issue with nothing in between: reservations
+   * could be listed and issued, and no screen could create one. The endpoint
+   * had existed since the stores work went in and nothing had ever called it.
+   */
+  const [reserveModalPart, setReserveModalPart] = useState<StoresPart | null>(null);
+  const [reserveWagon, setReserveWagon] = useState<string>('');
+  const [reserveQuantity, setReserveQuantity] = useState<number>(1);
+  const [reserveError, setReserveError] = useState<string | null>(null);
+
   const [restockModalPart, setRestockModalPart] = useState<StoresPart | null>(null);
   const [restockQuantity, setRestockQuantity] = useState<number>(10);
   const [issueModalReservation, setIssueModalReservation] = useState<InventoryReservation | null>(null);
@@ -105,6 +117,61 @@ export const StoresInventoryPage: React.FC = () => {
       }
     } catch (err: any) {
       showToast(err.message || 'Restock failed', 'error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleReserveSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!reserveModalPart) return;
+    setReserveError(null);
+    setActionLoading(true);
+    try {
+      const res = await api.reservePart({
+        wagonNumber: reserveWagon.trim(),
+        partCode: reserveModalPart.partCode,
+        quantity: Number(reserveQuantity),
+        source: 'MANUAL_INSPECTION'
+      });
+      if (res.success) {
+        showToast(
+          isHi
+            ? `${reserveModalPart.partCode} × ${reserveQuantity} — ${reserveWagon.trim().toUpperCase()} के लिए आरक्षित।`
+            : `Reserved ${reserveQuantity} × ${reserveModalPart.partCode} for ${reserveWagon.trim().toUpperCase()}.`
+        );
+        setReserveModalPart(null);
+        setReserveWagon('');
+        setReserveQuantity(1);
+        // Both lists move: availability drops in the catalogue and a new row
+        // appears under reservations. Reloading one would leave the other lying.
+        await loadData(false);
+      }
+    } catch (err: any) {
+      /*
+       * Kept in the dialog rather than thrown into a toast. A shortage names
+       * the number actually available, and that is the number the person needs
+       * in front of them while they change the quantity — not a message that
+       * disappears while the form they must correct stays untouched.
+       */
+      setReserveError(err?.message || (isHi ? 'आरक्षण विफल रहा।' : 'The reservation failed.'));
+
+      /*
+       * Re-read this one part.
+       *
+       * A shortage usually means somebody else reserved the stock while this
+       * dialog sat open, so the availability printed above the error is now
+       * wrong — the person would be told "0 available" directly beneath a line
+       * reading "Available: 12". By code rather than by reloading the whole
+       * catalogue: one number changed, and this is the call that fetches it.
+       */
+      try {
+        const fresh = await api.getPartByCode(reserveModalPart.partCode);
+        if (fresh?.data) setReserveModalPart(fresh.data);
+      } catch {
+        /* leave the stale figure rather than blanking the dialog */
+      }
+      await loadData(false);
     } finally {
       setActionLoading(false);
     }
@@ -455,6 +522,25 @@ export const StoresInventoryPage: React.FC = () => {
                         {/* Actions */}
                         <td className="py-3.5 px-4 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-2">
+                            {/* Reserve first: it is the step the cycle was
+                                missing, and the one an inspector needs. */}
+                            <button
+                              data-testid={`reserve-${part.partCode}`}
+                              onClick={() => {
+                                setReserveError(null);
+                                setReserveQuantity(1);
+                                setReserveModalPart(part);
+                              }}
+                              disabled={part.availableQuantity <= 0}
+                              title={
+                                part.availableQuantity <= 0
+                                  ? (isHi ? 'कुछ भी उपलब्ध नहीं' : 'Nothing available to reserve')
+                                  : (isHi ? 'किसी वैगन के लिए आरक्षित करें' : 'Reserve for a wagon')
+                              }
+                              className="px-3 py-1.5 bg-raised hover:bg-selected text-ink-body hover:text-ink border border-line-strong rounded-control text-xs font-bold flex items-center gap-1 transition-all disabled:opacity-40 disabled:pointer-events-none"
+                            >
+                              <span>{isHi ? 'आरक्षित करें' : 'Reserve'}</span>
+                            </button>
                             <button
                               onClick={() => setRestockModalPart(part)}
                               className="px-3 py-1.5 bg-accent-soft hover:bg-accent-soft text-accent-ink border border-accent-line rounded-control text-xs font-bold flex items-center gap-1 transition-all"
@@ -590,6 +676,107 @@ export const StoresInventoryPage: React.FC = () => {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Reserve Modal Dialog */}
+      {reserveModalPart && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-page backdrop-blur-sm animate-fadeIn">
+          <div className="bg-card border border-line w-full max-w-md rounded-card overflow-hidden" data-testid="reserve-modal">
+            <div className="p-5 bg-page border-b border-line flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-white text-base leading-tight">
+                  {isHi ? 'वैगन के लिए आरक्षित करें' : 'Reserve for a wagon'}
+                </h3>
+                <p className="text-xs text-ink-muted font-mono mt-0.5">{reserveModalPart.partCode}</p>
+              </div>
+              <button
+                onClick={() => { setReserveModalPart(null); setReserveError(null); }}
+                className="text-ink-muted hover:text-white text-lg font-bold p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleReserveSubmit} className="p-5 space-y-4">
+              <div>
+                <p className="text-sm font-semibold text-white">{reserveModalPart.partName}</p>
+                {/*
+                  * Availability, not stock. Stock already spoken for by another
+                  * wagon is not stock this one can have, and showing the larger
+                  * number would invite a reservation the server must refuse.
+                  */}
+                <p className="text-xs text-ink-muted mt-1">
+                  {isHi ? 'उपलब्ध' : 'Available'}:{' '}
+                  <span className="font-mono font-bold text-white">{reserveModalPart.availableQuantity}</span>
+                  {' '}{reserveModalPart.unitOfMeasure}
+                  {reserveModalPart.reservedQuantity > 0 && (
+                    <span className="text-ink-faint">
+                      {' '}({reserveModalPart.stockQuantity} {isHi ? 'स्टॉक में' : 'in stock'},{' '}
+                      {reserveModalPart.reservedQuantity} {isHi ? 'पहले से आरक्षित' : 'already reserved'})
+                    </span>
+                  )}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-ink-body uppercase tracking-[0.07em] mb-1" htmlFor="reserve-wagon">
+                  {isHi ? 'वैगन नंबर' : 'Wagon number'}
+                </label>
+                <input
+                  id="reserve-wagon"
+                  type="text"
+                  required
+                  value={reserveWagon}
+                  onChange={(e) => setReserveWagon(e.target.value)}
+                  placeholder="SECR/BOXNHL/40101"
+                  className="w-full px-4 py-2.5 bg-page border border-line rounded-control text-white font-mono text-sm focus:outline-none focus:border-accent-line"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-ink-body uppercase tracking-[0.07em] mb-1" htmlFor="reserve-qty">
+                  {isHi ? 'मात्रा' : 'Quantity'} ({reserveModalPart.unitOfMeasure})
+                </label>
+                <input
+                  id="reserve-qty"
+                  type="number"
+                  min="1"
+                  max={reserveModalPart.availableQuantity}
+                  required
+                  value={reserveQuantity}
+                  onChange={(e) => setReserveQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full px-4 py-2.5 bg-page border border-line rounded-control text-white font-mono font-bold text-base focus:outline-none focus:border-accent-line"
+                />
+              </div>
+
+              {reserveError && (
+                <div className="rounded-control border border-bad-line bg-bad-soft p-3" data-testid="reserve-error">
+                  <p className="text-xs font-bold text-bad-ink leading-snug">{reserveError}</p>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => { setReserveModalPart(null); setReserveError(null); }}
+                  className="flex-1 px-4 py-2.5 rounded-control border border-line bg-raised text-ink-body hover:text-ink text-sm font-bold"
+                >
+                  {isHi ? 'रद्द करें' : 'Cancel'}
+                </button>
+                <button
+                  type="submit"
+                  data-testid="reserve-confirm"
+                  disabled={actionLoading || !reserveWagon.trim()}
+                  className="flex-1 px-4 py-2.5 rounded-control bg-accent text-white text-sm font-bold disabled:opacity-40 disabled:pointer-events-none"
+                >
+                  {actionLoading
+                    ? (isHi ? 'आरक्षित हो रहा है…' : 'Reserving…')
+                    : (isHi ? 'आरक्षित करें' : 'Reserve')}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 

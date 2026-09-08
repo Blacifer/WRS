@@ -6,6 +6,7 @@
 import { Router } from '../framework/index.ts';
 import type { Request, Response } from '../framework/index.ts';
 import { authMiddleware } from '../middleware/auth.ts';
+import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { requireCapability } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { InventoryRepository } from '../db/inventoryRepository.ts';
@@ -197,13 +198,19 @@ inventoryRouter.post('/reserve', authMiddleware, async (req: Request, res: Respo
       return;
     }
 
+    const actor = (req as AuthenticatedRequest).user;
     const reservation = repo.reservePart({
       wagonNumber,
       partCode,
       quantity: qty,
       source: source || 'MANUAL_INSPECTION',
       predictedDefect,
-      confidenceScore
+      confidenceScore,
+      // From the token, never the body. A stores movement names the person who
+      // made it, and a client that could name somebody else is a client that
+      // can file a shortage under a colleague.
+      actorId: actor?.id,
+      actorRole: actor?.role
     });
 
     res.status(201).json({
@@ -214,9 +221,12 @@ inventoryRouter.post('/reserve', authMiddleware, async (req: Request, res: Respo
     });
   } catch (error: any) {
     const isNotFound = error.message && error.message.includes('does not exist');
+    // A shortage is its own answer, not a generic failure: the screen tells the
+    // person how many there actually are so they can reserve what exists.
+    const isShortage = error.name === 'ValidationError';
     res.status(isNotFound ? 404 : 400).json({
       success: false,
-      error: isNotFound ? 'PART_NOT_FOUND' : 'RESERVATION_FAILED',
+      error: isNotFound ? 'PART_NOT_FOUND' : isShortage ? 'INSUFFICIENT_STOCK' : 'RESERVATION_FAILED',
       message: error.message || 'Failed to reserve part.',
       statusCode: isNotFound ? 404 : 400,
       timestamp: new Date().toISOString()

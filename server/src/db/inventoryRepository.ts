@@ -122,6 +122,16 @@ export class InventoryRepository {
     source: string;
     predictedDefect?: string;
     confidenceScore?: number;
+    /*
+     * Who reserved it.
+     *
+     * Optional because the forecast reserves parts with nobody at a keyboard,
+     * and that case genuinely is the system. When a person does it from a
+     * screen, recording it against the seeded administrator would put a
+     * stores movement in somebody else's name.
+     */
+    actorId?: string;
+    actorRole?: string;
   }): InventoryReservation {
     const partCode = data.partCode.trim().toUpperCase();
     const wagonNumber = data.wagonNumber.trim().toUpperCase();
@@ -133,6 +143,27 @@ export class InventoryRepository {
     const part = this.getPartByCode(partCode);
     if (!part) {
       throw new Error(`Part '${partCode}' does not exist in stores inventory.`);
+    }
+
+    /*
+     * There has to be something to reserve.
+     *
+     * This incremented reserved_quantity unconditionally, so a reservation for
+     * five hundred could be placed against three in the bin. Nothing failed:
+     * the reservation existed, the catalogue showed a negative availability
+     * floored to zero, and the shortage was discovered by a fitter walking to
+     * an empty bin.
+     *
+     * Checked against AVAILABLE rather than stock, because stock already
+     * spoken for by another wagon is not stock this one can have.
+     */
+    if (quantity > part.availableQuantity) {
+      const err: any = new Error(
+        `Only ${part.availableQuantity} of '${partCode}' ${part.availableQuantity === 1 ? 'is' : 'are'} available ` +
+        `(${part.stockQuantity} in stock, ${part.reservedQuantity} already reserved). Cannot reserve ${quantity}.`
+      );
+      err.name = 'ValidationError';
+      throw err;
     }
 
     const now = new Date().toISOString();
@@ -165,13 +196,20 @@ export class InventoryRepository {
       now
     );
 
-    // Log audit event — 'usr_adm_001' is the always-seeded system/admin actor
-    // for automated events; a fake unseeded id here would silently violate
-    // the users FK and drop the audit entry.
+    /*
+     * The person, when there was one.
+     *
+     * 'usr_adm_001' is the always-seeded actor used for automated events — a
+     * fake unseeded id here would violate the users FK and drop the audit
+     * entry silently. It stays the fallback for the forecast, which reserves
+     * with nobody at a keyboard. It is the wrong answer for a reservation a
+     * named inspector placed from a screen, and every such reservation was
+     * being filed under the administrator's name.
+     */
     logAuditEvent(this.db, {
       eventType: 'INVENTORY_RESERVED',
-      userId: 'usr_adm_001',
-      userRole: 'SYSTEM',
+      userId: data.actorId || 'usr_adm_001',
+      userRole: data.actorRole || 'SYSTEM',
       payload: {
         reservationId,
         wagonNumber,

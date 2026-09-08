@@ -61,7 +61,6 @@ const REDUNDANT: Record<string, string> = {
   getExitGateStatus: 'wagon detail returns gate status in one combined call',
   getParameterHistory: 'history is included in the learning memory response',
   scanComponentQR: 'the scanner uses getComponentByQR against the GET endpoint',
-  getPartByCode: 'the inventory screen filters through getInventory',
   classify: 'classification is performed locally so it works offline',
   getMe: 'session is restored from local storage on load',
   getComponentHistory:
@@ -80,9 +79,6 @@ const NO_INTERFACE_YET: Record<string, string> = {
   upsertChecklistItem:
     'adding an item to a wagon MANDATORY checklist changes what the exit gate enforces for ' +
     'that vehicle, so it needs a designed, audited flow rather than a form bolted on',
-  reservePart:
-    'reserving stores against a wagon needs a stores workflow that does not exist yet — ' +
-    'issuing and restocking are reachable, reserving is the part with no home',
 };
 
 const EXEMPT = { ...REDUNDANT, ...NO_INTERFACE_YET };
