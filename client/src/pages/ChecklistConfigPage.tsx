@@ -85,6 +85,60 @@ export const ChecklistConfigPage: React.FC<ChecklistConfigPageProps> = ({ lang }
 
   useEffect(() => { void load(wagonType); }, [wagonType]);
 
+  /*
+   * What the manual can propose.
+   *
+   * The DRM's picture of a wagon is a hundred and fifty parts, every one
+   * seen and spoken for. The manual holds no single list of them and the
+   * template holds forty-one lines, so this offers the lines the manual
+   * states plainly — must-change items at POH, cited by page — for the
+   * administrator to accept or refuse. Nothing is added by looking. See
+   * server/src/manual/proposals.ts for what is and is not offered.
+   */
+  type Proposal = { key: string; partName: string; kind: 'MUST_CHANGE' | 'PROCEDURE'; qtyPerWagon: number | null; suggestedCategory: string; page: number; excerpt: string; standardReference: string; alreadyListed: boolean };
+  const [proposals, setProposals] = useState<Proposal[] | null>(null);
+  const [chosen, setChosen] = useState<Record<string, { category: string; isMandatory: boolean }>>({});
+  const [proposing, setProposing] = useState(false);
+
+  const propose = async () => {
+    setProposing(true); setError(null); setNotice(null);
+    try {
+      const res = await api.getChecklistProposals(wagonType);
+      setProposals(res.data.proposals);
+      setChosen({});
+    } catch (err: any) {
+      setError(err?.message || t('The manual could not be read.', 'मैनुअल पढ़ा नहीं जा सका।'));
+    } finally { setProposing(false); }
+  };
+
+  const toggle = (p: Proposal) =>
+    setChosen((c) => {
+      const n = { ...c };
+      if (n[p.key]) delete n[p.key];
+      else n[p.key] = { category: p.suggestedCategory, isMandatory: false };
+      return n;
+    });
+
+  const acceptChosen = async () => {
+    if (!proposals) return;
+    const items = proposals
+      .filter((p) => chosen[p.key])
+      .map((p) => ({ partName: p.partName, category: chosen[p.key].category, bogiePosition: 'NONE', isMandatory: chosen[p.key].isMandatory, standardReference: p.standardReference }));
+    if (items.length === 0) return;
+    setProposing(true); setError(null);
+    try {
+      const res = await api.bulkUpsertChecklistConfig(wagonType, items);
+      setNotice(t(
+        `${res.data.accepted.length} line(s) added from the manual${res.data.refused.length ? `; ${res.data.refused.length} refused` : ''}.`,
+        `मैनुअल से ${res.data.accepted.length} मद जोड़े गए${res.data.refused.length ? `; ${res.data.refused.length} अस्वीकृत` : ''}।`
+      ));
+      setProposals(null); setChosen({});
+      await load(wagonType);
+    } catch (err: any) {
+      setError(err?.message || t('Could not add the lines.', 'मद जोड़े नहीं जा सके।'));
+    } finally { setProposing(false); }
+  };
+
   const save = async () => {
     if (!draft.partName.trim()) {
       setError(t('Name the part.', 'पुर्जे का नाम दें।'));
@@ -180,6 +234,79 @@ export const ChecklistConfigPage: React.FC<ChecklistConfigPageProps> = ({ lang }
               {wt}
             </button>
           ))}
+        </div>
+
+        {/* Propose from the manual — lines cited by page, for the shop to accept or refuse. */}
+        <div className="rounded-control border border-line bg-raised p-3 space-y-3" data-testid="manual-proposals">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-bold text-white">{t('What the manual can propose', 'मैनुअल क्या सुझा सकता है')}</p>
+              <p className="text-[11px] text-ink-muted leading-snug">
+                {t(
+                  'Must-change items at POH, cited by page. Tick what this shop actually does; nothing is added by looking.',
+                  'POH पर अनिवार्य-बदलाव मद, पृष्ठ सहित। जो शॉप असल में करती है वही चुनें; देखने से कुछ नहीं जुड़ता।'
+                )}
+              </p>
+            </div>
+            <button
+              data-testid="propose-from-manual"
+              onClick={propose}
+              disabled={proposing}
+              className="min-h-[40px] px-3 rounded-control border border-accent-line bg-accent-soft text-accent-ink text-xs font-bold disabled:opacity-50"
+            >
+              {proposing ? t('Reading…', 'पढ़ा जा रहा है…') : t('Propose from the manual', 'मैनुअल से सुझाएँ')}
+            </button>
+          </div>
+
+          {proposals && proposals.length === 0 && (
+            <p className="text-[11px] text-ink-muted">{t('The manual proposes nothing this list does not already have.', 'मैनुअल में ऐसा कुछ नहीं जो सूची में पहले से न हो।')}</p>
+          )}
+
+          {proposals && proposals.length > 0 && (
+            <div className="space-y-2">
+              <ul className="max-h-80 overflow-y-auto space-y-1.5">
+                {proposals.map((p) => {
+                  const on = Boolean(chosen[p.key]);
+                  return (
+                    <li key={p.key} className={`rounded-control border p-2.5 ${p.alreadyListed ? 'border-line bg-page opacity-70' : on ? 'border-accent-line bg-accent-soft' : 'border-line bg-page'}`} data-testid={`proposal-${p.kind}`}>
+                      <label className="flex items-start gap-2 cursor-pointer">
+                        <input type="checkbox" className="mt-0.5" checked={on} onChange={() => toggle(p)} data-testid="proposal-check" />
+                        <span className="min-w-0 flex-1">
+                          <span className="text-xs font-bold text-white">{p.partName}</span>
+                          {p.qtyPerWagon !== null && <span className="text-[10px] font-mono text-ink-muted"> · {p.qtyPerWagon}/wagon</span>}
+                          {p.alreadyListed && <span className="text-[10px] font-mono text-ink-muted"> · {t('already listed', 'पहले से सूची में')}</span>}
+                          <span className="block text-[10px] font-mono text-ink-faint">{p.standardReference}</span>
+                        </span>
+                      </label>
+                      {on && (
+                        <div className="flex flex-wrap items-center gap-2 mt-2 pl-6">
+                          <select
+                            value={chosen[p.key].category}
+                            onChange={(e) => setChosen((c) => ({ ...c, [p.key]: { ...c[p.key], category: e.target.value } }))}
+                            className="bg-page border border-line rounded-control px-2 py-1 text-[11px] text-white"
+                          >
+                            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                          <label className="flex items-center gap-1.5 text-[11px] text-ink-body">
+                            <input type="checkbox" checked={chosen[p.key].isMandatory} onChange={(e) => setChosen((c) => ({ ...c, [p.key]: { ...c[p.key], isMandatory: e.target.checked } }))} />
+                            {t('mandatory — gates release', 'अनिवार्य — रिलीज़ रोकता है')}
+                          </label>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+              <button
+                data-testid="accept-proposals"
+                onClick={acceptChosen}
+                disabled={proposing || Object.keys(chosen).length === 0}
+                className="min-h-[40px] px-4 rounded-control bg-accent text-white text-xs font-bold disabled:opacity-40"
+              >
+                {t(`Add selected (${Object.keys(chosen).length})`, `चयनित जोड़ें (${Object.keys(chosen).length})`)}
+              </button>
+            </div>
+          )}
         </div>
 
         <div className={`rounded-control border p-3 ${onTemplate ? 'border-line bg-raised' : 'border-good-line bg-good-soft'}`}>

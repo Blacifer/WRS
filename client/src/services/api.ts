@@ -1375,6 +1375,28 @@ export class ApiClient {
    * reachable, by a fixed template when not — and is never stored. Only the
    * note a supervisor approves is recorded, under their own name.
    */
+  /**
+   * Lines the manual can propose for a wagon type's checklist, cited by page,
+   * minus the ones already listed. Nothing is written by asking.
+   */
+  public async getChecklistProposals(wagonType: string): Promise<{
+    success: boolean;
+    data: {
+      wagonType: string;
+      proposals: Array<{ key: string; partName: string; kind: 'MUST_CHANGE' | 'PROCEDURE'; qtyPerWagon: number | null; suggestedCategory: string; page: number; chapter: string | null; excerpt: string; standardReference: string; alreadyListed: boolean }>;
+      summary: { total: number; mustChange: number; procedures: number; alreadyListed: number };
+    };
+  }> {
+    return this.request(`/checklist/proposals?wagonType=${encodeURIComponent(wagonType)}`);
+  }
+
+  /** Accept several proposed lines at once. Each must cite a source or is refused alone. */
+  public async bulkUpsertChecklistConfig(wagonType: string, items: Array<{ partName: string; category: string; bogiePosition?: string; isMandatory?: boolean; standardReference: string }>): Promise<{
+    success: boolean; data: { accepted: string[]; refused: Array<{ partName: string; reason: string }> };
+  }> {
+    return this.request('/checklist/config/bulk', { method: 'POST', body: JSON.stringify({ wagonType, items }) });
+  }
+
   public async draftShiftHandover(date?: string): Promise<{
     success: boolean;
     data: { shiftDate: string; facts: Record<string, number | string>; draft: string; source: 'MODEL' | 'TEMPLATE'; rejectedNumbers: string[] };

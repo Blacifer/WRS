@@ -11,6 +11,7 @@ import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { requireCapability } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { logAuditEvent } from '../db/auditLog.ts';
+import { extractChecklistProposals } from '../manual/proposals.ts';
 import { parseVoiceIntent } from '../ai/zapheit.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
 import { applyVoiceAction } from '../voice/action.ts';
@@ -70,6 +71,91 @@ checklistRouter.get('/config', authMiddleware, async (req: Request, res: Respons
 // -------------------------------------------------------------------------
 // 2. Set / Update Mandatory Rule for Wagon Type
 // -------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// GET /api/checklist/proposals?wagonType= — what the manual can propose
+//
+// Lines the manual states plainly enough to extract, cited by page, minus the
+// ones this wagon type already lists. Nothing is written here. See
+// manual/proposals.ts for what is and is not offered, and why.
+// ---------------------------------------------------------------------------
+checklistRouter.get('/proposals', authMiddleware, requireCapability('checklist.configure'), (req: Request, res: Response) => {
+  try {
+    const wagonType = String(req.query?.wagonType || 'BOXNHL').trim().toUpperCase();
+    const repo = getRepo();
+    const current = repo.getChecklistConfig(wagonType) as Array<{ partName?: string; part_name?: string }>;
+    const names = current.map((r) => String(r.partName ?? r.part_name ?? '')).filter(Boolean);
+    const proposals = extractChecklistProposals(getDatabase(), names);
+    res.status(200).json({
+      success: true,
+      data: {
+        wagonType,
+        proposals,
+        summary: {
+          total: proposals.length,
+          mustChange: proposals.filter((p) => p.kind === 'MUST_CHANGE').length,
+          procedures: proposals.filter((p) => p.kind === 'PROCEDURE').length,
+          alreadyListed: proposals.filter((p) => p.alreadyListed).length
+        }
+      },
+      meta: { timestamp: new Date().toISOString() }
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: 'PROPOSALS_FAILED', message: err?.message || 'Could not read the manual', statusCode: 500, timestamp: new Date().toISOString() });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/checklist/config/bulk — accept several proposed lines at once
+//
+// The same rules as adding one: a category, a name, and a cited source for
+// every line, or that line is refused and the rest still go in. One audit
+// entry names how many, and which.
+// ---------------------------------------------------------------------------
+checklistRouter.post('/config/bulk', authMiddleware, requireCapability('checklist.configure'), (req: Request, res: Response) => {
+  const { wagonType, items } = req.body || {};
+  if (!wagonType || !Array.isArray(items) || items.length === 0) {
+    res.status(400).json({ success: false, error: 'MISSING_REQUIRED_FIELDS', message: 'wagonType and a non-empty items array are required', statusCode: 400, timestamp: new Date().toISOString() });
+    return;
+  }
+  if (items.length > 200) {
+    res.status(400).json({ success: false, error: 'TOO_MANY', message: 'At most 200 items per request.', statusCode: 400, timestamp: new Date().toISOString() });
+    return;
+  }
+  const repo = getRepo();
+  const accepted: string[] = [];
+  const refused: Array<{ partName: string; reason: string }> = [];
+
+  for (const it of items) {
+    const partName = String(it?.partName || '').trim();
+    const category = String(it?.category || '').trim();
+    const source = String(it?.standardReference || '').trim();
+    if (!partName || !category) { refused.push({ partName: partName || '(unnamed)', reason: 'category and partName are required' }); continue; }
+    if (!source) { refused.push({ partName, reason: 'no source cited' }); continue; }
+    try {
+      repo.setChecklistConfig({
+        wagonType: String(wagonType).toUpperCase(), category, partName,
+        bogiePosition: it.bogiePosition || 'NONE',
+        isMandatory: it.isMandatory === true,
+        standardReference: source
+      });
+      accepted.push(partName);
+    } catch (err: any) {
+      refused.push({ partName, reason: err?.message || 'could not save' });
+    }
+  }
+
+  if (accepted.length > 0) {
+    logAuditEvent(getDatabase(), {
+      eventType: 'CHECKLIST_ITEM_UPDATED',
+      userId: req.user?.id || 'usr_system',
+      userRole: req.user?.role || 'SYSTEM',
+      payload: { scope: 'CHECKLIST_CONFIG', action: 'BULK_UPSERT_FROM_MANUAL', wagonType, count: accepted.length, partNames: accepted.slice(0, 50) }
+    });
+  }
+
+  res.status(200).json({ success: true, data: { accepted, refused }, meta: { timestamp: new Date().toISOString() } });
+});
 
 checklistRouter.post('/config', authMiddleware, requireCapability('checklist.configure'), async (req: Request, res: Response) => {
   const repo = getRepo();
