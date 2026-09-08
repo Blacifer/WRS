@@ -1397,6 +1397,20 @@ export class ApiClient {
     return this.request('/checklist/config/bulk', { method: 'POST', body: JSON.stringify({ wagonType, items }) });
   }
 
+  /** A spring photograph this reader has not seen, without its label. Null when none is left. */
+  public async getNextBlindImage(): Promise<{ success: boolean; data: { id: string; bogieType: string; springPosition: string; imageData: string; mimeType: string } | null }> {
+    return this.request('/sorting/blind-read/next');
+  }
+
+  public async recordBlindRead(payload: { imageId: string; band: string | null; status: 'PASS' | 'CONDEMNED' | 'CANNOT_TELL' }): Promise<{ success: boolean; data: { id: string; bandAgrees: boolean | null; statusAgrees: boolean | null } }> {
+    return this.request('/sorting/blind-read', { method: 'POST', body: JSON.stringify(payload) });
+  }
+
+  /** The A0 number: how often a second person reads the same band from the photograph. */
+  public async getBlindReadAgreement(): Promise<{ success: boolean; data: { reads: number; cannotTell: number; bandRead: number; bandAgreed: number; bandAgreementPct: number | null; statusRead: number; statusAgreed: number; statusAgreementPct: number | null; readers: number; byPosition: Array<{ springPosition: string; bandRead: number; bandAgreed: number }>; verdict: 'INSUFFICIENT' | 'ASSIST' | 'FLAG_ONLY' | 'STOP'; minReads: number } }> {
+    return this.request('/sorting/blind-read/agreement');
+  }
+
   public async draftShiftHandover(date?: string): Promise<{
     success: boolean;
     data: { shiftDate: string; facts: Record<string, number | string>; draft: string; source: 'MODEL' | 'TEMPLATE'; rejectedNumbers: string[] };

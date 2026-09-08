@@ -36,6 +36,7 @@ import { playPassChime, playCondemnedBuzz } from '../utils/audioFeedback.ts';
 import { readThroughput, DAILY_PILE } from '../../../shared/sorting/throughput.ts';
 import { offlineDb } from '../services/offlineDb.ts';
 import { SpringEvidenceCamera } from '../components/SpringEvidenceCamera.tsx';
+import BlindSpringRead from '../components/BlindSpringRead.tsx';
 import type { SpringEvidenceHandle } from '../components/SpringEvidenceCamera.tsx';
 import type { PendingSortedSpring } from '../services/offlineDb.ts';
 
@@ -1189,6 +1190,12 @@ export function SpringSortingPage({ lang, onClose }: Props) {
             </span>
           </span>
         </label>
+        {/*
+          * The camera's go/no-go, answered by people before any model exists:
+          * can a second inspector read the band from the stored photograph?
+          * The server sends no label, and never this reader's own pictures.
+          */}
+        <BlindSpringRead lang={lang} />
         <SpringEvidenceCamera
           ref={cameraRef}
           lang={lang}

@@ -387,6 +387,87 @@ export class SortingRepository {
    * shift of them is megabytes, and nobody reviewing evidence starts at the
    * beginning of the year.
    */
+  /**
+   * The next photograph this reader has not yet read — WITHOUT its label.
+   *
+   * Their own photographs are excluded: the person who tapped the band would
+   * be reading their own memory, not the picture.
+   */
+  public nextBlindImage(readerId: string): { id: string; bogieType: string; springPosition: string; imageData: string; mimeType: string } | null {
+    const row = this.db.prepare(`
+      SELECT id, bogie_type AS bogieType, spring_position AS springPosition,
+             image_data AS imageData, mime_type AS mimeType
+      FROM spring_images
+      WHERE inspector_id != ?
+        AND id NOT IN (SELECT image_id FROM spring_image_blind_reads WHERE reader_id = ?)
+      ORDER BY RANDOM() LIMIT 1
+    `).get(readerId, readerId) as any;
+    return row || null;
+  }
+
+  /** Record what a reader saw, and whether it matched what the bench recorded. */
+  public recordBlindRead(input: { imageId: string; readerId: string; band: string | null; status: 'PASS' | 'CONDEMNED' | 'CANNOT_TELL' }): { id: string; bandAgrees: boolean | null; statusAgrees: boolean | null } {
+    const label = this.db.prepare('SELECT labelled_band AS band, labelled_status AS status, inspector_id AS owner FROM spring_images WHERE id = ?').get(input.imageId) as any;
+    if (!label) throw new Error('No such photograph.');
+    if (label.owner === input.readerId) throw new Error('A reader cannot blind-read their own photograph.');
+    const cannot = input.status === 'CANNOT_TELL';
+    const bandAgrees = cannot || !input.band || !label.band ? null : input.band === label.band ? 1 : 0;
+    const statusAgrees = cannot ? null : input.status === label.status ? 1 : 0;
+    const id = `bread_${crypto.randomUUID()}`;
+    this.db.prepare(`
+      INSERT INTO spring_image_blind_reads (id, image_id, reader_id, read_band, read_status, band_agrees, status_agrees)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(id, input.imageId, input.readerId, cannot ? null : input.band, input.status, bandAgrees, statusAgrees);
+    return { id, bandAgrees: bandAgrees === null ? null : bandAgrees === 1, statusAgrees: statusAgrees === null ? null : statusAgrees === 1 };
+  }
+
+  /**
+   * The A0 number. Thresholds are the ones fixed in the plan before any data
+   * existed, so the decision cannot drift toward whatever the data turns out
+   * to say: at or above 95% the camera may PROPOSE a band; 80–95% it may only
+   * FLAG a spring as unlike the others; below 80% it may do neither. Under
+   * MIN_READS there is no verdict at all, and the report says so rather than
+   * printing a percentage of three.
+   */
+  public blindReadAgreement(): {
+    reads: number; cannotTell: number; bandRead: number; bandAgreed: number; bandAgreementPct: number | null;
+    statusRead: number; statusAgreed: number; statusAgreementPct: number | null;
+    readers: number; byPosition: Array<{ springPosition: string; bandRead: number; bandAgreed: number }>;
+    verdict: 'INSUFFICIENT' | 'ASSIST' | 'FLAG_ONLY' | 'STOP'; minReads: number;
+  } {
+    const MIN_READS = 30;
+    const t = this.db.prepare(`
+      SELECT COUNT(*) AS reads,
+             SUM(CASE WHEN read_status = 'CANNOT_TELL' THEN 1 ELSE 0 END) AS cannotTell,
+             SUM(CASE WHEN band_agrees IS NOT NULL THEN 1 ELSE 0 END) AS bandRead,
+             SUM(CASE WHEN band_agrees = 1 THEN 1 ELSE 0 END) AS bandAgreed,
+             SUM(CASE WHEN status_agrees IS NOT NULL THEN 1 ELSE 0 END) AS statusRead,
+             SUM(CASE WHEN status_agrees = 1 THEN 1 ELSE 0 END) AS statusAgreed,
+             COUNT(DISTINCT reader_id) AS readers
+      FROM spring_image_blind_reads
+    `).get() as any;
+    const byPosition = this.db.prepare(`
+      SELECT i.spring_position AS springPosition,
+             SUM(CASE WHEN r.band_agrees IS NOT NULL THEN 1 ELSE 0 END) AS bandRead,
+             SUM(CASE WHEN r.band_agrees = 1 THEN 1 ELSE 0 END) AS bandAgreed
+      FROM spring_image_blind_reads r JOIN spring_images i ON i.id = r.image_id
+      GROUP BY i.spring_position ORDER BY i.spring_position
+    `).all() as any[];
+    const pct = (a: number, n: number) => (n > 0 ? Math.round((a / n) * 1000) / 10 : null);
+    const bandPct = pct(Number(t.bandAgreed || 0), Number(t.bandRead || 0));
+    let verdict: 'INSUFFICIENT' | 'ASSIST' | 'FLAG_ONLY' | 'STOP' = 'INSUFFICIENT';
+    if (Number(t.bandRead || 0) >= MIN_READS && bandPct !== null) {
+      verdict = bandPct >= 95 ? 'ASSIST' : bandPct >= 80 ? 'FLAG_ONLY' : 'STOP';
+    }
+    return {
+      reads: Number(t.reads || 0), cannotTell: Number(t.cannotTell || 0),
+      bandRead: Number(t.bandRead || 0), bandAgreed: Number(t.bandAgreed || 0), bandAgreementPct: bandPct,
+      statusRead: Number(t.statusRead || 0), statusAgreed: Number(t.statusAgreed || 0),
+      statusAgreementPct: pct(Number(t.statusAgreed || 0), Number(t.statusRead || 0)),
+      readers: Number(t.readers || 0), byPosition, verdict, minReads: MIN_READS
+    };
+  }
+
   public recentImages(options?: { limit?: number; batchId?: string; condemnedOnly?: boolean }): Array<{
     id: string;
     sortingRecordId: string | null;

@@ -606,6 +606,35 @@ export function runMigrations(db: DatabaseSync): void {
     CREATE INDEX IF NOT EXISTS idx_shift_handovers_date ON shift_handovers(shift_date);
   `);
 
+  /*
+   * Blind readings of spring photographs — the go/no-go for the camera.
+   *
+   * Before any model is trained, one question decides whether the DRM's
+   * camera is possible at all: can a PERSON read the band from the stored
+   * photograph, without seeing what the bench recorded? If a second reader
+   * cannot, no model can, and three weeks of photographs have answered the
+   * question without a line of machine learning. If they can, the agreement
+   * rate is the bar a model must clear, measured before it exists.
+   *
+   * The reader never sees the label. The agreement is computed at write time
+   * from the label they did not see, so the aggregate is one SUM away.
+   */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS spring_image_blind_reads (
+      id TEXT PRIMARY KEY,
+      image_id TEXT NOT NULL,
+      reader_id TEXT NOT NULL,
+      read_band TEXT DEFAULT NULL,
+      read_status TEXT NOT NULL CHECK(read_status IN ('PASS', 'CONDEMNED', 'CANNOT_TELL')),
+      band_agrees INTEGER DEFAULT NULL CHECK(band_agrees IS NULL OR band_agrees IN (0, 1)),
+      status_agrees INTEGER DEFAULT NULL CHECK(status_agrees IS NULL OR status_agrees IN (0, 1)),
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      UNIQUE (image_id, reader_id),
+      FOREIGN KEY (image_id) REFERENCES spring_images(id) ON DELETE CASCADE,
+      FOREIGN KEY (reader_id) REFERENCES users(id) ON DELETE RESTRICT
+    );
+  `);
+
   // Spring sorting — see the table comment in schema.sql. Created here too so
   // an existing database picks it up on boot rather than only a fresh one.
   db.exec(`

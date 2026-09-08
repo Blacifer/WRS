@@ -12,6 +12,7 @@ import type { Response } from '../framework/index.ts';
 import { getDatabase } from '../db/connection.ts';
 import { SortingRepository } from '../db/sortingRepository.ts';
 import { authMiddleware } from '../middleware/auth.ts';
+import { requireCapability } from '../middleware/rbac.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { getWagonSpringConfig } from '../../../shared/classification/wagonTypes.ts';
 import { judgeSortedSpring, isSortingBogie } from '../../../shared/classification/springJudgement.ts';
@@ -410,6 +411,44 @@ sortingRouter.get('/dataset', authMiddleware, (req: AuthenticatedRequest, res: R
 // photographs were landing, and nobody could look at the evidence behind a
 // condemnation. Images nobody can open are storage, not evidence.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Blind reading — the camera's go/no-go, measured before any model exists
+//
+// GET  /blind-read/next       a photograph this reader has not seen, no label
+// POST /blind-read            what they read; agreement computed from the
+//                             label they did not see
+// GET  /blind-read/agreement  the A0 number and the verdict it implies
+// ---------------------------------------------------------------------------
+sortingRouter.get('/blind-read/next', authMiddleware, requireCapability('spring.record'), (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const next = repo().nextBlindImage(req.user!.id);
+    res.status(200).json({ success: true, data: next, timestamp: new Date().toISOString() });
+  } catch (err: any) {
+    bad(res, err?.message || 'Could not fetch a photograph', 'SORTING_FAILED', 500);
+  }
+});
+
+sortingRouter.post('/blind-read', authMiddleware, requireCapability('spring.record'), (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { imageId, band, status } = req.body || {};
+    if (!imageId || !['PASS', 'CONDEMNED', 'CANNOT_TELL'].includes(status)) {
+      return bad(res, 'imageId and a status of PASS, CONDEMNED or CANNOT_TELL are required');
+    }
+    const out = repo().recordBlindRead({ imageId: String(imageId), readerId: req.user!.id, band: band ? String(band).toUpperCase() : null, status });
+    res.status(201).json({ success: true, data: out, timestamp: new Date().toISOString() });
+  } catch (err: any) {
+    bad(res, err?.message || 'Could not record the reading', /own photograph|No such/.test(String(err?.message)) ? 'BLIND_READ_REFUSED' : 'SORTING_FAILED', /own photograph|No such/.test(String(err?.message)) ? 409 : 500);
+  }
+});
+
+sortingRouter.get('/blind-read/agreement', authMiddleware, requireCapability('analytics.read'), (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    res.status(200).json({ success: true, data: repo().blindReadAgreement(), timestamp: new Date().toISOString() });
+  } catch (err: any) {
+    bad(res, err?.message || 'Could not compute agreement', 'SORTING_FAILED', 500);
+  }
+});
+
 sortingRouter.get('/images', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
   try {
     const q = (req.query || {}) as Record<string, string>;

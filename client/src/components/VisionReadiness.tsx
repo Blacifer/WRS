@@ -65,6 +65,12 @@ export const VisionReadiness: React.FC<VisionReadinessProps> = ({ lang }) => {
   const [total, setTotal] = useState(0);
   const [thinnest, setThinnest] = useState<string | null>(null);
   /*
+   * The A0 number. Whether a second person can read the band from the stored
+   * photograph decides the camera before any model exists, and the decision
+   * rule was fixed in the plan before there was data to bend it toward.
+   */
+  const [blind, setBlind] = useState<{ bandRead: number; bandAgreementPct: number | null; cannotTell: number; readers: number; verdict: string; minReads: number } | null>(null);
+  /*
    * Assembly coverage is fetched separately and allowed to fail on its own.
    * A shop that has photographed springs but never a bogie is the normal
    * starting state, and it must not blank the spring figures beside it.
@@ -149,6 +155,10 @@ export const VisionReadiness: React.FC<VisionReadinessProps> = ({ lang }) => {
      * back at the ceiling the figures are a floor, not a total, and the panel
      * says so rather than letting a truncated number read as complete.
      */
+    api.getBlindReadAgreement()
+      .then((res) => { if (!cancelled && res?.data) setBlind(res.data); })
+      .catch(() => { /* nothing read yet, or not permitted — say nothing */ });
+
     api.getAssemblyDataset(ASSEMBLY_LIMIT)
       .then((res: any) => {
         if (cancelled) return;
@@ -246,6 +256,28 @@ export const VisionReadiness: React.FC<VisionReadinessProps> = ({ lang }) => {
           </p>
         )}
       </div>
+
+      {blind && blind.bandRead > 0 && (
+        <div className="rounded-control border border-line bg-raised p-4 space-y-1.5" data-testid="blind-read-agreement">
+          <p className="text-sm font-bold text-white">
+            {isHi ? 'क्या फ़ोटो से बैंड पढ़ा जा सकता है — लोगों का उत्तर' : 'Can the band be read from a photograph — the people’s answer'}
+          </p>
+          <p className="text-2xl font-black text-white tabular-nums leading-none">
+            {blind.bandAgreementPct}%
+            <span className="text-xs font-bold text-ink-muted"> {isHi ? `सहमति, ${blind.bandRead} पढ़ाई, ${blind.readers} पाठक` : `agreement over ${blind.bandRead} blind reads by ${blind.readers} reader(s)`}</span>
+          </p>
+          <p className="text-[11px] text-ink-body leading-snug">
+            {blind.verdict === 'INSUFFICIENT'
+              ? (isHi ? `निर्णय के लिए कम से कम ${blind.minReads} पढ़ाई चाहिए।` : `No verdict yet — at least ${blind.minReads} blind reads are needed before this number means anything.`)
+              : blind.verdict === 'ASSIST'
+                ? (isHi ? 'लोग बैंड पढ़ सकते हैं। कैमरा बैंड सुझा सकता है; व्यक्ति पुष्टि करता है।' : 'People can read the band from these photographs. A camera may propose a band; the person confirms.')
+                : blind.verdict === 'FLAG_ONLY'
+                  ? (isHi ? 'आंशिक। कैमरा केवल “अलग दिखता है” का झंडा उठा सकता है, बैंड नहीं सुझा सकता।' : 'Partial. A camera may only flag a spring as unlike the others — it may not propose a band.')
+                  : (isHi ? 'नहीं। इन फ़ोटो से बैंड नहीं पढ़ा जा सकता — यही DRM को बताने की बात है।' : 'No. The band cannot be read from these photographs, and that is the result to report — not a failure to try.')}
+            {blind.cannotTell > 0 && ` ${isHi ? `${blind.cannotTell} बार “बता नहीं सकता”।` : `“Cannot tell” ${blind.cannotTell} time(s).`}`}
+          </p>
+        </div>
+      )}
 
       {/*
         * A second, different question, kept visibly separate from the three
