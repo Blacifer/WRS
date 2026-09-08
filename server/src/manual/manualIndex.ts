@@ -46,6 +46,8 @@ export interface ManualSearchHit {
   text: string;
   /** Lower is a better match (BM25 convention); exposed for transparency. */
   score: number;
+  /** Which document this passage came from — WMM, G95, ROH_AUDIT, … */
+  source: string;
   citation: string;
 }
 
@@ -224,19 +226,88 @@ export function buildSpringTablePassages(): ManualPassage[] {
 }
 
 /** Builds (or rebuilds) the index from already-extracted manual text. */
+/**
+ * What a passage should be cited as.
+ *
+ * The citation is the whole point of quoting the manual: an inspector
+ * defending a condemnation needs to name the document. Every source used to
+ * be cited as "RDSO Wagon Maintenance Manual" regardless of where the passage
+ * actually came from — which was harmless while there was only one document,
+ * and became a misattribution the moment there were two.
+ *
+ * The depot audit check-sheet is the case that matters. It is RDSO material,
+ * it is authoritative, and it describes ROH practice at a DEPOT while this
+ * shop does POH. Quoting it to an auditor as the Wagon Maintenance Manual
+ * would be wrong twice over: wrong document, wrong maintenance tier. So its
+ * citation says both.
+ */
+export function citationFor(
+  source: string,
+  page: number,
+  chapter?: string | null,
+  heading?: string | null
+): string {
+  const where = `${chapter ? ` — ${chapter}` : ''}`;
+  switch (source) {
+    case 'G95':
+      return `RDSO Technical Pamphlet G-95 Rev-II — ${heading || chapter || 'spring grouping table'}`;
+    case 'ROH_AUDIT':
+      return (
+        `RDSO Quality Assurance (Mechanical) — Quality audit check-sheet for ROH attention of ` +
+        `freight stock, page ${page}${where}. Depot ROH practice; this shop does POH.`
+      );
+    case 'WMM':
+      return `RDSO Wagon Maintenance Manual, page ${page}${where}`;
+    default:
+      /*
+       * Named rather than guessed. An unknown label means somebody indexed a
+       * document without saying what it is, and inventing a title for it is
+       * how a citation stops being worth anything.
+       */
+      return `${source}, page ${page}${where}`;
+  }
+}
+
 export function indexManualText(
   db: DatabaseSync,
   rawText: string,
-  sourceName: string
+  sourceName: string,
+  /*
+   * Which document these passages belong to.
+   *
+   * Every citation carries it, so an inspector reading an answer can see
+   * whether it came from the Wagon Maintenance Manual, the G-95 pamphlet, or
+   * something else — which matters most when the documents differ. The RDSO
+   * depot audit check-sheet, for instance, describes ROH practice at a depot,
+   * and this shop does POH. A passage from it is worth reading and is not the
+   * same authority as the manual.
+   */
+  sourceLabel: string = 'WMM'
 ): { passageCount: number; pageCount: number } {
   createManualTables(db);
 
-  // Drop rather than DELETE: an older database may hold the previous column
-  // layout, and CREATE VIRTUAL TABLE IF NOT EXISTS would silently keep it,
-  // making every insert fail. Re-indexing rebuilds the content anyway.
-  db.exec('DROP TABLE IF EXISTS manual_passages;');
-  db.exec('DELETE FROM manual_meta;');
-  createManualTables(db);
+  /*
+   * Additive, per source.
+   *
+   * This used to DROP the whole table on every run, so indexing a second
+   * document silently destroyed the first — there was no way to hold the
+   * manual and anything else at the same time. Only this source's rows are
+   * replaced now.
+   *
+   * The DROP existed for a real reason: an older database may hold the
+   * previous column layout, and CREATE VIRTUAL TABLE IF NOT EXISTS keeps it
+   * silently, making every insert fail. That case is still handled, by
+   * checking the columns rather than by destroying everything every time.
+   */
+  const columns = (db.prepare('PRAGMA table_info(manual_passages)').all() as any[]).map((c) => c.name);
+  const expected = ['passage_id', 'page', 'source', 'chapter', 'heading', 'body'];
+  if (columns.length > 0 && !expected.every((c) => columns.includes(c))) {
+    db.exec('DROP TABLE IF EXISTS manual_passages;');
+    db.exec('DELETE FROM manual_meta;');
+    createManualTables(db);
+  } else {
+    db.exec(`DELETE FROM manual_passages WHERE source = '${sourceLabel.replace(/'/g, "''")}';`);
+  }
 
   const passages = buildPassages(rawText);
   const insert = db.prepare(`
@@ -245,24 +316,44 @@ export function indexManualText(
   `);
 
   for (const p of passages) {
-    insert.run(p.id, p.page, 'WMM', p.chapter, p.heading, p.text);
+    insert.run(p.id, p.page, sourceLabel, p.chapter, p.heading, p.text);
   }
 
-  // The G-95 spring grouping tables are not in the WMM PDF — they come from
-  // the Technical Pamphlet, transcribed and verified separately. An inspector
-  // asking "what band is a 258mm NLB outer spring" should get the actual
-  // table, so they are indexed alongside the manual and cited to the pamphlet.
-  for (const t of buildSpringTablePassages()) {
-    insert.run(t.id, 0, 'G95', t.chapter, t.heading, t.text);
+  /*
+   * The G-95 spring grouping tables are not in the WMM PDF — they come from
+   * the Technical Pamphlet, transcribed and verified separately. An inspector
+   * asking "what band is a 258mm NLB outer spring" should get the actual
+   * table, so they are indexed alongside the manual and cited to the pamphlet.
+   *
+   * Only alongside the manual. Indexing another document must not duplicate
+   * them, and must not be able to remove them either.
+   */
+  if (sourceLabel === 'WMM') {
+    db.exec("DELETE FROM manual_passages WHERE source = 'G95';");
+    for (const t of buildSpringTablePassages()) {
+      insert.run(t.id, 0, 'G95', t.chapter, t.heading, t.text);
+    }
   }
 
   const pageCount = rawText.split('\f').length;
   const metaStmt = db.prepare('INSERT OR REPLACE INTO manual_meta (key, value) VALUES (?, ?)');
-  metaStmt.run('passage_count', String(passages.length));
   metaStmt.run('page_count', String(pageCount));
   metaStmt.run('source_name', sourceName);
   metaStmt.run('indexed_at', new Date().toISOString());
   metaStmt.run('source_sha256', crypto.createHash('sha256').update(rawText).digest('hex').slice(0, 16));
+  // Per source too, so adding a second document does not make the first one's
+  // provenance unreadable.
+  metaStmt.run(`source_name:${sourceLabel}`, sourceName);
+  metaStmt.run(`indexed_at:${sourceLabel}`, new Date().toISOString());
+
+  /*
+   * The count reported is what this database now holds, not what this call
+   * inserted. With two documents indexed, returning only the second one's
+   * passages would understate the index every time and make "how much is
+   * searchable" depend on which document was indexed last.
+   */
+  const held = (db.prepare('SELECT COUNT(*) AS c FROM manual_passages').get() as { c: number }).c;
+  metaStmt.run('passage_count', String(held));
 
   return { passageCount: passages.length, pageCount };
 }
@@ -364,10 +455,8 @@ export function searchManual(
       snippet: String(r.excerpt || '').replace(/\s+/g, ' ').trim(),
       text: r.body,
       score: Number(r.score),
-      citation:
-        r.source === 'G95'
-          ? `RDSO Technical Pamphlet G-95 Rev-II — ${r.heading || r.chapter || 'spring grouping table'}`
-          : `RDSO Wagon Maintenance Manual, page ${r.page}${r.chapter ? ` — ${r.chapter}` : ''}`
+      source: r.source || 'WMM',
+      citation: citationFor(String(r.source || 'WMM'), Number(r.page), r.chapter, r.heading)
     }))
   };
 }

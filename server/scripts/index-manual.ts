@@ -44,8 +44,19 @@ function extractPdf(pdfPath: string): string {
 
 function main() {
   const input = process.argv[2];
+  /*
+   * Which document this is, in citations.
+   *
+   * Defaults to WMM so the existing command keeps working unchanged. Anything
+   * else is added alongside the manual rather than replacing it — the index
+   * used to hold exactly one document, and indexing a second silently
+   * destroyed the first.
+   */
+  const sourceLabel = (process.argv[3] || 'WMM').trim().toUpperCase();
   if (!input) {
-    console.error('Usage: npm run index-manual -- "/path/to/manual.pdf"  (or a .txt)');
+    console.error('Usage: npm run index-manual -- "/path/to/manual.pdf" [SOURCE_LABEL]');
+    console.error('  SOURCE_LABEL defaults to WMM. Use another label to add a second document,');
+    console.error('  e.g. ROH_AUDIT for the RDSO depot audit check-sheet.');
     process.exit(1);
   }
   if (!fs.existsSync(input)) {
@@ -63,9 +74,9 @@ function main() {
   const db = getDatabase();
   runMigrations(db);
 
-  const { passageCount, pageCount } = indexManualText(db, raw, path.basename(input));
+  const { passageCount, pageCount } = indexManualText(db, raw, path.basename(input), sourceLabel);
 
-  console.log(`Indexed ${passageCount.toLocaleString()} passages across ${pageCount} pages.`);
+  console.log(`Indexed ${passageCount.toLocaleString()} passages across ${pageCount} pages as ${sourceLabel}.`);
   console.log('Stats:', JSON.stringify(getManualStats(db), null, 2));
   console.log('\nInspectors can now search the manual from inside the app.');
 }
