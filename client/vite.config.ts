@@ -52,6 +52,41 @@ export default defineConfig({
         globIgnores: ['**/tensorflow-*.js'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         runtimeCaching: [
+          /*
+           * The vision weights, kept for the shed.
+           *
+           * The 19 MB detector is excluded from the precache on purpose — an
+           * inspector who only sorts springs should never download it. But
+           * nothing cached it afterwards either, so it was fetched from the
+           * server every time and was simply unavailable with the network
+           * down. Tested against the built app: online the weights return
+           * 200, offline the same fetch fails outright.
+           *
+           * That is the difference between a demonstration on shop wifi and
+           * the shed, and it falls on the one feature the DRM asked for by
+           * name — boxing out anything in frame that is not a spring.
+           *
+           * CacheFirst, because these bytes never change without a new file
+           * name, and a year because that is how long a deployment lasts
+           * between updates. rangeRequests is on: the shards are fetched
+           * whole here, but a partial request that missed the cache would
+           * otherwise fall through to a network that is not there.
+           */
+          {
+            urlPattern: /\/models\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'vision-model-cache',
+              expiration: {
+                maxEntries: 24,
+                maxAgeSeconds: 60 * 60 * 24 * 365
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              },
+              rangeRequests: true
+            }
+          },
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
             handler: 'CacheFirst',
