@@ -93,6 +93,20 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
           const clientTempId = item.clientTempId || item.syncId || item.id;
           const record = inspectionRepo.insertInspection({
             ...item,
+            /*
+             * From the token, after the spread, so a queued record cannot
+             * name somebody else.
+             *
+             * Every other loop in this function already did this — wagons,
+             * checklist items, voice actions, transitions, photos. This one
+             * spread the client's record straight through, so the inspector on
+             * a synced spring measurement was whoever the payload said, and a
+             * record carrying none fell through to the repository's default of
+             * a real seeded inspector. On the one record type that decides
+             * whether a spring was fit to run.
+             */
+            inspectorId: actorId,
+            inspectorName: actorName,
             syncId: item.syncId || clientTempId,
             syncStatus: 'SYNCED',
             timestamp: item.timestamp || item.localCreatedAt || item.clientTimestamp || new Date().toISOString()

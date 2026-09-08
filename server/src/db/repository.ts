@@ -128,8 +128,25 @@ export class InspectionRepository {
     const validRangeMax = data.valid_range_max ?? 263.0;
     const condemnationReason = data.condemnationReason ?? data.condemnation_reason ?? null;
 
-    const inspectorId = data.inspectorId || data.inspector_id || 'usr_insp_001';
-    const inspectorName = data.inspectorName || data.inspector_name || 'Ramesh Kumar';
+    /*
+     * An unattributed inspection is attributed to nobody, not to somebody.
+     *
+     * This defaulted to 'usr_insp_001' and the name 'Ramesh Kumar' — a real
+     * person seeded into this database. A record arriving without an inspector
+     * was filed under his name, on the one record type that says whether a
+     * spring was fit to run, and nothing about the result looked wrong: it
+     * reads exactly like work he did.
+     *
+     * It now falls back to the seeded system account, whose name is "System
+     * (automated actions)". That is visibly not an inspector, so a record that
+     * reaches it announces itself in every list and export instead of hiding.
+     *
+     * Every real caller supplies an inspector from the token — the routes
+     * always did, and the offline sync now does too. This is what remains if
+     * one ever stops.
+     */
+    const inspectorId = data.inspectorId || data.inspector_id || 'usr_system';
+    const inspectorName = data.inspectorName || data.inspector_name || 'System (automated actions)';
 
     const supervisorOverride = data.isOverridden || data.supervisor_override ? 1 : 0;
     const originalBand = data.originalBand ?? data.original_band ?? null;

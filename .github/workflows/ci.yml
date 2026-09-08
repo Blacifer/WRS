@@ -212,6 +212,99 @@ jobs:
         run: node --experimental-strip-types scripts/concurrent-lifecycle-drill.mjs
 
   # ---------------------------------------------------------------------------
+  # Does the backup actually come back?
+  #
+  # backup-db.sh and restore-db.sh were written, reviewed and never once run
+  # until scripts/backup-drill.sh was added — and that drill was in the local
+  # gate only, so the backup path could have regressed here without anybody
+  # being told. The moment it is needed is the moment it is too late to find
+  # out. Needs only sqlite3 and openssl, both present on the runner.
+  # ---------------------------------------------------------------------------
+  backup-drill:
+    name: Backup and restore drill
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix server
+
+      - name: Back up, restore, and refuse a tampered file
+        run: bash scripts/backup-drill.sh
+
+  # ---------------------------------------------------------------------------
+  # The two drills that need a browser, run against the BUILT client.
+  #
+  # The offline drill is the one that matters most: it is the only proof that
+  # a shift's work survives a closed tab with no network, which is the whole
+  # reason the shop can use this in a shed. It cannot run against a dev server
+  # — vite-plugin-pwa registers no service worker there — so this builds the
+  # client and serves it exactly as preflight does locally.
+  # ---------------------------------------------------------------------------
+  browser-drills:
+    name: Role walkthrough and offline drill
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            server/package-lock.json
+            client/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm ci --prefix server
+          npm ci --prefix client
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build the client
+        run: npm run build --prefix client
+
+      - name: Start the API
+        run: |
+          npm run dev --prefix server > /tmp/api.log 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:3000/api/health >/dev/null && break
+            sleep 2
+          done
+          curl -sf http://localhost:3000/api/health >/dev/null || { cat /tmp/api.log; exit 1; }
+
+      - name: Serve the built client
+        run: |
+          npm run preview --prefix client > /tmp/preview.log 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -sf http://localhost:4173 >/dev/null && break
+            sleep 2
+          done
+          curl -sf http://localhost:4173 >/dev/null || { cat /tmp/preview.log; exit 1; }
+
+      - name: Every screen renders for every role
+        run: DRILL_URL=http://localhost:4173 node scripts/role-walkthrough.mjs
+
+      - name: A shift survives going offline and closing the tab
+        run: DRILL_URL=http://localhost:4173 node scripts/offline-drill.mjs
+
+  # ---------------------------------------------------------------------------
   # Proves the thing that actually ships still builds. `npm run build` runs the
   # type check first by design, so this also guards the root build wiring.
   # ---------------------------------------------------------------------------
