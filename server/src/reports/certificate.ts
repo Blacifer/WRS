@@ -167,6 +167,10 @@ export class CertificateGenerator {
     const tatDays = Math.max(0.1, Math.round(((releaseTime - entryTime) / (1000 * 60 * 60 * 24)) * 10) / 10);
 
     const checklistItems: any[] = checklistData.allItems || [];
+    const nameById = new Map<string, string>(
+      (getDatabase().prepare('SELECT id, full_name FROM users').all() as Array<{ id: string; full_name: string }>)
+        .map((u) => [u.id, u.full_name])
+    );
     const isItemCleared = (i: any) =>
       i.status === 'PASS' || (['REPAIRED', 'REPLACED'].includes(i.status) && i.reinspectedStatus === 'PASS');
     const passedCount = checklistItems.filter(isItemCleared).length;
@@ -182,7 +186,10 @@ export class CertificateGenerator {
       { key: 'WHEELS_AXLES',        label: '2. Wheels & Axles',    scope: 'Wheel profile, tread wear, flange, UST',       std: 'RDSO C-9901 / ND-97' },
       { key: 'BEARINGS',            label: '3. Bearings',          scope: 'CTRB cartridge bearings, adapter, seals',      std: 'RDSO G-81' },
       { key: 'BRAKE_SYSTEM',        label: '4. Brake System',      scope: 'Brake blocks, rigging, SAB, cylinder, DV',     std: 'RDSO 02-ABR-02' },
-      { key: 'COUPLERS_DRAFT_GEAR', label: '5. Couplers & Draft',  scope: 'CBC body, knuckle, Mark-50 draft gear',        std: 'RDSO 48-BD-08 / WRS gauge boards' },
+      // Mark-50 was withdrawn on 27 August 2026 — "presently we are not
+      // overhauling MK-50" — and every certificate went on printing it. A
+      // release document must not name work the shop does not do.
+      { key: 'COUPLERS_DRAFT_GEAR', label: '5. Couplers & Draft',  scope: 'CBC body, knuckle, high-capacity draft gear',  std: 'RDSO 48-BD-08 / WD-70-BD-10' },
       { key: 'BOGIE_FRAME_BOLSTER', label: '6. Bogie Frame',       scope: 'Side frames, bolster, centre plate, bearers',  std: 'RDSO G-95' },
       { key: 'FRICTION_WEDGES',     label: '7. Friction Wedges',   scope: 'Slope wear, vertical face, spigot fit',        std: 'RDSO G-95 / WMM 2.0 §309D' },
       { key: 'BODY_UNDERFRAME',     label: '8. Body / Underframe', scope: 'Centre sill, flooring, doors, stencilling',    std: 'RDSO G-70' }
@@ -592,6 +599,64 @@ export class CertificateGenerator {
           }
           return `<tr><td>${c.label}</td><td>${c.scope}</td><td>${c.std}</td><td><span class="${cls}">${detail}</span></td></tr>`;
         }).join('')}
+      </tbody>
+    </table>
+
+    <div class="section-title">1A. Every Checklist Line — Verdict, Work Done, and Who Recorded It</div>
+    <p style="font-size: 10px; color: #475569; margin: 0 0 6px 0;">
+      Section 1 gives the count. This gives the parts. A line marked NOT INSPECTED is exactly that — it was
+      neither examined nor passed — so that nothing found after release can be a question of what was looked at.
+    </p>
+    <table>
+      <thead>
+        <tr>
+          <th style="width: 14%;">Category</th>
+          <th>Part</th>
+          <th style="width: 9%;">Position</th>
+          <th style="width: 15%;">Verdict</th>
+          <th style="width: 14%;">Work done</th>
+          <th style="width: 14%;">Recorded by</th>
+          <th style="width: 10%;">On</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${
+          checklistItems.length > 0
+            ? [...checklistItems]
+                .sort((a, b) => String(a.category).localeCompare(String(b.category)) || String(a.partName).localeCompare(String(b.partName)))
+                .map((i: any) => {
+                  const status = String(i.status || 'PENDING');
+                  const reinspected = i.reinspectedStatus ?? i.reinspected_status ?? null;
+                  const repair = i.repairAction ?? i.repair_action ?? null;
+                  // The verdict's author, not the row's creator. Falls back to
+                  // the creator only for a row nobody has yet judged.
+                  const verdictBy = i.manualVerdictBy ?? i.manual_verdict_by ?? null;
+                  const who = (verdictBy && nameById.get(String(verdictBy))) || (status === 'PENDING' ? '' : (i.inspectorName ?? i.inspector_name ?? ''));
+                  const when = String(i.manualVerdictAt ?? i.manual_verdict_at ?? i.updatedAt ?? i.updated_at ?? '').slice(0, 10);
+                  let verdict: string;
+                  let cls: string;
+                  if (status === 'PENDING') { verdict = 'NOT INSPECTED'; cls = 'status-fail'; }
+                  else if (status === 'PASS') { verdict = 'PASS'; cls = 'status-pass'; }
+                  else if (status === 'REPAIRED' || status === 'REPLACED') {
+                    verdict = reinspected === 'PASS' ? `${status} — RE-INSPECTED PASS` : `${status} — NOT RE-INSPECTED`;
+                    cls = reinspected === 'PASS' ? 'status-pass' : 'status-fail';
+                  }
+                  else { verdict = status; cls = 'status-fail'; }
+                  const added = i.shopAdded
+                    ? `<br><span style="font-size: 9px; color: #64748b;">Added on this wagon${i.addedReason ? `: ${escapeHtml(String(i.addedReason))}` : ''}</span>`
+                    : '';
+                  return `<tr>
+                    <td style="font-size: 10px;">${escapeHtml(String(i.category || '').replace(/_/g, ' '))}</td>
+                    <td><strong>${escapeHtml(String(i.partName || ''))}</strong>${i.isMandatory ? '' : ' <span style="font-size: 9px; color: #64748b;">(advisory)</span>'}${added}</td>
+                    <td style="font-size: 10px;">${escapeHtml(String(i.bogiePosition || 'NONE').replace(/_/g, ' '))}</td>
+                    <td><span class="${cls}">${escapeHtml(verdict)}</span></td>
+                    <td style="font-size: 10px;">${escapeHtml(String(repair || '—').replace(/_/g, ' '))}</td>
+                    <td style="font-size: 10px;">${escapeHtml(String(who || '—'))}</td>
+                    <td style="font-size: 10px;">${escapeHtml(when || '—')}</td>
+                  </tr>`;
+                }).join('')
+            : `<tr><td colspan="7" style="text-align: center; color: #64748b; padding: 10px;">No checklist lines are recorded for this wagon. This section makes no statement about its parts.</td></tr>`
+        }
       </tbody>
     </table>
 
