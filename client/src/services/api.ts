@@ -1368,6 +1368,31 @@ export class ApiClient {
     });
   }
 
+  /**
+   * The shift, written down.
+   *
+   * The draft is produced from the day's own records — by a model when one is
+   * reachable, by a fixed template when not — and is never stored. Only the
+   * note a supervisor approves is recorded, under their own name.
+   */
+  public async draftShiftHandover(date?: string): Promise<{
+    success: boolean;
+    data: { shiftDate: string; facts: Record<string, number | string>; draft: string; source: 'MODEL' | 'TEMPLATE'; rejectedNumbers: string[] };
+  }> {
+    return this.request(`/shift/handover/draft${date ? `?date=${encodeURIComponent(date)}` : ''}`);
+  }
+
+  public async recordShiftHandover(payload: { shiftDate: string; body: string; draftSource: 'MODEL' | 'TEMPLATE'; edited: boolean }): Promise<{ success: boolean; data: { id: string; shiftDate: string } }> {
+    return this.request('/shift/handover', { method: 'POST', body: JSON.stringify(payload) });
+  }
+
+  public async getShiftHandovers(limit = 10): Promise<{
+    success: boolean;
+    data: Array<{ id: string; shiftDate: string; body: string; draftSource: string; edited: boolean; recordedByName: string; createdAt: string }>;
+  }> {
+    return this.request(`/shift/handover?limit=${limit}`);
+  }
+
   public async getAcousticHistory(wagonNumber: string): Promise<{ success: boolean; data: AcousticDiagnosticRecord[]; meta?: any }> {
     return this.request<{ success: boolean; data: AcousticDiagnosticRecord[]; meta?: any }>(`/acoustic/history/${encodeURIComponent(wagonNumber)}`);
   }

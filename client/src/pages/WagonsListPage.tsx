@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { api } from '../services/api.ts';
 import { offlineDb } from '../services/offlineDb.ts';
 import { useI18n } from '../i18n/index.ts';
+import ShiftHandover from '../components/ShiftHandover.tsx';
 import { WagonNumberCamera } from '../components/WagonNumberCamera.tsx';
 import { parseWagonNumber } from '../../../shared/wagons/wagonNumber.ts';
 import { TrainIcon, CameraIcon, PlusCircleIcon } from '../components/Icons.tsx';
@@ -194,6 +195,13 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
 
   return (
     <div className="space-y-6">
+      {/*
+        * First, because a supervisor lands here at the start of a shift and
+        * the previous shift's note is the first thing worth reading. Renders
+        * nothing for a role that may not read it.
+        */}
+      <ShiftHandover lang={lang} />
+
       {/* Top Banner / Actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-card p-6 rounded-card border border-line shadow-xl">
         <div className="flex items-start gap-3">

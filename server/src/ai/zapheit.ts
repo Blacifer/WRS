@@ -206,3 +206,107 @@ export async function parseVoiceIntent(transcript: string): Promise<ParsedVoiceI
 
   return Object.keys(out).length > 0 ? out : null;
 }
+
+// ---------------------------------------------------------------------------
+// 3. Write the shift down
+// ---------------------------------------------------------------------------
+
+export interface ShiftFacts {
+  shiftDate: string;
+  springsSorted: number;
+  springsCondemned: number;
+  sortingInspectors: number;
+  checklistVerdicts: number;
+  wagonsTouched: number;
+  defectsFound: number;
+  supervisorOverrides: number;
+  acousticDefects: number;
+  wagonsReleased: number;
+  gateSignoffs: number;
+}
+
+/**
+ * Every whole number the facts contain, plus the parts of the date.
+ *
+ * The draft is allowed to use these and nothing else. A narrative that says
+ * "twelve springs were condemned" when the records say nine is not a style
+ * problem, it is a false statement in a handover note that somebody will act
+ * on at 6 a.m. So the guard is not "does it sound right" but "does every
+ * figure in it exist in the facts".
+ */
+export function permittedNumbers(facts: ShiftFacts): Set<string> {
+  const out = new Set<string>();
+  for (const [k, v] of Object.entries(facts)) {
+    if (typeof v === 'number') out.add(String(v));
+    if (k === 'shiftDate') for (const part of String(v).split(/[-T:. ]/)) if (/^\d+$/.test(part)) out.add(String(Number(part)));
+  }
+  return out;
+}
+
+/**
+ * The numbers a draft actually used that the facts do not contain.
+ *
+ * Necessary, not sufficient. This catches an invented FIGURE — "twelve" when
+ * the records say nine. It cannot catch an invented PAIRING: a permitted "1"
+ * attached to a field whose true value is zero reads as fine here, and was
+ * seen live on the first real draft. That is why the counts are shown beside
+ * the words and a person records the note, not the model. The guard removes
+ * the class of error a reader could not check; the reader removes the rest.
+ */
+export function foreignNumbers(draft: string, facts: ShiftFacts): string[] {
+  const allowed = permittedNumbers(facts);
+  const found = draft.match(/\d+/g) || [];
+  return [...new Set(found.map((n) => String(Number(n))))].filter((n) => !allowed.has(n));
+}
+
+/**
+ * A handover note written from the facts, in plain words, by a model.
+ *
+ * Null when unconfigured, unreachable, or when the draft used a number the
+ * facts do not contain. Callers fall back to the template, which cannot lie
+ * because it only ever prints the figures it was given.
+ */
+export async function draftShiftHandover(facts: ShiftFacts): Promise<{ text: string } | { rejected: string[] } | null> {
+  const raw = await askZapheit(
+    'You write the end-of-shift handover note for a railway wagon overhaul workshop, for the ' +
+      'supervisor taking over. Plain English, three to six sentences, no headings, no bullet points. ' +
+      'Use ONLY the numbers given. Do not invent, round, or estimate any figure. Do not add ' +
+      'recommendations, verdicts or judgements about parts. If a figure is zero, say so or omit it.',
+    JSON.stringify(facts),
+    { maxTokens: 260 }
+  );
+  if (!raw) return null;
+  const text = raw.replace(/\s+/g, ' ').trim();
+  const rejected = foreignNumbers(text, facts);
+  if (rejected.length > 0) return { rejected };
+  return { text };
+}
+
+/**
+ * The note the system writes when the model cannot or must not.
+ *
+ * Deliberately dull. It prints the figures it was given in fixed sentences,
+ * which is exactly why it can be trusted on a LAN with no route out.
+ */
+export function templateShiftHandover(f: ShiftFacts): string {
+  const s: string[] = [];
+  s.push(`Shift of ${f.shiftDate}.`);
+  s.push(
+    f.springsSorted > 0
+      ? `${f.springsSorted} springs were sorted by ${f.sortingInspectors} inspector(s); ${f.springsCondemned} were condemned.`
+      : 'No springs were sorted.'
+  );
+  s.push(
+    f.checklistVerdicts > 0
+      ? `${f.checklistVerdicts} checklist verdicts were recorded across ${f.wagonsTouched} wagon(s), with ${f.defectsFound} defect(s) found.`
+      : 'No checklist verdicts were recorded.'
+  );
+  if (f.acousticDefects > 0) s.push(`${f.acousticDefects} acoustic defect(s) were logged.`);
+  if (f.supervisorOverrides > 0) s.push(`${f.supervisorOverrides} supervisor override(s) were recorded.`);
+  s.push(
+    f.wagonsReleased > 0 || f.gateSignoffs > 0
+      ? `${f.gateSignoffs} gate sign-off(s) were completed and ${f.wagonsReleased} wagon(s) released.`
+      : 'No wagons were released.'
+  );
+  return s.join(' ');
+}

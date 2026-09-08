@@ -581,6 +581,31 @@ export function runMigrations(db: DatabaseSync): void {
   }
 
 
+  /*
+   * Shift handover notes.
+   *
+   * A narrative of the shift, drafted from the day's own records and reviewed
+   * by a supervisor before it is kept. Its own table rather than an audit
+   * payload: the audit chain records THAT a handover was recorded and by
+   * whom, and this holds the text, which is read back as a document rather
+   * than as an event. The draft is never stored — only what a person approved.
+   */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS shift_handovers (
+      id TEXT PRIMARY KEY,
+      shift_date TEXT NOT NULL,
+      body TEXT NOT NULL,
+      facts_json TEXT NOT NULL,
+      draft_source TEXT NOT NULL CHECK(draft_source IN ('MODEL', 'TEMPLATE')),
+      edited INTEGER NOT NULL DEFAULT 0 CHECK(edited IN (0, 1)),
+      recorded_by TEXT NOT NULL,
+      recorded_by_name TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      FOREIGN KEY (recorded_by) REFERENCES users(id) ON DELETE RESTRICT
+    );
+    CREATE INDEX IF NOT EXISTS idx_shift_handovers_date ON shift_handovers(shift_date);
+  `);
+
   // Spring sorting — see the table comment in schema.sql. Created here too so
   // an existing database picks it up on boot rather than only a fresh one.
   db.exec(`
