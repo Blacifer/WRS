@@ -328,10 +328,24 @@ healthRouter.get(
       id: 'gauges',
       label: 'A calibrated gauge for every spring position',
       state: gaugeRows.length === 0 ? 'FAIL' : missing.length ? 'WARN' : 'PASS',
+      /*
+       * The register can only be filled by the shop, and the manual says why.
+       *
+       * WMM p.191: "Spring height gauges must be kept in spring section", and
+       * on banding, "As of now, only local colour coding is in practice in
+       * zonal Railways." There is no national catalogue of gauge codes to look
+       * up — the instruments and their markings are local to each workshop.
+       * So this row names what is missing and points at the screen that fixes
+       * it, rather than implying somebody could find the answer elsewhere.
+       */
       detail: gaugeRows.length === 0
-        ? 'No gauges in the register, so no reading can name the instrument it was taken with.'
+        ? 'No gauges in the register, so no reading can name the instrument it was taken with. ' +
+          'Add them under User Accounts → Gauge Register, from the instruments actually on the bench.'
         : missing.length
-          ? `${inCalibration.length} of ${gaugeRows.length} gauge(s) in calibration. Nothing covers: ${missing.join(', ').toLowerCase()}. Each spring position has its own strip, so one gauge cannot stand in for another.`
+          ? `${inCalibration.length} of ${gaugeRows.length} gauge(s) in calibration. Nothing covers: ${missing.join(', ').toLowerCase()}. ` +
+            'Each spring position has its own strip, so one gauge cannot stand in for another. ' +
+            'WMM p.191 keeps spring height gauges in the spring section and notes that colour coding is local practice, ' +
+            'so these codes come from this shop rather than from a national list.'
           : `${inCalibration.length} gauge(s) in calibration, covering outer, inner and snubber.`
     });
 

@@ -116,10 +116,26 @@ export const GaugeRegister: React.FC<{ lang: LanguageCode }> = ({ lang }) => {
           <RefreshCwIcon size={14} />
         </button>
       </div>
-      <p className="text-[11px] text-ink-faint mb-4">
+      <p className="text-[11px] text-ink-faint mb-2">
         {isHi
           ? 'हर रीडिंग किस उपकरण से ली गई और उस समय उसका अंशांकन क्या था।'
           : 'Which instrument took each reading, and what its calibration was worth at the time.'}
+      </p>
+      {/*
+        * Where these codes come from, said once, here.
+        *
+        * There is no national list of spring gauge codes to look up. WMM p.191
+        * keeps spring height gauges in the spring section and records that "as
+        * of now, only local colour coding is in practice in zonal Railways" —
+        * so the instruments and their markings belong to this workshop. That
+        * is worth stating on the screen that asks for them, because the
+        * natural assumption is that a standard exists somewhere and somebody
+        * simply has not found it.
+        */}
+      <p className="text-[11px] text-ink-muted mb-4 leading-snug">
+        {isHi
+          ? 'ये कोड इसी कारख़ाने के हैं। WMM पृ.191 के अनुसार रंग-कोडिंग अभी स्थानीय स्तर पर ही होती है — कोई राष्ट्रीय सूची नहीं है। बेंच पर जो उपकरण असल में हैं, वही दर्ज करें।'
+          : 'These codes are this shop’s own. WMM p.191 records that only local colour coding is in practice across zonal railways, so there is no national list to copy — enter the instruments actually on the bench. Each spring position needs its own: outer, inner and snubber are different strips.'}
       </p>
 
       {exposure && exposure.total > 0 && (
