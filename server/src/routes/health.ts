@@ -271,6 +271,55 @@ healthRouter.get(
           (unchecked ? ` ${unchecked} further account(s) were not checked.` : '')
     });
 
+    /*
+     * How big this has grown, and what that costs the backup.
+     *
+     * Photographs are stored as base64 inside the database file, so the
+     * evidence a shop is asked to collect is also the thing that makes the
+     * weekly backup impossible. Nothing warned about this: SystemStorage
+     * displayed the figure and no check acted on it.
+     *
+     * The thresholds come from a measurement rather than a guess. Backing up
+     * a 514 MB database — snapshot, encrypt, verify — ran at 11.1 MB/s on a
+     * developer machine, and the shop PC is three to five times slower. That
+     * puts 5 GB at roughly half an hour there, 20 GB at two hours, 80 GB at
+     * eight. A weekly job that takes eight hours is a job somebody kills.
+     *
+     * The restore needs room for the encrypted file and the plaintext beside
+     * the original, so the disk wants roughly three times the database free.
+     */
+    const dbBytes = (() => {
+      let total = 0;
+      for (const suffix of ['', '-wal', '-shm']) {
+        try { total += fs.statSync(config.dbPath + suffix).size; } catch { /* absent is zero */ }
+      }
+      return total;
+    })();
+    const photoBytes = (() => {
+      try {
+        const a = db.prepare('SELECT COALESCE(SUM(LENGTH(image_data)), 0) AS b FROM wagon_photos').get() as { b: number };
+        const c = db.prepare('SELECT COALESCE(SUM(LENGTH(image_data)), 0) AS b FROM spring_images').get() as { b: number };
+        return Number(a?.b || 0) + Number(c?.b || 0);
+      } catch { return 0; }
+    })();
+    const gb = dbBytes / (1024 ** 3);
+    const BACKUP_MB_PER_SEC = 11.1;
+    const shopMinutes = Math.round(((dbBytes / (1024 * 1024)) / BACKUP_MB_PER_SEC) * 4 / 60);
+    const photoShare = dbBytes > 0 ? Math.round((photoBytes / dbBytes) * 100) : 0;
+    const sizeText = gb >= 1 ? `${gb.toFixed(1)} GB` : `${Math.round(dbBytes / (1024 * 1024))} MB`;
+
+    checks.push({
+      id: 'storage',
+      label: 'The database is small enough to keep backing up',
+      state: gb >= 8 ? 'FAIL' : gb >= 2 ? 'WARN' : 'PASS',
+      detail: gb >= 2
+        ? `${sizeText}, of which ${photoShare}% is photographs. A backup of this runs about ${shopMinutes} minute(s) on shop hardware, ` +
+          'and the disk needs roughly three times the database free to take and restore one. ' +
+          'Photographs are stored inside the database file: if "Photograph springs while sorting" has been left on past the ' +
+          'point the training set needed, turning it off stops the growth. Nothing already recorded is affected.'
+        : `${sizeText}, of which ${photoShare}% is photographs. A backup of this takes about ${Math.max(shopMinutes, 1)} minute(s) on shop hardware.`
+    });
+
     // --- the record, and whether a copy of it exists ---
     const backupDir = path.resolve(path.dirname(config.dbPath), 'backups');
     let newestBackupMs: number | null = null;

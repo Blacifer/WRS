@@ -181,6 +181,25 @@ describe('Deployment readiness', () => {
     assert.match(manual.detail, /ROH_AUDIT/);
   });
 
+  it('TC-RDY-05c: storage is reported with what a backup of it would cost', async () => {
+    /*
+     * Photographs live inside the database file, so the evidence the shop is
+     * asked to collect is also what makes the weekly backup impossible.
+     * Measured at 11.1 MB/s: 20 GB is a two-hour backup on shop hardware and
+     * 80 GB is eight. Nothing warned about this before — SystemStorage
+     * displayed the number and no check acted on it.
+     */
+    const token = await signIn(app, 'admin1');
+    const res = await call(app, 'GET', '/api/system/readiness', undefined, { authorization: `Bearer ${token}` });
+    const storage = findCheck(res.body, 'storage');
+
+    assert.ok(storage, 'storage must be one of the checks');
+    assert.match(storage.detail, /photographs/, 'it must say how much of the file is photographs');
+    assert.match(storage.detail, /minute/, 'and what a backup of it would cost');
+    // A fresh in-memory installation is small, so this is the green case.
+    assert.strictEqual(storage.state, 'PASS');
+  });
+
   it('TC-RDY-06: a supervisor cannot read the installation’s state', async () => {
     const token = await signIn(app, 'supervisor1');
     const res = await call(app, 'GET', '/api/system/readiness', undefined, { authorization: `Bearer ${token}` });
