@@ -15,6 +15,7 @@ import { config } from '../config/index.ts';
 import { verifyPassword } from '../auth/password.ts';
 import { verifyAuditChain } from '../db/auditLog.ts';
 import { isZapheitConfigured, askZapheit } from '../ai/zapheit.ts';
+import { EXPECTED_MANUAL_SOURCES, indexedSources } from '../manual/manualIndex.ts';
 
 /** The password published in the README. Login refuses it in production. */
 const DEMO_PASSWORD = 'password123';
@@ -335,17 +336,37 @@ healthRouter.get(
     });
 
     // --- the manual, which is the citation behind every refusal ---
-    let manualPassages = 0;
-    try {
-      manualPassages = (db.prepare('SELECT COUNT(*) AS c FROM manual_passages').get() as { c: number }).c;
-    } catch { /* table absent means not indexed */ }
+    /*
+     * Per document, not just a total.
+     *
+     * A count on its own cannot tell a healthy index from one missing a
+     * document — and the index now holds more than one. A deployment with the
+     * manual but without the audit check-sheet reported thousands of passages
+     * and looked entirely well.
+     */
+    const present = indexedSources(db);
+    const manualPassages = Object.values(present).reduce((n, c) => n + c, 0);
+    const notIndexed = EXPECTED_MANUAL_SOURCES.filter((src) => !present[src.label]);
+    const notIndexedRequired = notIndexed.filter((src) => src.required);
+
+    const held = EXPECTED_MANUAL_SOURCES
+      .filter((src) => present[src.label])
+      .map((src) => `${src.label} ${present[src.label]}`)
+      .join(', ');
+
     checks.push({
       id: 'manual',
       label: 'The manual is indexed and searchable',
-      state: manualPassages > 0 ? 'PASS' : 'WARN',
-      detail: manualPassages > 0
-        ? `${manualPassages} passages indexed. Ask the Manual quotes them with page and chapter.`
-        : 'No passages indexed. Run server/scripts/index-manual.ts so refusals can cite a clause.'
+      state: notIndexedRequired.length ? 'WARN' : notIndexed.length ? 'WARN' : 'PASS',
+      detail: notIndexedRequired.length
+        ? 'The Wagon Maintenance Manual is not indexed, so nothing can cite a clause. ' +
+          'Run: npm run index-manual -- "/path/to/Vol-I (System Documentation).pdf"'
+        : notIndexed.length
+          ? `${manualPassages} passages indexed (${held}). Not indexed: ` +
+            notIndexed
+              .map((src) => `${src.name}${src.file ? ` — npm run index-manual -- "${src.file}" ${src.label}` : ''}`)
+              .join('; ')
+          : `${manualPassages} passages indexed (${held}). Every quote names the document it came from.`
     });
 
     /*

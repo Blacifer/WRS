@@ -227,6 +227,68 @@ export function buildSpringTablePassages(): ManualPassage[] {
 
 /** Builds (or rebuilds) the index from already-extracted manual text. */
 /**
+ * The documents this installation expects to be able to quote.
+ *
+ * Kept here rather than in the health route, because which documents exist and
+ * what they are called is knowledge about the manual, not about the panel that
+ * happens to display it.
+ *
+ * `file` is a path in this repository where one is shipped. The Wagon
+ * Maintenance Manual is not — it is large and comes from RDSO — so a fresh
+ * installation is told to point the indexer at its own copy rather than being
+ * left to discover the index is empty.
+ */
+export interface ExpectedManualSource {
+  label: string;
+  name: string;
+  /** Where the document lives in this repository, when it is shipped with it. */
+  file: string | null;
+  /**
+   * Whether Ask the Manual is meaningfully usable without it. Only the manual
+   * itself is required — the audit check-sheet is worth having and nothing
+   * depends on it, so its absence is worth saying and is not a fault.
+   */
+  required: boolean;
+}
+
+export const EXPECTED_MANUAL_SOURCES: ExpectedManualSource[] = [
+  {
+    label: 'WMM',
+    name: 'RDSO Wagon Maintenance Manual 2.0',
+    file: null,
+    required: true
+  },
+  {
+    // Transcribed rather than extracted, and indexed alongside the manual —
+    // so its absence means the manual was never indexed, not that a separate
+    // document is missing.
+    label: 'G95',
+    name: 'RDSO Technical Pamphlet G-95 Rev-II spring tables',
+    file: null,
+    required: true
+  },
+  {
+    label: 'ROH_AUDIT',
+    name: 'RDSO quality audit check-sheet (depot ROH)',
+    file: 'docs/Quality_Audit_check-sheet_for_Wagon_Depot.pdf',
+    required: false
+  }
+];
+
+/** What is actually in the index, per source. */
+export function indexedSources(db: DatabaseSync): Record<string, number> {
+  try {
+    const rows = db
+      .prepare('SELECT source, COUNT(*) AS c FROM manual_passages GROUP BY source')
+      .all() as Array<{ source: string; c: number }>;
+    return Object.fromEntries(rows.map((r) => [r.source, r.c]));
+  } catch {
+    // No index yet is a normal state on a fresh installation, not an error.
+    return {};
+  }
+}
+
+/**
  * What a passage should be cited as.
  *
  * The citation is the whole point of quoting the manual: an inspector

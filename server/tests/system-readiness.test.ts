@@ -17,6 +17,7 @@
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import { createApp } from '../src/app.ts';
+import { getDatabase } from '../src/db/connection.ts';
 import type { ExpressApp } from '../src/framework/index.ts';
 
 async function call(app: ExpressApp, method: string, path: string, body?: any, headers: Record<string, string> = {}) {
@@ -117,6 +118,43 @@ describe('Deployment readiness', () => {
     // with the number of entries it actually walked.
     assert.strictEqual(chain.state, 'PASS');
     assert.match(chain.detail, /\d+ entries/);
+  });
+
+  it('TC-RDY-05b: the manual row names each document, and what is not indexed', async () => {
+    /*
+     * A total on its own cannot tell a healthy index from one missing a
+     * document, and the index now holds more than one. A deployment with the
+     * manual but without the audit check-sheet reported thousands of passages
+     * and looked entirely well.
+     */
+    const { createManualTables, indexManualText } = await import('../src/manual/manualIndex.ts');
+    const db = getDatabase();
+    createManualTables(db);
+    // A clause marker is what buildPassages splits on; text without one yields
+    // no passages at all, which is not what this test is about.
+    indexManualText(db, 'CHAPTER-6 BOGIE\n308 E. Outer spring nominal 260 mm, condemning 245 mm.\n', 'manual.pdf', 'WMM');
+
+    const token = await signIn(app, 'admin1');
+    let res = await call(app, 'GET', '/api/system/readiness', undefined, { authorization: `Bearer ${token}` });
+    let manual = findCheck(res.body, 'manual');
+
+    assert.strictEqual(manual.state, 'WARN', 'a document that is not indexed must be said');
+    assert.match(manual.detail, /check-sheet/i, 'and named');
+    assert.match(manual.detail, /index-manual/, 'with the command that fixes it');
+
+    indexManualText(
+      db,
+      'SN Requirements Clause Observation\nG Side bearer Nom Cond\n' +
+        'Side bearer springs are condemned on the basis of height.\n',
+      'audit.pdf',
+      'ROH_AUDIT'
+    );
+    res = await call(app, 'GET', '/api/system/readiness', undefined, { authorization: `Bearer ${token}` });
+    manual = findCheck(res.body, 'manual');
+
+    assert.strictEqual(manual.state, 'PASS');
+    assert.match(manual.detail, /WMM/);
+    assert.match(manual.detail, /ROH_AUDIT/);
   });
 
   it('TC-RDY-06: a supervisor cannot read the installation’s state', async () => {

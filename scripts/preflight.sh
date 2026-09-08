@@ -100,10 +100,52 @@ step "Backup and restore drill"      bash scripts/backup-drill.sh
 # conditions rather than waiting for someone to arrange them.
 # ---------------------------------------------------------------------------
 PREVIEW_PID=""
-stop_preview() {
-  if [ -n "$PREVIEW_PID" ]; then kill "$PREVIEW_PID" 2>/dev/null; PREVIEW_PID=""; fi
+API_PID=""
+
+stop_started() {
+  for pid in "$PREVIEW_PID" "$API_PID"; do
+    if [ -n "$pid" ]; then kill "$pid" 2>/dev/null; fi
+  done
+  PREVIEW_PID=""; API_PID=""; }
+trap stop_started EXIT
+
+# Waits for a URL to answer, up to roughly 40 seconds.
+wait_for() {
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    if curl -s -o /dev/null --max-time 2 "$1"; then return 0; fi
+    sleep 2
+  done
+  return 1
 }
-trap stop_preview EXIT
+
+# ---------------------------------------------------------------------------
+# Start what the drills need, if it is not already running.
+#
+# The same reasoning as the preview server below: a check that is skipped
+# whenever the conditions are not already arranged is a check that stops being
+# run. This script kept reporting both browser drills as failures because the
+# API or the client happened to be down at that moment — which is a fact about
+# the machine, not about the code being gated.
+#
+# Anything already running is left alone and NOT stopped afterwards: somebody
+# working with a dev server open should not have it killed by running the
+# gate. Only what this script starts, this script stops.
+# ---------------------------------------------------------------------------
+if ! curl -s -o /dev/null --max-time 2 http://localhost:3000/api/health; then
+  printf '  %-34s' "Starting the API"
+  npm run dev --prefix server >/tmp/wrs_preflight_api.log 2>&1 &
+  API_PID=$!
+  if wait_for http://localhost:3000/api/health; then echo "up"; else
+    echo "did not start"
+    sed 's/^/      /' /tmp/wrs_preflight_api.log | tail -6
+  fi
+fi
+
+# Deliberately no dev client. Both browser drills run against a preview of the
+# BUILT client, started below — the artefact the shop actually installs, and
+# the only one whose service worker exists. A vite dev server also exits on
+# its own when started from a script with no terminal attached, which made
+# "started the client" and "nothing serving on :5173" appear two lines apart.
 
 if ! node -e "import('playwright')" >/dev/null 2>&1; then
   skip "Role walkthrough" "playwright not installed"
@@ -112,29 +154,28 @@ elif ! curl -s -o /dev/null --max-time 2 http://localhost:3000/api/health; then
   skip "Role walkthrough" "the API is not answering on :3000"
   skip "Offline drill"    "the API is not answering on :3000"
 else
-  if curl -s -o /dev/null --max-time 2 http://localhost:5173; then
-    step "Role walkthrough" node scripts/role-walkthrough.mjs
-  else
-    skip "Role walkthrough" "nothing serving on :5173"
-  fi
-
-  # The production build ran above, so client/dist is current.
+  # The production build ran above, so client/dist is current. Both drills run
+  # against it.
   if [ -f client/dist/sw.js ]; then
     npm run preview --prefix client >/tmp/wrs_preflight_preview.log 2>&1 &
     PREVIEW_PID=$!
     preview_up=0
-    for _ in 1 2 3 4 5 6 7 8 9 10; do
+    for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
       if curl -s -o /dev/null --max-time 2 http://localhost:4173; then preview_up=1; break; fi
-      sleep 1
+      sleep 2
     done
     if [ "$preview_up" -eq 1 ]; then
-      DRILL_URL=http://localhost:4173 step "Offline drill" node scripts/offline-drill.mjs
+      DRILL_URL=http://localhost:4173 step "Role walkthrough" node scripts/role-walkthrough.mjs
+      DRILL_URL=http://localhost:4173 step "Offline drill"    node scripts/offline-drill.mjs
     else
-      skip "Offline drill" "the preview server did not come up on :4173"
+      skip "Role walkthrough" "the preview server did not come up on :4173"
+      skip "Offline drill"    "the preview server did not come up on :4173"
+      sed 's/^/      /' /tmp/wrs_preflight_preview.log | tail -6
     fi
-    stop_preview
+    if [ -n "$PREVIEW_PID" ]; then kill "$PREVIEW_PID" 2>/dev/null; PREVIEW_PID=""; fi
   else
-    skip "Offline drill" "client/dist/sw.js missing — the production build did not produce a service worker"
+    skip "Role walkthrough" "client/dist/sw.js missing — the production build did not produce a client"
+    skip "Offline drill"    "client/dist/sw.js missing — the production build did not produce a service worker"
   fi
 fi
 

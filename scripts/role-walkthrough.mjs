@@ -29,6 +29,17 @@
  */
 
 import { chromium } from 'playwright';
+
+/*
+ * Where to drive.
+ *
+ * Defaults to the dev server for a developer running this by hand. The gate
+ * points it at a preview of the BUILT client instead — the same artefact the
+ * shop installs, and the one whose service worker the offline drill needs. A
+ * screen that renders in dev and not in the build is a failure this would
+ * otherwise never see.
+ */
+const BASE = process.env.DRILL_URL || 'http://localhost:5173';
 const b = await chromium.launch();
 
 const users = [
@@ -50,7 +61,7 @@ for (const [user, role] of users) {
     if (r.url().includes('/api/') && r.status() >= 400) bad.push(`${r.status()} ${r.url().split('/api/')[1].split('?')[0]}`);
   });
 
-  await p.goto('http://localhost:5173', { waitUntil: 'networkidle' });
+  await p.goto(BASE, { waitUntil: 'networkidle' });
   await p.fill('input[type="text"]', user);
   await p.fill('input[type="password"]', 'password123');
   await p.click('button[type="submit"]');
