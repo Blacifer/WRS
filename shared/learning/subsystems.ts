@@ -64,7 +64,24 @@ export const ALL_LEARNING_SUBSYSTEMS = [
    * it happens rather than months later, and the supervisor's correction is
    * ground truth rather than an opinion.
    */
-  'WAGON_NUMBER_OCR'
+  'WAGON_NUMBER_OCR',
+  /*
+   * The camera naming a spring, and whether the inspector kept the name.
+   *
+   * Unlike every other subsystem here, this one feeds back into what the
+   * camera knows: a correction is not only recorded, it is remembered as a new
+   * example, so the same mistake is less likely on the next spring. That makes
+   * this ledger the running answer to the only question worth asking about
+   * it — is it actually getting better, or does it only feel like it is.
+   *
+   * Read it alongside the leave-one-out score. This one says how often the
+   * inspector agreed; that one says how well it does on photographs it was
+   * not taught from. Both can be flattering on their own and neither is
+   * flattering in the same way.
+   */
+  'SPRING_VISION',
+  /** The same camera, naming a wagon part rather than a spring. */
+  'PART_VISION'
 ] as const;
 
 export type LearningSubsystem = (typeof ALL_LEARNING_SUBSYSTEMS)[number];
@@ -77,5 +94,7 @@ export const SUBSYSTEM_LABELS: Record<LearningSubsystem, string> = {
   ACOUSTIC_DIAGNOSTIC: 'Acoustic Diagnostics',
   DEFECT_SUGGESTION: 'Defect Suggestions',
   MEASUREMENT_ANOMALY: 'Unusual Readings',
-  WAGON_NUMBER_OCR: 'Wagon Number from Photograph'
+  WAGON_NUMBER_OCR: 'Wagon Number from Photograph',
+  SPRING_VISION: 'Camera — Spring Recognition',
+  PART_VISION: 'Camera — Part Recognition'
 };

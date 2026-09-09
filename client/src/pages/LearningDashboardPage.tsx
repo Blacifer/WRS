@@ -17,6 +17,7 @@ import { api } from '../services/api.ts';
 import type { LanguageCode } from '../i18n/index.ts';
 import type { User } from '../../../shared/types.ts';
 import { LearningMemory } from '../components/LearningMemory.tsx';
+import { CameraProgress } from '../components/CameraProgress.tsx';
 
 interface LearningDashboardPageProps {
   lang: LanguageCode;
@@ -120,6 +121,13 @@ export const LearningDashboardPage: React.FC<LearningDashboardPageProps> = ({ la
           what changed as a result. */}
       <div className="rounded-card border border-line bg-card p-5">
         <LearningMemory lang={lang} />
+        {/*
+          * Above the per-subsystem accuracy tables deliberately. The camera is
+          * the only part of this system that changes what it knows from use,
+          * so it is the only one where "is it improving" is a real question,
+          * and it is the first question anybody asks.
+          */}
+        <CameraProgress lang={lang} />
       </div>
 
       {error && (

@@ -24,6 +24,7 @@ import { learningRouter } from './learning.ts';
 import { manualRouter } from './manual.ts';
 import { auditRouter } from './audit.ts';
 import { sortingRouter } from './sorting.ts';
+import { visionRouter } from './vision.ts';
 
 export const apiRouter = Router();
 
@@ -45,6 +46,7 @@ apiRouter.use('/learning', learningRouter);
 apiRouter.use('/manual', manualRouter);
 apiRouter.use('/audit', auditRouter);
 apiRouter.use('/sorting', sortingRouter);
+apiRouter.use('/vision', visionRouter);
 apiRouter.use('/classification', classifyRouter);
 apiRouter.use('/', classifyRouter);
 apiRouter.use('/', healthRouter);

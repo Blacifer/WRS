@@ -78,9 +78,18 @@ export type OtpAction =
   | 'EXPORT' 
   | 'USER_MGMT';
 
-export type MeasurementSource = 
-  | 'MANUAL' 
-  | 'OCR';
+export type MeasurementSource =
+  | 'MANUAL'
+  | 'OCR'
+  /*
+   * The camera proposed it and a person accepted it.
+   *
+   * A distinct value rather than folding into MANUAL, because a record has to
+   * say how its number was arrived at. If a camera reading were stored as
+   * MANUAL it would claim a person measured something they only agreed with,
+   * and the day that reading is questioned is the day that difference matters.
+   */
+  | 'CAMERA_ASSISTED';
 
 export type LanguageCode = 
   | 'hi' 

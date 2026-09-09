@@ -73,6 +73,37 @@ verifying.
 npm run build
 ```
 
+### The camera's weights must be inside the build
+
+The camera does not download anything at the moment it is used. Two model
+files are served by this application itself, from `client/public/models/`:
+
+| Folder | Size | What it does |
+|---|---|---|
+| `coco-ssd/` | 18 MB | Finds the people and clutter in a frame so they can be cut away |
+| `mobilenet/` | 13 MB | Turns the remaining crop into the 1280 numbers the camera compares |
+
+Both are committed to the repository, so a normal checkout already has them
+and **nothing further is needed**. Confirm before you leave the office:
+
+```bash
+ls client/public/models/mobilenet/     # model.json + 4 shards
+ls client/public/models/coco-ssd/      # model.json + 5 shards
+```
+
+If either folder is empty — a shallow clone, or a copy made by hand that
+skipped large files — fetch them **on a machine that has internet**, before
+going to the shop:
+
+```bash
+node scripts/vendor-vision-models.mjs
+```
+
+A shop LAN commonly has no route to the internet, and the one moment the
+camera is needed is the moment somebody is standing at a bogie holding a
+part. A model that is fetched on first use is a model that does not exist in
+the shed.
+
 ## 4. First start, and the first administrator
 
 A production start creates **no accounts at all**. The demonstration logins are

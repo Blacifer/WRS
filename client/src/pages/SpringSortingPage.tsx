@@ -37,6 +37,7 @@ import { readThroughput, DAILY_PILE } from '../../../shared/sorting/throughput.t
 import { offlineDb } from '../services/offlineDb.ts';
 import { SpringEvidenceCamera } from '../components/SpringEvidenceCamera.tsx';
 import BlindSpringRead from '../components/BlindSpringRead.tsx';
+import TeachTheCamera from '../components/TeachTheCamera.tsx';
 import type { SpringEvidenceHandle } from '../components/SpringEvidenceCamera.tsx';
 import type { PendingSortedSpring } from '../services/offlineDb.ts';
 
@@ -1196,6 +1197,15 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           * The server sends no label, and never this reader's own pictures.
           */}
         <BlindSpringRead lang={lang} />
+        {/*
+          * The camera that learns, put where the springs actually are.
+          *
+          * Next to the blind read deliberately: that panel measures the
+          * ceiling for reading a BAND from a photograph, which is a question
+          * this camera does not attempt. The two sit together so nobody
+          * confuses what the camera claims with what it does not.
+          */}
+        <TeachTheCamera lang={lang} domain="SPRING" />
         <SpringEvidenceCamera
           ref={cameraRef}
           lang={lang}

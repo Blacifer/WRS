@@ -954,7 +954,14 @@ CREATE TABLE IF NOT EXISTS machine_learning_events (
     'MEASUREMENT_ANOMALY',
     -- Reading the stencilled wagon number off a photograph, and whether the
     -- supervisor kept what it read.
-    'WAGON_NUMBER_OCR'
+    'WAGON_NUMBER_OCR',
+    -- The camera naming a spring, and whether the inspector kept the name.
+    -- Unlike the others, a correction here feeds back into what the camera
+    -- knows, so this ledger is the running answer to whether it is actually
+    -- improving rather than only being used more.
+    'SPRING_VISION',
+    -- The same camera, naming a wagon part rather than a spring.
+    'PART_VISION'
   )),
   wagon_number TEXT DEFAULT NULL,
   inspection_id TEXT DEFAULT NULL,

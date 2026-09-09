@@ -25,7 +25,10 @@
     "test:tier4": "bash tests/run_e2e.sh --tier4",
     "test:tier5": "bash tests/run_e2e.sh --tier5",
     "test:all": "bash tests/run_e2e.sh --all",
-    "generate-fixtures": "node tests/fixtures/generate_fixtures.js"
+    "generate-fixtures": "node tests/fixtures/generate_fixtures.js",
+    "vendor:models": "node scripts/vendor-vision-models.mjs",
+    "proof:vision": "node scripts/vision-brain-proof.mjs",
+    "drive:camera": "node scripts/teach-camera-drive.mjs"
   },
   "engines": {
     "node": ">=22"

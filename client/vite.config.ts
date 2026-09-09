@@ -184,6 +184,16 @@ export default defineConfig({
       }
     }
   },
+  /*
+   * Pre-bundle the two vision packages instead of letting Vite discover them
+   * the first time a camera is opened. Discovered mid-session, it re-optimises
+   * and reloads the page — which in dev looks like the camera freezing on its
+   * very first frame, and cost an afternoon to find. Production builds are
+   * unaffected; this is a dev-server correctness fix.
+   */
+  optimizeDeps: {
+    include: ['@tensorflow/tfjs', '@tensorflow-models/coco-ssd', '@tensorflow-models/mobilenet']
+  },
   build: {
     outDir: 'dist',
     emptyOutDir: true,

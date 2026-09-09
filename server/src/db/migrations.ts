@@ -1093,7 +1093,7 @@ export function runMigrations(db: DatabaseSync): void {
     .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='machine_learning_events'")
     .get() as { sql?: string } | undefined)?.sql || '';
 
-  if (mlTableSql && !mlTableSql.includes("'WAGON_NUMBER_OCR'")) {
+  if (mlTableSql && !mlTableSql.includes("'PART_VISION'")) {
     const cols = (db.prepare('PRAGMA table_info(machine_learning_events)').all() as any[]).map(
       (c) => c.name
     );
@@ -1107,7 +1107,7 @@ export function runMigrations(db: DatabaseSync): void {
         /CHECK\s*\(\s*subsystem\s+IN\s*\([^)]*\)\s*\)/i,
         "CHECK(subsystem IN ('OCR_CALIPER', 'SPRING_CLASSIFICATION', 'VOICE_COMMAND', " +
           "'ACOUSTIC_DIAGNOSTIC', 'DEFECT_SUGGESTION', 'MEASUREMENT_ANOMALY', " +
-          "'WAGON_NUMBER_OCR'))"
+          "'WAGON_NUMBER_OCR', 'SPRING_VISION', 'PART_VISION'))"
       );
 
     db.exec('PRAGMA foreign_keys = OFF;');
@@ -1151,6 +1151,101 @@ export function runMigrations(db: DatabaseSync): void {
     } finally {
       db.exec('PRAGMA foreign_keys = ON;');
     }
+  }
+
+
+  /*
+   * What the camera has learned.
+   *
+   * Each row is one photograph a person labelled, reduced to the 1280 numbers
+   * MobileNet uses to describe an image. The photograph itself is not here —
+   * it is already kept as evidence in spring_images or wagon_photos under
+   * their own append-only rules, and this row points back at it.
+   *
+   * WHY THE EMBEDDING AND NOT THE IMAGE
+   * A photograph is 200 KB and an embedding is 5 KB, so three thousand of them
+   * is 15 MB rather than 600 MB. That difference is what lets everything the
+   * camera knows sit inside the database the weekly backup already carries off
+   * the machine. Format the shop PC and restore the backup, and the camera
+   * still recognises what it recognised before — which is not true of anything
+   * that lives in a browser's storage on one bench.
+   *
+   * WHY IT IS ON THE SERVER AT ALL
+   * Three benches each learning privately is three brains, each a third as
+   * good, and each unable to help a new inspector on their first day. One
+   * shared list means a spring taught at the sorting bench is recognised at
+   * the assembly bay an hour later.
+   *
+   * WHY APPEND-ONLY, LIKE EVERYTHING ELSE HERE
+   * These rows are the evidence for why the camera said what it said. An
+   * inspector defending a condemnation can be shown the exact photographs that
+   * produced the answer. That is only worth anything if nobody can quietly
+   * revise them afterwards, so the same two triggers guard this table as guard
+   * the inspection records themselves.
+   *
+   * There is deliberately no BAND head, and the CHECK below enforces it. A
+   * band is 2 to 3mm on a component 245 to 290mm tall and a photograph carries
+   * no scale, so a technique that measures how alike two pictures look would
+   * be confident and wrong. Bands come from the strip or the caliper.
+   */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS vision_examples (
+      id TEXT PRIMARY KEY,
+      domain TEXT NOT NULL CHECK(domain IN ('SPRING', 'WAGON_PART')),
+      head TEXT NOT NULL CHECK(head IN ('CATEGORY', 'SURFACE', 'DAMAGE', 'PART_ID')),
+      -- The person's answer. This is the truth; the camera only guesses at it.
+      label TEXT NOT NULL,
+      -- base64 of a Float32Array(1280), unit length.
+      embedding TEXT NOT NULL,
+      -- Points at the photograph this was taken from, so any answer can be
+      -- traced back to pictures a person can actually look at.
+      source_image_id TEXT DEFAULT NULL,
+      /*
+       * A small JPEG of the crop the embedding was taken from — about 3 KB at
+       * 96 pixels square, against 5 KB for the embedding itself.
+       *
+       * Worth the space because of what it buys: an inspector defending a
+       * condemnation can be shown the actual photographs that produced the
+       * camera's answer, side by side with the spring in their hand. A trained
+       * network cannot do that — it has no examples left to point at, only
+       * weights — and it is the single strongest reason to prefer this
+       * approach here over a conventional model.
+       *
+       * Nullable, because a teaching is still worth keeping if the thumbnail
+       * could not be made, and because rows written before this column existed
+       * are still perfectly good examples.
+       */
+      thumbnail TEXT DEFAULT NULL,
+      part_name TEXT DEFAULT NULL,
+      bogie_position TEXT DEFAULT NULL,
+      -- Whether the camera had proposed something, and what. Kept so the
+      -- corrections can be told apart from the first teachings later.
+      proposed_label TEXT DEFAULT NULL,
+      was_correction INTEGER NOT NULL DEFAULT 0,
+      taught_by TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      FOREIGN KEY (taught_by) REFERENCES users(id) ON DELETE RESTRICT
+    );
+    CREATE INDEX IF NOT EXISTS idx_vision_examples_head ON vision_examples(domain, head, label);
+    CREATE INDEX IF NOT EXISTS idx_vision_examples_created ON vision_examples(created_at DESC);
+    CREATE TRIGGER IF NOT EXISTS trg_vision_examples_no_update
+    BEFORE UPDATE ON vision_examples
+    BEGIN
+      SELECT RAISE(ABORT, 'What the camera was taught is evidence and cannot be rewritten.');
+    END;
+    CREATE TRIGGER IF NOT EXISTS trg_vision_examples_no_delete
+    BEFORE DELETE ON vision_examples
+    BEGIN
+      SELECT RAISE(ABORT, 'What the camera was taught is evidence and cannot be deleted.');
+    END;
+  `);
+
+  // vision_examples predates its thumbnail column on any database created
+  // between the two. Added rather than rebuilt: the table's append-only
+  // triggers make a rebuild expensive, and a NULL thumbnail is a valid state.
+  const vexCols = db.prepare("PRAGMA table_info(vision_examples)").all() as any[];
+  if (vexCols.length > 0 && !vexCols.some((c) => c.name === 'thumbnail')) {
+    db.exec('ALTER TABLE vision_examples ADD COLUMN thumbnail TEXT DEFAULT NULL;');
   }
 
   // A declared principal for actions the system performs itself.

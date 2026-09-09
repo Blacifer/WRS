@@ -78,6 +78,19 @@ step "Production build"           npm run build
 # cross-process fault no suite can reach, so it is not optional.
 step "Concurrent lifecycle drill" node --experimental-strip-types scripts/concurrent-lifecycle-drill.mjs
 
+# The camera's weights, proven to load from disk and to separate classes.
+#
+# It needs a browser but no server — it starts its own, serving only this
+# app's own files, and fails if the page reaches for anything else. That is
+# the property being guarded: a model fetched from a CDN at first use is a
+# model that does not exist in a shed with no internet, and the failure would
+# appear at Raipur rather than here.
+if node -e "import('playwright')" >/dev/null 2>&1; then
+  step "Vision model proof" node scripts/vision-brain-proof.mjs
+else
+  skip "Vision model proof" "playwright not installed"
+fi
+
 # The backup path, which had never been run by anybody. It needs no browser
 # and no server — only sqlite3 and openssl — and it works in a temporary
 # directory with a throwaway key, so it is safe to run every time and there is

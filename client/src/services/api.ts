@@ -1425,6 +1425,84 @@ export class ApiClient {
     return this.request('/sorting/blind-read/agreement');
   }
 
+
+  // -------------------------------------------------------------------------
+  // The camera's memory
+  //
+  // Loaded once when a bench opens the camera, and added to every time an
+  // inspector confirms or corrects what it proposed. Kept on the server rather
+  // than in the browser so that what one bench learns, every bench knows — and
+  // so that it is inside the database the weekly backup carries off the
+  // machine.
+  // -------------------------------------------------------------------------
+
+  /** Everything the camera has been taught, so the browser can rebuild it. */
+  public async getVisionBrain(domain: 'SPRING' | 'WAGON_PART' = 'SPRING'): Promise<{
+    success: boolean;
+    data: {
+      domain: string;
+      counts: Record<string, Record<string, number>>;
+      examples: Array<{
+        id: string;
+        head: 'CATEGORY' | 'SURFACE' | 'DAMAGE' | 'PART_ID';
+        label: string;
+        embedding: string;
+        thumbnail: string | null;
+        sourceImageId: string | null;
+        partName: string | null;
+        taughtBy: string;
+        createdAt: string;
+      }>;
+    };
+    meta: { total: number };
+  }> {
+    return this.request(`/vision/brain?domain=${encodeURIComponent(domain)}`);
+  }
+
+  /**
+   * One photograph, and what a person called it.
+   *
+   * `proposedLabel` is what the camera offered, and passing it is what makes
+   * the accuracy figures honest — the server derives "was this a correction"
+   * from the difference rather than taking the client's word for it. Omit it
+   * when the camera stayed silent; a teaching with no proposal says nothing
+   * about accuracy and must not be counted as agreement.
+   */
+  public async teachVisionBrain(payload: {
+    domain: 'SPRING' | 'WAGON_PART';
+    head: 'CATEGORY' | 'SURFACE' | 'DAMAGE' | 'PART_ID';
+    label: string;
+    embedding: string;
+    /** A small JPEG data URL of the crop, so an answer can be shown, not just stated. */
+    thumbnail?: string | null;
+    proposedLabel?: string | null;
+    confidence?: number | null;
+    sourceImageId?: string | null;
+    partName?: string | null;
+    bogiePosition?: string | null;
+  }): Promise<{ success: boolean; data: { id: string; head: string; label: string; wasCorrection: boolean } }> {
+    return this.request('/vision/brain/teach', { method: 'POST', body: JSON.stringify(payload) });
+  }
+
+  /** Is it actually getting better — agreement week by week, not example count. */
+  public async getVisionBrainProgress(
+    domain: 'SPRING' | 'WAGON_PART' = 'SPRING',
+    head?: 'CATEGORY' | 'SURFACE' | 'DAMAGE' | 'PART_ID'
+  ): Promise<{
+    success: boolean;
+    data: {
+      domain: string;
+      head: string | null;
+      counts: Record<string, Record<string, number>>;
+      weeks: Array<{ week: string; taught: number; proposed: number; corrections: number; agreementRate: number | null }>;
+      summary: string;
+    };
+  }> {
+    return this.request(
+      `/vision/brain/progress?domain=${encodeURIComponent(domain)}${head ? `&head=${encodeURIComponent(head)}` : ''}`
+    );
+  }
+
   public async draftShiftHandover(date?: string): Promise<{
     success: boolean;
     data: { shiftDate: string; facts: Record<string, number | string>; draft: string; source: 'MODEL' | 'TEMPLATE'; rejectedNumbers: string[] };
