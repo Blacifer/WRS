@@ -89,6 +89,26 @@ export interface PartLedgerEntry {
   createdAt: string;
 }
 
+/**
+ * What a wagon of this type is supposed to carry — the baseline the ledger is
+ * measured against.
+ *
+ * `verified` is false until the shop has cited a source for the count. An
+ * unsourced expectation still helps (it names the positions), but it must
+ * never be presented as a fact, so it travels with the flag rather than
+ * without it.
+ */
+export interface ExpectedPart {
+  partKey: string;
+  category: string;
+  partName: string;
+  bogiePosition: string;
+  expectedQuantity: number;
+  quantitySource: string | null;
+  quantityVerified: boolean;
+  isMandatory: boolean;
+}
+
 export interface PartBalance {
   partKey: string;
   category: string;
@@ -105,6 +125,18 @@ export interface PartBalance {
   unaccounted: boolean;
   photographs: number;
   suggestion: string | null;
+  /** What the wagon type is supposed to carry here, when that is configured. */
+  expected: number | null;
+  /** False when the expected figure has no cited source behind it. */
+  expectedVerified: boolean;
+  /**
+   * Expected, but with nothing recorded against it at all.
+   *
+   * Distinct from outstanding, and the distinction is the point: outstanding
+   * means we watched it come off and not go back, which is a finding about the
+   * wagon. This means nobody looked, which is a finding about the record.
+   */
+  neverRecorded: boolean;
 }
 
 export interface Reconciliation {
@@ -114,7 +146,14 @@ export interface Reconciliation {
   totalBack: number;
   outstandingParts: PartBalance[];
   unaccountedParts: PartBalance[];
+  /** Expected positions with nothing recorded against them at all. */
+  neverRecordedParts: PartBalance[];
   parts: PartBalance[];
+  /** How much of the expected wagon the ledger actually covers, 0..1. */
+  coverage: number | null;
+  /** How many expected positions carry a cited source for their count. */
+  expectedVerifiedCount: number;
+  expectedTotal: number;
   /** Plain words for the gate panel and the certificate. */
   summary: string;
 }
@@ -130,6 +169,59 @@ export interface Reconciliation {
 export function partKeyFor(category: string, partName: string, bogiePosition?: string | null): string {
   const norm = (v: string) => v.trim().toUpperCase().replace(/\s+/g, '_').replace(/[^A-Z0-9_\-.]/g, '');
   return [norm(category), norm(partName), norm(bogiePosition || 'NONE')].join('|');
+}
+
+/**
+ * What a wagon of this type is supposed to carry.
+ *
+ * Read from checklist_config, which is the shop's own list, editable by the
+ * shop, with a cited standard against each line. It is deliberately not a
+ * table of our own: this workshop has already been given fourteen coupler
+ * items built from photographs of gauge boards it turned out not to use, and
+ * every wagon's exit gate was permanently blocked as a result. The lesson
+ * recorded in checklistTemplate.ts is that a photograph of a board is evidence
+ * a board exists, not evidence of what the shop does.
+ *
+ * DEFAULT rows fill in for a wagon type that has no list of its own, and are
+ * overridden line by line where the type does. A type with nothing configured
+ * returns an empty list, and the reconciliation then says plainly that it has
+ * no baseline rather than inventing one.
+ */
+export function expectedPartsFor(db: DatabaseSync, wagonType: string): ExpectedPart[] {
+  let rows: any[] = [];
+  try {
+    rows = db
+      .prepare(
+        `SELECT wagon_type, category, part_name, bogie_position, is_mandatory,
+                expected_quantity, quantity_source, quantity_verified
+         FROM checklist_config
+         WHERE wagon_type IN (?, 'DEFAULT')`
+      )
+      .all(wagonType) as any[];
+  } catch {
+    // A database predating the expected-quantity columns. No baseline is a
+    // valid state; a wrong one is not.
+    return [];
+  }
+
+  const byKey = new Map<string, ExpectedPart>();
+  for (const r of rows) {
+    const key = partKeyFor(r.category, r.part_name, r.bogie_position);
+    const isSpecific = r.wagon_type === wagonType;
+    // A line for this exact type beats the DEFAULT line for the same position.
+    if (byKey.has(key) && !isSpecific) continue;
+    byKey.set(key, {
+      partKey: key,
+      category: String(r.category),
+      partName: String(r.part_name),
+      bogiePosition: String(r.bogie_position || 'NONE'),
+      expectedQuantity: Math.max(1, Number(r.expected_quantity) || 1),
+      quantitySource: r.quantity_source ?? null,
+      quantityVerified: Number(r.quantity_verified) === 1,
+      isMandatory: Number(r.is_mandatory) === 1
+    });
+  }
+  return [...byKey.values()];
 }
 
 export class PartLedgerRepository {
@@ -203,7 +295,8 @@ export class PartLedgerRepository {
   reconcile(
     wagonNumber: string,
     storesLookup?: (partName: string) => { available: number; binLocation: string | null } | null,
-    standardLookup?: (partKey: string) => string | null
+    standardLookup?: (partKey: string) => string | null,
+    expectedParts?: ExpectedPart[]
   ): Reconciliation {
     const rows = this.db
       .prepare(
@@ -232,7 +325,11 @@ export class PartLedgerRepository {
         outstanding: 0,
         unaccounted: false,
         photographs: 0,
-        suggestion: null
+        suggestion: null,
+        // Filled in below from the expected list, when the wagon type has one.
+        expected: null,
+        expectedVerified: false,
+        neverRecorded: false
       };
       const qty = Number(r.qty) || 0;
       b.photographs += Number(r.photos) || 0;
@@ -244,8 +341,54 @@ export class PartLedgerRepository {
       byKey.set(key, b);
     }
 
+    /*
+     * Every position the wagon type is supposed to carry, whether or not
+     * anything has been recorded against it.
+     *
+     * This is what turns "nothing was recorded, so I cannot tell you" into
+     * "forty-three positions are expected and nothing has been recorded
+     * against any of them". The first is honest and useless; the second is
+     * honest and actionable.
+     */
+    const expectedByKey = new Map<string, ExpectedPart>();
+    for (const e of expectedParts || []) expectedByKey.set(e.partKey, e);
+
+    for (const [key, e] of expectedByKey) {
+      if (byKey.has(key)) continue;
+      byKey.set(key, {
+        partKey: key,
+        category: e.category,
+        partName: e.partName,
+        bogiePosition: e.bogiePosition,
+        removed: 0,
+        refitted: 0,
+        replaced: 0,
+        scrapped: 0,
+        notFitted: 0,
+        outstanding: 0,
+        unaccounted: false,
+        photographs: 0,
+        suggestion: null,
+        expected: e.expectedQuantity,
+        expectedVerified: e.quantityVerified,
+        neverRecorded: true
+      });
+    }
+
     const parts = [...byKey.values()];
     for (const b of parts) {
+      const e = expectedByKey.get(b.partKey);
+      b.expected = e ? e.expectedQuantity : b.expected ?? null;
+      b.expectedVerified = e ? e.quantityVerified : false;
+      /*
+       * Nothing at all recorded here. Deliberately not folded into
+       * `outstanding`: outstanding means we watched it come off and not go
+       * back, which is a finding about the WAGON. This means nobody looked,
+       * which is a finding about the RECORD, and a supervisor should be able
+       * to tell those two apart at a glance.
+       */
+      b.neverRecorded =
+        b.removed === 0 && b.refitted === 0 && b.replaced === 0 && b.scrapped === 0 && b.notFitted === 0;
       const accountedFor = b.refitted + b.replaced + b.scrapped + b.notFitted;
       b.outstanding = b.removed - accountedFor;
       /*
@@ -260,18 +403,51 @@ export class PartLedgerRepository {
 
     const outstandingParts = parts.filter((p) => p.outstanding > 0);
     const unaccountedParts = parts.filter((p) => p.unaccounted);
+    const neverRecordedParts = parts.filter((p) => p.neverRecorded && p.expected !== null);
     const totalRemoved = parts.reduce((n, p) => n + p.removed, 0);
     const totalBack = parts.reduce((n, p) => n + p.refitted + p.replaced, 0);
 
+    const expectedTotal = expectedByKey.size;
+    const covered = expectedTotal - neverRecordedParts.length;
+
     return {
       wagonNumber,
-      balanced: outstandingParts.length === 0 && unaccountedParts.length === 0,
+      /*
+       * A wagon is only balanced if every expected position was actually
+       * looked at. Calling a wagon balanced because the three positions
+       * somebody happened to record all add up — while forty others were never
+       * touched — is precisely the false assurance this whole feature exists
+       * to prevent.
+       */
+      balanced:
+        outstandingParts.length === 0 &&
+        unaccountedParts.length === 0 &&
+        neverRecordedParts.length === 0 &&
+        parts.length > 0,
       totalRemoved,
       totalBack,
       outstandingParts,
       unaccountedParts,
-      parts: parts.sort((a, b) => b.outstanding - a.outstanding || a.partName.localeCompare(b.partName)),
-      summary: summarise(parts, outstandingParts, unaccountedParts, totalRemoved, totalBack)
+      neverRecordedParts,
+      coverage: expectedTotal > 0 ? covered / expectedTotal : null,
+      expectedVerifiedCount: [...expectedByKey.values()].filter((e) => e.quantityVerified).length,
+      expectedTotal,
+      parts: parts.sort(
+        (a, b) =>
+          Number(b.unaccounted) - Number(a.unaccounted) ||
+          b.outstanding - a.outstanding ||
+          Number(b.neverRecorded) - Number(a.neverRecorded) ||
+          a.partName.localeCompare(b.partName)
+      ),
+      summary: summarise(
+        parts,
+        outstandingParts,
+        unaccountedParts,
+        neverRecordedParts,
+        totalRemoved,
+        totalBack,
+        expectedTotal
+      )
     };
   }
 
@@ -318,6 +494,13 @@ function suggestionFor(
       `Check the entries for this position before the gate.`
     );
   }
+  if (b.neverRecorded && b.expected !== null) {
+    return (
+      `Nothing has been recorded for this position. A ${b.bogiePosition.replace(/_/g, ' ').toLowerCase()} ` +
+      `is expected to carry ${b.expected}${b.expectedVerified ? '' : ' (count not yet sourced from the shop)'}. ` +
+      `Record what came off, or record that it was not disturbed.`
+    );
+  }
   if (b.outstanding <= 0) return null;
 
   const bits: string[] = [
@@ -344,18 +527,47 @@ function summarise(
   parts: PartBalance[],
   outstanding: PartBalance[],
   unaccounted: PartBalance[],
+  neverRecorded: PartBalance[],
   totalRemoved: number,
-  totalBack: number
+  totalBack: number,
+  expectedTotal: number
 ): string {
   if (parts.length === 0) {
     return (
-      'Nothing has been recorded coming off this wagon yet. ' +
-      'The ledger fills in during dismantling; until it does, it can say nothing ' +
-      'about whether anything is missing.'
+      'Nothing has been recorded coming off this wagon yet, and no expected parts list ' +
+      'is configured for its type. The ledger cannot say anything about whether ' +
+      'something is missing — which is not the same as saying nothing is.'
     );
+  }
+  /*
+   * The strongest version of the empty case, and the reason the expected list
+   * is worth having at all: a number of positions nobody has touched beats
+   * "cannot tell you", because it says how much is unknown.
+   */
+  if (expectedTotal > 0 && neverRecorded.length === expectedTotal) {
+    return (
+      `${expectedTotal} part position${expectedTotal === 1 ? ' is' : 's are'} expected on a wagon of this type, ` +
+      `and nothing has been recorded against any of them. This wagon has no parts record at all.`
+    );
+  }
+  if (neverRecorded.length > 0) {
+    const covered = expectedTotal - neverRecorded.length;
+    const base =
+      `${covered} of ${expectedTotal} expected position${expectedTotal === 1 ? '' : 's'} have been recorded. ` +
+      `${neverRecorded.length} ${neverRecorded.length === 1 ? 'has' : 'have'} nothing against ` +
+      `${neverRecorded.length === 1 ? 'it' : 'them'} at all: ` +
+      neverRecorded.slice(0, 4).map((p) => `${p.partName} (${p.bogiePosition})`).join('; ') +
+      (neverRecorded.length > 4 ? `, and ${neverRecorded.length - 4} more.` : '.');
+    const rest =
+      outstanding.length > 0
+        ? ` Separately, ${outstanding.reduce((t, p) => t + p.outstanding, 0)} recorded coming off ` +
+          'and not going back on.'
+        : '';
+    return base + rest;
   }
   if (outstanding.length === 0 && unaccounted.length === 0) {
     return (
+      (expectedTotal > 0 ? `All ${expectedTotal} expected positions were recorded. ` : '') +
       `${totalRemoved} part${totalRemoved === 1 ? '' : 's'} came off and every one is accounted for — ` +
       `${totalBack} refitted or replaced, the rest recorded as scrapped or deliberately not refitted, ` +
       `each with a reason and a name against it.`

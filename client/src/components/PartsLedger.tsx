@@ -83,6 +83,7 @@ export function PartsLedger({ wagonNumber, stage, lang, canRecord }: Props) {
   const [bogiePosition, setBogiePosition] = useState(POSITIONS[0]);
   const [quantity, setQuantity] = useState(1);
   const [reason, setReason] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -128,6 +129,19 @@ export function PartsLedger({ wagonNumber, stage, lang, canRecord }: Props) {
     }
   }, [wagonNumber, category, partName, bogiePosition, event, quantity, reason, load]);
 
+  /*
+   * Every position this wagon type is supposed to have. Ones with nothing
+   * recorded come first — those are the ones a fitter still has to get to.
+   */
+  const expectedNames = Array.from(
+    new Set(
+      (recon?.parts || [])
+        .filter((p) => p.expected !== null)
+        .sort((a, b) => Number(b.neverRecorded) - Number(a.neverRecorded))
+        .map((p) => p.partName)
+    )
+  );
+
   const needsReason = NEEDS_REASON.includes(event);
   const nothingRecorded = !!recon && recon.parts.length === 0;
 
@@ -169,12 +183,64 @@ export function PartsLedger({ wagonNumber, stage, lang, canRecord }: Props) {
             {recon && recon.parts.length > 0 && (
               <p className="text-[11px] font-mono text-ink-muted mt-2">
                 {recon.totalRemoved} off · {recon.totalBack} back on ·{' '}
-                {recon.parts.length} position{recon.parts.length === 1 ? '' : 's'} tracked
+                {recon.coverage !== null
+                  ? `${Math.round(recon.coverage * 100)}% of ${recon.expectedTotal} expected positions covered`
+                  : `${recon.parts.length} position${recon.parts.length === 1 ? '' : 's'} tracked`}
+              </p>
+            )}
+            {/*
+              * How much of the baseline is actually sourced.
+              *
+              * An expected count nobody has cited is a recollection, and a
+              * recollection printed on a release certificate becomes a fact
+              * nobody can trace back. So the screen says how many of the counts
+              * came from somewhere, rather than presenting them all alike.
+              */}
+            {recon && recon.expectedTotal > 0 && recon.expectedVerifiedCount < recon.expectedTotal && (
+              <p className="text-[11px] text-ink-muted mt-1">
+                {isHi
+                  ? `${recon.expectedTotal} में से ${recon.expectedVerifiedCount} गिनती का स्रोत दर्ज है।`
+                  : `${recon.expectedVerifiedCount} of ${recon.expectedTotal} expected counts have a source cited. The rest default to one each — set them in the checklist configuration, with where the figure comes from.`}
               </p>
             )}
           </>
         )}
       </div>
+
+      {/*
+        * Positions the wagon is supposed to have that nobody has touched.
+        *
+        * Shown apart from the outstanding parts deliberately: an outstanding
+        * part is a statement about the WAGON, and this is a statement about the
+        * RECORD. Only one of them is fixed by walking to the wagon.
+        */}
+      {recon && recon.neverRecordedParts.length > 0 && (
+        <details className="rounded-control border border-warn bg-warn/10 p-3" data-testid="parts-never-recorded">
+          <summary className="text-sm font-bold text-white cursor-pointer">
+            {isHi
+              ? `${recon.neverRecordedParts.length} स्थान पर कुछ दर्ज नहीं`
+              : `${recon.neverRecordedParts.length} expected position${recon.neverRecordedParts.length === 1 ? '' : 's'} with nothing recorded`}
+          </summary>
+          <p className="text-xs text-ink-body mt-2 leading-relaxed">
+            {isHi
+              ? 'इनका अभिलेख नहीं है — इसका अर्थ यह नहीं कि कुछ गायब नहीं है।'
+              : 'Nothing has been recorded against these. That is not evidence that nothing is missing — it is the absence of evidence either way.'}
+          </p>
+          <ul className="mt-2 space-y-1">
+            {recon.neverRecordedParts.map((p) => (
+              <li key={p.partKey} className="text-xs text-ink-body">
+                <span className="font-bold">{p.partName}</span>{' '}
+                <span className="font-mono text-ink-muted">{p.bogiePosition.replace(/_/g, ' ')}</span>
+                {p.expected !== null && (
+                  <span className="text-ink-muted">
+                    {' '}— {p.expected} expected{p.expectedVerified ? '' : ' (count not sourced)'}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       {/* Anything outstanding, with what to do about it. */}
       {recon && (recon.outstandingParts.length > 0 || recon.unaccountedParts.length > 0) && (
@@ -245,15 +311,61 @@ export function PartsLedger({ wagonNumber, stage, lang, canRecord }: Props) {
               </select>
             </label>
 
+            {/*
+              * The wagon's own expected positions, offered rather than typed.
+              *
+              * This is not a convenience. A ledger entry only counts towards a
+              * position if its part name matches the configured line, and the
+              * shop has two vocabularies for the same object: the stores call
+              * a wedge "CASNUB Cast Steel Friction Wedge (RDSO SK-77579)" and
+              * the checklist calls it something shorter. Typed free-hand, a
+              * fitter's entry silently becomes a forty-fourth position while
+              * all forty-three expected ones still read as never recorded —
+              * which is exactly what happened the first time this was driven.
+              *
+              * Picking from the list makes the join the default. It stays a
+              * text field because a genuinely new part must still be
+              * recordable; the list guides rather than restricts.
+              */}
             <label className="text-xs font-bold text-ink-muted sm:col-span-2">
               {isHi ? 'पुर्जे का नाम' : 'Part'}
               <input
                 value={partName}
                 onChange={(e) => setPartName(e.target.value)}
+                onFocus={() => setShowSuggestions(true)}
+                list="parts-ledger-expected"
                 data-testid="part-name-input"
-                placeholder={isHi ? 'जैसे Friction Wedge' : 'e.g. Friction Wedge'}
+                placeholder={
+                  isHi ? 'सूची से चुनें या लिखें' : 'Pick one of this wagon type\'s parts, or type a new one'
+                }
                 className="mt-1 w-full bg-page border border-line rounded-control px-2 py-2 text-sm text-white"
               />
+              <datalist id="parts-ledger-expected">
+                {expectedNames.map((n) => (
+                  <option key={n} value={n} />
+                ))}
+              </datalist>
+              {showSuggestions && expectedNames.length > 0 && !partName && (
+                <div className="mt-1.5 flex flex-wrap gap-1.5" data-testid="part-name-suggestions">
+                  {expectedNames.slice(0, 8).map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => {
+                        setPartName(n);
+                        const match = recon?.parts.find((p) => p.partName === n);
+                        if (match) {
+                          setBogiePosition(match.bogiePosition);
+                          setCategory(match.category);
+                        }
+                      }}
+                      className="px-2 py-1 rounded-control border border-line text-[11px] text-ink-body"
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              )}
             </label>
 
             <label className="text-xs font-bold text-ink-muted">

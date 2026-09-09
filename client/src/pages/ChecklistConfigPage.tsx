@@ -69,7 +69,18 @@ export const ChecklistConfigPage: React.FC<ChecklistConfigPageProps> = ({ lang }
     partName: '',
     bogiePosition: 'BODY',
     isMandatory: true,
-    standardReference: ''
+    standardReference: '',
+    /*
+     * How many physical pieces this line covers, and where that figure comes
+     * from.
+     *
+     * One is the default because it is the safe direction: right for genuinely
+     * single parts, and where it is wrong it under-counts, which shows a
+     * position looking complete rather than a wagon falsely accused of missing
+     * parts. The parts ledger measures wagons against these numbers.
+     */
+    expectedQuantity: 1,
+    quantitySource: ''
   });
 
   const load = async (type: string) => {
@@ -123,7 +134,24 @@ export const ChecklistConfigPage: React.FC<ChecklistConfigPageProps> = ({ lang }
     if (!proposals) return;
     const items = proposals
       .filter((p) => chosen[p.key])
-      .map((p) => ({ partName: p.partName, category: chosen[p.key].category, bogiePosition: 'NONE', isMandatory: chosen[p.key].isMandatory, standardReference: p.standardReference }));
+      /*
+       * The manual's own quantity, carried through with its page citation.
+       *
+       * A must-change row in WMM 2.0 states how many of a part a wagon has, and
+       * that page reference is the best possible source for the count — better
+       * than anything typed from memory. A proposal without one falls back to
+       * one, unsourced, which the ledger then flags rather than trusting.
+       */
+      .map((p) => ({
+        partName: p.partName,
+        category: chosen[p.key].category,
+        bogiePosition: 'NONE',
+        isMandatory: chosen[p.key].isMandatory,
+        standardReference: p.standardReference,
+        expectedQuantity: p.qtyPerWagon && p.qtyPerWagon > 0 ? p.qtyPerWagon : 1,
+        quantitySource:
+          p.qtyPerWagon && p.qtyPerWagon > 0 ? `WMM 2.0 p.${p.page} — ${p.qtyPerWagon} per wagon` : null
+      }));
     if (items.length === 0) return;
     setProposing(true); setError(null);
     try {
@@ -162,13 +190,15 @@ export const ChecklistConfigPage: React.FC<ChecklistConfigPageProps> = ({ lang }
         partName: draft.partName.trim(),
         bogiePosition: draft.bogiePosition,
         isMandatory: draft.isMandatory,
+        expectedQuantity: draft.expectedQuantity,
+        quantitySource: draft.quantitySource.trim() || null,
         standardReference: draft.standardReference.trim()
       });
       setNotice(t(
         `"${draft.partName.trim()}" saved. Wagons registered from now on will be checked against it.`,
         `"${draft.partName.trim()}" सहेजा गया।`
       ));
-      setDraft({ ...draft, partName: '', standardReference: '' });
+      setDraft({ ...draft, partName: '', standardReference: '', expectedQuantity: 1, quantitySource: '' });
       await load(wagonType);
     } catch (err: any) {
       setError(err.message || 'Save failed');
@@ -382,6 +412,51 @@ export const ChecklistConfigPage: React.FC<ChecklistConfigPageProps> = ({ lang }
               {t(
                 'A source does not make a check right. It makes it answerable — somebody can read the clause and disagree with it.',
                 'स्रोत जाँच को सही नहीं बनाता — वह उसे जवाबदेह बनाता है।'
+              )}
+            </span>
+          </label>
+
+          {/*
+            * How many, and where the number comes from.
+            *
+            * The parts ledger measures a wagon against these counts, so this is
+            * the difference between "was anything missing" being answerable and
+            * not. One is the default and the safe direction — right for
+            * genuinely single parts, and where it is wrong it under-counts,
+            * which shows a position looking complete rather than a wagon
+            * falsely accused of missing parts.
+            */}
+          <label className="block">
+            <span className="text-[11px] font-bold text-ink-muted">
+              {t('How many on a wagon', 'एक वैगन पर कितने')}
+            </span>
+            <input
+              type="number"
+              min={1}
+              data-testid="config-expected-quantity"
+              value={draft.expectedQuantity}
+              onChange={(e) =>
+                setDraft({ ...draft, expectedQuantity: Math.max(1, Number(e.target.value) || 1) })
+              }
+              className="w-full min-h-[44px] mt-1 bg-raised border border-line rounded-control px-3 text-sm text-white"
+            />
+          </label>
+
+          <label className="block">
+            <span className="text-[11px] font-bold text-ink-muted">
+              {t('Where that count comes from', 'यह गिनती कहाँ से आई')}
+            </span>
+            <input
+              data-testid="config-quantity-source"
+              value={draft.quantitySource}
+              onChange={(e) => setDraft({ ...draft, quantitySource: e.target.value })}
+              placeholder={t('e.g. WMM 2.0 p.118 — 4 per wagon', 'जैसे WMM 2.0 p.118')}
+              className="w-full min-h-[44px] mt-1 bg-raised border border-line rounded-control px-3 text-sm text-white"
+            />
+            <span className="text-[10.5px] text-ink-muted mt-1 block leading-snug">
+              {t(
+                'Optional, but a count with no source is used and never presented as a fact — the gate and the certificate mark it unsourced. The clause above says which rule governs the part, not how many of them a wagon has.',
+                'वैकल्पिक — बिना स्रोत की गिनती को तथ्य के रूप में नहीं दिखाया जाता।'
               )}
             </span>
           </label>

@@ -20,7 +20,7 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert';
 import { createApp } from '../src/app.ts';
 import { getDatabase } from '../src/db/connection.ts';
-import { partKeyFor, PartLedgerRepository } from '../src/db/partLedgerRepository.ts';
+import { partKeyFor, PartLedgerRepository, expectedPartsFor } from '../src/db/partLedgerRepository.ts';
 import type { ExpressApp } from '../src/framework/index.ts';
 
 async function call(
@@ -83,9 +83,17 @@ describe('The parts ledger', () => {
     assert.strictEqual(res.body.data.wagonNumber, WAGON);
   });
 
-  it('TC-PL-02: an empty ledger says it cannot answer, rather than saying nothing is missing', async () => {
-    // The dangerous failure would be a wagon with no recorded dismantling
-    // reading as "balanced" at the gate.
+  it('TC-PL-02: a fresh install has no baseline, says so, and is never balanced', async () => {
+    /*
+     * checklist_config is empty on a new installation, so this is what the
+     * shop genuinely sees on day one — before anybody has configured what a
+     * wagon of this type carries.
+     *
+     * The dangerous failure would be reading as "balanced" at the gate. It
+     * must say the opposite: that it has no basis for an opinion, which is not
+     * the same as an opinion that nothing is missing. TC-PL-16 covers the same
+     * empty ledger once a baseline exists, where the answer gets stronger.
+     */
     const res = await call(
       app,
       'GET',
@@ -94,8 +102,11 @@ describe('The parts ledger', () => {
       auth(token)
     );
     assert.strictEqual(res.status, 200);
-    assert.match(res.body.data.summary, /Nothing has been recorded coming off/i);
-    assert.match(res.body.data.summary, /can say nothing/i);
+    assert.strictEqual(res.body.data.balanced, false);
+    assert.strictEqual(res.body.data.expectedTotal, 0);
+    assert.strictEqual(res.body.data.coverage, null);
+    assert.match(res.body.data.summary, /cannot say anything about whether something is missing/i);
+    assert.match(res.body.data.summary, /not the same as saying nothing is/i);
   });
 
   it('TC-PL-03: four off and three back leaves one outstanding, named', async () => {
@@ -274,5 +285,165 @@ describe('The parts ledger', () => {
       partKeyFor('friction wedges', '  Friction  Wedge ', 'bogie_1')
     );
     assert.strictEqual(repo.reconcile(WAGON).parts.length, 0);
+  });
+});
+
+describe('Measured against what the wagon should have', () => {
+  let app: ExpressApp;
+  let token: string;
+
+  /** Two positions the shop has configured for this wagon type. */
+  function configureExpected(counts: Array<[string, string, number, string | null]>) {
+    const db = getDatabase();
+    let n = 0;
+    for (const [partName, position, qty, source] of counts) {
+      db.prepare(
+        `INSERT OR REPLACE INTO checklist_config
+           (id, wagon_type, category, part_name, bogie_position, is_mandatory,
+            standard_reference, expected_quantity, quantity_source, quantity_verified)
+         VALUES (?, 'BOXNHL', 'FRICTION_WEDGES', ?, ?, 1, 'WMM 2.0 §309B', ?, ?, ?)`
+      ).run(`cc_test_${n++}`, partName, position, qty, source, source ? 1 : 0);
+    }
+  }
+
+  beforeEach(async () => {
+    app = createApp(':memory:');
+    token = await signIn(app, 'inspector1');
+    await registerWagon(app, token);
+    // Start from a clean baseline: the seeded template would otherwise put
+    // forty other positions in every assertion below.
+    getDatabase().prepare("DELETE FROM checklist_config").run();
+  });
+
+  it('TC-PL-15: with no expected list, it says it has no baseline rather than inventing one', async () => {
+    const res = await call(app, 'GET', `/api/wagons/${enc}/parts/reconciliation`, undefined, auth(token));
+    assert.strictEqual(res.body.data.expectedTotal, 0);
+    assert.strictEqual(res.body.data.coverage, null);
+    assert.match(res.body.data.summary, /no expected parts list is configured/i);
+    // The critical half: an absence of evidence must never read as evidence of
+    // absence.
+    assert.match(res.body.data.summary, /not the same as saying nothing is/i);
+  });
+
+  it('TC-PL-16: an untouched wagon reports how much is unknown, not that it cannot tell', async () => {
+    // This is the whole reason the expected list is worth having. "Cannot tell
+    // you" is honest and useless; "43 positions, nothing recorded against any"
+    // is honest and actionable.
+    configureExpected([
+      ['Friction Wedge', 'BOGIE_1', 4, 'WMM 2.0 §309B'],
+      ['Friction Wedge', 'BOGIE_2', 4, 'WMM 2.0 §309B']
+    ]);
+    const res = await call(app, 'GET', `/api/wagons/${enc}/parts/reconciliation`, undefined, auth(token));
+    assert.strictEqual(res.body.data.expectedTotal, 2);
+    assert.strictEqual(res.body.data.neverRecordedParts.length, 2);
+    assert.strictEqual(res.body.data.coverage, 0);
+    assert.strictEqual(res.body.data.balanced, false);
+    assert.match(res.body.data.summary, /2 part positions are expected/i);
+    assert.match(res.body.data.summary, /no parts record at all/i);
+  });
+
+  it('TC-PL-17: a wagon whose recorded parts balance is NOT balanced if positions were never touched', async () => {
+    /*
+     * The false assurance this exists to prevent. Bogie 1 adds up perfectly.
+     * Without the expected list the wagon would read "balanced" while nobody
+     * had so much as looked at bogie 2.
+     */
+    configureExpected([
+      ['Friction Wedge', 'BOGIE_1', 4, 'WMM 2.0 §309B'],
+      ['Friction Wedge', 'BOGIE_2', 4, 'WMM 2.0 §309B']
+    ]);
+    await call(app, 'POST', `/api/wagons/${enc}/parts`, wedge('REMOVED', { quantity: 4 }), auth(token));
+    await call(app, 'POST', `/api/wagons/${enc}/parts`, wedge('REFITTED', { quantity: 4 }), auth(token));
+
+    const res = await call(app, 'GET', `/api/wagons/${enc}/parts/reconciliation`, undefined, auth(token));
+    assert.strictEqual(res.body.data.outstandingParts.length, 0, 'bogie 1 does balance');
+    assert.strictEqual(res.body.data.balanced, false, 'but the wagon does not');
+    assert.strictEqual(res.body.data.neverRecordedParts.length, 1);
+    assert.strictEqual(res.body.data.neverRecordedParts[0].bogiePosition, 'BOGIE_2');
+    assert.strictEqual(res.body.data.coverage, 0.5);
+    assert.match(res.body.data.summary, /1 of 2 expected positions/i);
+  });
+
+  it('TC-PL-18: covering every expected position is what makes a wagon balanced', async () => {
+    configureExpected([
+      ['Friction Wedge', 'BOGIE_1', 4, 'WMM 2.0 §309B'],
+      ['Friction Wedge', 'BOGIE_2', 4, 'WMM 2.0 §309B']
+    ]);
+    for (const position of ['BOGIE_1', 'BOGIE_2']) {
+      await call(app, 'POST', `/api/wagons/${enc}/parts`, { ...wedge('REMOVED', { quantity: 4 }), bogiePosition: position }, auth(token));
+      await call(app, 'POST', `/api/wagons/${enc}/parts`, { ...wedge('REFITTED', { quantity: 4 }), bogiePosition: position }, auth(token));
+    }
+    const res = await call(app, 'GET', `/api/wagons/${enc}/parts/reconciliation`, undefined, auth(token));
+    assert.strictEqual(res.body.data.balanced, true);
+    assert.strictEqual(res.body.data.coverage, 1);
+    assert.match(res.body.data.summary, /All 2 expected positions were recorded/i);
+  });
+
+  it('TC-PL-19: an unsourced count is used but never presented as a fact', async () => {
+    // The same rule SPRING_COUNTS follows. A count nobody has cited is a
+    // recollection, and a recollection printed on a certificate becomes a fact
+    // nobody can trace.
+    configureExpected([['Friction Wedge', 'BOGIE_1', 4, null]]);
+    const res = await call(app, 'GET', `/api/wagons/${enc}/parts/reconciliation`, undefined, auth(token));
+    assert.strictEqual(res.body.data.expectedTotal, 1);
+    assert.strictEqual(res.body.data.expectedVerifiedCount, 0);
+    const p = res.body.data.neverRecordedParts[0];
+    assert.strictEqual(p.expectedVerified, false);
+    assert.match(p.suggestion, /count not yet sourced from the shop/i);
+  });
+
+  it('TC-PL-20: every existing configured line defaults to one, marked unsourced', async () => {
+    // We do not fill these in ourselves. This shop already had fourteen coupler
+    // items built from photographs of gauge boards it did not use, and every
+    // exit gate was permanently blocked as a result.
+    const db = getDatabase();
+    db.prepare(
+      `INSERT INTO checklist_config (id, wagon_type, category, part_name, bogie_position, is_mandatory)
+       VALUES ('cc_legacy', 'BOXNHL', 'BRAKE_SYSTEM', 'Brake Beam', 'BOGIE_1', 1)`
+    ).run();
+    const expected = expectedPartsFor(db, 'BOXNHL');
+    const beam = expected.find((e) => e.partName === 'Brake Beam')!;
+    assert.strictEqual(beam.expectedQuantity, 1);
+    assert.strictEqual(beam.quantityVerified, false);
+    assert.strictEqual(beam.quantitySource, null);
+  });
+
+  it('TC-PL-21: a line for this wagon type overrides the DEFAULT line for the same position', async () => {
+    const db = getDatabase();
+    db.prepare(
+      `INSERT INTO checklist_config (id, wagon_type, category, part_name, bogie_position,
+         is_mandatory, expected_quantity, quantity_source, quantity_verified)
+       VALUES ('cc_def', 'DEFAULT', 'FRICTION_WEDGES', 'Friction Wedge', 'BOGIE_1', 1, 4, 'generic', 1)`
+    ).run();
+    db.prepare(
+      `INSERT INTO checklist_config (id, wagon_type, category, part_name, bogie_position,
+         is_mandatory, expected_quantity, quantity_source, quantity_verified)
+       VALUES ('cc_spec', 'BOXNHL', 'FRICTION_WEDGES', 'Friction Wedge', 'BOGIE_1', 1, 8, 'BOXNHL specific', 1)`
+    ).run();
+
+    const expected = expectedPartsFor(db, 'BOXNHL');
+    assert.strictEqual(expected.length, 1, 'one position, not two');
+    assert.strictEqual(expected[0].expectedQuantity, 8);
+    assert.strictEqual(expected[0].quantitySource, 'BOXNHL specific');
+  });
+
+  it('TC-PL-22: the gate reports unrecorded positions as their own finding', async () => {
+    // Separate from an outstanding part deliberately: one is a statement about
+    // the wagon, the other about the record, and only one is fixed by walking
+    // to the wagon.
+    configureExpected([
+      ['Friction Wedge', 'BOGIE_1', 4, 'WMM 2.0 §309B'],
+      ['Friction Wedge', 'BOGIE_2', 4, 'WMM 2.0 §309B']
+    ]);
+    const res = await call(app, 'GET', `/api/wagons/${enc}/gate/status`, undefined, auth(token));
+    assert.strictEqual(res.status, 200, JSON.stringify(res.body));
+    const finding = (res.body.data.advisoryDetails || []).find(
+      (a: any) => a.id === 'parts_never_recorded'
+    );
+    assert.ok(finding, 'the gate must name unrecorded positions');
+    assert.match(finding.description, /nothing recorded against/i);
+    assert.match(finding.remediationAction, /not evidence that nothing is missing/i);
+    // Advisory during the shadow run, as every other check was introduced.
+    assert.strictEqual(finding.severity, 'ADVISORY');
   });
 });

@@ -69,20 +69,42 @@ if (reg !== 201 && reg !== 200) {
 }
 
 /*
- * Use a part the shop's own stores actually carry, rather than planting one.
- * The suggestion is only worth checking if the quantity and bin in it were
- * read from a real row.
+ * Pick a part from the wagon type's OWN expected list.
+ *
+ * Not from the stores, which was the first attempt and was wrong in an
+ * instructive way. The stores call a wedge "CASNUB Cast Steel Friction Wedge
+ * (RDSO SK-77579)" and the checklist calls it something shorter, so a ledger
+ * entry typed from the stores vocabulary became a forty-fourth position while
+ * all forty-three expected ones still read as never recorded. The shop would
+ * have hit that on its first morning. The screen now offers the expected
+ * positions, and this drives what the screen offers.
  */
-const PART = await page.evaluate(async () => {
-  const r = await fetch('/api/inventory', {
+const expected = await page.evaluate(async ({ wagonNumber }) => {
+  const r = await fetch(`/api/wagons/${wagonNumber}/parts/reconciliation`, {
     headers: { authorization: `Bearer ${localStorage.getItem('wrs_token')}` }
   });
   const b = await r.json().catch(() => null);
-  const list = b?.data?.parts || b?.data || [];
-  const wedge = (Array.isArray(list) ? list : []).find((p) => /wedge/i.test(p.partName || ''));
-  return wedge?.partName || 'Friction Wedge';
-});
-console.log(`Using a part the stores really carry: ${PART}`);
+  return {
+    total: b?.data?.expectedTotal ?? 0,
+    first: b?.data?.parts?.find((p) => p.expected !== null) ?? null
+  };
+}, { wagonNumber: WAGON });
+
+if (!expected.first) {
+  console.error(
+    'This wagon type has no configured parts list, so there is no baseline to drive against.\n' +
+      'Configure one in Checklist Configuration first.'
+  );
+  process.exit(1);
+}
+
+const PART = expected.first.partName;
+const POSITION = expected.first.bogiePosition;
+const CATEGORY = expected.first.category;
+console.log(
+  `This wagon type expects ${expected.total} positions. Driving against one of them: ` +
+    `${PART} (${POSITION}).`
+);
 
 /*
  * Open the wagon the way an inspector does.
@@ -143,7 +165,7 @@ async function readSummary() {
 // 1. Nothing recorded.
 const empty = await readSummary();
 console.log(`1. With nothing recorded, it says:\n   "${empty.split('\n')[0]}"`);
-if (!/can say nothing|Nothing has been recorded/i.test(empty)) {
+if (!/can say nothing|Nothing has been recorded|no parts record at all/i.test(empty)) {
   console.error('   FAIL — an empty ledger must not read as "nothing is missing".');
   process.exit(1);
 }
@@ -151,6 +173,10 @@ console.log('   Correct: silence is not balance, and it says so.\n');
 
 async function record(event, part, qty, reason) {
   await page.click(`[data-testid="part-event-${event}"]`);
+  // Category and position are part of the identity of a position, so they are
+  // set explicitly rather than left on whatever the form defaulted to.
+  await page.selectOption('select >> nth=0', CATEGORY).catch(() => {});
+  await page.selectOption('select >> nth=1', POSITION).catch(() => {});
   await page.fill('[data-testid="part-name-input"]', part);
   await page.fill('[data-testid="part-quantity-input"]', String(qty));
   if (reason) await page.fill('[data-testid="part-reason-input"]', reason);
@@ -179,7 +205,14 @@ const suggestion = await page
   .catch(() => '');
 console.log(`   Suggestion: "${suggestion.split('\n').slice(1).join(' ').trim()}"`);
 
-const namesOutstanding = short.includes(PART) && /ha(s|ve) not gone back on/i.test(short);
+/*
+ * The summary now leads with coverage, because a wagon where one position
+ * balances and forty-two were never touched is not a balanced wagon. The
+ * outstanding part is named in the suggestion beside it.
+ */
+const namesOutstanding =
+  /of \d+ expected positions have been recorded/i.test(short) &&
+  /1 recorded coming off and not going back on|ha(s|ve) not gone back on/i.test(short);
 const namesStores = /Stores holds/i.test(suggestion);
 if (!namesOutstanding) {
   console.error('   FAIL — the outstanding part must be named.');
@@ -193,8 +226,18 @@ await record('NOT_FITTED', PART, 1, 'Condemned; replacement on indent IND-2291.'
 
 const closed = await readSummary();
 console.log(`   "${closed.split('\n')[0]}"`);
-const balanced = /every one is accounted for/i.test(closed);
-console.log(`   Balanced: ${balanced ? 'yes' : 'no'}\n`);
+/*
+ * This position now balances. The WAGON does not, and must not: the other
+ * expected positions have still never been touched. That distinction is the
+ * whole point of measuring against what the wagon should have, so it is what
+ * is asserted here rather than a green tick.
+ */
+const positionClosed = !/1 recorded coming off and not going back on/i.test(closed);
+const wagonStillOpen = /of \d+ expected positions have been recorded/i.test(closed);
+console.log(`   This position now balances: ${positionClosed ? 'yes' : 'no'}`);
+console.log(
+  `   The wagon is still open, because other positions were never touched: ${wagonStillOpen ? 'yes' : 'no'}\n`
+);
 
 // 4. Every entry is still there, individually.
 await page.click('[data-testid="parts-history-toggle"]');
@@ -211,14 +254,17 @@ Failed API calls:  ${failedCalls.filter((c) => !/inventory/.test(c)).join('\n  '
 
 const ok =
   namesOutstanding &&
-  balanced &&
+  positionClosed &&
+  wagonStillOpen &&
   rows === 3 &&
   consoleErrors.length === 0 &&
   failedCalls.filter((c) => !/inventory/.test(c)).length === 0;
 
 console.log(
   ok
-    ? 'PASS — an empty ledger admits it, a short one names the part, and a reason closes it.'
+    ? 'PASS — an empty ledger says how much is unknown, a short one names the part and where\n' +
+      '       the spare is, a reason closes the position, and the WAGON stays open while other\n' +
+      '       expected positions have never been touched.'
     : 'FAIL — see above.'
 );
 process.exit(ok ? 0 : 1);

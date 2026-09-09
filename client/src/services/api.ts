@@ -692,6 +692,14 @@ export class ApiClient {
     bogiePosition?: string;
     isMandatory: boolean;
     standardReference: string;
+    /** How many physical pieces this line covers. Defaults to one. */
+    expectedQuantity?: number;
+    /**
+     * Where that count comes from. Without it the count is still used, but it
+     * is never presented as a fact — the parts ledger marks it unsourced and
+     * the certificate footnotes it.
+     */
+    quantitySource?: string | null;
   }): Promise<{ success: boolean; message: string }> {
     return this.request<{ success: boolean; message: string }>('/checklist/config', {
       method: 'POST',
@@ -1405,7 +1413,7 @@ export class ApiClient {
   }
 
   /** Accept several proposed lines at once. Each must cite a source or is refused alone. */
-  public async bulkUpsertChecklistConfig(wagonType: string, items: Array<{ partName: string; category: string; bogiePosition?: string; isMandatory?: boolean; standardReference: string }>): Promise<{
+  public async bulkUpsertChecklistConfig(wagonType: string, items: Array<{ partName: string; category: string; bogiePosition?: string; isMandatory?: boolean; standardReference: string; expectedQuantity?: number; quantitySource?: string | null }>): Promise<{
     success: boolean; data: { accepted: string[]; refused: Array<{ partName: string; reason: string }> };
   }> {
     return this.request('/checklist/config/bulk', { method: 'POST', body: JSON.stringify({ wagonType, items }) });
@@ -1603,6 +1611,12 @@ export interface PartBalance {
   photographs: number;
   /** What to do next, assembled from the ledger, stores and the cited standard. */
   suggestion: string | null;
+  /** What the wagon type is supposed to carry here, when that is configured. */
+  expected: number | null;
+  /** False when the expected figure has no cited source behind it. */
+  expectedVerified: boolean;
+  /** Expected, but with nothing recorded against it at all. */
+  neverRecorded: boolean;
 }
 
 export interface PartReconciliation {
@@ -1612,7 +1626,13 @@ export interface PartReconciliation {
   totalBack: number;
   outstandingParts: PartBalance[];
   unaccountedParts: PartBalance[];
+  /** Expected positions with nothing recorded against them at all. */
+  neverRecordedParts: PartBalance[];
   parts: PartBalance[];
+  /** How much of the expected wagon the ledger covers, 0..1, or null with no baseline. */
+  coverage: number | null;
+  expectedVerifiedCount: number;
+  expectedTotal: number;
   summary: string;
 }
 

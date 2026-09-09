@@ -11,7 +11,7 @@ import { WagonRepository } from '../db/wagonRepository.ts';
 import { InspectionRepository } from '../db/repository.ts';
 import { ComponentRepository } from '../db/componentRepository.ts';
 import { getDatabase } from '../db/connection.ts';
-import { PartLedgerRepository } from '../db/partLedgerRepository.ts';
+import { PartLedgerRepository, expectedPartsFor } from '../db/partLedgerRepository.ts';
 import qrcode from 'qrcode-generator';
 import { SIGNATURE_ALGORITHM, certificateKeyFingerprint } from './certificateSigning.ts';
 
@@ -180,7 +180,12 @@ export class CertificateGenerator {
      */
     let reconciliation: any = null;
     try {
-      reconciliation = new PartLedgerRepository(getDatabase()).reconcile(wagon.wagonNumber);
+      reconciliation = new PartLedgerRepository(getDatabase()).reconcile(
+        wagon.wagonNumber,
+        undefined,
+        undefined,
+        expectedPartsFor(getDatabase(), wagon.wagonType || 'DEFAULT')
+      );
     } catch {
       // A database predating the ledger. The certificate still issues; the
       // section below says plainly that no ledger was kept.
@@ -707,17 +712,21 @@ export class CertificateGenerator {
                  <th style="width: 7%;">Replaced</th>
                  <th style="width: 7%;">Scrapped</th>
                  <th style="width: 9%;">Not refitted</th>
+                 <th style="width: 7%;">Expected</th>
                  <th style="width: 13%;">Outstanding</th>
                </tr>
              </thead>
              <tbody>
                ${reconciliation.parts
                  .map((b: any) => {
-                   const cls = b.outstanding > 0 || b.unaccounted ? 'status-fail' : 'status-pass';
+                   const cls =
+                     b.outstanding > 0 || b.unaccounted || b.neverRecorded ? 'status-fail' : 'status-pass';
                    const state = b.unaccounted
                      ? `${Math.abs(b.outstanding)} MORE BACK THAN OFF`
                      : b.outstanding > 0
                      ? `${b.outstanding} OUTSTANDING`
+                     : b.neverRecorded
+                     ? 'NOTHING RECORDED'
                      : 'ACCOUNTED FOR';
                    return `<tr>
                      <td style="font-size: 10px;">${escapeHtml(String(b.category || '').replace(/_/g, ' '))}</td>
@@ -728,12 +737,21 @@ export class CertificateGenerator {
                      <td style="font-size: 10px;">${b.replaced}</td>
                      <td style="font-size: 10px;">${b.scrapped}</td>
                      <td style="font-size: 10px;">${b.notFitted}</td>
+                     <td style="font-size: 10px;">${b.expected === null ? '—' : `${b.expected}${b.expectedVerified ? '' : '*'}`}</td>
                      <td><span class="${cls}">${escapeHtml(state)}</span></td>
                    </tr>`;
                  })
                  .join('')}
              </tbody>
-           </table>`
+           </table>
+           ${
+             reconciliation.expectedVerifiedCount < reconciliation.expectedTotal
+               ? `<p style="font-size: 9px; color: #64748b; margin: 4px 0 0 0;">
+                    * Expected count has no cited source and defaults to one. ${reconciliation.expectedVerifiedCount}
+                    of ${reconciliation.expectedTotal} expected counts are sourced.
+                  </p>`
+               : ''
+           }`
     }
 
     <div class="section-title">2. RDSO G-95 Rev-II Spring Nest Classification Summary</div>

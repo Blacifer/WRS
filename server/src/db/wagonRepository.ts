@@ -11,7 +11,7 @@ import { signCertificate } from '../reports/certificateSigning.ts';
 import * as analytics from './wagonAnalytics.ts';
 import { CASNUB_CHECKLIST_TEMPLATE } from './checklistTemplate.ts';
 import { validateSpringNests } from '../../../shared/classification/nestGrouping.ts';
-import { PartLedgerRepository } from './partLedgerRepository.ts';
+import { PartLedgerRepository, expectedPartsFor } from './partLedgerRepository.ts';
 import { getSpringCountOptions, buildSpringQueue } from '../../../shared/classification/springCounts.ts';
 import { evaluateSwt } from '../../../shared/classification/swtSpec.ts';
 import type { PipeType, LoadCondition, SwtReading } from '../../../shared/classification/swtSpec.ts';
@@ -1061,6 +1061,10 @@ export class WagonRepository {
     bogiePosition?: string;
     isMandatory: boolean;
     standardReference?: string;
+    /** How many physical pieces this line covers. Defaults to one. */
+    expectedQuantity?: number;
+    /** Where that count comes from. Absent means it is used but not verified. */
+    quantitySource?: string | null;
   }): void {
     const now = new Date().toISOString();
 
@@ -1102,15 +1106,31 @@ export class WagonRepository {
     }
 
     const id = `cfg_${crypto.randomUUID()}`;
+    const qtyRaw = Number(entry.expectedQuantity);
+    const qty = Number.isFinite(qtyRaw) && qtyRaw >= 1 ? Math.floor(qtyRaw) : 1;
+    const qtySource = (entry.quantitySource || '').trim();
+
     this.db.prepare(`
       INSERT INTO checklist_config (
-        id, wagon_type, category, part_name, bogie_position, is_mandatory, standard_reference, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        id, wagon_type, category, part_name, bogie_position, is_mandatory, standard_reference,
+        expected_quantity, quantity_source, quantity_verified, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(wagon_type, category, part_name, bogie_position)
-      DO UPDATE SET is_mandatory = excluded.is_mandatory, standard_reference = excluded.standard_reference, updated_at = excluded.updated_at
+      DO UPDATE SET is_mandatory = excluded.is_mandatory,
+                    standard_reference = excluded.standard_reference,
+                    expected_quantity = excluded.expected_quantity,
+                    quantity_source = excluded.quantity_source,
+                    quantity_verified = excluded.quantity_verified,
+                    updated_at = excluded.updated_at
     `).run(
       id, entry.wagonType, entry.category, entry.partName, entry.bogiePosition || 'NONE',
-      entry.isMandatory ? 1 : 0, entry.standardReference || null, now, now
+      entry.isMandatory ? 1 : 0, entry.standardReference || null,
+      qty, qtySource || null,
+      // Verified only when the count itself carries a source. The item's own
+      // standardReference is not enough: it says which clause governs the part,
+      // not how many of them a wagon has.
+      qtySource ? 1 : 0,
+      now, now
     );
   }
 
@@ -1637,7 +1657,42 @@ export class WagonRepository {
      * silence here must never read as "nothing is missing".
      */
     try {
-      const reconciliation = new PartLedgerRepository(this.db).reconcile(normalizedWagonNumber);
+      const reconciliation = new PartLedgerRepository(this.db).reconcile(
+        normalizedWagonNumber,
+        undefined,
+        undefined,
+        expectedPartsFor(this.db, wagon?.wagonType || 'DEFAULT')
+      );
+
+      /*
+       * A position the wagon type is supposed to have, with nothing recorded
+       * against it at all.
+       *
+       * Deliberately its own finding rather than folded in with the others: an
+       * outstanding part is a statement about the WAGON, and this is a
+       * statement about the RECORD. A supervisor signing a release should be
+       * able to tell at a glance which of the two they are looking at, because
+       * only one of them is fixed by walking to the wagon.
+       */
+      if (reconciliation.neverRecordedParts.length > 0) {
+        const n = reconciliation.neverRecordedParts.length;
+        const message =
+          `${n} expected part position${n === 1 ? '' : 's'} on this wagon type ` +
+          `${n === 1 ? 'has' : 'have'} nothing recorded against ${n === 1 ? 'it' : 'them'} — ` +
+          `the parts record covers ${reconciliation.expectedTotal - n} of ${reconciliation.expectedTotal}.`;
+        advisories.push(message);
+        advisoryDetails.push({
+          id: 'parts_never_recorded',
+          category: 'BODY_UNDERFRAME',
+          partName: `${n} position${n === 1 ? '' : 's'}`,
+          issueType: 'PARTS_NOT_ACCOUNTED',
+          description: message,
+          severity: 'ADVISORY',
+          remediationAction:
+            'Record what came off and went back on for these positions, or record that they were ' +
+            'not disturbed. An unrecorded position is not evidence that nothing is missing.'
+        });
+      }
       for (const part of reconciliation.outstandingParts) {
         const message =
           `${part.outstanding} × ${part.partName} (${part.bogiePosition}) came off this wagon ` +

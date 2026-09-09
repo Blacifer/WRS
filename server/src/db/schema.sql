@@ -258,6 +258,17 @@ CREATE TABLE IF NOT EXISTS checklist_config (
   bogie_position TEXT NOT NULL DEFAULT 'NONE',
   is_mandatory INTEGER NOT NULL DEFAULT 1 CHECK(is_mandatory IN (0, 1)),
   standard_reference TEXT DEFAULT NULL,
+  -- How many physical pieces this line covers. One is the safe default: right
+  -- for genuinely single parts, and where it is wrong it under-counts, which
+  -- shows a position looking complete rather than a wagon falsely accused of
+  -- missing parts. The parts ledger measures against this.
+  expected_quantity INTEGER NOT NULL DEFAULT 1 CHECK(expected_quantity > 0),
+  -- Where the count comes from, and whether it is sourced at all. The same two
+  -- fields SPRING_COUNTS carries, for the same reason: a count with no cited
+  -- source is a recollection, and a recollection printed on a release
+  -- certificate becomes a fact nobody can trace back.
+  quantity_source TEXT DEFAULT NULL,
+  quantity_verified INTEGER NOT NULL DEFAULT 0 CHECK(quantity_verified IN (0, 1)),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   UNIQUE(wagon_type, category, part_name, bogie_position)

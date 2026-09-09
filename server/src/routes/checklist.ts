@@ -137,7 +137,12 @@ checklistRouter.post('/config/bulk', authMiddleware, requireCapability('checklis
         wagonType: String(wagonType).toUpperCase(), category, partName,
         bogiePosition: it.bogiePosition || 'NONE',
         isMandatory: it.isMandatory === true,
-        standardReference: source
+        standardReference: source,
+        // The manual states how many of a must-change part a wagon carries, and
+        // its page reference is the best source a count can have — better than
+        // anything typed from memory. Carried through rather than discarded.
+        expectedQuantity: Number(it?.expectedQuantity) >= 1 ? Math.floor(Number(it.expectedQuantity)) : 1,
+        quantitySource: typeof it?.quantitySource === 'string' ? it.quantitySource.trim() || null : null
       });
       accepted.push(partName);
     } catch (err: any) {
@@ -159,7 +164,8 @@ checklistRouter.post('/config/bulk', authMiddleware, requireCapability('checklis
 
 checklistRouter.post('/config', authMiddleware, requireCapability('checklist.configure'), async (req: Request, res: Response) => {
   const repo = getRepo();
-  const { wagonType, category, partName, bogiePosition, isMandatory, standardReference } = req.body;
+  const { wagonType, category, partName, bogiePosition, isMandatory, standardReference,
+          expectedQuantity, quantitySource } = req.body;
 
   if (!wagonType || !category || !partName) {
     res.status(400).json({
@@ -187,6 +193,21 @@ checklistRouter.post('/config', authMiddleware, requireCapability('checklist.con
    * having it.
    */
   const source = typeof standardReference === 'string' ? standardReference.trim() : '';
+
+  /*
+   * How many physical pieces this line covers, and where that figure came
+   * from.
+   *
+   * Defaults to one, unsourced. That is the safe direction: one is right for
+   * genuinely single parts, and where it is wrong it under-counts, which shows
+   * a position looking complete rather than a wagon falsely accused of missing
+   * parts. A count with a cited source is marked verified; one typed without
+   * a source is used but never presented as a fact — the same rule
+   * SPRING_COUNTS already follows.
+   */
+  const qtyRaw = Number(expectedQuantity);
+  const qty = Number.isFinite(qtyRaw) && qtyRaw >= 1 ? Math.floor(qtyRaw) : 1;
+  const qtySource = typeof quantitySource === 'string' ? quantitySource.trim() : '';
   if (!source) {
     res.status(400).json({
       success: false,
@@ -208,7 +229,9 @@ checklistRouter.post('/config', authMiddleware, requireCapability('checklist.con
       partName,
       bogiePosition: bogiePosition || 'NONE',
       isMandatory: Boolean(isMandatory),
-      standardReference: source
+      standardReference: source,
+      expectedQuantity: qty,
+      quantitySource: qtySource || null
     });
 
     /*
@@ -232,6 +255,8 @@ checklistRouter.post('/config', authMiddleware, requireCapability('checklist.con
         partName,
         bogiePosition: bogiePosition || 'NONE',
         isMandatory: Boolean(isMandatory),
+        expectedQuantity: qty,
+        quantitySource: qtySource || null,
         standardReference: source
       }
     });

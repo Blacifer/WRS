@@ -19,6 +19,7 @@ import {
   PartLedgerRepository,
   PART_EVENTS,
   EVENTS_NEEDING_REASON,
+  expectedPartsFor,
   type PartEvent
 } from '../db/partLedgerRepository.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
@@ -203,10 +204,15 @@ partLedgerRouter.get(
       if (!wagonNumber) return bad(res, 'wagonNumber is required.', 'MISSING_PARAM');
 
       const wagon = new WagonRepository(getDatabase()).getWagonByNumber(wagonNumber);
+      const wagonType = wagon?.wagonType || 'DEFAULT';
       const result = new PartLedgerRepository(getDatabase()).reconcile(
         wagonNumber,
         storesLookup,
-        standardLookupFor(wagon?.wagonType || 'DEFAULT')
+        standardLookupFor(wagonType),
+        // What this wagon type is supposed to carry. Without it the ledger can
+        // only compare against what somebody happened to record; with it, a
+        // position nobody touched is itself a finding.
+        expectedPartsFor(getDatabase(), wagonType)
       );
 
       res.status(200).json({

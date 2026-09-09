@@ -1317,6 +1317,48 @@ export function runMigrations(db: DatabaseSync): void {
     END;
   `);
 
+  /*
+   * How many of each part a wagon of this type actually carries.
+   *
+   * WHY THIS WAS MISSING, AND WHY IT MATTERS
+   * checklist_config has always known WHICH parts a wagon type has and WHERE
+   * they sit. It has never known HOW MANY. That was survivable while the
+   * checklist was the only consumer — a line is inspected or it is not,
+   * regardless of how many physical pieces it covers — but it is not
+   * survivable for the parts ledger, which has to answer "is anything
+   * missing".
+   *
+   * Without an expected count the ledger can only compare what went back on
+   * against what somebody recorded coming off. If nobody recorded the removal,
+   * it can say nothing at all. With one, a wagon can be measured against what
+   * it is supposed to have, which is the question actually being asked.
+   *
+   * WHY source AND verified, AND WHY THE DEFAULT IS UNVERIFIED
+   * Copied deliberately from SPRING_COUNTS in springCounts.ts, which carries
+   * the same two fields for the same reason: a count with no cited source is
+   * somebody's recollection, and a recollection printed on a release
+   * certificate becomes a fact nobody can trace.
+   *
+   * So every existing row gets 1, marked NOT verified. One is the safe
+   * default — it is right for the many genuinely single parts, and where it is
+   * wrong it under-counts, which shows up as a position that looks complete
+   * rather than a wagon falsely accused of missing parts.
+   *
+   * We do not fill these in ourselves. This shop has been burned by that
+   * before: fourteen MK-50 coupler items were built from photographs of gauge
+   * boards the shop turned out not to use, and every wagon's exit gate was
+   * permanently blocked as a result. The note left in checklistTemplate.ts is
+   * the lesson — a photograph of a board is evidence that a board exists, not
+   * evidence of what the shop does. The counts come from the shop, through the
+   * checklist editor, with a source against each.
+   */
+  const ccCols = db.prepare("PRAGMA table_info(checklist_config)").all() as any[];
+  if (ccCols.length > 0 && !ccCols.some((c) => c.name === 'expected_quantity')) {
+    db.exec("ALTER TABLE checklist_config ADD COLUMN expected_quantity INTEGER NOT NULL DEFAULT 1;");
+    db.exec("ALTER TABLE checklist_config ADD COLUMN quantity_source TEXT DEFAULT NULL;");
+    db.exec("ALTER TABLE checklist_config ADD COLUMN quantity_verified INTEGER NOT NULL DEFAULT 0;");
+  }
+
   // A declared principal for actions the system performs itself.
   //
   // Audit rows carry a foreign key to users, so an event with no human actor
