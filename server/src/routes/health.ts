@@ -333,14 +333,38 @@ healthRouter.get(
       }
     } catch { /* no directory yet is the same as no backup */ }
 
+    /*
+     * A backup on the same disk as the database is not a backup.
+     *
+     * The default destination is server/data/backups — beside the file it is
+     * protecting. Format the machine, lose the disk, or meet ransomware, and
+     * the database and every copy of it go together. Nothing said so, and the
+     * panel showed a healthy green row for exactly that arrangement.
+     *
+     * Compared by filesystem device rather than by path text, so a mapped
+     * network drive on Windows or a mounted USB disk reads as separate even
+     * though the path may look similar.
+     */
+    let backupOnSameDisk = false;
+    try {
+      const dbDev = fs.statSync(config.dbPath).dev;
+      const dirDev = fs.statSync(backupDir).dev;
+      backupOnSameDisk = dbDev === dirDev;
+    } catch { /* no backup directory yet — the row below already says that */ }
+
     const backupAgeHours = newestBackupMs === null ? null : (Date.now() - newestBackupMs) / 3_600_000;
     checks.push({
       id: 'backup',
       label: 'A recent encrypted backup exists',
-      state: backupAgeHours === null ? 'FAIL' : backupAgeHours <= 24 * 8 ? 'PASS' : 'WARN',
+      state: backupAgeHours === null ? 'FAIL' : backupOnSameDisk ? 'WARN' : backupAgeHours <= 24 * 8 ? 'PASS' : 'WARN',
       detail: backupAgeHours === null
         ? 'No backup has ever been taken. server/scripts/backup-db.sh encrypts and verifies one; nothing schedules it. A weekly cron line on this host is enough, and scripts/backup-drill.sh proves the whole round trip — backup, restore, and refusal of a tampered file — before you need it.'
-        : `${backupCount} backup(s) retained, newest ${Math.floor(backupAgeHours)} hour(s) ago.`
+        : backupOnSameDisk
+          ? `${backupCount} backup(s) retained, newest ${Math.floor(backupAgeHours)} hour(s) ago — but they are on the same disk as the database. ` +
+            'If this machine is formatted or its disk fails, the records and every copy of them go together. ' +
+            'Point the backup at another drive, a network share, or a USB disk kept elsewhere: ' +
+            'node server/scripts/backup-db.mjs <database> <that other place>'
+          : `${backupCount} backup(s) retained on a separate disk, newest ${Math.floor(backupAgeHours)} hour(s) ago.`
     });
 
     const chain = verifyAuditChain(db);

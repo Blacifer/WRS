@@ -200,6 +200,35 @@ describe('Deployment readiness', () => {
     assert.strictEqual(storage.state, 'PASS');
   });
 
+  it('TC-RDY-05d: a backup beside the database is not reported as protection', async () => {
+    /*
+     * The default destination is server/data/backups — the same folder as the
+     * file it protects. Format the machine and the records and every copy go
+     * together. The panel showed a green row for exactly that arrangement,
+     * which is the most dangerous kind of wrong: it invites somebody to stop
+     * worrying.
+     */
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const { config } = await import('../src/config/index.ts');
+    const dir = path.resolve(path.dirname(config.dbPath), 'backups');
+    fs.mkdirSync(dir, { recursive: true });
+    const enc = path.join(dir, 'wrs_inspections_test.db.enc');
+    fs.writeFileSync(enc, 'not a real backup, but a recent one');
+
+    try {
+      const token = await signIn(app, 'admin1');
+      const res = await call(app, 'GET', '/api/system/readiness', undefined, { authorization: `Bearer ${token}` });
+      const backup = findCheck(res.body, 'backup');
+
+      assert.notStrictEqual(backup.state, 'PASS', 'a backup on the same disk must not read as healthy');
+      assert.match(backup.detail, /same disk/i, 'and it must say why');
+      assert.match(backup.detail, /another drive|network share|USB/i, 'and what to do about it');
+    } finally {
+      fs.rmSync(enc, { force: true });
+    }
+  });
+
   it('TC-RDY-06: a supervisor cannot read the installation’s state', async () => {
     const token = await signIn(app, 'supervisor1');
     const res = await call(app, 'GET', '/api/system/readiness', undefined, { authorization: `Bearer ${token}` });
