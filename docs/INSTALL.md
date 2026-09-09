@@ -11,19 +11,27 @@ itself, so there is nothing else to run and nothing to keep in sync.
 
 ## 1. What the machine needs
 
-- **Node 22 or later.** The server runs TypeScript directly with
-  `--experimental-strip-types`, and older releases reject the flag with
-  `node: bad option` — which then makes every later step fail for a reason that
-  does not mention Node.
-- **`sqlite3` and `openssl`** on the path. Both are used by the backup.
+- **Node 22 or later, and nothing else.** The server runs TypeScript directly
+  with `--experimental-strip-types`, and older releases reject the flag with
+  `node: bad option`. An older Node earlier on the PATH gives a stranger error
+  still — `ERR_UNKNOWN_BUILTIN_MODULE` from `node:sqlite` — so check the
+  version rather than assuming.
 - **A PC that stays on.** This is the system of record for wagon releases; it
   should not be somebody's laptop that goes home.
 
-```bash
-node -v          # must be v22 or later
-sqlite3 --version
-openssl version
 ```
+node -v          # must be v22 or later
+```
+
+> **Windows.** Everything below works on Windows, Linux and macOS. The backup
+> is a Node script needing no `sqlite3` or `openssl` binary. There are older
+> shell versions of the backup scripts in `server/scripts/*.sh` — they do the
+> same job and are kept for Linux hosts that prefer them, but on Windows use
+> the `.mjs` one. Both write the same file format, so a backup taken by either
+> can be restored by either, or by plain `openssl` on any machine.
+
+**WRS Raipur runs Windows**, so the commands below give the Windows form
+first.
 
 ## 2. Install and configure
 
@@ -135,19 +143,39 @@ chmod 400 /etc/wrs/backup.key
 Prove the whole round trip before trusting it. This works in a temporary
 directory with a throwaway key and never touches the real database:
 
-```bash
+```
 bash scripts/backup-drill.sh
 ```
 
+That drill needs bash, so run it on any machine — it proves the code, not the
+host. It exercises both the Node and shell implementations, and checks that a
+backup written by one opens with the other and with plain `openssl`.
+
 It should end `All checks passed. A backup taken now would come back.`
 
-Then schedule it. Weekly, on Linux, via `crontab -e`:
+Then schedule it.
+
+**Windows** — Task Scheduler, weekly, running whether or not anybody is logged
+in:
 
 ```
-0 2 * * 0 WRS_BACKUP_KEY_FILE=/etc/wrs/backup.key /path/to/server/scripts/backup-db.sh >> /var/log/wrs-backup.log 2>&1
+schtasks /Create /TN "WRS backup" /SC WEEKLY /D SUN /ST 02:00 /RU SYSTEM ^
+  /TR "node C:\wrs-raipur\server\scripts\backup-db.mjs"
+```
+
+**Linux** — `crontab -e`:
+
+```
+0 2 * * 0 WRS_BACKUP_KEY_FILE=/etc/wrs/backup.key node /path/to/server/scripts/backup-db.mjs >> /var/log/wrs-backup.log 2>&1
 ```
 
 On macOS use `launchd` rather than `cron`.
+
+**To restore**, on any platform:
+
+```
+node server/scripts/backup-db.mjs --restore <file.db.enc> [target_db]
+```
 
 ## 8. Check your work
 
@@ -171,8 +199,16 @@ network blip — press **Check now** again before investigating.
 
 ## 9. Keeping it running
 
-The server must come back after a power cut without anybody logging in. Use
-`launchd` on macOS or `systemd` on Linux with `Restart=always`.
+The server must come back after a power cut without anybody logging in.
+
+**Windows** — run it as a service. Task Scheduler with "At startup", running as
+SYSTEM, restarting on failure, is enough:
+
+```
+schtasks /Create /TN "WRS Raipur" /SC ONSTART /RU SYSTEM /TR "npm start" /RL HIGHEST
+```
+
+**Linux** — `systemd` with `Restart=always`. **macOS** — `launchd`.
 
 > This is the one section not exercised end to end here, because it depends on
 > the machine you install on. Verify it the only way that means anything: pull

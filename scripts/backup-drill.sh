@@ -137,6 +137,60 @@ bash server/scripts/backup-db.sh "$DB" "$WORK/nokey" >/dev/null 2>&1
 check "backup without a key refuses rather than write plaintext" "1" "$?"
 check "  and no plaintext is left behind" "absent" "$([ -n "$(ls "$WORK"/nokey/*.db 2>/dev/null)" ] && echo present || echo absent)"
 
+# ---------------------------------------------------------------------------
+# The same five proofs against the Node implementation.
+#
+# WRS Raipur runs Windows, where bash, sqlite3 and openssl are not present and
+# the shell version simply never runs. That version is the one the shop will
+# actually use, so it has to clear the same bar — and the two must be able to
+# read each other's files, or a backup written on the shop PC could not be
+# opened by an engineer with openssl years from now.
+# ---------------------------------------------------------------------------
+echo
+echo "  Node implementation (the one Windows will use)"
+echo "  ----------------------------------------------"
+
+NODE_OUT="$WORK/node-out"
+WRS_BACKUP_KEY_FILE="$WORK/backup.key" node server/scripts/backup-db.mjs "$DB" "$NODE_OUT" >"$WORK/node-backup.log" 2>&1
+check "backup of a live database succeeds" "0" "$?"
+
+NODE_ENC="$(ls "$NODE_OUT"/*.db.enc 2>/dev/null | head -1)"
+if [ -z "$NODE_ENC" ]; then
+  say "backup produced a file" "FAIL (nothing written)"
+  fail=$((fail + 1))
+else
+  WRS_BACKUP_KEY_FILE="$WORK/backup.key" node server/scripts/backup-db.mjs --restore "$NODE_ENC" "$WORK/node-restored.db" >"$WORK/node-restore.log" 2>&1
+  check "restore succeeds" "0" "$?"
+
+  NODE_ROWS="$(sqlite3 "$WORK/node-restored.db" 'SELECT COUNT(*) FROM users;' 2>/dev/null || echo -1)"
+  check "restored row count matches the live database" "$LIVE_ROWS" "$NODE_ROWS"
+
+  # Interchangeable with openssl, so a backup is never hostage to the program
+  # that wrote it.
+  if command -v openssl >/dev/null 2>&1; then
+    openssl enc -d -aes-256-cbc -pbkdf2 -iter 210000 -md sha512 \
+      -pass "file:$WORK/backup.key" -in "$NODE_ENC" -out "$WORK/node-via-openssl.db" >/dev/null 2>&1
+    check "a Node backup opens with plain openssl" "0" "$?"
+    OSSL_ROWS="$(sqlite3 "$WORK/node-via-openssl.db" 'SELECT COUNT(*) FROM users;' 2>/dev/null || echo -1)"
+    check "  and holds the same rows" "$LIVE_ROWS" "$OSSL_ROWS"
+  fi
+
+  cp "$NODE_ENC" "$WORK/node-tampered.db.enc"
+  cp "$NODE_ENC.hmac" "$WORK/node-tampered.db.enc.hmac"
+  printf '\x00' | dd of="$WORK/node-tampered.db.enc" bs=1 seek=5000 conv=notrunc >/dev/null 2>&1
+  WRS_BACKUP_KEY_FILE="$WORK/backup.key" node server/scripts/backup-db.mjs --restore "$WORK/node-tampered.db.enc" "$WORK/node-tampered-out.db" >/dev/null 2>&1
+  check "a tampered backup is refused" "1" "$?"
+  check "  and no file is written" "absent" "$([ -f "$WORK/node-tampered-out.db" ] && echo present || echo absent)"
+
+  WRS_BACKUP_KEY_FILE="$WORK/wrong.key" node server/scripts/backup-db.mjs --restore "$NODE_ENC" "$WORK/node-wrongkey.db" >/dev/null 2>&1
+  check "the wrong key is refused" "1" "$?"
+  check "  and no file is written" "absent" "$([ -f "$WORK/node-wrongkey.db" ] && echo present || echo absent)"
+fi
+
+node server/scripts/backup-db.mjs "$DB" "$WORK/node-nokey" >/dev/null 2>&1
+check "backup without a key refuses rather than write plaintext" "1" "$?"
+check "  and no plaintext is left behind" "absent" "$([ -n "$(ls "$WORK"/node-nokey/*.db 2>/dev/null)" ] && echo present || echo absent)"
+
 echo
 if [ "$fail" -gt 0 ]; then
   echo "  $fail check(s) FAILED — the backup path cannot be relied on."
