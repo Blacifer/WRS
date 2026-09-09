@@ -28,7 +28,8 @@
     "generate-fixtures": "node tests/fixtures/generate_fixtures.js",
     "vendor:models": "node scripts/vendor-vision-models.mjs",
     "proof:vision": "node scripts/vision-brain-proof.mjs",
-    "drive:camera": "node scripts/teach-camera-drive.mjs"
+    "drive:camera": "node scripts/teach-camera-drive.mjs",
+    "drive:parts": "node scripts/parts-ledger-drive.mjs"
   },
   "engines": {
     "node": ">=22"

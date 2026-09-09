@@ -11,6 +11,7 @@ import { WagonRepository } from '../db/wagonRepository.ts';
 import { InspectionRepository } from '../db/repository.ts';
 import { ComponentRepository } from '../db/componentRepository.ts';
 import { getDatabase } from '../db/connection.ts';
+import { PartLedgerRepository } from '../db/partLedgerRepository.ts';
 import qrcode from 'qrcode-generator';
 import { SIGNATURE_ALGORITHM, certificateKeyFingerprint } from './certificateSigning.ts';
 
@@ -167,6 +168,25 @@ export class CertificateGenerator {
     const tatDays = Math.max(0.1, Math.round(((releaseTime - entryTime) / (1000 * 60 * 60 * 24)) * 10) / 10);
 
     const checklistItems: any[] = checklistData.allItems || [];
+
+    /*
+     * Parts in, parts out — the section a DRM actually asks for.
+     *
+     * Section 1A proves every named line was looked at. It does not prove that
+     * the four friction wedges that came off are the four that went back on,
+     * and that is the question asked months later when something is found
+     * missing. This section is the answer, or it is the honest statement that
+     * the ledger was not kept for this wagon and therefore cannot answer.
+     */
+    let reconciliation: any = null;
+    try {
+      reconciliation = new PartLedgerRepository(getDatabase()).reconcile(wagon.wagonNumber);
+    } catch {
+      // A database predating the ledger. The certificate still issues; the
+      // section below says plainly that no ledger was kept.
+      reconciliation = null;
+    }
+
     const nameById = new Map<string, string>(
       (getDatabase().prepare('SELECT id, full_name FROM users').all() as Array<{ id: string; full_name: string }>)
         .map((u) => [u.id, u.full_name])
@@ -659,6 +679,62 @@ export class CertificateGenerator {
         }
       </tbody>
     </table>
+
+    <div class="section-title">1B. Parts Removed and Refitted — Does the Wagon Leave With What It Arrived With</div>
+    <p style="font-size: 10px; color: #475569; margin: 0 0 6px 0;">
+      Recorded during dismantling and reassembly, one entry per event, each with the person who made it.
+      A part not going back carries a stated reason. This section exists so that anything found missing after
+      release is a matter of record rather than of recollection.
+    </p>
+    ${
+      !reconciliation || reconciliation.parts.length === 0
+        ? `<p style="font-size: 11px; color: #b45309; border: 1px solid #fcd34d; background: #fffbeb; padding: 8px; margin: 0 0 10px 0;">
+             <strong>No parts ledger was kept for this wagon.</strong> Nothing was recorded coming off it during
+             dismantling, so this certificate makes no statement about whether every part that was removed went
+             back on. That is not the same as saying nothing is missing.
+           </p>`
+        : `<p style="font-size: 11px; ${reconciliation.balanced ? 'color: #166534;' : 'color: #b45309;'} margin: 0 0 8px 0;">
+             <strong>${escapeHtml(String(reconciliation.summary))}</strong>
+           </p>
+           <table>
+             <thead>
+               <tr>
+                 <th style="width: 14%;">Category</th>
+                 <th>Part</th>
+                 <th style="width: 9%;">Position</th>
+                 <th style="width: 7%;">Off</th>
+                 <th style="width: 7%;">Refitted</th>
+                 <th style="width: 7%;">Replaced</th>
+                 <th style="width: 7%;">Scrapped</th>
+                 <th style="width: 9%;">Not refitted</th>
+                 <th style="width: 13%;">Outstanding</th>
+               </tr>
+             </thead>
+             <tbody>
+               ${reconciliation.parts
+                 .map((b: any) => {
+                   const cls = b.outstanding > 0 || b.unaccounted ? 'status-fail' : 'status-pass';
+                   const state = b.unaccounted
+                     ? `${Math.abs(b.outstanding)} MORE BACK THAN OFF`
+                     : b.outstanding > 0
+                     ? `${b.outstanding} OUTSTANDING`
+                     : 'ACCOUNTED FOR';
+                   return `<tr>
+                     <td style="font-size: 10px;">${escapeHtml(String(b.category || '').replace(/_/g, ' '))}</td>
+                     <td><strong>${escapeHtml(String(b.partName || ''))}</strong></td>
+                     <td style="font-size: 10px;">${escapeHtml(String(b.bogiePosition || 'NONE').replace(/_/g, ' '))}</td>
+                     <td style="font-size: 10px;">${b.removed}</td>
+                     <td style="font-size: 10px;">${b.refitted}</td>
+                     <td style="font-size: 10px;">${b.replaced}</td>
+                     <td style="font-size: 10px;">${b.scrapped}</td>
+                     <td style="font-size: 10px;">${b.notFitted}</td>
+                     <td><span class="${cls}">${escapeHtml(state)}</span></td>
+                   </tr>`;
+                 })
+                 .join('')}
+             </tbody>
+           </table>`
+    }
 
     <div class="section-title">2. RDSO G-95 Rev-II Spring Nest Classification Summary</div>
     <table>

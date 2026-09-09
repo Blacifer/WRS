@@ -163,9 +163,11 @@ fi
 if ! node -e "import('playwright')" >/dev/null 2>&1; then
   skip "Role walkthrough" "playwright not installed"
   skip "Offline drill"    "playwright not installed"
+  skip "Parts ledger drive" "playwright not installed"
 elif ! curl -s -o /dev/null --max-time 2 http://localhost:3000/api/health; then
   skip "Role walkthrough" "the API is not answering on :3000"
   skip "Offline drill"    "the API is not answering on :3000"
+  skip "Parts ledger drive" "the API is not answering on :3000"
 else
   # The production build ran above, so client/dist is current. Both drills run
   # against it.
@@ -180,15 +182,21 @@ else
     if [ "$preview_up" -eq 1 ]; then
       DRILL_URL=http://localhost:4173 step "Role walkthrough" node scripts/role-walkthrough.mjs
       DRILL_URL=http://localhost:4173 step "Offline drill"    node scripts/offline-drill.mjs
+      # Parts in, parts out — driven the way a fitter uses it. The property
+      # worth guarding is that an empty ledger says it CANNOT answer rather
+      # than that nothing is missing; that distinction is the section's point.
+      APP_URL=http://localhost:4173 step "Parts ledger drive" node scripts/parts-ledger-drive.mjs
     else
       skip "Role walkthrough" "the preview server did not come up on :4173"
       skip "Offline drill"    "the preview server did not come up on :4173"
+      skip "Parts ledger drive" "the preview server did not come up on :4173"
       sed 's/^/      /' /tmp/wrs_preflight_preview.log | tail -6
     fi
     if [ -n "$PREVIEW_PID" ]; then kill "$PREVIEW_PID" 2>/dev/null; PREVIEW_PID=""; fi
   else
     skip "Role walkthrough" "client/dist/sw.js missing — the production build did not produce a client"
     skip "Offline drill"    "client/dist/sw.js missing — the production build did not produce a service worker"
+    skip "Parts ledger drive" "client/dist/sw.js missing — the production build did not produce a client"
   fi
 fi
 

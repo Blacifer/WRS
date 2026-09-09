@@ -25,6 +25,7 @@ import { manualRouter } from './manual.ts';
 import { auditRouter } from './audit.ts';
 import { sortingRouter } from './sorting.ts';
 import { visionRouter } from './vision.ts';
+import { partLedgerRouter } from './partLedger.ts';
 
 export const apiRouter = Router();
 
@@ -32,6 +33,13 @@ apiRouter.use('/auth', authRouter);
 apiRouter.use('/inspections', inspectionsRouter);
 apiRouter.use('/i18n', i18nRouter);
 apiRouter.use('/sync', syncRouter);
+/*
+ * Before wagonsRouter, deliberately. Wagon numbers contain slashes
+ * (SECR/BOXNHL/40101), so that router's bare `/:wagonNumber` matches across
+ * path segments and would swallow `/:wagonNumber/parts` entirely — the same
+ * trap already documented against the SWT route inside wagons.ts.
+ */
+apiRouter.use('/wagons', partLedgerRouter);
 apiRouter.use('/wagons', wagonsRouter);
 apiRouter.use('/checklist', checklistRouter);
 apiRouter.use('/photos', photosRouter);

@@ -11,6 +11,7 @@ import { signCertificate } from '../reports/certificateSigning.ts';
 import * as analytics from './wagonAnalytics.ts';
 import { CASNUB_CHECKLIST_TEMPLATE } from './checklistTemplate.ts';
 import { validateSpringNests } from '../../../shared/classification/nestGrouping.ts';
+import { PartLedgerRepository } from './partLedgerRepository.ts';
 import { getSpringCountOptions, buildSpringQueue } from '../../../shared/classification/springCounts.ts';
 import { evaluateSwt } from '../../../shared/classification/swtSpec.ts';
 import type { PipeType, LoadCondition, SwtReading } from '../../../shared/classification/swtSpec.ts';
@@ -116,6 +117,8 @@ export interface ExitGateBlockerDetail {
     | 'STAGE_INVALID'
     | 'SPRINGS_NOT_FULLY_MEASURED'
     | 'CTRB_CYCLE_MISMATCH'
+    // Something came off and was never recorded going back on, or vice versa.
+    | 'PARTS_NOT_ACCOUNTED'
     | 'SWT_NOT_PERFORMED'
     | 'SWT_FAILED'
     // Nest grouping violations, from NestViolationType.
@@ -1610,6 +1613,69 @@ export class WagonRepository {
         severity: 'CRITICAL_BLOCKER',
         remediationAction: 'Advance wagon through required workshop stages to Stage 6.'
       });
+    }
+
+    /*
+     * Parts in, parts out.
+     *
+     * The DRM's question about what happens after a wagon leaves — "was
+     * anything missing, was a part rusted or damaged" — is answered here or
+     * nowhere. A checklist says every named line was looked at; it says
+     * nothing about whether the four friction wedges that came off are the
+     * four that went back on.
+     *
+     * ADVISORY, NOT BLOCKING, AND DELIBERATELY SO FOR NOW
+     * Every other check in this file was introduced the same way: advisory
+     * first, blocking once the shop has run it long enough to trust it. A
+     * ledger that blocks release from its first day would be a ledger the shop
+     * learns to route around, and a routed-around ledger records nothing. It
+     * appears on the gate panel and on the certificate from day one, which is
+     * what makes it visible enough to become blocking honestly later.
+     *
+     * A wagon with nothing recorded produces no advisory at all. That is not
+     * the same as balanced, and the reconciliation summary says so in words —
+     * silence here must never read as "nothing is missing".
+     */
+    try {
+      const reconciliation = new PartLedgerRepository(this.db).reconcile(normalizedWagonNumber);
+      for (const part of reconciliation.outstandingParts) {
+        const message =
+          `${part.outstanding} × ${part.partName} (${part.bogiePosition}) came off this wagon ` +
+          `and ${part.outstanding === 1 ? 'has' : 'have'} not been recorded going back on.`;
+        advisories.push(message);
+        advisoryDetails.push({
+          id: `parts_outstanding_${part.partKey}`,
+          category: part.category,
+          partName: part.partName,
+          issueType: 'PARTS_NOT_ACCOUNTED',
+          description: message,
+          severity: 'ADVISORY',
+          remediationAction:
+            part.suggestion ||
+            'Record the refit, or record why the part is deliberately not going back on.'
+        });
+      }
+      for (const part of reconciliation.unaccountedParts) {
+        const message =
+          `More ${part.partName} (${part.bogiePosition}) went back on than were recorded coming off.`;
+        advisories.push(message);
+        advisoryDetails.push({
+          id: `parts_unaccounted_${part.partKey}`,
+          category: part.category,
+          partName: part.partName,
+          issueType: 'PARTS_NOT_ACCOUNTED',
+          description: message,
+          severity: 'ADVISORY',
+          remediationAction:
+            part.suggestion || 'Check whether a removal went unrecorded or a refit was entered twice.'
+        });
+      }
+    } catch {
+      /*
+       * A database old enough to predate the ledger table. The gate must still
+       * evaluate — every other check is unaffected, and a wagon cannot be held
+       * at the gate because a feature was added after it arrived.
+       */
     }
 
     // Check if supervisor signoff exists

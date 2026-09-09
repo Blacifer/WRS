@@ -15,6 +15,7 @@ import { PhotoGallery } from '../components/PhotoGallery.tsx';
 import { AssemblyEvidenceCapture } from '../components/AssemblyEvidenceCapture.tsx';
 import { parseAssemblyTags } from '../../../shared/assembly/assemblyCapture.ts';
 import { WagonConditionReport } from '../components/WagonConditionReport.tsx';
+import { PartsLedger } from '../components/PartsLedger.tsx';
 import { ReleaseCertificateModal } from '../components/ReleaseCertificateModal.tsx';
 import { SoundDiagnosticTool } from '../components/SoundDiagnosticTool.tsx';
 import { VoiceInspectionToolbar } from '../components/VoiceInspectionToolbar.tsx';
@@ -73,10 +74,10 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
    * still exactly what happened — reported a second time, correctly. The tab
    * within the wagon is the part somebody is actually looking at.
    */
-  const [activeTab, setActiveTab] = useState<'CHECKLIST' | 'GATE' | 'PHOTOS' | 'TIMELINE' | 'ACOUSTIC' | 'COMPONENTS' | 'SWT' | 'REPORT'>(() => {
+  const [activeTab, setActiveTab] = useState<'CHECKLIST' | 'GATE' | 'PHOTOS' | 'TIMELINE' | 'ACOUSTIC' | 'COMPONENTS' | 'SWT' | 'REPORT' | 'PARTS'>(() => {
     try {
       const saved = sessionStorage.getItem('wrs-wagon-tab');
-      const known = ['CHECKLIST', 'GATE', 'PHOTOS', 'TIMELINE', 'ACOUSTIC', 'COMPONENTS', 'SWT'];
+      const known = ['CHECKLIST', 'GATE', 'PHOTOS', 'TIMELINE', 'ACOUSTIC', 'COMPONENTS', 'SWT', 'PARTS'];
       if (saved && known.includes(saved)) return saved as any;
     } catch { /* private windows fall through to the checklist */ }
     return 'CHECKLIST';
@@ -1288,6 +1289,18 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
         </button>
 
         <button
+          onClick={() => setActiveTab('PARTS')}
+          data-testid="tab-parts"
+          className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
+            activeTab === 'PARTS'
+              ? 'border-accent-line text-accent-ink'
+              : 'border-transparent text-ink-muted hover:text-ink-body'
+          }`}
+        >
+          {isHi ? 'पुर्जे' : 'Parts'}
+        </button>
+
+        <button
           onClick={() => setActiveTab('PHOTOS')}
           className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
             activeTab === 'PHOTOS'
@@ -2073,6 +2086,21 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
           photos={photos}
           gateStatus={gateStatus}
           lang={lang}
+        />
+      )}
+
+      {activeTab === 'PARTS' && wagon && (
+        <PartsLedger
+          wagonNumber={wagon.wagonNumber}
+          stage={wagon.currentStage}
+          lang={lang}
+          /*
+           * Recording is shop-floor work. An administrator holds
+           * checklist.configure and deliberately no shop capability, so the
+           * form is hidden for them rather than shown and then refused — the
+           * mistake already made once on the add-item route.
+           */
+          canRecord={api.getUser()?.role === 'INSPECTOR' || api.getUser()?.role === 'SUPERVISOR'}
         />
       )}
 

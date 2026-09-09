@@ -1427,6 +1427,48 @@ export class ApiClient {
 
 
   // -------------------------------------------------------------------------
+  // Parts in, parts out
+  //
+  // The DRM's question about what happens after a wagon leaves. Recorded
+  // during dismantling and reassembly, one entry per event, and reconciled at
+  // the gate.
+  // -------------------------------------------------------------------------
+
+  public async recordPartEvent(
+    wagonNumber: string,
+    payload: {
+      category: string;
+      partName: string;
+      bogiePosition?: string | null;
+      event: 'REMOVED' | 'REFITTED' | 'REPLACED' | 'SCRAPPED' | 'NOT_FITTED';
+      quantity?: number;
+      /** Required for SCRAPPED and NOT_FITTED: a part not going back needs a decision. */
+      reason?: string | null;
+      photoId?: string | null;
+      storesItemId?: string | null;
+      componentSerial?: string | null;
+    }
+  ): Promise<{ success: boolean; data: PartLedgerEntry }> {
+    return this.request(`/wagons/${encodeURI(wagonNumber)}/parts`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+  }
+
+  public async getPartLedger(
+    wagonNumber: string
+  ): Promise<{ success: boolean; data: { wagonNumber: string; entries: PartLedgerEntry[] } }> {
+    return this.request(`/wagons/${encodeURI(wagonNumber)}/parts`);
+  }
+
+  /** Does what came off match what went back on — with what to do about it. */
+  public async getPartReconciliation(
+    wagonNumber: string
+  ): Promise<{ success: boolean; data: PartReconciliation }> {
+    return this.request(`/wagons/${encodeURI(wagonNumber)}/parts/reconciliation`);
+  }
+
+  // -------------------------------------------------------------------------
   // The camera's memory
   //
   // Loaded once when a bench opens the camera, and added to every time an
@@ -1524,6 +1566,54 @@ export class ApiClient {
   public async getAcousticHistory(wagonNumber: string): Promise<{ success: boolean; data: AcousticDiagnosticRecord[]; meta?: any }> {
     return this.request<{ success: boolean; data: AcousticDiagnosticRecord[]; meta?: any }>(`/acoustic/history/${encodeURIComponent(wagonNumber)}`);
   }
+}
+
+/** One thing that happened to one part, on one wagon. */
+export interface PartLedgerEntry {
+  id: string;
+  wagonNumber: string;
+  partKey: string;
+  category: string;
+  partName: string;
+  bogiePosition: string;
+  event: 'REMOVED' | 'REFITTED' | 'REPLACED' | 'SCRAPPED' | 'NOT_FITTED';
+  quantity: number;
+  reason: string | null;
+  photoId: string | null;
+  storesItemId: string | null;
+  componentSerial: string | null;
+  stage: string;
+  inspectorId: string;
+  inspectorName: string;
+  createdAt: string;
+}
+
+export interface PartBalance {
+  partKey: string;
+  category: string;
+  partName: string;
+  bogiePosition: string;
+  removed: number;
+  refitted: number;
+  replaced: number;
+  scrapped: number;
+  notFitted: number;
+  outstanding: number;
+  unaccounted: boolean;
+  photographs: number;
+  /** What to do next, assembled from the ledger, stores and the cited standard. */
+  suggestion: string | null;
+}
+
+export interface PartReconciliation {
+  wagonNumber: string;
+  balanced: boolean;
+  totalRemoved: number;
+  totalBack: number;
+  outstandingParts: PartBalance[];
+  unaccountedParts: PartBalance[];
+  parts: PartBalance[];
+  summary: string;
 }
 
 export const api = new ApiClient();

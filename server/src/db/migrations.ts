@@ -1248,6 +1248,75 @@ export function runMigrations(db: DatabaseSync): void {
     db.exec('ALTER TABLE vision_examples ADD COLUMN thumbnail TEXT DEFAULT NULL;');
   }
 
+  /*
+   * What came off the wagon, and what went back on.
+   *
+   * THE QUESTION THIS ANSWERS
+   * The DRM's worry, in his own words, is what happens after a wagon leaves:
+   * that nobody should be able to ask whether something was missing, or
+   * whether a part went back rusted or damaged, and get no answer. A count of
+   * checklist lines does not answer that. What answers it is a ledger — every
+   * part recorded coming off during dismantling, every part recorded going
+   * back on during reassembly, and the difference named at the gate.
+   *
+   * WHY EVENTS AND NOT A TALLY
+   * A running total can be corrected until it agrees with itself, which is
+   * exactly the property that makes it worthless as evidence. Each row here is
+   * one thing that happened, at a stage, by a named person, at a time, with a
+   * photograph where one was taken. The balance is derived from them and can
+   * never disagree with them.
+   *
+   * WHY NOT_FITTED IS AN EVENT
+   * A part that came off and is deliberately not going back — a fitting this
+   * wagon type does not carry, or one condemned with no replacement due — must
+   * be recordable as a decision by a person, with a reason. Otherwise the only
+   * way to balance the ledger is to lie in it, and a ledger people have to lie
+   * in to close a wagon is worse than no ledger.
+   */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS wagon_part_ledger (
+      id TEXT PRIMARY KEY,
+      wagon_id TEXT NOT NULL,
+      wagon_number TEXT NOT NULL,
+      -- Identifies the physical position, so two side frames on one bogie are
+      -- two entries rather than one part counted twice.
+      part_key TEXT NOT NULL,
+      category TEXT NOT NULL,
+      part_name TEXT NOT NULL,
+      bogie_position TEXT NOT NULL DEFAULT 'NONE',
+      event TEXT NOT NULL CHECK(event IN
+        ('REMOVED', 'REFITTED', 'REPLACED', 'SCRAPPED', 'NOT_FITTED')),
+      quantity INTEGER NOT NULL DEFAULT 1 CHECK(quantity > 0),
+      -- Required by the route for NOT_FITTED and SCRAPPED: a part that is not
+      -- going back needs a stated reason, not a silent absence.
+      reason TEXT DEFAULT NULL,
+      photo_id TEXT DEFAULT NULL,
+      -- Where a replacement came from, so a new part's provenance is on the
+      -- record beside the old part's removal.
+      stores_item_id TEXT DEFAULT NULL,
+      component_serial TEXT DEFAULT NULL,
+      stage TEXT NOT NULL,
+      inspector_id TEXT NOT NULL,
+      inspector_name TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      FOREIGN KEY (wagon_id) REFERENCES wagons(id) ON DELETE RESTRICT,
+      FOREIGN KEY (inspector_id) REFERENCES users(id) ON DELETE RESTRICT
+    );
+    CREATE INDEX IF NOT EXISTS idx_wpl_wagon ON wagon_part_ledger(wagon_id, part_key);
+    CREATE INDEX IF NOT EXISTS idx_wpl_number ON wagon_part_ledger(wagon_number, created_at DESC);
+    -- Evidence, so append-only like every other measurement in this system.
+    CREATE TRIGGER IF NOT EXISTS trg_wpl_no_update
+    BEFORE UPDATE ON wagon_part_ledger
+    BEGIN
+      SELECT RAISE(ABORT, 'The parts ledger records what happened and cannot be rewritten.');
+    END;
+    CREATE TRIGGER IF NOT EXISTS trg_wpl_no_delete
+    BEFORE DELETE ON wagon_part_ledger
+    BEGIN
+      SELECT RAISE(ABORT, 'The parts ledger records what happened and cannot be deleted.');
+    END;
+  `);
+
   // A declared principal for actions the system performs itself.
   //
   // Audit rows carry a foreign key to users, so an event with no human actor
