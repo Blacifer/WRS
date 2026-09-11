@@ -55,6 +55,23 @@ interface Props {
   lang: 'en' | 'hi';
   /** Springs at the sorting bench; wagon parts everywhere else. */
   domain?: 'SPRING' | 'WAGON_PART';
+  /**
+   * The answers to offer, keyed by label with a human name to show.
+   *
+   * For wagon parts this is the wagon type's own expected positions — the
+   * checklist already knows what a BOXNHL carries, and those are exactly the
+   * names the camera should learn. Without this the PART_ID head has nothing
+   * to offer and is unusable, which is why it was unreachable until now.
+   */
+  choices?: Array<{ label: string; display: string }>;
+  /** The question to open on. */
+  initialHead?: BrainHead;
+  /**
+   * Called with the confirmed answer, so a screen can act on it — the parts
+   * ledger fills its form from this, which is what makes "photograph the
+   * part, tap once" true rather than a slogan.
+   */
+  onConfirm?: (label: string, display: string) => void;
 }
 
 /** Only the heads that make sense for a spring on a sorting bench. */
@@ -84,7 +101,13 @@ function thumbnailOf(crop: HTMLCanvasElement): string | null {
   }
 }
 
-export default function TeachTheCamera({ lang, domain = 'SPRING' }: Props) {
+export default function TeachTheCamera({
+  lang,
+  domain = 'SPRING',
+  choices,
+  initialHead,
+  onConfirm
+}: Props) {
   const isHi = lang === 'hi';
   const heads = domain === 'SPRING' ? SPRING_HEADS : (BRAIN_HEADS as BrainHead[]);
 
@@ -103,7 +126,7 @@ export default function TeachTheCamera({ lang, domain = 'SPRING' }: Props) {
   const [loading, setLoading] = useState(true);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [head, setHead] = useState<BrainHead>(heads[0]);
+  const [head, setHead] = useState<BrainHead>(initialHead ?? heads[0]);
   const [proposals, setProposals] = useState<Record<string, Proposal>>({});
   const [accuracy, setAccuracy] = useState<Record<string, BrainAccuracy>>({});
   const [counts, setCounts] = useState<Record<string, number>>({});
@@ -320,6 +343,8 @@ export default function TeachTheCamera({ lang, domain = 'SPRING' }: Props) {
         setUnsent(readUnsent().length);
       }
 
+      onConfirm?.(label, choices?.find((c) => c.label === label)?.display ?? label.replace(/_/g, ' '));
+
       // Immediately re-judge the same frame, so the effect of the correction
       // is visible rather than asserted.
       const next: Record<string, Proposal> = {};
@@ -327,12 +352,14 @@ export default function TeachTheCamera({ lang, domain = 'SPRING' }: Props) {
       lastRef.current = { ...last, proposals: next };
       setProposals(next);
     },
-    [head, domain, heads, isHi, refreshStats]
+    [head, domain, heads, isHi, refreshStats, choices, onConfirm]
   );
 
   const acc = accuracy[head];
   const labelsSeen = Object.keys(brainRef.current.counts(head));
-  const labels = Array.from(new Set([...SUGGESTED_LABELS[head], ...labelsSeen]));
+  const offered = head === 'PART_ID' && choices ? choices.map((c) => c.label) : SUGGESTED_LABELS[head];
+  const labels = Array.from(new Set([...offered, ...labelsSeen]));
+  const displayFor = (l: string) => choices?.find((c) => c.label === l)?.display ?? l.replace(/_/g, ' ');
   const p = proposals[head];
   const thinnest = brainRef.current.thinnestClass(head);
 
@@ -440,7 +467,7 @@ export default function TeachTheCamera({ lang, domain = 'SPRING' }: Props) {
                   {isHi ? 'इसे लगता है' : 'It thinks'}
                 </p>
                 <p className="text-3xl font-black text-white leading-none mt-1" data-testid="teach-proposal">
-                  {p.label}
+                  {displayFor(p.label)}
                 </p>
                 <p className="text-xs text-ink-body mt-2">
                   {isHi ? 'निश्चितता' : 'Confidence'}{' '}
@@ -480,7 +507,7 @@ export default function TeachTheCamera({ lang, domain = 'SPRING' }: Props) {
                       : 'border-line text-ink-body'
                   }`}
                 >
-                  {l.replace(/_/g, ' ')}
+                  {displayFor(l)}
                   <span className="ml-2 font-mono text-[11px] opacity-60">
                     {brainRef.current.counts(head)[l] ?? 0}
                   </span>

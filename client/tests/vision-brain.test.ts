@@ -369,3 +369,32 @@ describe('a teaching made while the network is away', () => {
     expect(kept[kept.length - 1].label).toBe(`L${m.MAX_UNSENT + 39}`);
   });
 });
+
+describe('a wagon part as a label the camera can learn', () => {
+  it('TC-VB-24 turns a checklist part name into a label the server will accept', async () => {
+    // The server allows only letters, digits, underscore and hyphen, because a
+    // label is a join key and punctuation would make two spellings of one part
+    // into two classes. Checked here against the same rule the server applies.
+    const { labelForPart } = await import('../src/services/visionBrain.ts');
+    const serverRule = /^[A-Z0-9_\-]+$/;
+    for (const name of [
+      'Axle Box Adapter Crown Lug Wear (Max 4.0mm)',
+      'CTRB End Cap Screws (100% Replace — POH)',
+      'Air Hose & Angle Cocks (BP Air Hose 100% Replace — POH)',
+      'Composite Brake Blocks (Min 10mm)'
+    ]) {
+      const label = labelForPart(name);
+      expect(label).toMatch(serverRule);
+      expect(label.length).toBeLessThanOrEqual(64);
+    }
+    expect(labelForPart('Axle Box Adapter Crown Lug Wear (Max 4.0mm)')).toBe(
+      'AXLE_BOX_ADAPTER_CROWN_LUG_WEAR_MAX_4_0MM'
+    );
+  });
+
+  it('TC-VB-25 gives the same label to the same part however it is typed', async () => {
+    const { labelForPart } = await import('../src/services/visionBrain.ts');
+    expect(labelForPart('friction wedge')).toBe(labelForPart('  Friction  Wedge '));
+    expect(labelForPart('Friction-Wedge')).toBe('FRICTION_WEDGE');
+  });
+});

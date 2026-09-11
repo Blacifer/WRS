@@ -87,6 +87,23 @@ export const SUGGESTED_LABELS: Record<BrainHead, string[]> = {
 
 export type BrainDomain = 'SPRING' | 'WAGON_PART';
 
+/**
+ * A part name as a label the brain will accept.
+ *
+ * "Axle Box Adapter Crown Lug Wear (Max 4.0mm)" cannot be a label as written —
+ * the server allows only letters, digits, underscore and hyphen, because a
+ * label is a join key and punctuation makes two spellings of one part into two
+ * classes. This is the single place that rule is applied on the way in, so the
+ * camera and the ledger cannot disagree about what a part is called.
+ */
+export function labelForPart(partName: string): string {
+  return partName
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 64);
+}
+
 /** One remembered photograph: what it looked like, and what a person called it. */
 export interface BrainExample {
   id: string;

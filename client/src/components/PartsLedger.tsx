@@ -30,6 +30,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { api, type PartLedgerEntry, type PartReconciliation } from '../services/api.ts';
+import TeachTheCamera from './TeachTheCamera.tsx';
+import { labelForPart } from '../services/visionBrain.ts';
 
 interface Props {
   wagonNumber: string;
@@ -84,6 +86,7 @@ export function PartsLedger({ wagonNumber, stage, lang, canRecord }: Props) {
   const [quantity, setQuantity] = useState(1);
   const [reason, setReason] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [useCamera, setUseCamera] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -141,6 +144,16 @@ export function PartsLedger({ wagonNumber, stage, lang, canRecord }: Props) {
         .map((p) => p.partName)
     )
   );
+
+  /*
+   * The same expected positions, as labels the camera can learn.
+   *
+   * One entry per part NAME rather than per position: a friction wedge on
+   * bogie 1 looks exactly like one on bogie 2, so asking the camera to tell
+   * them apart would be asking it to guess. It names the part; the fitter
+   * says which bogie, as they already do.
+   */
+  const cameraChoices = expectedNames.map((n) => ({ label: labelForPart(n), display: n }));
 
   const needsReason = NEEDS_REASON.includes(event);
   const nothingRecorded = !!recon && recon.parts.length === 0;
@@ -262,6 +275,57 @@ export function PartsLedger({ wagonNumber, stage, lang, canRecord }: Props) {
       )}
 
       {/* Recording one event. */}
+      {/*
+        * The camera, for the fitter who would rather point than type.
+        *
+        * Off by default: it costs 13 MB of weights on first use and most of
+        * this screen's visitors are supervisors reading the balance, not
+        * fitters recording it. When it is on, a confirmed answer fills the
+        * part name below — and the category and position when the name maps
+        * to exactly one expected position — so recording a removal is:
+        * photograph, tap the name, tap "record".
+        *
+        * It learns this wagon type's parts from the fitter's own taps, the
+        * same way the sorting bench learns springs. On day one it knows
+        * nothing and says so.
+        */}
+      {canRecord && expectedNames.length > 0 && (
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => setUseCamera((v) => !v)}
+            data-testid="parts-camera-toggle"
+            className="text-xs font-bold text-sky-400 underline-offset-2 hover:underline"
+          >
+            {useCamera
+              ? isHi
+                ? 'कैमरा छिपाएँ'
+                : 'Hide the camera'
+              : isHi
+              ? 'कैमरे से पुर्जा पहचानें'
+              : 'Use the camera to name the part'}
+          </button>
+          {useCamera && (
+            <TeachTheCamera
+              lang={lang}
+              domain="WAGON_PART"
+              initialHead="PART_ID"
+              choices={cameraChoices}
+              onConfirm={(_label, display) => {
+                setPartName(display);
+                const matches = (recon?.parts || []).filter((p) => p.partName === display);
+                if (matches.length === 1) {
+                  setCategory(matches[0].category);
+                  setBogiePosition(matches[0].bogiePosition);
+                } else if (matches.length > 1) {
+                  setCategory(matches[0].category);
+                }
+              }}
+            />
+          )}
+        </div>
+      )}
+
       {canRecord && (
         <div className="rounded-control border border-line bg-card p-4 space-y-3">
           <div className="flex flex-wrap gap-2">
