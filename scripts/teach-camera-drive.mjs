@@ -15,12 +15,28 @@
  *
  *   npm run dev                              # in one terminal
  *   node scripts/teach-camera-drive.mjs      # in another
+ *
+ * DELIBERATELY NOT PART OF PREFLIGHT
+ * ----------------------------------
+ * The other browser drills are read-mostly. This one TEACHES: thirty drawn
+ * springs go into vision_examples, which is append-only by design. On a
+ * developer's machine that is harmless. On the shop's machine — where preflight
+ * is exactly what somebody would run before go-live — it would seed the
+ * camera's memory with cartoons that can never be removed. So it is a
+ * deliberate run, it refuses a database that holds anything real, and the
+ * pipeline itself is proven in preflight by vision-brain-proof.mjs, which
+ * writes nothing.
  */
 
 import { chromium } from 'playwright';
 
-const BASE = process.env.APP_URL || 'http://localhost:5173';
-const API = process.env.API_URL || 'http://localhost:3001/api';
+/*
+ * The BUILT client, as the other browser drills use — the artefact the shop
+ * actually installs. The preview proxies /api through to the server, so there
+ * is one URL here rather than two that can drift apart.
+ */
+const BASE = process.env.APP_URL || 'http://localhost:4173';
+const API = process.env.API_URL || `${BASE}/api`;
 /*
  * Ten of each rather than twenty. The claim being checked here is that the
  * screen teaches and remembers, and thirty taps establish that as well as
@@ -29,6 +45,24 @@ const API = process.env.API_URL || 'http://localhost:3001/api';
  * different question, answered by scripts/vision-brain-proof.mjs.
  */
 const PER_CLASS = Number(process.env.PER_CLASS || 10);
+
+/*
+ * Everything this drive teaches is stamped with this, and the stamp is what
+ * makes the guard below possible.
+ *
+ * The springs here are DRAWN, not photographed. They are good enough to prove
+ * the screen teaches and remembers, and they are nothing like a real spring in
+ * a real shed. Left in a shop's database they would do two kinds of harm: the
+ * camera would compare real springs against cartoons, and the readiness panel
+ * would count thirty cartoons as thirty pieces of evidence — the one number in
+ * this system that must never be inflated.
+ *
+ * vision_examples is append-only by trigger, deliberately: it is the evidence
+ * for why the camera said what it said. So these rows cannot be tidied away
+ * afterwards. The only safe answer is to refuse to write them in the first
+ * place, which is what the guard does.
+ */
+const SYNTHETIC_MARK = 'SYNTHETIC_DRIVE';
 
 const TYPES = {
   OUTER:   { coils: 9,  wire: 13, width: 0.62, height: 0.86 },
@@ -54,6 +88,17 @@ const browser = await chromium.launch({
 });
 const ctx = await browser.newContext({ permissions: ['camera'] });
 const page = await ctx.newPage();
+
+await page.route('**/api/vision/brain/teach', (route) => {
+  const req = route.request();
+  let body = {};
+  try {
+    body = JSON.parse(req.postData() || '{}');
+  } catch {
+    /* leave it */
+  }
+  return route.continue({ postData: JSON.stringify({ ...body, partName: SYNTHETIC_MARK }) });
+});
 
 const consoleErrors = [];
 page.on('console', (m) => m.type() === 'error' && consoleErrors.push(m.text()));
@@ -81,6 +126,45 @@ if (!openedSorting) {
   process.exit(1);
 }
 await page.waitForTimeout(2000);
+
+/*
+ * Refuse to run against a database that holds anything real.
+ *
+ * A real teaching has no partName; ours carry SYNTHETIC_MARK. If even one
+ * unmarked example exists, this is a shop's database — or a developer's that
+ * is standing in for one — and thirty cartoons must not be written into it.
+ * The override exists for a developer who knows exactly what they are doing
+ * and is prepared to say so in the environment.
+ */
+const before = await page.evaluate(async () => {
+  const r = await fetch('/api/vision/brain?domain=SPRING', {
+    headers: { authorization: `Bearer ${localStorage.getItem('wrs_token')}` }
+  });
+  const b = await r.json().catch(() => null);
+  const examples = b?.data?.examples || [];
+  return {
+    total: examples.length,
+    real: examples.filter((e) => e.partName !== 'SYNTHETIC_DRIVE').length
+  };
+});
+
+if (before.real > 0 && process.env.TEACH_DRIVE_ALLOW_REAL_DB !== '1') {
+  console.error(`
+REFUSING TO RUN.
+
+This database holds ${before.real} taught photograph${before.real === 1 ? '' : 's'} that did not come
+from this drive. That makes it a real database, and this drive would write
+${PER_CLASS * 3} DRAWN springs into it — permanently, because what the camera is
+taught is append-only evidence.
+
+The camera would then compare real springs against cartoons, and the readiness
+panel would count cartoons as evidence.
+
+Run this against a fresh database, or set TEACH_DRIVE_ALLOW_REAL_DB=1 if you
+are a developer and this is not a shop's machine.
+`);
+  process.exit(2);
+}
 
 const panel = page.locator('[data-testid="teach-the-camera"]');
 await panel.waitFor({ timeout: 15000 });

@@ -91,6 +91,17 @@ else
   skip "Vision model proof" "playwright not installed"
 fi
 
+# scripts/teach-camera-drive.mjs is deliberately NOT here.
+#
+# It drives the teaching screen end to end and it passes — but it TEACHES: thirty
+# drawn springs go into vision_examples, which is append-only by design. On a
+# developer's machine that is harmless. On the shop's machine, where this
+# script is exactly what somebody would run before go-live, it would seed the
+# camera's memory with cartoons that can never be removed. It refuses a
+# database holding anything real, and it is run deliberately:
+#
+#   node scripts/teach-camera-drive.mjs
+
 # The backup path, which had never been run by anybody. It needs no browser
 # and no server — only sqlite3 and openssl — and it works in a temporary
 # directory with a throwaway key, so it is safe to run every time and there is
