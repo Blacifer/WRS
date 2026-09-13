@@ -19,6 +19,7 @@
  */
 
 import fs from 'node:fs';
+import path from 'node:path';
 import crypto from 'node:crypto';
 import type { DatabaseSync } from 'node:sqlite';
 import { RDSO_TABLES } from '../../../shared/classification/tables.ts';
@@ -423,7 +424,10 @@ export function indexManualText(
 /** Convenience for the CLI: index straight from an extracted .txt file. */
 export function indexManualFromFile(db: DatabaseSync, filePath: string) {
   const raw = fs.readFileSync(filePath, 'utf8');
-  return indexManualText(db, raw, filePath.split('/').pop() || 'manual.txt');
+  // path.basename rather than split('/'): on Windows the path has no forward
+  // slashes at all, and the whole of C:\...\manual.txt would have become the
+  // source label printed against every citation.
+  return indexManualText(db, raw, path.basename(filePath) || 'manual.txt');
 }
 
 /**

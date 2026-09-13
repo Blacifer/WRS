@@ -250,6 +250,9 @@ if (args[0] === '--restore') {
 } else {
   backup(
     args[0] || path.join(here, '..', 'data', 'wrs_inspections.db'),
-    args[1] || path.join(here, '..', 'data', 'backups')
+    // The same value the readiness panel reads, so the two cannot disagree
+    // about where a backup lives. A positional argument still wins, for a
+    // one-off to a USB stick.
+    args[1] || process.env.WRS_BACKUP_DIR || path.join(here, '..', 'data', 'backups')
   );
 }

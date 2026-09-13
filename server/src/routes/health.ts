@@ -92,7 +92,7 @@ healthRouter.get(
   requireCapability('system.configure'),
   (_req: AuthenticatedRequest, res: Response): void => {
     const dbPath = config.dbPath;
-    const backupDir = path.resolve(path.dirname(dbPath), 'backups');
+    const backupDir = config.backupDir;
 
     const sizeOf = (f: string): number => {
       try { return fs.statSync(f).size; } catch { return 0; }
@@ -321,7 +321,7 @@ healthRouter.get(
     });
 
     // --- the record, and whether a copy of it exists ---
-    const backupDir = path.resolve(path.dirname(config.dbPath), 'backups');
+    const backupDir = config.backupDir;
     let newestBackupMs: number | null = null;
     let backupCount = 0;
     try {

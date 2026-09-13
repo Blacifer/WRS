@@ -54,6 +54,10 @@ Then add the rest:
 NODE_ENV=production
 PORT=3000
 CORS_ORIGIN=http://<the address the tablets use>:3000
+# Where backups go. MUST be a different disk from the database — a second
+# drive, a USB disk kept in another room, or a network share. The dashboard
+# looks here, and flags the default (beside the database) as not protection.
+WRS_BACKUP_DIR=D:\wrs-backups
 OTP_DELIVERY=INLINE
 
 # Optional. Everything works without it — Ask the Manual stays keyword search
@@ -163,7 +167,23 @@ entry, with its calibration date.
 ## 7. Backups
 
 Create a key **once**, and keep it off the backup volume — a key stored beside
-the thing it encrypts protects against nothing:
+the thing it encrypts protects against nothing.
+
+**Windows** (PowerShell, as Administrator):
+
+```powershell
+New-Item -ItemType Directory -Force C:\wrs | Out-Null
+$bytes = New-Object byte[] 32
+[System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+[System.IO.File]::WriteAllText('C:\wrs\backup.key', (($bytes | ForEach-Object { $_.ToString('x2') }) -join ''))
+icacls C:\wrs\backup.key /inheritance:r /grant:r "SYSTEM:R" "Administrators:R"
+```
+
+Keep a copy of `C:\wrs\backup.key` somewhere that is not this PC — a
+password manager, or a sealed envelope in the office. **A backup whose key was
+only ever on the formatted machine cannot be opened.**
+
+**Linux/macOS:**
 
 ```bash
 umask 077
@@ -187,12 +207,40 @@ It should end `All checks passed. A backup taken now would come back.`
 Then schedule it.
 
 **Windows** — Task Scheduler, weekly, running whether or not anybody is logged
-in:
+in. Three things in this command are there because leaving them out produces a
+task that reports success and backs up nothing:
+
+- The key path is passed **inline**. The task runs as SYSTEM, and SYSTEM never
+  sees a variable you set with `setx` in your own session — so without this
+  the script exits at 2 am with "WRS_BACKUP_KEY_FILE is not set" and nobody is
+  there to read it.
+- `node.exe` is given by **full path**, because SYSTEM's PATH may not include
+  it.
+- The destination is a **different drive**, and it is the same `WRS_BACKUP_DIR`
+  you put in `.env` — that is where the dashboard looks, and the two must
+  agree. The application refuses to call a same-disk copy a backup: format the
+  PC and the records and every copy of them go together. `D:` here is a second
+  internal drive, a USB disk kept in another room, or a mapped network share —
+  anything that is not `C:`.
 
 ```
 schtasks /Create /TN "WRS backup" /SC WEEKLY /D SUN /ST 02:00 /RU SYSTEM ^
-  /TR "node C:\wrs-raipur\server\scripts\backup-db.mjs"
+  /TR "cmd /c set WRS_BACKUP_KEY_FILE=C:\wrs\backup.key && set WRS_BACKUP_DIR=D:\wrs-backups && ^
+       \"C:\Program Files\nodejs\node.exe\" C:\wrs-raipur\server\scripts\backup-db.mjs"
 ```
+
+Then **run it once by hand and look**, rather than trusting the schedule:
+
+```
+schtasks /Run /TN "WRS backup"
+dir D:\wrs-backups
+```
+
+A file named `wrs_inspections_<timestamp>.db.enc` should be there. If it is not,
+open Task Scheduler, find "WRS backup", and read the **Last Run Result** —
+`0x0` is success; anything else is the exit code of the script, and the reason
+is in the History tab. Once it has run by hand, the admin dashboard's readiness
+panel should show the backup row green with "on a different disk".
 
 **Linux** — `crontab -e`:
 

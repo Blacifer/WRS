@@ -36,6 +36,19 @@ export interface AppConfig {
   jwtSecret: string;
   jwtExpiresIn: string;
   dbPath: string;
+  /**
+   * Where backups are written, and therefore where the readiness panel looks
+   * for them.
+   *
+   * One value read by both the backup script and the health check, because
+   * the two disagreeing is worse than either being wrong: the runbook tells
+   * the shop to back up to a second drive, and a dashboard still looking in
+   * the default folder would report "no backup" every day while a perfectly
+   * good one sat on D:. The default is beside the database, which the panel
+   * flags as not protection — deliberately, so the first thing an installer
+   * sees is the instruction to move it.
+   */
+  backupDir: string;
   corsOrigin: string;
   otpDelivery: 'INLINE' | 'SMS';
   nodeEnv: string;
@@ -94,6 +107,9 @@ export const config: AppConfig = {
   jwtSecret: process.env.JWT_SECRET || 'wrs-raipur-rdso-g95-secret-key-2026-DEV-ONLY',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
   dbPath: process.env.DB_PATH || path.resolve(__dirname, '..', '..', 'data', 'wrs_inspections.db'),
+  backupDir:
+    process.env.WRS_BACKUP_DIR ||
+    path.resolve(path.dirname(process.env.DB_PATH || path.resolve(__dirname, '..', '..', 'data', 'wrs_inspections.db')), 'backups'),
   corsOrigin: process.env.CORS_ORIGIN || '*',
   // How a supervisor receives their one-time code.
   //
