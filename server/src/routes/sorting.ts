@@ -21,6 +21,7 @@ import type { BogieType, SpringCondition, SpringPosition } from '../../../shared
 import { allocateNests } from '../../../shared/sorting/nestAllocation.ts';
 import { findMeasurementAnomaly } from '../../../shared/analysis/measurementAnomaly.ts';
 import { LearningService } from '../learning/learningService.ts';
+import { parseClaimedSource } from '../../../shared/vision/autoCommit.ts';
 
 export const sortingRouter = Router();
 
@@ -106,8 +107,19 @@ sortingRouter.post('/record', authMiddleware, (req: AuthenticatedRequest, res: R
       anomaly = null;
     }
 
+    /*
+     * How this verdict was reached. A camera decision must say so on the row,
+     * because CAMERA_AUTO rows are the ones a supervisor pulls for a blind
+     * re-check, and a typo must not quietly turn one into "a person did this".
+     */
+    const measurementSource = parseClaimedSource(b.measurementSource);
+    if (measurementSource === null) {
+      return bad(res, 'measurementSource must be MANUAL, CAMERA_ASSISTED or CAMERA_AUTO.');
+    }
+
     const { id, alreadyRecorded } = r.record({
       batchId: String(b.batchId),
+      measurementSource,
       bogieType: bogieType as BogieType,
       condition,
       springPosition,

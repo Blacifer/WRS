@@ -68,6 +68,15 @@ export interface AppConfig {
   zapheitApiKey: string | null;
   zapheitBaseUrl: string;
   zapheitModel: string;
+
+  /**
+   * Whether the camera may ever decide without asking. Default on: the rule
+   * in shared/vision/autoCommit.ts keeps a fresh installation from doing so
+   * anyway, since no head has earned it. This is the supervisor's kill
+   * switch for a bad day — VISION_AUTO_COMMIT=off — and the reason on screen
+   * then says a person did that.
+   */
+  visionAutoCommit: boolean;
 }
 
 const nodeEnv = process.env.NODE_ENV || 'development';
@@ -128,6 +137,7 @@ export const config: AppConfig = {
   zapheitApiKey: process.env.ZAPHEIT_API_KEY || null,
   zapheitBaseUrl: process.env.ZAPHEIT_BASE_URL || 'https://api.zapheit.com/v1',
   zapheitModel: process.env.ZAPHEIT_MODEL || 'gpt-4o-mini',
+  visionAutoCommit: !/^(off|false|0|no)$/i.test(String(process.env.VISION_AUTO_COMMIT || 'on').trim()),
 
   nodeEnv
 };

@@ -17,7 +17,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import crypto from 'node:crypto';
 import { logAuditEvent } from './auditLog.ts';
-import type { BogieType, SpringCondition, SpringPosition, BandColor } from '../../../shared/types.ts';
+import type { BogieType, SpringCondition, SpringPosition, BandColor, MeasurementSource } from '../../../shared/types.ts';
 import { GaugeRepository } from './gaugeRepository.ts';
 
 export interface SortingRecordInput {
@@ -36,6 +36,8 @@ export interface SortingRecordInput {
   inspectorId: string;
   inspectorName?: string | null;
   syncId?: string | null;
+  /** How the verdict was arrived at. Defaults to a person. */
+  measurementSource?: MeasurementSource;
   /**
    * Which gauge produced the reading.
    *
@@ -144,8 +146,8 @@ export class SortingRepository {
         measured_height, height_is_approximate, classified_band, band_roman,
         status, damage_type, condemnation_reason, table_reference,
         inspector_id, inspector_name, sync_id, supersedes, voided,
-        gauge_code, gauge_calibration_state
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        gauge_code, gauge_calibration_state, measurement_source
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       input.batchId,
@@ -172,7 +174,8 @@ export class SortingRepository {
        * spring was judged, so that recalibrating an instrument next month
        * cannot retrospectively make today's unverified readings look sound.
        */
-      new GaugeRepository(this.db).stateForReading(input.gaugeCode)
+      new GaugeRepository(this.db).stateForReading(input.gaugeCode),
+      input.measurementSource ?? 'MANUAL'
     );
 
     return { id, alreadyRecorded: false };

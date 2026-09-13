@@ -16,6 +16,7 @@ import { WagonRepository } from '../db/wagonRepository.ts';
 import { InspectionRepository } from '../db/repository.ts';
 import { LifecycleEngine } from '../lifecycle/engine.ts';
 import { ExitGateValidator } from '../gate/validator.ts';
+import { parseClaimedSource } from '../../../shared/vision/autoCommit.ts';
 import { CertificateGenerator } from '../reports/certificate.ts';
 import { otpService } from '../auth/otpService.ts';
 import { TotpService } from '../auth/totpService.ts';
@@ -735,6 +736,19 @@ wagonsRouter.put('/:wagonNumber/checklist/items/:itemId', authMiddleware, async 
   const itemId = req.params?.itemId;
   const { status, repairAction, repairNotes, reinspectedStatus, conditionNotes, photoId } = req.body;
 
+  // See the sorting route: a camera decision must say so on the row.
+  const verdictSource = parseClaimedSource(req.body?.verdictSource);
+  if (verdictSource === null) {
+    res.status(400).json({
+      success: false,
+      error: 'VALIDATION_ERROR',
+      message: 'verdictSource must be MANUAL, CAMERA_ASSISTED or CAMERA_AUTO.',
+      statusCode: 400,
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
+
   if (!itemId) {
     res.status(400).json({
       success: false,
@@ -762,7 +776,8 @@ wagonsRouter.put('/:wagonNumber/checklist/items/:itemId', authMiddleware, async 
       {
         expectedUpdatedAt: req.body?.expectedUpdatedAt,
         userId: (req as any).user?.id,
-        userRole: (req as any).user?.role
+        userRole: (req as any).user?.role,
+        verdictSource
       }
     );
 

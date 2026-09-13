@@ -66,9 +66,10 @@ export const EMBEDDER_URL = '/models/mobilenet/model.json';
  * category — and because they should be able to fail independently. Category
  * will work long before damage does, and it should not be held back by it.
  */
-export type BrainHead = 'CATEGORY' | 'SURFACE' | 'DAMAGE' | 'PART_ID';
-
-export const BRAIN_HEADS: readonly BrainHead[] = ['CATEGORY', 'SURFACE', 'DAMAGE', 'PART_ID'] as const;
+export type { BrainHead, BrainDomain, BrainVerdict } from '../../../shared/vision/types.ts';
+export { BRAIN_HEADS, BRAIN_DOMAINS } from '../../../shared/vision/types.ts';
+import type { BrainHead, BrainDomain, BrainVerdict } from '../../../shared/vision/types.ts';
+import { BRAIN_HEADS } from '../../../shared/vision/types.ts';
 
 export const HEAD_QUESTION: Record<BrainHead, string> = {
   CATEGORY: 'Which kind of spring is this?',
@@ -85,7 +86,6 @@ export const SUGGESTED_LABELS: Record<BrainHead, string[]> = {
   PART_ID: []
 };
 
-export type BrainDomain = 'SPRING' | 'WAGON_PART';
 
 /**
  * A part name as a label the brain will accept.
@@ -489,7 +489,6 @@ export interface BrainAccuracy {
   verdict: BrainVerdict;
 }
 
-export type BrainVerdict = 'INSUFFICIENT' | 'ASSIST' | 'FLAG_ONLY' | 'STOP';
 
 /**
  * The thresholds, fixed here in advance and in code.

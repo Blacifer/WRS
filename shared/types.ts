@@ -89,7 +89,33 @@ export type MeasurementSource =
    * MANUAL it would claim a person measured something they only agreed with,
    * and the day that reading is questioned is the day that difference matters.
    */
-  | 'CAMERA_ASSISTED';
+  | 'CAMERA_ASSISTED'
+  /*
+   * The camera decided and nobody confirmed it.
+   *
+   * Written only when every contributing head has a MEASURED accuracy of 95%
+   * or better on this shop's own photographs, the proposal itself was
+   * confident, the outcome is a pass, and the live agreement rate has not
+   * fallen. See shared/vision/autoCommit.ts for the rule, which is the only
+   * place it is decided. A record carrying this value can be pulled for a
+   * supervisor's blind re-check precisely because it says what it is.
+   */
+  | 'CAMERA_AUTO';
+
+/**
+ * Kept in step with the database, which is the authority: the CHECK on
+ * inspections.measurement_source, and the same list on
+ * spring_sorting_records and checklist_items. A value added here without the
+ * migration is not a change, it is a silent refusal at the first write —
+ * which is exactly what happened to CAMERA_ASSISTED before the drift test
+ * existed. server/tests/measurement-source-drift.test.ts holds them together.
+ */
+export const ALL_MEASUREMENT_SOURCES: readonly MeasurementSource[] = [
+  'MANUAL',
+  'OCR',
+  'CAMERA_ASSISTED',
+  'CAMERA_AUTO'
+] as const;
 
 export type LanguageCode = 
   | 'hi' 

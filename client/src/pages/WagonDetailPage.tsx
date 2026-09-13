@@ -11,6 +11,7 @@ import { BanIcon, CaliperIcon, CameraIcon, ClipboardIcon, ClockIcon, CoilIcon, F
 import { offlineDb } from '../services/offlineDb.ts';
 import { useI18n } from '../i18n/index.ts';
 import { PhotoCaptureModal } from '../components/PhotoCaptureModal.tsx';
+import AutoJudgePart from '../components/AutoJudgePart.tsx';
 import { PhotoGallery } from '../components/PhotoGallery.tsx';
 import { AssemblyEvidenceCapture } from '../components/AssemblyEvidenceCapture.tsx';
 import { parseAssemblyTags } from '../../../shared/assembly/assemblyCapture.ts';
@@ -104,6 +105,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
   // Photo Capture Modal State
   const [photoModalTarget, setPhotoModalTarget] = useState<{ category: string; partName: string; itemId?: string } | null>(null);
+  const [judgeTarget, setJudgeTarget] = useState<ChecklistItem | null>(null);
 
   // Camera-and-caliper modal state
   const [smartVisionModalTarget, setSmartVisionModalTarget] = useState<{
@@ -1619,6 +1621,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                 <button
                   key={catKey}
                   onClick={() => setSelectedCategory(catKey)}
+                  data-testid={`category-tab-${catKey}`}
                   className={`min-h-tap px-4 py-2 rounded-control text-sm font-semibold transition-colors flex items-center gap-2 ${
                     isSelected
                       ? 'bg-selected text-ink'
@@ -1873,6 +1876,24 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                         >
                           <SparklesIcon size={15} />
                           <span className="hidden sm:inline">{t('actions.smartVision') || 'Measure'}</span>
+                        </button>
+                      )}
+
+                      {/*
+                        * The camera judging the part. Same rule as the sorting
+                        * bench: passes without a tap only when it has earned
+                        * it on this shop's parts; never fails on its own.
+                        */}
+                      {mayInspect && item.status === 'PENDING' && (
+                        <button
+                          onClick={() => setJudgeTarget(item)}
+                          data-testid={`judge-part-${item.id}`}
+                          className="min-h-[48px] px-3 py-2 bg-raised hover:bg-selected border border-line rounded-control text-xs text-ink-body font-bold transition flex items-center justify-center gap-1"
+                          title="Judge with the camera"
+                          aria-label="Judge with the camera"
+                        >
+                          <SparklesIcon size={15} />
+                          <span className="hidden sm:inline">Judge</span>
                         </button>
                       )}
 
@@ -2736,6 +2757,17 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
             </form>
           </div>
         </div>
+      )}
+
+      {judgeTarget && (
+        <AutoJudgePart
+          wagonNumber={wagonNumber}
+          item={judgeTarget}
+          stage={wagon?.currentStage}
+          lang={lang}
+          onClose={() => setJudgeTarget(null)}
+          onJudged={() => loadWagonData()}
+        />
       )}
 
       {/* Photo Capture Modal */}

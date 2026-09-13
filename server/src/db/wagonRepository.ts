@@ -6,6 +6,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import crypto from 'node:crypto';
 import { logAuditEvent } from './auditLog.ts';
+import type { MeasurementSource } from '../../../shared/types.ts';
 import { config } from '../config/index.ts';
 import { signCertificate } from '../reports/certificateSigning.ts';
 import * as analytics from './wagonAnalytics.ts';
@@ -777,7 +778,13 @@ export class WagonRepository {
   public updateChecklistItem(
     itemId: string,
     updates: Partial<ChecklistItemData>,
-    options?: { expectedUpdatedAt?: string; userId?: string; userRole?: string }
+    options?: {
+      expectedUpdatedAt?: string;
+      userId?: string;
+      userRole?: string;
+      /** How the verdict was arrived at. Defaults to a person. */
+      verdictSource?: MeasurementSource;
+    }
   ): any {
     const existing = this.getChecklistItemById(itemId);
     if (!existing) {
@@ -808,20 +815,23 @@ export class WagonRepository {
     const conditionNotes = updates.conditionNotes !== undefined ? updates.conditionNotes : existing.conditionNotes;
     const photoId = updates.photoId !== undefined ? updates.photoId : existing.photoId;
 
-    // This route is only ever reached by a person acting on the part, so any
-    // status they set claims the row against later measurement updates.
+    // Any status set here claims the row against later measurement updates.
+    // Until the camera could decide, "here" always meant a person; now the
+    // source says which, and CAMERA_AUTO rows are what a supervisor samples.
     const claimsRow = updates.status !== undefined && updates.status !== 'PENDING';
+    const verdictSource = options?.verdictSource ?? 'MANUAL';
 
     this.db.prepare(`
       UPDATE checklist_items
       SET status = ?, repair_action = ?, repair_notes = ?, reinspected_status = ?,
           condition_notes = ?, photo_id = ?, updated_at = ?,
-          manual_verdict_at = ?, manual_verdict_by = ?
+          manual_verdict_at = ?, manual_verdict_by = ?, verdict_source = ?
       WHERE id = ?
     `).run(
       status, repairAction, repairNotes, reinspectedStatus, conditionNotes, photoId, now,
       claimsRow ? now : (existing.manualVerdictAt ?? null),
       claimsRow ? (options?.userId || existing.manualVerdictBy || null) : (existing.manualVerdictBy ?? null),
+      claimsRow ? verdictSource : (existing.verdictSource ?? 'MANUAL'),
       itemId
     );
 
@@ -843,6 +853,7 @@ export class WagonRepository {
         partName: existing.part_name,
         previousStatus: existing.status,
         newStatus: status,
+        verdictSource,
         repairAction,
         reinspectedStatus,
         conditionNotes: conditionNotes || null
@@ -2371,6 +2382,7 @@ export class WagonRepository {
       manual_verdict_at: row.manual_verdict_at,
       manualVerdictBy: row.manual_verdict_by,
       manual_verdict_by: row.manual_verdict_by,
+      verdictSource: row.verdict_source ?? 'MANUAL',
       /*
        * Set when a measurement disagrees with a standing human verdict and is
        * MORE severe. The measurement is not applied — a person's finding is

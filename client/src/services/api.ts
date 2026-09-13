@@ -560,6 +560,8 @@ export class ApiClient {
      */
     expectedUpdatedAt?: string;
     photoId?: string;
+    /** How the verdict was reached. Defaults to MANUAL on the server. */
+    verdictSource?: 'MANUAL' | 'CAMERA_ASSISTED' | 'CAMERA_AUTO';
   }): Promise<{ success: boolean; data: ChecklistItem }> {
     return this.request<{ success: boolean; data: ChecklistItem }>(`/wagons/${wagonNumber}/checklist/items/${itemId}`, {
       method: 'PUT',
@@ -1193,6 +1195,8 @@ export class ApiClient {
     syncId?: string;
     /** The gauge the reading was taken with, when one is named. */
     gaugeCode?: string | null;
+      /** How the verdict was reached. Defaults to MANUAL on the server. */
+    measurementSource?: 'MANUAL' | 'CAMERA_ASSISTED' | 'CAMERA_AUTO';
   }): Promise<{ success: boolean; data: { id: string; band: string | null; bandRoman: string | null; status: string; tableReference: string | null; condemnationReason: string | null } }> {
     return this.request('/sorting/record', { method: 'POST', body: JSON.stringify(payload) });
   }
@@ -1551,6 +1555,31 @@ export class ApiClient {
     return this.request(
       `/vision/brain/progress?domain=${encodeURIComponent(domain)}${head ? `&head=${encodeURIComponent(head)}` : ''}`
     );
+  }
+
+  /** Whether the camera may currently decide without asking, per head, and why not. */
+  public async getVisionAutoStatus(domain: 'SPRING' | 'WAGON_PART' = 'SPRING'): Promise<{
+    success: boolean;
+    data: {
+      domain: string;
+      master: boolean;
+      heads: Array<{ head: 'CATEGORY' | 'SURFACE' | 'DAMAGE' | 'PART_ID'; sampled: number; kept: number; rate: number | null; newestAt: string | null; allowed: boolean; reason: string }>;
+    };
+  }> {
+    return this.request(`/vision/auto/status?domain=${encodeURIComponent(domain)}`);
+  }
+
+  /**
+   * The camera decided and nobody confirmed. Logged as such — excluded from
+   * its own agreement score, and never a teaching.
+   */
+  public async recordVisionAutoDecision(payload: {
+    domain: 'SPRING' | 'WAGON_PART';
+    recordId?: string | null;
+    wagonNumber?: string | null;
+    heads: Array<{ head: 'CATEGORY' | 'SURFACE' | 'DAMAGE' | 'PART_ID'; label: string; confidence: number; neighbours?: string[] }>;
+  }): Promise<{ success: boolean; data: { logged: number } }> {
+    return this.request('/vision/auto/record', { method: 'POST', body: JSON.stringify(payload) });
   }
 
   public async draftShiftHandover(date?: string): Promise<{

@@ -22,12 +22,15 @@ import {
   isValidEmbedding,
   isValidThumbnail,
   MAX_THUMBNAIL_CHARS,
+  liveAgreement,
   BRAIN_DOMAINS,
   BRAIN_HEADS,
   type BrainDomain,
   type BrainHead
 } from '../db/visionBrainRepository.ts';
 import { authMiddleware } from '../middleware/auth.ts';
+import { AUTO_AGREEMENT_FLOOR, AUTO_AGREEMENT_MIN_SAMPLE } from '../../../shared/vision/autoCommit.ts';
+import { config } from '../config/index.ts';
 import { requireCapability } from '../middleware/rbac.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { LearningService } from '../learning/learningService.ts';
@@ -288,6 +291,123 @@ visionRouter.get(
         statusCode: 500,
         timestamp: new Date().toISOString()
       });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// GET /api/vision/auto/status?domain=SPRING
+//
+// Whether the camera is currently permitted to decide without asking, per
+// head, and why not where it is not. This is the third condition of the rule
+// in shared/vision/autoCommit.ts, served from the learning ledger; the other
+// conditions are judged in the browser, where the measured accuracy lives.
+//
+// Readable by anyone signed in: an inspector at the bench needs to know why
+// the camera has gone back to asking, and "because a supervisor turned it
+// off" or "because you have been correcting it" are both answers they are
+// owed.
+// ---------------------------------------------------------------------------
+visionRouter.get('/auto/status', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const domain = String(req.query?.domain || 'SPRING') as BrainDomain;
+    if (!BRAIN_DOMAINS.includes(domain)) {
+      return bad(res, `domain must be one of ${BRAIN_DOMAINS.join(', ')}.`);
+    }
+
+    /*
+     * The master switch. Default on, because the rule itself keeps a fresh
+     * installation from auto-committing anything — every head is
+     * INSUFFICIENT until taught and scored on real parts. The switch exists
+     * so a supervisor can stop it on a bad day without redeploying, and so
+     * the reason on screen says a person did that rather than the numbers.
+     */
+    const master = config.visionAutoCommit;
+    const agreement = liveAgreement(getDatabase(), domain, 200, AUTO_AGREEMENT_MIN_SAMPLE);
+
+    const heads = BRAIN_HEADS.map((head) => {
+      const a = agreement[head];
+      const allowed = master && a.rate !== null && a.rate >= AUTO_AGREEMENT_FLOOR;
+      return {
+        head,
+        sampled: a.sampled,
+        kept: a.kept,
+        rate: a.rate,
+        newestAt: a.newestAt,
+        allowed,
+        reason: !master
+          ? 'Switched off in the server configuration (VISION_AUTO_COMMIT=off).'
+          : a.rate === null
+            ? `Not enough recent proposals to judge (${a.sampled} of ${AUTO_AGREEMENT_MIN_SAMPLE}).`
+            : a.rate < AUTO_AGREEMENT_FLOOR
+              ? `Inspectors kept ${Math.round(a.rate * 100)}% of recent answers; needs ${Math.round(AUTO_AGREEMENT_FLOOR * 100)}%.`
+              : `Inspectors kept ${Math.round(a.rate * 100)}% of the last ${a.sampled}.`
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: { domain, master, heads },
+      meta: { window: 200, minSample: AUTO_AGREEMENT_MIN_SAMPLE, floor: AUTO_AGREEMENT_FLOOR, timestamp: new Date().toISOString() }
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      success: false,
+      error: 'AUTO_STATUS_FAILED',
+      message: err?.message || 'Could not read the auto-commit status',
+      statusCode: 500,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/vision/auto/record
+//
+// The camera decided and nobody confirmed. Logged so the decision is on the
+// record with its confidence and neighbours — and logged with auto: true so
+// it is EXCLUDED from the live agreement, because the camera agreeing with
+// itself is not evidence. It is deliberately not a teaching: a brain that
+// remembers its own unconfirmed answers reinforces its own mistakes.
+// ---------------------------------------------------------------------------
+visionRouter.post(
+  '/auto/record',
+  authMiddleware,
+  requireCapability('wagon.inspect'),
+  (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const b = req.body || {};
+      const domain = b.domain as BrainDomain;
+      if (!BRAIN_DOMAINS.includes(domain)) return bad(res, `domain must be one of ${BRAIN_DOMAINS.join(', ')}.`);
+      if (!Array.isArray(b.heads) || b.heads.length === 0) return bad(res, 'heads[] is required.');
+
+      const ls = new LearningService(getDatabase());
+      const ids: string[] = [];
+      for (const h of b.heads) {
+        if (!BRAIN_HEADS.includes(h?.head)) continue;
+        const label = normaliseLabel(h.label);
+        if (!label) continue;
+        const { id } = ls.recordOutcome({
+          subsystem: domain === 'SPRING' ? 'SPRING_VISION' : 'PART_VISION',
+          machineOutput: { head: h.head, label },
+          machineConfidence:
+            typeof h.confidence === 'number' && h.confidence >= 0 && h.confidence <= 1 ? h.confidence : null,
+          humanOutput: null,
+          wasCorrected: false,
+          context: {
+            auto: true,
+            recordId: typeof b.recordId === 'string' ? b.recordId : null,
+            wagonNumber: typeof b.wagonNumber === 'string' ? b.wagonNumber : null,
+            neighbours: Array.isArray(h.neighbours) ? h.neighbours.slice(0, 5) : null
+          },
+          userId: req.user!.id,
+          userRole: req.user!.role ?? null
+        });
+        ids.push(id);
+      }
+      res.status(201).json({ success: true, data: { logged: ids.length }, meta: { timestamp: new Date().toISOString() } });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: 'AUTO_RECORD_FAILED', message: err?.message || 'Could not log the camera decision', statusCode: 500, timestamp: new Date().toISOString() });
     }
   }
 );

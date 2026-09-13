@@ -73,7 +73,13 @@ CREATE TABLE IF NOT EXISTS inspections (
   override_supervisor_id TEXT DEFAULT NULL,
   override_supervisor_name TEXT DEFAULT NULL,
   otp_token_ref TEXT DEFAULT NULL,
-  measurement_source TEXT NOT NULL DEFAULT 'MANUAL' CHECK(measurement_source IN ('MANUAL', 'OCR')),
+  -- How the number was arrived at. CAMERA_ASSISTED: the camera proposed, a
+  -- person accepted. CAMERA_AUTO: the camera decided at measured >=95% and
+  -- nobody confirmed -- which is why it must say so, so it can be sampled.
+  -- Kept in step with ALL_MEASUREMENT_SOURCES in shared/types.ts; this
+  -- constraint is the authority.
+  measurement_source TEXT NOT NULL DEFAULT 'MANUAL'
+    CHECK(measurement_source IN ('MANUAL', 'OCR', 'CAMERA_ASSISTED', 'CAMERA_AUTO')),
   ocr_confidence REAL DEFAULT NULL,
   ocr_image_ref TEXT DEFAULT NULL,
   offline_created_at TEXT DEFAULT NULL,
@@ -242,6 +248,9 @@ CREATE TABLE IF NOT EXISTS checklist_items (
   -- overturn a person. These mark the rows a person has claimed.
   manual_verdict_at TEXT DEFAULT NULL,
   manual_verdict_by TEXT DEFAULT NULL,
+  -- How the verdict was reached; see spring_sorting_records.measurement_source.
+  verdict_source TEXT NOT NULL DEFAULT 'MANUAL'
+    CHECK(verdict_source IN ('MANUAL', 'OCR', 'CAMERA_ASSISTED', 'CAMERA_AUTO')),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   FOREIGN KEY (wagon_id) REFERENCES wagons(id) ON DELETE RESTRICT,
@@ -361,6 +370,11 @@ CREATE TABLE IF NOT EXISTS spring_sorting_records (
   inspector_name TEXT DEFAULT NULL,
   assigned_wagon_number TEXT DEFAULT NULL,
   sync_id TEXT DEFAULT NULL UNIQUE,
+  -- How the verdict was reached. CAMERA_AUTO rows are the ones a supervisor
+  -- pulls for a blind re-check. Kept in step with ALL_MEASUREMENT_SOURCES in
+  -- shared/types.ts; this constraint is the authority.
+  measurement_source TEXT NOT NULL DEFAULT 'MANUAL'
+    CHECK(measurement_source IN ('MANUAL', 'OCR', 'CAMERA_ASSISTED', 'CAMERA_AUTO')),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   FOREIGN KEY (inspector_id) REFERENCES users(id) ON DELETE RESTRICT
 );

@@ -59,7 +59,7 @@ export function runMigrations(db: DatabaseSync): void {
         override_supervisor_id TEXT DEFAULT NULL,
         override_supervisor_name TEXT DEFAULT NULL,
         otp_token_ref TEXT DEFAULT NULL,
-        measurement_source TEXT NOT NULL DEFAULT 'MANUAL' CHECK(measurement_source IN ('MANUAL', 'OCR')),
+        measurement_source TEXT NOT NULL DEFAULT 'MANUAL' CHECK(measurement_source IN ('MANUAL', 'OCR', 'CAMERA_ASSISTED', 'CAMERA_AUTO')),
         ocr_confidence REAL DEFAULT NULL,
         ocr_image_ref TEXT DEFAULT NULL,
         offline_created_at TEXT DEFAULT NULL,
@@ -1357,6 +1357,118 @@ export function runMigrations(db: DatabaseSync): void {
     db.exec("ALTER TABLE checklist_config ADD COLUMN expected_quantity INTEGER NOT NULL DEFAULT 1;");
     db.exec("ALTER TABLE checklist_config ADD COLUMN quantity_source TEXT DEFAULT NULL;");
     db.exec("ALTER TABLE checklist_config ADD COLUMN quantity_verified INTEGER NOT NULL DEFAULT 0;");
+  }
+
+  /*
+   * Widen measurement_source on inspections to admit the two camera values.
+   *
+   * THE FAULT THIS FIXES
+   * CAMERA_ASSISTED was added to the MeasurementSource union with no
+   * migration. The CHECK on this column still said ('MANUAL', 'OCR'), so the
+   * first inspection written with the new value would have been refused by
+   * the database -- and the sorting route swallows write failures
+   * deliberately, because a ledger write must never cost an inspector their
+   * tap. The result would have been a camera that appeared to work and
+   * recorded nothing. This is the drift the machine_learning_events rebuild
+   * above already names as a pattern, and it happened again here because
+   * nothing guarded it. server/tests/measurement-source-drift.test.ts now
+   * does.
+   *
+   * SQLite cannot alter a CHECK in place, so the table is rebuilt. This one
+   * is the inspection record itself: append-only by trigger, hash-chained
+   * through the audit log, seven indexes, and a foreign-key target for
+   * checklist_items. So every object is recreated explicitly after the swap,
+   * foreign keys are off for the duration, and the row count is checked
+   * before the old table is dropped -- losing an inspection here silently
+   * would be worse than the fault being fixed.
+   */
+  const inspSql = (db
+    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='inspections'")
+    .get() as { sql?: string } | undefined)?.sql || '';
+
+  if (inspSql && !inspSql.includes("'CAMERA_AUTO'")) {
+    const cols = (db.prepare('PRAGMA table_info(inspections)').all() as any[]).map((c) => c.name);
+    const columnList = cols.join(', ');
+    const rebuilt = inspSql
+      .replace(/CREATE TABLE\s+(IF NOT EXISTS\s+)?["'`]?inspections["'`]?/i, 'CREATE TABLE inspections_srcfix')
+      .replace(
+        /CHECK\s*\(\s*measurement_source\s+IN\s*\([^)]*\)\s*\)/i,
+        "CHECK(measurement_source IN ('MANUAL', 'OCR', 'CAMERA_ASSISTED', 'CAMERA_AUTO'))"
+      );
+    if (!rebuilt.includes("'CAMERA_AUTO'")) {
+      throw new Error('inspections rebuild: the measurement_source CHECK was not found to widen');
+    }
+
+    const before = Number((db.prepare('SELECT COUNT(*) AS c FROM inspections').get() as any).c);
+
+    db.exec('PRAGMA foreign_keys = OFF;');
+    try {
+      db.exec('DROP TRIGGER IF EXISTS trg_prevent_inspections_update;');
+      db.exec('DROP TRIGGER IF EXISTS trg_prevent_inspections_delete;');
+
+      db.exec(rebuilt);
+      db.exec(`INSERT INTO inspections_srcfix (${columnList}) SELECT ${columnList} FROM inspections;`);
+
+      const after = Number((db.prepare('SELECT COUNT(*) AS c FROM inspections_srcfix').get() as any).c);
+      if (after !== before) {
+        db.exec('DROP TABLE inspections_srcfix;');
+        throw new Error(`inspections rebuild: ${before} rows before, ${after} after -- refusing to continue`);
+      }
+
+      db.exec('DROP TABLE inspections;');
+      db.exec('ALTER TABLE inspections_srcfix RENAME TO inspections;');
+
+      for (const ddl of [
+        'CREATE INDEX IF NOT EXISTS idx_inspections_created_at ON inspections(created_at DESC);',
+        'CREATE INDEX IF NOT EXISTS idx_inspections_wagon_created ON inspections(wagon_number, created_at DESC);',
+        'CREATE INDEX IF NOT EXISTS idx_inspections_inspector_date ON inspections(inspector_id, created_at DESC);',
+        'CREATE INDEX IF NOT EXISTS idx_inspections_band_status ON inspections(classified_band, status, created_at DESC);',
+        'CREATE INDEX IF NOT EXISTS idx_inspections_status_date ON inspections(status, created_at DESC);',
+        'CREATE INDEX IF NOT EXISTS idx_inspections_bogie_cond_pos ON inspections(bogie_type, spring_condition, spring_position);',
+        'CREATE INDEX IF NOT EXISTS idx_inspections_sync_id ON inspections(sync_id);'
+      ]) {
+        db.exec(ddl);
+      }
+
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS trg_prevent_inspections_update
+        BEFORE UPDATE ON inspections
+        BEGIN
+          SELECT RAISE(ABORT, 'Audit log is strictly append-only. Inspection records are immutable and cannot be updated.');
+        END;
+      `);
+      db.exec(`
+        CREATE TRIGGER IF NOT EXISTS trg_prevent_inspections_delete
+        BEFORE DELETE ON inspections
+        BEGIN
+          SELECT RAISE(ABORT, 'Audit log is strictly append-only. Inspection records are immutable and cannot be deleted.');
+        END;
+      `);
+    } finally {
+      db.exec('PRAGMA foreign_keys = ON;');
+    }
+  }
+
+  /*
+   * The sorting bench and the wagon checklist never recorded HOW a verdict
+   * was arrived at, because until now the answer was always "a person". Once
+   * the camera can decide unconfirmed, that has to be on the row -- it is
+   * what lets a supervisor pull the auto-decided ones for a blind re-check,
+   * and what stops a camera decision being mistaken for a person's later.
+   */
+  const ssrCols = db.prepare('PRAGMA table_info(spring_sorting_records)').all() as any[];
+  if (ssrCols.length > 0 && !ssrCols.some((c) => c.name === 'measurement_source')) {
+    db.exec(
+      "ALTER TABLE spring_sorting_records ADD COLUMN measurement_source TEXT NOT NULL DEFAULT 'MANUAL' " +
+        "CHECK(measurement_source IN ('MANUAL', 'OCR', 'CAMERA_ASSISTED', 'CAMERA_AUTO'));"
+    );
+  }
+  const ciCols = db.prepare('PRAGMA table_info(checklist_items)').all() as any[];
+  if (ciCols.length > 0 && !ciCols.some((c) => c.name === 'verdict_source')) {
+    db.exec(
+      "ALTER TABLE checklist_items ADD COLUMN verdict_source TEXT NOT NULL DEFAULT 'MANUAL' " +
+        "CHECK(verdict_source IN ('MANUAL', 'OCR', 'CAMERA_ASSISTED', 'CAMERA_AUTO'));"
+    );
   }
 
   // A declared principal for actions the system performs itself.

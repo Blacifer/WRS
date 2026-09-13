@@ -38,6 +38,7 @@ import { offlineDb } from '../services/offlineDb.ts';
 import { SpringEvidenceCamera } from '../components/SpringEvidenceCamera.tsx';
 import BlindSpringRead from '../components/BlindSpringRead.tsx';
 import TeachTheCamera from '../components/TeachTheCamera.tsx';
+import AutoSortBench from '../components/AutoSortBench.tsx';
 import type { SpringEvidenceHandle } from '../components/SpringEvidenceCamera.tsx';
 import type { PendingSortedSpring } from '../services/offlineDb.ts';
 
@@ -1205,6 +1206,24 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           * this camera does not attempt. The two sit together so nobody
           * confuses what the camera claims with what it does not.
           */}
+        {/*
+          * The bench with the taps taken out. Above the teaching panel because
+          * once the camera has earned it, this is where the shift happens; the
+          * teaching panel is how it earns it.
+          */}
+        <AutoSortBench
+          lang={lang}
+          batchId={batchId}
+          bogieType={bogieType}
+          condition={condition}
+          gaugeCode={gaugeCode || null}
+          expectedPosition={position}
+          onRecorded={(status) => {
+            if (status === 'CONDEMNED') playCondemnedBuzz();
+            else playPassChime();
+            void refresh();
+          }}
+        />
         <TeachTheCamera lang={lang} domain="SPRING" />
         <SpringEvidenceCamera
           ref={cameraRef}
