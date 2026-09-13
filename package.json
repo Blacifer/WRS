@@ -30,7 +30,8 @@
     "proof:vision": "node scripts/vision-brain-proof.mjs",
     "drive:camera": "node scripts/teach-camera-drive.mjs",
     "drive:parts": "node scripts/parts-ledger-drive.mjs",
-    "drive:part-camera": "node scripts/part-camera-drive.mjs"
+    "drive:part-camera": "node scripts/part-camera-drive.mjs",
+    "package:shop": "node scripts/package-for-shop.mjs"
   },
   "engines": {
     "node": ">=22"

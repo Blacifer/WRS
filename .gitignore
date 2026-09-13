@@ -41,3 +41,4 @@ backups/
 
 # Locally generated TLS material for LAN testing — never commit
 server/certs/
+dist-shop/

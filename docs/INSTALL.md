@@ -9,6 +9,26 @@ itself, so there is nothing else to run and nothing to keep in sync.
 
 ---
 
+## 0. The short way: a folder on a USB stick
+
+Everything below this section is the developer's install. The shop does not
+need it. On a machine with internet, run once:
+
+```bash
+npm run package:shop
+```
+
+That produces `dist-shop/wrs-raipur/` — about 40 MB, everything the
+application needs at runtime and nothing it needs only to be developed. Copy
+it to a USB stick **beside the Node.js 22 LTS Windows installer** downloaded
+from nodejs.org, and follow `READ-ME-FIRST.txt` inside the folder: run the
+Node installer, copy the folder, double-click `START.cmd`.
+
+No Git, no npm, no internet on the shop PC. `START.cmd` checks that Node is
+present and new enough, creates the settings file with a generated secret on
+first run, and starts the server. Sections 5–8 below still apply afterwards —
+the manual, the gauges, the scheduled backup, and checking your work.
+
 ## 1. What the machine needs
 
 - **Node 22 or later, and nothing else.** The server runs TypeScript directly

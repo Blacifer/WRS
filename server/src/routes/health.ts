@@ -358,12 +358,14 @@ healthRouter.get(
       label: 'A recent encrypted backup exists',
       state: backupAgeHours === null ? 'FAIL' : backupOnSameDisk ? 'WARN' : backupAgeHours <= 24 * 8 ? 'PASS' : 'WARN',
       detail: backupAgeHours === null
-        ? 'No backup has ever been taken. server/scripts/backup-db.sh encrypts and verifies one; nothing schedules it. A weekly cron line on this host is enough, and scripts/backup-drill.sh proves the whole round trip — backup, restore, and refusal of a tampered file — before you need it.'
+        ? 'No backup has ever been taken. server/scripts/backup-db.mjs encrypts and verifies one, and nothing schedules it yet. ' +
+          'Schedule it weekly — Task Scheduler on Windows, cron on Linux; docs/INSTALL.md §7 has the exact command — ' +
+          `and point it at a different disk from the database (WRS_BACKUP_DIR is currently ${backupDir}).`
         : backupOnSameDisk
           ? `${backupCount} backup(s) retained, newest ${Math.floor(backupAgeHours)} hour(s) ago — but they are on the same disk as the database. ` +
             'If this machine is formatted or its disk fails, the records and every copy of them go together. ' +
-            'Point the backup at another drive, a network share, or a USB disk kept elsewhere: ' +
-            'node server/scripts/backup-db.mjs <database> <that other place>'
+            'Point the backup at another drive, a network share, or a USB disk kept elsewhere — ' +
+            `set WRS_BACKUP_DIR in .env (currently ${backupDir}) and in the scheduled task.`
           : `${backupCount} backup(s) retained on a separate disk, newest ${Math.floor(backupAgeHours)} hour(s) ago.`
     });
 
