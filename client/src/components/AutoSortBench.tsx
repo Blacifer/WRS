@@ -107,6 +107,12 @@ export default function AutoSortBench({ lang, batchId, bogieType, condition, gau
   const [height, setHeight] = useState('');
   const [problem, setProblem] = useState<string | null>(null);
   const [live, setLive] = useState<Partial<Record<BrainHead, LiveAgreement>> | null>(null);
+  /*
+   * The server's ceiling on a head — a score the shop's own blind reads do
+   * not yet support. Known at load, so the bench asks up front with the
+   * reason rather than learning it from a refused write.
+   */
+  const [ceilings, setCeilings] = useState<Partial<Record<BrainHead, string>>>({});
   const [master, setMaster] = useState(true);
   const [decision, setDecision] = useState<AutoCommitDecision | null>(null);
   const [proposals, setProposals] = useState<Record<string, Proposal>>({});
@@ -131,8 +137,13 @@ export default function AutoSortBench({ lang, batchId, bogieType, condition, gau
       }
       brainRef.current = b;
       const l: Partial<Record<BrainHead, LiveAgreement>> = {};
-      for (const h of status.data.heads) l[h.head] = { sampled: h.sampled, rate: h.rate };
+      const c: Partial<Record<BrainHead, string>> = {};
+      for (const h of status.data.heads) {
+        l[h.head] = { sampled: h.sampled, rate: h.rate };
+        if (h.measured?.ceiling) c[h.head] = h.measured.ceiling;
+      }
       setLive(l);
+      setCeilings(c);
       setMaster(status.data.master);
     } catch {
       // Offline. The camera still proposes; it just cannot auto-commit,
@@ -192,7 +203,7 @@ export default function AutoSortBench({ lang, batchId, bogieType, condition, gau
         domain: 'SPRING',
         heads: HEADS.map((head) => ({
           head,
-          verdict: brainRef.current.evaluate(head).verdict,
+          verdict: ceilings[head] ? 'FLAG_ONLY' : brainRef.current.evaluate(head).verdict,
           confidence: ps[head].confidence,
           label: ps[head].label
         })),
@@ -200,7 +211,8 @@ export default function AutoSortBench({ lang, batchId, bogieType, condition, gau
         liveAgreement: master ? live : null,
         expected: { CATEGORY: expectedPosition }
       });
-      setDecision(d);
+      const ceilingReason = d.stoppedBy === 'NOT_EARNED' ? HEADS.map((h) => ceilings[h]).find(Boolean) : undefined;
+      setDecision(ceilingReason ? { ...d, reason: ceilingReason } : d);
       setChosen({ CATEGORY: ps.CATEGORY.label, SURFACE: ps.SURFACE.label, DAMAGE: ps.DAMAGE.label });
 
       if (d.mode === 'AUTO' && position) {
@@ -245,7 +257,7 @@ export default function AutoSortBench({ lang, batchId, bogieType, condition, gau
     } finally {
       setBusy(false);
     }
-  }, [ready, bogieType, condition, batchId, gaugeCode, live, master, expectedPosition, onRecorded, reload]);
+  }, [ready, bogieType, condition, batchId, gaugeCode, live, master, ceilings, expectedPosition, onRecorded, reload]);
 
   /** The person's answer when asked: record it, and teach every head from it. */
   const confirm = useCallback(async () => {

@@ -51,6 +51,7 @@ import {
 import { BRAIN_HEADS, type BrainDomain, type BrainHead } from '../../../shared/vision/types.ts';
 import { config } from '../config/index.ts';
 import { LearningService } from '../learning/learningService.ts';
+import { SortingRepository } from '../db/sortingRepository.ts';
 
 /** The heads each bench judges by. The same lists the two screens use. */
 export const AUTO_HEADS: Record<BrainDomain, readonly BrainHead[]> = {
@@ -147,11 +148,55 @@ function accuracyFor(c: Cached, head: BrainHead): BrainAccuracy {
   return a;
 }
 
-/** The server's measured score per head, for the status endpoint. */
-export function serverAccuracy(db: DatabaseSync, domain: BrainDomain): Partial<Record<BrainHead, BrainAccuracy>> {
+/**
+ * THE CAMERA CANNOT BE BETTER THAN THE PEOPLE WHO LABELLED ITS EXAMPLES
+ *
+ * The SURFACE and DAMAGE heads judge a spring's condition from a
+ * photograph. Their examples are people's answers about photographs. If
+ * the shop's own blind reads — one inspector judging another's photograph
+ * without the label — do not show that a person can tell a passing spring
+ * from a condemned one at 95% from a picture, then a head scoring 95%
+ * leave-one-out against those labels is scoring 95% against noise, and the
+ * number is not evidence of anything. So for those two heads, ASSIST also
+ * requires the blind read to have reached ASSIST on at least thirty
+ * status reads. Until then the head is FLAG_ONLY however its own score
+ * reads, and the reason on screen names the blind read as the thing to do.
+ *
+ * CATEGORY is not gated this way: outer, inner and snubber are told apart
+ * by size and coil count, which a person reads off a photograph without
+ * difficulty and the blind read does not measure. Wagon parts have no
+ * blind read yet, and are not gated; that is a stated gap, not a pass.
+ *
+ * Waived only under VISION_COUNT_SYNTHETIC, which production refuses to
+ * start with — a drive with drawn springs has no photographs for anyone to
+ * read blind, and cartoons are already not evidence there.
+ */
+export function evidenceCeiling(db: DatabaseSync, domain: BrainDomain, head: BrainHead): { capped: boolean; reason: string | null; blind: { statusRead: number; statusAgreementPct: number | null } | null } {
+  if (domain !== 'SPRING' || (head !== 'SURFACE' && head !== 'DAMAGE') || config.visionCountSynthetic) return { capped: false, reason: null, blind: null };
+  const b = new SortingRepository(db).blindReadAgreement();
+  const enough = b.statusRead >= b.minReads;
+  const pct = b.statusAgreementPct;
+  const ok = enough && pct !== null && pct >= 95;
+  return {
+    capped: !ok,
+    reason: ok ? null : !enough
+      ? `${head.toLowerCase()}: the camera cannot be trusted beyond the people who labelled its examples, and only ${b.statusRead} of ${b.minReads} blind reads have been done. Blind-read some springs first.`
+      : `${head.toLowerCase()}: people agree with each other on condition from a photograph only ${pct}% of the time (${b.statusRead} blind reads); the camera's ${'95'}% cannot mean more than that.`,
+    blind: { statusRead: b.statusRead, statusAgreementPct: pct }
+  };
+}
+
+function ceilinged(db: DatabaseSync, domain: BrainDomain, head: BrainHead, a: BrainAccuracy): BrainAccuracy & { ceiling?: string } {
+  const c = evidenceCeiling(db, domain, head);
+  if (!c.capped || a.verdict !== 'ASSIST') return a;
+  return { ...a, verdict: 'FLAG_ONLY', ceiling: c.reason ?? undefined };
+}
+
+/** The server's measured score per head, for the status endpoint — with the evidence ceiling applied. */
+export function serverAccuracy(db: DatabaseSync, domain: BrainDomain): Partial<Record<BrainHead, BrainAccuracy & { ceiling?: string }>> {
   const c = brainFor(db, domain);
-  const out: Partial<Record<BrainHead, BrainAccuracy>> = {};
-  for (const head of BRAIN_HEADS) out[head] = accuracyFor(c, head);
+  const out: Partial<Record<BrainHead, BrainAccuracy & { ceiling?: string }>> = {};
+  for (const head of BRAIN_HEADS) out[head] = ceilinged(db, domain, head, accuracyFor(c, head));
   return out;
 }
 
@@ -209,7 +254,7 @@ export function judgeAutoCommit(db: DatabaseSync, input: GateInput): GateResult 
   const accuracy: Partial<Record<BrainHead, BrainAccuracy>> = {};
   for (const head of heads) {
     proposals[head] = c.brain.predict(head, query);
-    accuracy[head] = accuracyFor(c, head);
+    accuracy[head] = ceilinged(db, input.domain, head, accuracyFor(c, head));
   }
 
   // The client's labels must be the server's labels. Not "close": the same.
@@ -267,12 +312,18 @@ export function judgeAutoCommit(db: DatabaseSync, input: GateInput): GateResult 
   });
 
   if (decision.mode !== 'AUTO') {
+    // When the stop is a ceilinged head, the reason on screen should name
+    // the blind read, not the head's own score, which may be perfectly good.
+    const capped = decision.stoppedBy === 'NOT_EARNED'
+      ? heads.map((h) => (accuracy[h] as any)?.ceiling as string | undefined).find(Boolean)
+      : undefined;
+    const withReason = capped ? { ...decision, reason: capped } : decision;
     return {
       ok: false,
       status: 422,
       code: 'AUTO_COMMIT_REFUSED',
-      message: decision.reason,
-      decision
+      message: withReason.reason,
+      decision: withReason
     };
   }
 

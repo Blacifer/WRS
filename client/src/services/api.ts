@@ -1650,7 +1650,7 @@ export class ApiClient {
         rate: number | null;
         newestAt: string | null;
         /** The server's own leave-one-out score — the one a CAMERA_AUTO write is judged by. */
-        measured: { verdict: 'INSUFFICIENT' | 'ASSIST' | 'FLAG_ONLY' | 'STOP'; taught: number; answered: number; accuracy: number; answerRate: number; twinsHeldOut: number };
+        measured: { verdict: 'INSUFFICIENT' | 'ASSIST' | 'FLAG_ONLY' | 'STOP'; taught: number; answered: number; accuracy: number; answerRate: number; twinsHeldOut: number; ceiling: string | null };
         allowed: boolean;
         reason: string;
       }>;

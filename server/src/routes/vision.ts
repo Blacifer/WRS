@@ -361,12 +361,16 @@ visionRouter.get('/auto/status', authMiddleware, (req: AuthenticatedRequest, res
           answered: m.answered,
           accuracy: m.accuracy,
           answerRate: m.answerRate,
-          twinsHeldOut: m.twinsHeldOut
+          twinsHeldOut: m.twinsHeldOut,
+          /** Set when the head's own score reached ASSIST but the shop's blind reads do not yet support it. */
+          ceiling: (m as any).ceiling ?? null
         },
         allowed,
         reason: !master
           ? 'Switched off in the server configuration (VISION_AUTO_COMMIT=off).'
-          : m.verdict !== 'ASSIST'
+          : (m as any).ceiling
+            ? String((m as any).ceiling)
+            : m.verdict !== 'ASSIST'
             ? m.verdict === 'INSUFFICIENT'
               ? `Too few of this shop's photographs to score it yet (${m.answered} answered of 30 needed).`
               : `Measured ${Math.round(m.accuracy * 100)}% on this shop's photographs, answering ${Math.round(m.answerRate * 100)}% of them; ${m.verdict.replace(/_/g, ' ').toLowerCase()}.`

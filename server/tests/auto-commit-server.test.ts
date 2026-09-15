@@ -139,6 +139,23 @@ function propose(domain: 'SPRING' | 'WAGON_PART', head: string, corrected: boole
 }
 
 const SPRING_HEADS = ['CATEGORY', 'SURFACE', 'DAMAGE'];
+
+/**
+ * The shop's own evidence that a person can judge condition from a
+ * photograph: `n` blind reads of `n` stored spring images, `agreeing` of
+ * them agreeing with the recorded status. Written straight to the tables —
+ * the reading screen is driven elsewhere; what these tests need is the
+ * figure the camera's condition heads are now ceilinged by.
+ */
+function blindReads(n: number, agreeing: number) {
+  const db = getDatabase();
+  const img = db.prepare(`INSERT INTO spring_images (id, batch_id, bogie_type, spring_condition, spring_position, labelled_status, mime_type, image_data, inspector_id) VALUES (?, 'b', 'CASNUB_22_NLB', 'USED', 'OUTER', 'PASS', 'image/jpeg', 'data:image/jpeg;base64,AAAA', 'usr_insp_002')`);
+  const read = db.prepare(`INSERT INTO spring_image_blind_reads (id, image_id, reader_id, read_status, status_agrees, band_agrees) VALUES (?, ?, 'usr_insp_001', 'PASS', ?, 1)`);
+  for (let i = 0; i < n; i++) {
+    img.run(`simg_t_${i}`);
+    read.run(`sbr_t_${i}`, `simg_t_${i}`, i < agreeing ? 1 : 0);
+  }
+}
 const PART_HEADS = ['SURFACE', 'DAMAGE'];
 
 /** A clean, undamaged outer spring the camera has seen the like of, but not this one. */
@@ -234,6 +251,8 @@ describe('The server judges a spring for itself', () => {
   async function earnEverything() {
     await teachEarned(app, token, 'SPRING', SPRING_HEADS, 20);
     for (const head of ['CATEGORY', 'SURFACE', 'DAMAGE']) propose('SPRING', head, false, 40);
+    // And the people: thirty blind reads, all agreeing, so the condition heads are not ceilinged.
+    blindReads(30, 30);
   }
 
   it('TC-ACS-10: once every head has earned it on the server\'s examples, a clean in-band spring is written CAMERA_AUTO', async () => {
@@ -285,6 +304,7 @@ describe('The server judges a spring for itself', () => {
     await teachEarned(app, token, 'SPRING', ['CATEGORY', 'SURFACE'], 20);
     await teachEarned(app, token, 'SPRING', ['DAMAGE'], 5);
     for (const head of ['CATEGORY', 'SURFACE', 'DAMAGE']) propose('SPRING', head, false, 40);
+    blindReads(30, 30);
     const r = await call(app, 'POST', '/api/sorting/record',
       spring({ measurementSource: 'CAMERA_AUTO', autoEvidence: springEvidence(cleanOuterFrame()) }), auth(token));
     assert.strictEqual(r.status, 422, JSON.stringify(r.body));
@@ -502,5 +522,71 @@ describe('The leave-one-out score hides what would answer for itself', () => {
     assert.strictEqual(r.status, 201);
     const row = getDatabase().prepare('SELECT capture_group FROM vision_examples').get() as any;
     assert.strictEqual(row.capture_group, null);
+  });
+});
+
+
+describe('The camera cannot be better than the people who labelled its examples', () => {
+  let app: ExpressApp;
+  let token: string;
+  beforeEach(async () => {
+    app = createApp(':memory:');
+    token = await signIn(app, 'inspector1');
+    config.visionAutoCommit = true;
+    config.visionCountSynthetic = false;
+  });
+  afterEach(() => { config.visionAutoCommit = true; config.visionCountSynthetic = false; });
+
+  async function earnedHeadsOnly() {
+    await teachEarned(app, token, 'SPRING', SPRING_HEADS, 20);
+    for (const head of ['CATEGORY', 'SURFACE', 'DAMAGE']) propose('SPRING', head, false, 40);
+  }
+
+  it('TC-ACS-50: with no blind reads, SURFACE and DAMAGE are FLAG_ONLY however their own score reads; CATEGORY is not', async () => {
+    await earnedHeadsOnly();
+    const status = await call(app, 'GET', '/api/vision/auto/status?domain=SPRING', undefined, auth(token));
+    const by = Object.fromEntries(status.body.data.heads.map((h: any) => [h.head, h]));
+    assert.strictEqual(by.CATEGORY.measured.verdict, 'ASSIST');
+    assert.strictEqual(by.CATEGORY.measured.ceiling, null);
+    for (const h of ['SURFACE', 'DAMAGE']) {
+      assert.strictEqual(by[h].measured.accuracy >= 0.95, true, `${h} scores 95% on its own examples`);
+      assert.strictEqual(by[h].measured.verdict, 'FLAG_ONLY', `${h} is ceilinged`);
+      assert.match(by[h].measured.ceiling, /only 0 of 30 blind reads/);
+      assert.strictEqual(by[h].allowed, false);
+    }
+    // And on the write path, the reason names the blind read, not the head's score.
+    const r = await call(app, 'POST', '/api/sorting/record', spring({ measurementSource: 'CAMERA_AUTO', autoEvidence: springEvidence(cleanOuterFrame()) }), auth(token));
+    assert.strictEqual(r.status, 422);
+    assert.strictEqual(r.body.data.decision.stoppedBy, 'NOT_EARNED');
+    assert.match(r.body.message, /blind reads/);
+  });
+
+  it('TC-ACS-51: thirty blind reads at 95% lift the ceiling; at 90% they do not, and the reason says how often people agree', async () => {
+    await earnedHeadsOnly();
+    blindReads(30, 27); // 90%
+    let status = await call(app, 'GET', '/api/vision/auto/status?domain=SPRING', undefined, auth(token));
+    let dmg = status.body.data.heads.find((h: any) => h.head === 'DAMAGE');
+    assert.strictEqual(dmg.measured.verdict, 'FLAG_ONLY');
+    assert.match(dmg.measured.ceiling, /only 90% of the time \(30 blind reads\)/);
+
+    const app2 = createApp(':memory:');
+    const t2 = await signIn(app2, 'inspector1');
+    await teachEarned(app2, t2, 'SPRING', SPRING_HEADS, 20);
+    for (const head of ['CATEGORY', 'SURFACE', 'DAMAGE']) propose('SPRING', head, false, 40);
+    blindReads(30, 29); // 96.7%
+    status = await call(app2, 'GET', '/api/vision/auto/status?domain=SPRING', undefined, auth(t2));
+    dmg = status.body.data.heads.find((h: any) => h.head === 'DAMAGE');
+    assert.strictEqual(dmg.measured.verdict, 'ASSIST');
+    assert.strictEqual(dmg.measured.ceiling, null);
+    const r = await call(app2, 'POST', '/api/sorting/record', spring({ measurementSource: 'CAMERA_AUTO', autoEvidence: springEvidence(cleanOuterFrame()) }), auth(t2));
+    assert.strictEqual(r.status, 201, JSON.stringify(r.body));
+  });
+
+  it('TC-ACS-52: a drive with drawn springs is not ceilinged — there are no photographs for anyone to read', async () => {
+    config.visionCountSynthetic = true;
+    await teachEarned(app, token, 'SPRING', SPRING_HEADS, 20, SYNTHETIC_PART_NAME);
+    for (const head of ['CATEGORY', 'SURFACE', 'DAMAGE']) propose('SPRING', head, false, 40);
+    const status = await call(app, 'GET', '/api/vision/auto/status?domain=SPRING', undefined, auth(token));
+    assert.strictEqual(status.body.data.heads.find((h: any) => h.head === 'DAMAGE').measured.verdict, 'ASSIST');
   });
 });
