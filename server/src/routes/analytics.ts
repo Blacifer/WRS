@@ -14,6 +14,7 @@ import { verifyAuditChain } from '../db/auditLog.ts';
 import { GaugeRepository } from '../db/gaugeRepository.ts';
 import { InspectionRepository } from '../db/repository.ts';
 import { forecastConsumption } from '../../../shared/knowledge/consumptionForecast.ts';
+import { standardReport } from '../../../shared/analysis/standardReport.ts';
 
 export const analyticsRouter = Router();
 
@@ -90,6 +91,29 @@ analyticsRouter.get('/dwell', authMiddleware, requireCapability('analytics.read'
     res.status(200).json({ success: true, data: getAnalyticsDwell(getDatabase()), meta: { timestamp: new Date().toISOString() } });
   } catch (err: any) {
     res.status(500).json({ success: false, error: 'DWELL_FAILED', message: err?.message || 'Could not compute stage dwell', statusCode: 500, timestamp: new Date().toISOString() });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/analytics/standard?days=365
+//
+// What this shop's springs look like against RDSO's bands — the figures a
+// design office could not sample. See shared/analysis/standardReport.ts.
+// ---------------------------------------------------------------------------
+analyticsRouter.get('/standard', authMiddleware, requireCapability('analytics.read'), async (req: Request, res: Response) => {
+  try {
+    const days = Math.min(Math.max(Number((req.query || {}).days) || 365, 7), 3660);
+    const since = new Date(Date.now() - days * 86400_000).toISOString();
+    const rows = getDatabase().prepare(`
+      SELECT bogie_type AS bogieType, spring_condition AS condition, spring_position AS position,
+             measured_height AS heightMm, classified_band AS band, status
+      FROM spring_sorting_records r
+      WHERE created_at >= ? AND voided = 0 AND measured_height IS NOT NULL AND height_is_approximate = 0
+        AND NOT EXISTS (SELECT 1 FROM spring_sorting_records l WHERE l.supersedes = r.id)
+    `).all(since) as any[];
+    res.status(200).json({ success: true, data: { days, ...standardReport(rows) }, meta: { timestamp: new Date().toISOString() } });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: 'STANDARD_REPORT_FAILED', message: err?.message || 'Could not build the report', statusCode: 500, timestamp: new Date().toISOString() });
   }
 });
 

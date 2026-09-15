@@ -16,6 +16,7 @@ import type { InspectionStats, User } from '../../../shared/types.ts';
 import { getDictionary } from '../i18n/index.ts';
 import type { LanguageCode } from '../i18n/index.ts';
 import { api } from '../services/api.ts';
+import { StandardReport } from '../components/StandardReport.tsx';
 import { COLOR_HEX_MAP } from '../../../shared/classification/tables.ts';
 import { AdminExportModal } from '../components/AdminExportModal.tsx';
 import { AlertTriangleIcon, BarChartIcon, CheckCircleIcon, CoilIcon, DownloadIcon, RefreshCwIcon, ShieldIcon } from '../components/Icons.tsx';
@@ -386,6 +387,8 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
           </p>
         )}
       </div>
+
+      <StandardReport lang={lang} />
 
       {/*
         * The day against the shop's own figure.
