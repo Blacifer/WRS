@@ -1448,6 +1448,36 @@ export interface VoiceActionRequest {
   language: VoiceLanguageCode;
   confidence?: number;
   timestamp?: string;
+  /**
+   * Set when the fields above are a model's reading of the sentence that the
+   * person has looked at and confirmed. The server then records the verdict
+   * as MODEL_CONFIRMED rather than DEVICE_PARSER — a person decided, but the
+   * words were the model's interpretation, and an auditor should know both.
+   */
+  readBy?: 'MODEL';
+}
+
+/**
+ * What comes back when the device could not read the sentence and the
+ * server's model could: a PROPOSAL, not a record. Nothing has been written.
+ * The person confirms it (re-sending the fields with readBy: 'MODEL') or
+ * taps the verdict in by hand.
+ */
+export interface VoiceActionProposalResponse {
+  success: true;
+  message: string;
+  messageHi: string;
+  data: {
+    applied: false;
+    statusSource: 'MODEL';
+    proposal: {
+      status: PartInspectionStatus;
+      partName: string | null;
+      bogiePosition: string | null;
+      defectNotes: string | null;
+      transcript: string;
+    };
+  };
 }
 
 export interface VoiceActionResponse {

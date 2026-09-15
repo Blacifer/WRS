@@ -21,8 +21,9 @@ import { api } from './api.ts';
 
 const DEFAULTS: Record<string, number> = {
   'ocr.manual_confirm_threshold': 0.5,
-  'acoustic.alert_threshold': 0.6,
-  'voice.match_threshold': 0.7
+  // 0.90 is the first value the acoustic engine can ever report; see
+  // learningService.ts for why anything lower was never a setting.
+  'acoustic.alert_threshold': 0.9
 };
 
 let cache: Record<string, number> | null = null;

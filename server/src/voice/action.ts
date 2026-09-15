@@ -52,7 +52,13 @@ export interface VoiceActionInput {
    * cannot be. Both are recorded; an auditor should be able to tell them
    * apart without having to reason about which phrasings the parser handles.
    */
-  statusSource?: 'DEVICE_PARSER' | 'MODEL';
+  /**
+   * DEVICE_PARSER: the tablet's regular expressions matched the sentence.
+   * MODEL_CONFIRMED: a model read it, and a person confirmed that reading
+   * before it was recorded. There is deliberately no unconfirmed MODEL: the
+   * route returns a model's reading as a proposal and writes nothing.
+   */
+  statusSource?: 'DEVICE_PARSER' | 'MODEL_CONFIRMED';
   inspectionId?: string | null;
 }
 

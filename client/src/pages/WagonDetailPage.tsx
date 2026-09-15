@@ -129,7 +129,12 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
    * inspector had no way to tell "not understood" from "understood and
    * recorded", which on a checklist are opposite outcomes.
    */
-  const [voiceNote, setVoiceNote] = useState<{ tone: 'good' | 'warn' | 'busy'; text: string } | null>(null);
+  const [voiceNote, setVoiceNote] = useState<{
+    tone: 'good' | 'warn' | 'busy';
+    text: string;
+    /** A model's reading of an unread sentence, waiting for the person to confirm it. */
+    confirm?: { label: string; run: () => Promise<void> };
+  } | null>(null);
 
   /*
    * A part that is on this wagon and not on the list.
@@ -717,17 +722,59 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
           confidence: result.confidence || 0.9
         });
 
-        const item = res?.data?.item;
+        /*
+         * The server's model read it — and recorded nothing. What comes back
+         * is its reading, for the person to confirm or ignore. A model may
+         * interpret what was said; it may not decide what was recorded.
+         */
+        if ('applied' in res.data && res.data.applied === false) {
+          const p = res.data.proposal;
+          const where = p.partName ? `${p.partName}${p.bogiePosition ? ` (${p.bogiePosition.replace(/_/g, ' ')})` : ''}` : (isHi ? 'अज्ञात पुर्ज़ा' : 'an unnamed part');
+          setVoiceNote({
+            tone: 'warn',
+            text: isHi
+              ? `पढ़ा गया: ${where} — ${p.status}${p.defectNotes ? ` (${p.defectNotes})` : ''}। अभी दर्ज नहीं हुआ।`
+              : `Read as: ${where} — ${p.status}${p.defectNotes ? ` (${p.defectNotes})` : ''}. Not recorded yet.`,
+            confirm: {
+              label: isHi ? 'हाँ, दर्ज करें' : 'Yes, record it',
+              run: async () => {
+                setVoiceNote({ tone: 'busy', text: isHi ? 'दर्ज किया जा रहा है…' : 'Recording…' });
+                const done = await api.recordVoiceAction({
+                  wagonNumber,
+                  transcript: spoken,
+                  language: 'en-IN',
+                  confidence: result.confidence || 0.9,
+                  status: p.status,
+                  itemName: p.partName ?? undefined,
+                  bogiePosition: p.bogiePosition ?? undefined,
+                  defectNotes: p.defectNotes ?? undefined,
+                  readBy: 'MODEL'
+                });
+                const item = 'item' in done.data ? done.data.item : null;
+                if (item?.id) {
+                  setHighlightedItemId(item.id);
+                  if (item.category && item.category !== selectedCategory) setSelectedCategory(item.category);
+                  setTimeout(() => setHighlightedItemId((cur) => (cur === item.id ? null : cur)), 3500);
+                }
+                setVoiceNote({
+                  tone: 'good',
+                  text: item?.partName
+                    ? `${(isHi ? 'दर्ज किया गया —' : 'Recorded against')} ${item.partName}: ${item.status}`
+                    : (isHi ? 'दर्ज कर लिया गया।' : 'Recorded.')
+                });
+                loadWagonData();
+              }
+            }
+          });
+          return;
+        }
+
+        const item = 'item' in res.data ? res.data.item : null;
         if (item?.id) {
           setHighlightedItemId(item.id);
           if (item.category && item.category !== selectedCategory) setSelectedCategory(item.category);
           setTimeout(() => setHighlightedItemId((cur) => (cur === item.id ? null : cur)), 3500);
         }
-        /*
-         * Named, not silent. A verdict recorded from a sentence the device
-         * could not read is exactly the one the inspector should glance at
-         * before walking away.
-         */
         setVoiceNote({
           tone: 'good',
           text: item?.partName
@@ -1406,6 +1453,15 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
               }`}
             >
               <p className="text-xs font-bold text-ink-body leading-snug">{voiceNote.text}</p>
+              {voiceNote.confirm && (
+                <button
+                  data-testid="voice-confirm-model-reading"
+                  onClick={() => voiceNote.confirm!.run().catch((err: any) => setVoiceNote({ tone: 'warn', text: err?.message || 'Could not record that.' }))}
+                  className="shrink-0 rounded-control bg-ink text-canvas text-xs font-bold px-3 py-1.5"
+                >
+                  {voiceNote.confirm.label}
+                </button>
+              )}
               <button
                 onClick={() => setVoiceNote(null)}
                 className="text-ink-muted hover:text-ink text-xs shrink-0"

@@ -202,7 +202,9 @@ authRouter.post('/login', (req: Request, res: Response, next: NextFunction): voi
       employeeId: userRow.employee_id
     };
 
-    const token = signToken(user, 86400);
+    // From the configuration, which for months said 24h and was ignored.
+    const expiresIn = config.jwtExpiresInSeconds;
+    const token = signToken(user, expiresIn);
 
     /*
      * Every sign-in, recorded with its address.
@@ -222,11 +224,11 @@ authRouter.post('/login', (req: Request, res: Response, next: NextFunction): voi
     res.status(200).json({
       success: true,
       token,
-      expiresIn: 86400,
+      expiresIn,
       user,
       data: {
         token,
-        expiresIn: 86400,
+        expiresIn,
         user
       }
     });

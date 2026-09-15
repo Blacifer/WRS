@@ -34,7 +34,10 @@ dotenv.config({ path: path.join(REPO_ROOT, '.env'), quiet: true });
 export interface AppConfig {
   port: number;
   jwtSecret: string;
+  /** Raw setting, e.g. "24h". */
   jwtExpiresIn: string;
+  /** The same, in seconds — what the token is actually signed with. */
+  jwtExpiresInSeconds: number;
   dbPath: string;
   /**
    * Where backups are written, and therefore where the readiness panel looks
@@ -90,6 +93,29 @@ export interface AppConfig {
 
 const nodeEnv = process.env.NODE_ENV || 'development';
 
+/**
+ * "24h", "30m", "7d", "3600s" or a bare number of seconds.
+ *
+ * JWT_EXPIRES_IN was read into the config and never used: the login route
+ * signed every token for a hardcoded 86400 seconds, so the documented
+ * setting changed nothing. Parsed here, refused if it cannot be, because a
+ * setting that silently falls back is one nobody can trust to have applied.
+ */
+export function parseDuration(raw: string, label: string): number {
+  const m = /^\s*(\d+)\s*([smhd]?)\s*$/i.exec(raw);
+  if (!m) {
+    throw new Error(`${label}="${raw}" is not a duration. Use a number of seconds or e.g. 30m, 24h, 7d.`);
+  }
+  const n = Number(m[1]);
+  const unit = (m[2] || 's').toLowerCase();
+  const mult = unit === 'd' ? 86400 : unit === 'h' ? 3600 : unit === 'm' ? 60 : 1;
+  const seconds = n * mult;
+  if (seconds < 60 || seconds > 30 * 86400) {
+    throw new Error(`${label}="${raw}" must be between 1 minute and 30 days.`);
+  }
+  return seconds;
+}
+
 // The JWT secret must never fall back to a hardcoded default in production —
 // anyone who has seen this source code would be able to forge valid tokens
 // for any user, including ADMIN. Fail loudly at startup instead of silently
@@ -133,6 +159,7 @@ export const config: AppConfig = {
   port: parseInt(process.env.PORT || '3000', 10),
   jwtSecret: process.env.JWT_SECRET || 'wrs-raipur-rdso-g95-secret-key-2026-DEV-ONLY',
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
+  jwtExpiresInSeconds: parseDuration(process.env.JWT_EXPIRES_IN || '24h', 'JWT_EXPIRES_IN'),
   dbPath: process.env.DB_PATH || path.resolve(__dirname, '..', '..', 'data', 'wrs_inspections.db'),
   backupDir:
     process.env.WRS_BACKUP_DIR ||

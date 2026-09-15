@@ -32,6 +32,7 @@ import type {
   AcousticDiagnoseResponse,
   VoiceActionRequest,
   VoiceActionResponse,
+  VoiceActionProposalResponse,
   SerializedComponent,
   ComponentHistoryEvent,
   RegisterComponentRequest,
@@ -602,7 +603,12 @@ export class ApiClient {
     });
   }
 
-  public async recordVoiceAction(payload: VoiceActionRequest): Promise<VoiceActionResponse> {
+  /**
+   * Resolves to a record when the verdict was known, or — when only the
+   * transcript was sent and the server's model read it — to a PROPOSAL with
+   * nothing written. `'applied' in data && !data.applied` tells them apart.
+   */
+  public async recordVoiceAction(payload: VoiceActionRequest): Promise<VoiceActionResponse | VoiceActionProposalResponse> {
     return this.request<VoiceActionResponse>('/checklist/voice-action', {
       method: 'POST',
       body: JSON.stringify(payload)

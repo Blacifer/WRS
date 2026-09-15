@@ -116,13 +116,15 @@ pilot's `.env` carries `CORS_ORIGIN=*`. In that combination the server prints
     [config] WARNING: CORS_ORIGIN is "*" in production.
 
 and **starts anyway**. State this plainly rather than let a reviewer discover
-it: of the three production start-up guards, two refuse to start and one only
-warns.
+it: of the production start-up guards, all but one refuse to start, and that
+one only warns.
 
 | Condition | Behaviour |
 |---|---|
 | `JWT_SECRET` unset in production | **Refuses to start** |
 | `OTP_DELIVERY=SMS` | **Refuses to start** (no gateway is integrated) |
+| `VISION_COUNT_SYNTHETIC` set in production | **Refuses to start** (drawn parts must never be the camera's evidence) |
+| `JWT_EXPIRES_IN` unparseable, or outside 1 minute–30 days | **Refuses to start** |
 | `CORS_ORIGIN` unset or `*` in production | **Warns, then starts** |
 
 The warning is the right behaviour for this deployment rather than an
@@ -139,11 +141,37 @@ accepted risk. Before any deployment reachable from outside the workshop,
 `CORS_ORIGIN` should be set to the exact origin the tablets load from — and at
 that point the wildcard warning becomes something to act on rather than note.
 
-> A caution for whoever maintains the deployment: the comment beside
-> `CORS_ORIGIN` in the pilot `.env` currently claims the server "refuses to
-> start in production if this is left as `*`". It does not. Correct that
-> comment rather than trusting it — a security control believed to be enforced
-> and merely warned about is worse than one known to be absent.
+> The comment beside `CORS_ORIGIN` in `.env.example` used to claim the server
+> "refuses to start in production if this is left as `*`". It did not, and the
+> comment now says what actually happens. If a pilot `.env` was copied before
+> that correction, its comment is still wrong — a security control believed to
+> be enforced and merely warned about is worse than one known to be absent.
+
+### 7. With `ZAPHEIT_API_KEY` set, three kinds of text leave the machine
+
+`deploy/README.md` said the application makes no outbound network calls. That
+is true only when no model key is configured — and the pilot `.env` configures
+one. With `ZAPHEIT_API_KEY` set, `server/src/ai/zapheit.ts` sends to the
+configured `ZAPHEIT_BASE_URL` (an OpenAI-compatible endpoint on the public
+internet):
+
+- a manual-search question the local index could not answer, so the model
+  can suggest search terms;
+- the transcript of a spoken sentence the tablet's parser could not read, so
+  the model can propose which part and which verdict was meant;
+- the counts a shift-handover note is drafted from.
+
+No measurement, verdict, photograph, wagon record, name or employee id is ever
+sent. What comes back is bounded: search terms are stripped to words; a
+proposed verdict is checked against the five this system has and **returned
+to the person as a proposal — nothing is recorded on the model's word**; a
+handover draft is discarded if it contains any number not in the facts it was
+given. Unset the key and the application is fully self-contained; the health
+endpoint reports which posture it is in.
+
+For a government deployment, treat the key as a decision: a CERT-In auditor
+will ask where the text goes, and "an inspector's spoken sentence goes to a
+commercial API" is an answer to have ready rather than discover.
 
 ---
 

@@ -5,13 +5,15 @@
  * WHY THIS ONE AND NOT THE SPRINGS
  * --------------------------------
  * Free height cannot be recovered from a photograph, because an image carries
- * no scale — that is why the spring camera was removed and should stay
- * removed. A painted wagon number has no such problem: it is high-contrast
- * text, and reading text needs no reference dimension at all.
+ * no scale — so no camera in this system measures a spring, and none ever
+ * will. (The spring camera that exists, visionBrain.ts, names what kind of
+ * spring it is and whether it looks damaged; the band always comes from the
+ * caliper or the strip.) A painted wagon number has no such problem: it is
+ * high-contrast text, and reading text needs no reference dimension at all.
  *
- * So this is the one piece of computer vision in the system that is honest,
- * and it removes a real piece of manual work — typing a wagon number, in a
- * shop, on a tablet, at the start of every wagon.
+ * So this is a piece of computer vision that is honest by construction, and
+ * it removes a real piece of manual work — typing a wagon number, in a shop,
+ * on a tablet, at the start of every wagon.
  *
  * WHAT IT REFUSES TO DO
  * ---------------------

@@ -331,6 +331,9 @@ export class AcousticDiagnosticEngine {
 
       if (this.hissFrameCounter >= 5) {
         detectedAnomaly = 'AIR_LEAK';
+        // A frame count dressed as a fraction, not a probability: the first
+        // frame that can fire (the fifth consecutive) reports 0.90, and each
+        // further frame adds 0.03. The alert threshold is bounded to match.
         confidence = Math.min(0.98, 0.75 + (this.hissFrameCounter * 0.03));
         details = `Continuous high-frequency pneumatic hiss detected at ${dominantFrequencyHz} Hz (>4.5 kHz energy ratio: ${highFreqPowerRatio.toFixed(2)}). Air brake / reservoir leakage flagged.`;
         recommendedAction = 'Inspect air hose coupling, angle cocks, and distributor valve seals for pneumatic leakage.';

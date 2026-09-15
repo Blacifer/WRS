@@ -58,8 +58,15 @@ is quick, so they are worth starting before the code is finished:
 ### Data localisation
 
 All data stays in one SQLite file on the host, so localisation follows the
-hosting decision automatically. Nothing is sent to any external service — the
-application makes no outbound network calls at all.
+hosting decision automatically. The application makes no outbound network
+calls **unless `ZAPHEIT_API_KEY` is set**. With it set, three things leave the
+machine, each to the configured `ZAPHEIT_BASE_URL`: a manual-search question
+that the local index could not answer, the transcript of a spoken sentence the
+tablet could not parse (returned as a proposal for the person to confirm —
+never recorded on the model's word), and the counts a shift-handover note is
+drafted from. No measurement, verdict, photograph, wagon record or personal
+detail is ever sent. Leave the key unset and the application is fully
+self-contained; the health endpoint reports which posture it is in.
 
 
 ## Backup and restore drill

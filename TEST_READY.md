@@ -17,7 +17,7 @@ above and re-run the commands in §3 before relying on it.
   — **251 test cases**, 0 failing (~81s). The case count is quotable for the
   first time: the runner's metric parser was reading a reporter format these
   suites do not emit, so it reported 0 cases under a green pass until 3 Sep.
-- **Server unit/integration**: 697 tests across 139 suites (59 files) — **0 failing**.
+- **Server unit/integration**: 953 tests in 97 files — **0 failing**.
 - **Client**: 173 tests across 15 files — **0 failing**.
 - **Total Verification Tiers**: 5 Tiers (Tier 1: Feature Coverage, Tier 2: Boundary & Corner Cases, Tier 3: Cross-Feature Flows, Tier 4: Real-World Scenarios, Tier 5: Adversarial Stress)
 - **Harness Framework**: Native Node.js 22 test runner (`node:test`, `node:assert`, `node:sqlite`) with zero runtime mock facades.
@@ -70,7 +70,7 @@ The `npm test` commands above cover the E2E tier suites only. The server and
 client suites are separate, and both must pass:
 
 ```bash
-npm test --prefix server   # 697 tests / 139 suites — takes ~7 minutes
+npm test --prefix server   # 953 tests in 97 files — takes ~7 minutes
 npm test --prefix client   # 173 tests / 15 files — takes ~8 seconds
 ```
 
@@ -83,7 +83,7 @@ npm run test:tier1   # Tier 1: Feature Coverage (16 suites)
 npm run test:tier2   # Tier 2: Boundary & Corner Cases (6 suites)
 npm run test:tier3   # Tier 3: Cross-Feature Integration Flows (5 suites)
 npm run test:tier4   # Tier 4: Real-World Workshop Scenarios (5 suites)
-npm run test:tier5   # Tier 5: Adversarial Stress & Dynamic Sweeps (6 suites)
+npm run test:tier5   # Tier 5: Adversarial Stress & Dynamic Sweeps (7 suites)
 ```
 
 ---

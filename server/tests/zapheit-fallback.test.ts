@@ -222,7 +222,7 @@ describe('Voice — a sentence the device could not parse', () => {
     assert.equal(res.body.error, 'MISSING_STATUS', 'the previous behaviour is unchanged');
   });
 
-  test('TC-ZAP-08: with a key, the sentence is read and the transcript kept verbatim', async () => {
+  test('TC-ZAP-08: with a key, the sentence is read — as a proposal, with nothing written', async () => {
     (config as any).zapheitApiKey = 'test-key';
     globalThis.fetch = (async () =>
       new Response(JSON.stringify({
@@ -230,39 +230,54 @@ describe('Voice — a sentence the device could not parse', () => {
       }), { status: 200, headers: { 'content-type': 'application/json' } })) as any;
 
     const spoken = 'the second inner on bogie two looks cracked';
+    const before = (getDatabase().prepare("SELECT COUNT(*) AS n FROM inspection_audit_log WHERE event_type = 'CHECKLIST_ITEM_INSPECTED'").get() as any).n;
+
     const res = await app.dispatch({
       method: 'POST', url: '/api/checklist/voice-action', headers: auth(),
       body: { wagonNumber, transcript: spoken }
     });
 
-    assert.equal(res.status, 200, `refused: ${res.body?.message}`);
+    /*
+     * A model choosing between FAIL and CONDEMNED for a part is the one
+     * thing this system says a model never does — and this route used to
+     * do exactly that, labelled MODEL and written straight to the record.
+     * Now the reading comes back for a person to confirm, and the ledger is
+     * untouched until they do.
+     */
+    assert.equal(res.status, 202, `expected a proposal: ${res.body?.message}`);
+    assert.equal(res.body.data.applied, false);
+    assert.equal(res.body.data.statusSource, 'MODEL');
+    assert.equal(res.body.data.proposal.status, 'CONDEMNED');
+    assert.equal(res.body.data.proposal.partName, 'Inner Spring (Bogie 2)');
+    assert.equal(res.body.data.proposal.transcript, spoken);
+    const after = (getDatabase().prepare("SELECT COUNT(*) AS n FROM inspection_audit_log WHERE event_type = 'CHECKLIST_ITEM_INSPECTED'").get() as any).n;
+    assert.equal(after, before, 'a proposal writes nothing');
+
+    // The person confirms it: the same fields, and readBy says whose reading they were.
+    const confirmed = await app.dispatch({
+      method: 'POST', url: '/api/checklist/voice-action', headers: auth(),
+      body: {
+        wagonNumber, transcript: spoken, readBy: 'MODEL',
+        status: res.body.data.proposal.status,
+        itemName: res.body.data.proposal.partName,
+        bogiePosition: res.body.data.proposal.bogiePosition,
+        defectNotes: res.body.data.proposal.defectNotes
+      }
+    });
+    assert.equal(confirmed.status, 200, `refused: ${confirmed.body?.message}`);
 
     const rows = getDatabase().prepare(`
       SELECT payload_json FROM inspection_audit_log
       WHERE event_type = 'CHECKLIST_ITEM_INSPECTED'
     `).all() as any[];
-
     const voice = rows.map((r) => JSON.parse(r.payload_json))
-      .find((p: any) => p.inputSource === 'VOICE_DICTATION');
+      .find((p: any) => p.inputSource === 'VOICE_DICTATION' && p.transcript === spoken);
 
     assert.ok(voice, 'a spoken verdict must record that it was spoken');
-    assert.equal(
-      voice.transcript, spoken,
-      'what an auditor reads is what was said, not what a model made of it'
-    );
+    assert.equal(voice.transcript, spoken, 'what an auditor reads is what was said, not what a model made of it');
     assert.equal(voice.status, 'CONDEMNED');
-
-    /*
-     * Which reader produced the verdict.
-     *
-     * The device's parser is a regular expression and fails visibly. A model
-     * fails plausibly — it can turn a word this system does not know into one
-     * it does, which is how "scrapped" becomes CONDEMNED. That is usually the
-     * right reading and it is never a reading anybody chose, so the record has
-     * to say which of the two read the sentence. Without it an auditor cannot
-     * tell a matched phrase from an inferred one.
-     */
-    assert.equal(voice.statusSource, 'MODEL', 'a verdict the model read must say so');
+    // Which reader produced the words, and that a person confirmed them.
+    assert.equal(voice.statusSource, 'MODEL_CONFIRMED');
 
     globalThis.fetch = originalFetch;
   });

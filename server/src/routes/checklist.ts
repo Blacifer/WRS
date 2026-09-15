@@ -429,22 +429,44 @@ checklistRouter.post('/voice-action', authMiddleware, async (req: Request, res: 
    * ordinary path. When Zapheit is unconfigured or unreachable, this returns
    * nothing and the refusal below stands exactly as it did before.
    *
-   * The model may fill in the fields. It may not invent a verdict: a status it
-   * returns is checked against the five this system has, and anything else is
-   * dropped. And the transcript is stored unaltered either way, so what an
-   * auditor reads is what was said, not what a model made of it.
+   * THE MODEL PROPOSES; IT DOES NOT RECORD
+   * This used to fill the fields in and carry on to the write, marked
+   * statusSource: MODEL. That is a model choosing between FAIL and
+   * CONDEMNED for a part — the one thing this system says a model never
+   * does, however well labelled. So the reading now comes back as a
+   * proposal with nothing written, and the person confirms it (the same
+   * request again, fields filled, readBy: 'MODEL') or taps the verdict in.
+   * The status it proposes is still checked against the five this system
+   * has, and the transcript is stored unaltered when the confirmed record
+   * is finally written.
    */
-  let statusSource: 'DEVICE_PARSER' | 'MODEL' = 'DEVICE_PARSER';
+  let statusSource: 'DEVICE_PARSER' | 'MODEL_CONFIRMED' =
+    req.body?.readBy === 'MODEL' ? 'MODEL_CONFIRMED' : 'DEVICE_PARSER';
   if ((!status || typeof status !== 'string') && typeof transcript === 'string' && transcript.trim()) {
     const guessed = await parseVoiceIntent(transcript.trim());
     if (guessed?.status) {
-      status = guessed.status;
-      // Marked here rather than inferred later. Once the field is filled in,
-      // nothing downstream can tell where the verdict came from.
-      statusSource = 'MODEL';
-      if (!itemName && guessed.partName) itemName = guessed.partName;
-      if (!defectNotes && guessed.defectNotes) defectNotes = guessed.defectNotes;
-      if (!bogiePosition && guessed.bogiePosition) bogiePosition = guessed.bogiePosition;
+      const proposed = String(guessed.status).trim().toUpperCase();
+      const allowed: PartInspectionStatus[] = ['PASS', 'CONDEMNED', 'REPAIRED', 'REPLACED', 'FAIL'];
+      if (allowed.includes(proposed as PartInspectionStatus)) {
+        res.status(202).json({
+          success: true,
+          message: `Read as "${proposed}"${guessed.partName ? ` on ${guessed.partName}` : ''}. Nothing is recorded until you confirm it.`,
+          messageHi: `"${proposed}" पढ़ा गया${guessed.partName ? ` — ${guessed.partName}` : ''}। पुष्टि होने तक कुछ दर्ज नहीं हुआ।`,
+          data: {
+            applied: false,
+            statusSource: 'MODEL',
+            proposal: {
+              status: proposed,
+              partName: guessed.partName ?? null,
+              bogiePosition: guessed.bogiePosition ?? null,
+              defectNotes: guessed.defectNotes ?? null,
+              transcript: transcript.trim()
+            }
+          },
+          meta: { timestamp: new Date().toISOString() }
+        });
+        return;
+      }
     }
   }
 

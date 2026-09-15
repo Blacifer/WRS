@@ -149,23 +149,38 @@ export const TUNABLE_PARAMETERS: {
       'OCR confidence below which the inspector is asked to confirm the reading by hand. ' +
       'Raising it trades a little speed for fewer wrong readings reaching the record.'
   },
+  /*
+   * What the acoustic "confidence" actually is, so this threshold is not
+   * mistaken for a probability. acousticEngine.ts counts consecutive frames
+   * that meet the hiss or knock rule and reports 0.75 + 0.03 per frame; the
+   * rule needs five frames (hiss) or four (knock) before it fires at all, so
+   * the first report is always 0.90. A threshold below 0.90 therefore has no
+   * effect, and this one sat at 0.60 for months looking adjustable. Its
+   * floor is now 0.90, and each 0.03 above that is one more consecutive
+   * frame the sound must hold before it is raised.
+   */
   {
     key: 'acoustic.alert_threshold',
     subsystem: 'ACOUSTIC_DIAGNOSTIC',
-    defaultValue: 0.6,
-    min: 0.3,
-    max: 0.95,
-    description: 'Confidence above which an acoustic anomaly is raised to the inspector.'
-  },
-  {
-    key: 'voice.match_threshold',
-    subsystem: 'VOICE_COMMAND',
-    defaultValue: 0.7,
-    min: 0.4,
-    max: 0.95,
-    description: 'Fuzzy-match score below which a voice command asks for confirmation.'
+    defaultValue: 0.9,
+    min: 0.9,
+    max: 0.96,
+    description:
+      'The acoustic confidence is a count of consecutive frames (0.90 at the first that can fire, ' +
+      '+0.03 per frame), not a probability. Raising this by 0.03 demands one more frame of the sound before it is raised.'
   }
+  /*
+   * There is deliberately no voice.match_threshold. The voice parser is a
+   * set of regular expressions and substring matches with no score, so a
+   * threshold on a "fuzzy-match score" adjusted nothing. It was listed here
+   * for months and approvable on the learning screen. A parameter nobody
+   * reads is worse than none: a supervisor who tunes it believes something
+   * changed.
+   */
 ];
+
+/** Keys that were once tunable and are not: removed from the table on start. */
+export const RETIRED_PARAMETERS = ['voice.match_threshold'] as const;
 
 export class LearningService {
   private db: DatabaseSync;
@@ -489,6 +504,24 @@ export class LearningService {
         p.description,
         now
       );
+      /*
+       * The bounds and the description are this code's, not the row's. An
+       * installation that seeded a row under older, wrong bounds would
+       * otherwise keep them for ever — and a current value the new floor
+       * rules out (the acoustic 0.60) is lifted to the floor, because a
+       * value with no effect is not a setting anybody chose.
+       */
+      this.db
+        .prepare(
+          `UPDATE learned_parameters
+           SET min_allowed = ?, max_allowed = ?, default_value = ?, description = ?,
+               current_value = MIN(MAX(current_value, ?), ?)
+           WHERE param_key = ?`
+        )
+        .run(p.min, p.max, p.defaultValue, p.description, p.min, p.max, p.key);
+    }
+    for (const key of RETIRED_PARAMETERS) {
+      this.db.prepare('DELETE FROM learned_parameters WHERE param_key = ?').run(key);
     }
   }
 
