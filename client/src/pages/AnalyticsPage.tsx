@@ -357,7 +357,12 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
                         <td className="py-1.5 pr-3 text-right text-ink-body tabular-nums">{l.springsHandled}</td>
                         <td className="py-1.5 pr-3 text-right text-ink-body tabular-nums">{l.condemnationRatePct}%</td>
                         <td className="py-1.5 pr-3 text-right text-white font-bold tabular-nums">{l.expectedReplacements}</td>
-                        <td className="py-1.5 text-right text-ink-faint tabular-nums">{l.basis}</td>
+                        <td className="py-1.5 text-right text-ink-faint tabular-nums" title={`${l.basisFromWagons ?? l.basis} from wagon inspections, ${l.basisFromBench ?? 0} from the sorting bench`}>
+                          {l.basis}
+                          {typeof l.basisFromBench === 'number' && l.basisFromBench > 0 && (
+                            <span className="ml-1 text-[10.5px]">({l.basisFromBench} bench)</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

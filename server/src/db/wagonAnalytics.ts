@@ -312,13 +312,28 @@ export function getAnalyticsBlockers(repo: {
 
 /**
  * How often each kind of spring is actually condemned, from this shop's own
- * inspection record.
+ * record — both records.
  *
  * This is the only learned input to the consumption forecast — the wagon mix
  * comes from the out-turn return and the spring counts from RDSO WMM 2.0
  * §601, both of which are fixed. Everything the forecast claims about the
  * future rests on this rate, so it is computed from real recorded outcomes
  * rather than an assumed failure percentage.
+ *
+ * TWO RECORDS, NOT ONE
+ * For its first weeks this read only `inspections` — the per-wagon spring
+ * flow, forty rows in the developer database — and left out the sorting
+ * bench, which is where roughly seven hundred springs a shift are judged
+ * against the same tables. The forecast therefore said "not forecast yet"
+ * for every type while the bench was writing the very observations it
+ * needed, and would have gone on saying so for months. Now both are
+ * counted, and every line says how many came from each, because a rate
+ * resting on the bench alone is a rate about loose springs of unknown
+ * wagons, and a supervisor reading it should know that.
+ *
+ * Bench rows that were undone (`voided`) or corrected (another row
+ * `supersedes` them) are left out — the correction is the record, not the
+ * tap it replaced.
  *
  * The window is deliberately a parameter with no default beyond a year:
  * spring condemnation is seasonal in a way a fortnight cannot see, and a rate
@@ -332,22 +347,43 @@ export function getObservedCondemnationRates(
 
   const rows = db
     .prepare(
-      `SELECT bogie_type   AS bogieType,
+      `SELECT bogie_type      AS bogieType,
               spring_position AS springPosition,
-              COUNT(*)     AS inspected,
-              SUM(CASE WHEN status = 'CONDEMNED' THEN 1 ELSE 0 END) AS condemned
-         FROM inspections
-        WHERE created_at >= ?
+              SUM(n)          AS inspected,
+              SUM(c)          AS condemned,
+              SUM(CASE WHEN src = 'WAGON' THEN n ELSE 0 END) AS inspectedFromWagons,
+              SUM(CASE WHEN src = 'BENCH' THEN n ELSE 0 END) AS inspectedFromBench,
+              SUM(CASE WHEN src = 'WAGON' THEN c ELSE 0 END) AS condemnedFromWagons,
+              SUM(CASE WHEN src = 'BENCH' THEN c ELSE 0 END) AS condemnedFromBench
+         FROM (
+           SELECT 'WAGON' AS src, bogie_type, spring_position,
+                  COUNT(*) AS n,
+                  SUM(CASE WHEN status = 'CONDEMNED' THEN 1 ELSE 0 END) AS c
+             FROM inspections
+            WHERE created_at >= ?
+            GROUP BY bogie_type, spring_position
+           UNION ALL
+           SELECT 'BENCH' AS src, bogie_type, spring_position,
+                  COUNT(*) AS n,
+                  SUM(CASE WHEN status = 'CONDEMNED' THEN 1 ELSE 0 END) AS c
+             FROM spring_sorting_records r
+            WHERE created_at >= ?
+              AND voided = 0
+              AND NOT EXISTS (SELECT 1 FROM spring_sorting_records later WHERE later.supersedes = r.id)
+            GROUP BY bogie_type, spring_position
+         )
         GROUP BY bogie_type, spring_position
         ORDER BY inspected DESC`
     )
-    .all(since) as Array<Record<string, unknown>>;
+    .all(since, since) as Array<Record<string, unknown>>;
 
   return rows.map((r) => ({
     bogieType: r.bogieType as ObservedRate['bogieType'],
     springPosition: r.springPosition as ObservedRate['springPosition'],
     inspected: Number(r.inspected ?? 0),
-    condemned: Number(r.condemned ?? 0)
+    condemned: Number(r.condemned ?? 0),
+    fromWagons: { inspected: Number(r.inspectedFromWagons ?? 0), condemned: Number(r.condemnedFromWagons ?? 0) },
+    fromBench: { inspected: Number(r.inspectedFromBench ?? 0), condemned: Number(r.condemnedFromBench ?? 0) }
   }));
 }
 

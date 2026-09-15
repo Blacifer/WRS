@@ -37,7 +37,7 @@ The **WRS Raipur Quality Control Platform** is an enterprise-grade web applicati
    - Enforces WMM 2.0 Chapter 6 clause (f): every bearing under one wagon must share its overhaul cycle — the rule currently kept in yellow paint on end cap screws and verified by sample check.
 
 7. **What Stores should expect to issue**
-   - Expected spring replacements for the coming fortnight, built from three inputs of deliberately different kinds: the shop's own out-turn return (5,747 wagons last year, BOXNHL 43.6% of them), RDSO's published spring counts, and the condemnation rate observed here. Only the last is learned.
+   - Expected spring replacements for the coming fortnight, built from three inputs of deliberately different kinds: the shop's own out-turn return (5,747 wagons last year, BOXNHL 43.6% of them), RDSO's published spring counts, and the condemnation rate observed here — from the per-wagon spring flow and the sorting bench together, each line saying how many observations came from which. Only the last is learned.
    - There is no model, and that is a choice. The arithmetic is the answer and a supervisor can check it on paper; every line reports how many observations its rate rests on.
    - A spring type with fewer than 30 condemnations on record is reported as *not forecast yet* rather than given a number. An order quantity invented from four observations is worse than a blank, because somebody acts on it.
 

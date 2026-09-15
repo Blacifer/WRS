@@ -153,3 +153,58 @@ describe('Consumption forecast — what Stores should expect to issue', () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// The rate comes from both records, and says so
+// ---------------------------------------------------------------------------
+
+import { createApp } from '../src/app.ts';
+import { getDatabase } from '../src/db/connection.ts';
+import { getObservedCondemnationRates } from '../src/db/wagonAnalytics.ts';
+
+describe('5. The bench counts', () => {
+  async function bench(app: any, token: string, n: number, condemned: number, batchId = 'b') {
+    for (let i = 0; i < n; i++) {
+      const r = await app.dispatch({
+        method: 'POST', url: '/api/sorting/record', headers: { authorization: `Bearer ${token}` },
+        body: { batchId, bogieType: 'CASNUB_22_NLB', condition: 'USED', springPosition: 'INNER', measuredFreeHeight: i < condemned ? 200 : 258 }
+      });
+      if (r.status !== 201) throw new Error(JSON.stringify(r.body));
+    }
+  }
+
+  it('TC-FCST-20: the sorting bench feeds the rate — a shop that only sorts still gets a forecast', async () => {
+    const app = createApp(':memory:');
+    const login = await app.dispatch({ method: 'POST', url: '/api/auth/login', body: { username: 'inspector1', password: 'password123' } });
+    const token = login.body.token;
+    // Forty inner springs on the bench, thirty-two of them condemned by height; no wagon inspections at all.
+    await bench(app, token, 40, 32);
+    const rates = getObservedCondemnationRates(getDatabase());
+    const inner = rates.find((r) => r.bogieType === 'CASNUB_22_NLB' && r.springPosition === 'INNER')!;
+    if (!inner) throw new Error('no INNER rate');
+    if (inner.inspected !== 40 || inner.condemned !== 32) throw new Error(JSON.stringify(inner));
+    if (inner.fromBench?.inspected !== 40 || inner.fromWagons?.inspected !== 0) throw new Error('the split must say where they came from');
+    const fc = await app.dispatch({ method: 'GET', url: '/api/analytics/forecast?days=14', headers: { authorization: `Bearer ${(await app.dispatch({ method: 'POST', url: '/api/auth/login', body: { username: 'admin1', password: 'password123' } })).body.token}` } });
+    const line = fc.body.data.lines.find((l: any) => l.bogieType === 'CASNUB_22_NLB' && l.springPosition === 'INNER');
+    if (!line) throw new Error(`INNER should be forecast now: ${JSON.stringify(fc.body.data.notForecast)}`);
+    if (line.basis !== 40 || line.basisFromBench !== 40 || line.basisFromWagons !== 0) throw new Error(JSON.stringify(line));
+  });
+
+  it('TC-FCST-21: an undone tap and a corrected tap are not observations', async () => {
+    const app = createApp(':memory:');
+    const login = await app.dispatch({ method: 'POST', url: '/api/auth/login', body: { username: 'inspector1', password: 'password123' } });
+    const token = login.body.token;
+    await bench(app, token, 3, 3, 'undo-batch');
+    // Undo the last (voids it), then correct the new last (supersedes it).
+    const undo = await app.dispatch({ method: 'POST', url: '/api/sorting/batches/undo-batch/undo', headers: { authorization: `Bearer ${token}` }, body: {} });
+    if (!undo.body.data?.corrected) throw new Error(JSON.stringify(undo.body));
+    const fix = await app.dispatch({ method: 'POST', url: '/api/sorting/batches/undo-batch/undo', headers: { authorization: `Bearer ${token}` }, body: { replacement: {
+      bogieType: 'CASNUB_22_NLB', condition: 'USED', springPosition: 'INNER', measuredFreeHeight: 258, heightIsApproximate: false,
+      classifiedBand: 'BLUE', bandRoman: 'Band I', status: 'PASS', damageType: null, condemnationReason: null, tableReference: null
+    } } });
+    if (!fix.body.data?.corrected) throw new Error(JSON.stringify(fix.body));
+    const inner = getObservedCondemnationRates(getDatabase()).find((r) => r.springPosition === 'INNER')!;
+    // Three taps: one voided, one superseded by a PASS correction, one untouched condemnation.
+    if (inner.inspected !== 2 || inner.condemned !== 1) throw new Error(JSON.stringify(inner));
+  });
+});

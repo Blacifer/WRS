@@ -63,6 +63,14 @@ export interface ObservedRate {
   inspected: number;
   /** Of those, how many were condemned. */
   condemned: number;
+  /**
+   * Where the observations came from. The per-wagon spring flow judges
+   * springs on a known wagon; the sorting bench judges loose springs of no
+   * known wagon, at ten times the volume. Both use the same tables; a reader
+   * deciding how far to trust a rate should see which record it rests on.
+   */
+  fromWagons?: { inspected: number; condemned: number };
+  fromBench?: { inspected: number; condemned: number };
 }
 
 export interface SpringDemandLine {
@@ -76,6 +84,9 @@ export interface SpringDemandLine {
   expectedReplacements: number;
   /** How many observations the rate rests on. */
   basis: number;
+  /** Of those, how many were per-wagon inspections and how many were the sorting bench. */
+  basisFromWagons: number;
+  basisFromBench: number;
 }
 
 export interface UnforecastableLine {
@@ -191,7 +202,9 @@ export function forecastConsumption(
       condemnationRatePct: Math.round(ratePct * 100) / 100,
       // Round up: a shortfall stops a wagon, a surplus sits on a shelf.
       expectedReplacements: Math.ceil(springsHandled * (rate.condemned / rate.inspected)),
-      basis: rate.inspected
+      basis: rate.inspected,
+      basisFromWagons: rate.fromWagons?.inspected ?? rate.inspected,
+      basisFromBench: rate.fromBench?.inspected ?? 0
     });
   }
 
