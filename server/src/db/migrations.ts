@@ -11,6 +11,47 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+/**
+ * A table rebuild, all or nothing.
+ *
+ * SQLite cannot widen a CHECK in place, so three migrations below copy a
+ * table into a replacement, DROP the original and RENAME the copy. Each of
+ * those was a sequence of separate statements with no transaction around
+ * them. Between the DROP and the RENAME the table did not exist, and a power
+ * cut on the shop PC in that window — or any error — would have left the
+ * database without it. For inspections that is the inspection record.
+ *
+ * So the whole sequence runs inside BEGIN IMMEDIATE ... COMMIT, and any
+ * failure rolls back to the table exactly as it was. Foreign-key enforcement
+ * is switched off OUTSIDE the transaction, because that pragma is a no-op
+ * inside one — which is the mistake the obvious arrangement makes. The check
+ * on the way out confirms the swap left every reference intact before it is
+ * committed.
+ */
+export function rebuildAtomically(db: DatabaseSync, label: string, body: () => void): void {
+  db.exec('PRAGMA foreign_keys = OFF;');
+  try {
+    db.exec('BEGIN IMMEDIATE;');
+    try {
+      body();
+      const broken = db.prepare('PRAGMA foreign_key_check').all() as any[];
+      if (broken.length > 0) {
+        throw new Error(`${broken.length} foreign key reference(s) would be left dangling`);
+      }
+      db.exec('COMMIT;');
+    } catch (err: any) {
+      try {
+        db.exec('ROLLBACK;');
+      } catch {
+        // Already rolled back by the engine, or never began; nothing to undo.
+      }
+      throw new Error(`${label}: rolled back, nothing changed — ${err?.message || err}`);
+    }
+  } finally {
+    db.exec('PRAGMA foreign_keys = ON;');
+  }
+}
+
 export function runMigrations(db: DatabaseSync): void {
   const schemaPath = path.resolve(__dirname, 'schema.sql');
   let schemaSql = '';
@@ -922,8 +963,7 @@ export function runMigrations(db: DatabaseSync): void {
         "CHECK(role IN ('INSPECTOR', 'SUPERVISOR', 'ADMIN', 'DRM'))"
       );
 
-    db.exec('PRAGMA foreign_keys = OFF;');
-    try {
+    rebuildAtomically(db, 'users rebuild', () => {
       db.exec(rebuilt);
       // Roles are normalised on the way across, so a row stored as "Admin"
       // under the old constraint survives the move to the new one.
@@ -934,9 +974,7 @@ export function runMigrations(db: DatabaseSync): void {
       `);
       db.exec('DROP TABLE users;');
       db.exec('ALTER TABLE users_rolefix RENAME TO users;');
-    } finally {
-      db.exec('PRAGMA foreign_keys = ON;');
-    }
+    });
   }
 
   /*
@@ -1110,8 +1148,7 @@ export function runMigrations(db: DatabaseSync): void {
           "'WAGON_NUMBER_OCR', 'SPRING_VISION', 'PART_VISION'))"
       );
 
-    db.exec('PRAGMA foreign_keys = OFF;');
-    try {
+    rebuildAtomically(db, 'machine_learning_events rebuild', () => {
       // Must go before the table they guard, or the swap is refused.
       db.exec('DROP TRIGGER IF EXISTS trg_mle_no_update;');
       db.exec('DROP TRIGGER IF EXISTS trg_mle_no_delete;');
@@ -1148,9 +1185,7 @@ export function runMigrations(db: DatabaseSync): void {
           SELECT RAISE(ABORT, 'Machine learning event ledger is strictly append-only.');
         END;
       `);
-    } finally {
-      db.exec('PRAGMA foreign_keys = ON;');
-    }
+    });
   }
 
 
@@ -1411,8 +1446,7 @@ export function runMigrations(db: DatabaseSync): void {
 
     const before = Number((db.prepare('SELECT COUNT(*) AS c FROM inspections').get() as any).c);
 
-    db.exec('PRAGMA foreign_keys = OFF;');
-    try {
+    rebuildAtomically(db, 'inspections rebuild', () => {
       db.exec('DROP TRIGGER IF EXISTS trg_prevent_inspections_update;');
       db.exec('DROP TRIGGER IF EXISTS trg_prevent_inspections_delete;');
 
@@ -1421,8 +1455,8 @@ export function runMigrations(db: DatabaseSync): void {
 
       const after = Number((db.prepare('SELECT COUNT(*) AS c FROM inspections_srcfix').get() as any).c);
       if (after !== before) {
-        db.exec('DROP TABLE inspections_srcfix;');
-        throw new Error(`inspections rebuild: ${before} rows before, ${after} after -- refusing to continue`);
+        // The rollback discards the copy; the throw says why.
+        throw new Error(`${before} rows before, ${after} after -- refusing to continue`);
       }
 
       db.exec('DROP TABLE inspections;');
@@ -1454,9 +1488,7 @@ export function runMigrations(db: DatabaseSync): void {
           SELECT RAISE(ABORT, 'Audit log is strictly append-only. Inspection records are immutable and cannot be deleted.');
         END;
       `);
-    } finally {
-      db.exec('PRAGMA foreign_keys = ON;');
-    }
+    });
   }
 
   /*

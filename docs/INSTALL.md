@@ -342,7 +342,10 @@ npm run build
 # restart the service
 ```
 
-Migrations run automatically at startup and are additive. Take a backup first
+Migrations run automatically at startup and are additive. The few that have
+to rebuild a table (SQLite cannot widen a constraint in place) do so inside a
+single transaction, so a power cut mid-way leaves the table exactly as it was
+and the migration simply runs again on the next start. Take a backup first
 anyway — the point of having one is not needing to decide whether this is the
 time you need it.
 
