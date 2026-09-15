@@ -1645,6 +1645,49 @@ export function runMigrations(db: DatabaseSync): void {
   `);
 
   /*
+   * Pocket counts on assembly photographs.
+   *
+   * See shared/assembly/pocketCount.ts and docs/ASSEMBLY_COMPLETENESS.md. A
+   * count is a set of marks a person made on one frame of an open bogie —
+   * a label on a photograph, and the whole of the labelled dataset any
+   * later model would be trained and judged on. The expected number is NOT
+   * stored: it is derived from the wagon designation every time it is
+   * compared, so a copy cannot drift from the registry. What is stored is
+   * what the counter saw (the taps), tallied, and who saw it.
+   *
+   * FIRST is the first count of a frame; BLIND_RECOUNT is a second person's
+   * count made without seeing the first, which is where the agreement
+   * figure comes from. Append-only: a count that turns out wrong is
+   * followed by another, and both survive.
+   */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS bogie_pocket_counts (
+      id TEXT PRIMARY KEY,
+      photo_id TEXT NOT NULL,
+      wagon_number TEXT NOT NULL,
+      designation TEXT NOT NULL,
+      bogie TEXT NOT NULL CHECK(bogie IN ('BOGIE_1', 'BOGIE_2')),
+      side TEXT NOT NULL CHECK(side IN ('SIDE_A', 'SIDE_B')),
+      kind TEXT NOT NULL CHECK(kind IN ('FIRST', 'BLIND_RECOUNT')),
+      counted_outer INTEGER NOT NULL,
+      counted_inner INTEGER NOT NULL,
+      counted_snubber INTEGER NOT NULL,
+      taps_json TEXT NOT NULL,
+      counted_by TEXT NOT NULL,
+      counted_by_name TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      FOREIGN KEY (photo_id) REFERENCES wagon_photos(id) ON DELETE RESTRICT,
+      FOREIGN KEY (counted_by) REFERENCES users(id) ON DELETE RESTRICT
+    );
+    CREATE INDEX IF NOT EXISTS idx_pocket_counts_photo ON bogie_pocket_counts(photo_id, created_at);
+    CREATE INDEX IF NOT EXISTS idx_pocket_counts_wagon ON bogie_pocket_counts(wagon_number);
+    CREATE TRIGGER IF NOT EXISTS trg_pocket_counts_no_update BEFORE UPDATE ON bogie_pocket_counts
+    BEGIN SELECT RAISE(ABORT, 'A pocket count is a label on evidence and cannot be rewritten; count again.'); END;
+    CREATE TRIGGER IF NOT EXISTS trg_pocket_counts_no_delete BEFORE DELETE ON bogie_pocket_counts
+    BEGIN SELECT RAISE(ABORT, 'A pocket count is a label on evidence and cannot be deleted.'); END;
+  `);
+
+  /*
    * What the offline queue has already delivered.
    *
    * A tablet that loses the wifi between the server committing a batch and

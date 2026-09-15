@@ -98,7 +98,7 @@ export const WagonPassport: React.FC<Props> = ({ wagonNumber, released, lang }) 
              'एक फ़ाइल जो वैगन अगली ओवरहॉल तक ले जाता है: इस दुकान का पूरा रिकॉर्ड, हैश-श्रृंखलित और हस्ताक्षरित; /verify.html पर बिना सर्वर के सत्यापन योग्य।')}
         </p>
         {mayExport && (
-          <button onClick={exportPassport} data-testid="passport-export" className="px-4 py-2 rounded-control bg-ink text-canvas text-xs font-bold">
+          <button onClick={exportPassport} data-testid="passport-export" className="px-4 py-2 rounded-control bg-accent text-white text-xs font-bold">
             {released ? t('Export the passport', 'पासपोर्ट निर्यात करें') : t('Export the passport so far', 'अब तक का पासपोर्ट निर्यात करें')}
           </button>
         )}

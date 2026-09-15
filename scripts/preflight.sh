@@ -183,10 +183,12 @@ if ! node -e "import('playwright')" >/dev/null 2>&1; then
   skip "Role walkthrough" "playwright not installed"
   skip "Offline drill"    "playwright not installed"
   skip "Parts ledger drive" "playwright not installed"
+  skip "Pocket count drive" "playwright not installed"
 elif ! curl -s -o /dev/null --max-time 2 http://localhost:3000/api/health; then
   skip "Role walkthrough" "the API is not answering on :3000"
   skip "Offline drill"    "the API is not answering on :3000"
   skip "Parts ledger drive" "the API is not answering on :3000"
+  skip "Pocket count drive" "the API is not answering on :3000"
 else
   # The production build ran above, so client/dist is current. Both drills run
   # against it.
@@ -205,10 +207,16 @@ else
       # worth guarding is that an empty ledger says it CANNOT answer rather
       # than that nothing is missing; that distinction is the section's point.
       APP_URL=http://localhost:4173 step "Parts ledger drive" node scripts/parts-ledger-drive.mjs
+      # A person counts the springs on an assembly frame. What is guarded:
+      # the expected number is never on the counter's screen, a match is
+      # silence, a short count reaches the gate by name, and the recount is
+      # blind. No model — the drive checks the dashboard says so.
+      APP_URL=http://localhost:4173 step "Pocket count drive" node scripts/pocket-count-drive.mjs
     else
       skip "Role walkthrough" "the preview server did not come up on :4173"
       skip "Offline drill"    "the preview server did not come up on :4173"
       skip "Parts ledger drive" "the preview server did not come up on :4173"
+      skip "Pocket count drive" "the preview server did not come up on :4173"
       sed 's/^/      /' /tmp/wrs_preflight_preview.log | tail -6
     fi
     if [ -n "$PREVIEW_PID" ]; then kill "$PREVIEW_PID" 2>/dev/null; PREVIEW_PID=""; fi

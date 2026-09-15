@@ -62,7 +62,7 @@ export const AskRecordsPage: React.FC<Props> = ({ lang }) => {
         <input value={question} onChange={(e) => setQuestion(e.target.value)} data-testid="ask-input"
           placeholder={t('e.g. which wagon type condemns the most snubbers this quarter', 'जैसे: इस तिमाही में किस वैगन प्रकार में सबसे अधिक स्नबर कंडम हुए')}
           className="flex-1 bg-raised border border-line rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-accent-hover" />
-        <button type="submit" disabled={busy || !question.trim()} data-testid="ask-submit" className="px-4 py-2 rounded-control bg-ink text-canvas text-xs font-bold disabled:opacity-50">{t('Ask', 'पूछें')}</button>
+        <button type="submit" disabled={busy || !question.trim()} data-testid="ask-submit" className="px-4 py-2 rounded-control bg-accent text-white text-xs font-bold disabled:opacity-50">{t('Ask', 'पूछें')}</button>
       </form>
 
       {answer && answer.answered === false && (

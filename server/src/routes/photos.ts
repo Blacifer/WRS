@@ -8,6 +8,7 @@ import type { Request, Response } from '../framework/index.ts';
 import { authMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { requireCapability } from '../middleware/rbac.ts';
+import { can } from '../../../shared/auth/permissions.ts';
 import { getDatabase } from '../db/connection.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
 import { logAuditEvent } from '../db/auditLog.ts';
@@ -21,6 +22,8 @@ import {
   summariseAssemblyCoverage
 } from '../../../shared/assembly/assemblyCapture.ts';
 import { getWagonSpringConfig, springsPerBogie } from '../../../shared/classification/wagonTypes.ts';
+import { PocketCountRepository } from '../db/pocketCountRepository.ts';
+import { comparePocketCount, countsAgree, expectedPerSideFor, validateTaps } from '../../../shared/assembly/pocketCount.ts';
 
 export const photosRouter = Router();
 
@@ -387,6 +390,106 @@ photosRouter.get(
     }
   }
 );
+
+// ---------------------------------------------------------------------------
+// Pocket counts — a person counts the springs on one assembly frame
+//
+// See shared/assembly/pocketCount.ts and docs/ASSEMBLY_COMPLETENESS.md. The
+// count is a set of taps on the photograph; the expected number is derived
+// from the wagon designation on the frame's tags, never sent by the caller;
+// the comparison is done in shared code. A count that matches produces no
+// record of "verified" — it produces a label. A count that falls short
+// reaches the exit gate as an advisory the supervisor acknowledges by name.
+//
+// The second count of a frame is blind: whoever could still make it is not
+// shown the first. Two people who saw each other's marks do not "agree".
+// ---------------------------------------------------------------------------
+photosRouter.get(
+  '/dataset/pocket-counts',
+  authMiddleware,
+  requireCapability('analytics.read'),
+  async (_req: AuthenticatedRequest, res: Response) => {
+    try {
+      res.status(200).json({ success: true, data: new PocketCountRepository(getDatabase()).readiness(), meta: { timestamp: new Date().toISOString() } });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: 'DATASET_QUERY_FAILED', message: err?.message || 'Could not summarise pocket counts', statusCode: 500, timestamp: new Date().toISOString() });
+    }
+  }
+);
+
+photosRouter.get('/pocket-counts', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  const wagonNumber = String(req.query?.wagonNumber || '').trim();
+  if (!wagonNumber) {
+    res.status(400).json({ success: false, error: 'MISSING_PARAM', message: 'wagonNumber is required', statusCode: 400, timestamp: new Date().toISOString() });
+    return;
+  }
+  const repo = new PocketCountRepository(getDatabase());
+  const userId = req.user!.id;
+  // The first count's figures are withheld from anyone who could still make
+  // the blind recount. Whoever may release the wagon is not a recounter —
+  // the exit gate already tells them what the count found.
+  const mayRelease = can(req.user!.role, 'wagon.release');
+  const frames = repo.wagonSummary(wagonNumber).map((f) => {
+    const couldRecount = !mayRelease && f.first && !f.recount && f.first.countedBy !== userId;
+    if (!couldRecount) return { ...f, blind: false };
+    const { counted: _c, taps: _t, ...first } = f.first!;
+    return { ...f, first, comparison: null, blind: true };
+  });
+  res.status(200).json({ success: true, data: frames, meta: { wagonNumber: wagonNumber.toUpperCase(), timestamp: new Date().toISOString() } });
+});
+
+photosRouter.get('/:photoId/pocket-counts', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  const repo = new PocketCountRepository(getDatabase());
+  const frame = repo.frameFor(String(req.params?.photoId || ''));
+  if (!frame) {
+    res.status(404).json({ success: false, error: 'NOT_AN_ASSEMBLY_FRAME', message: 'No assembly photograph with that id. Only frames tagged as bogie assembly evidence can be counted.', statusCode: 404, timestamp: new Date().toISOString() });
+    return;
+  }
+  const { turn, first, recount } = repo.turnFor(frame.photoId, req.user!.id);
+  const expected = expectedPerSideFor(frame.designation);
+  // Blind: a person who has not yet counted sees neither the first count nor the expected figure.
+  const blind = turn === 'FIRST' || turn === 'BLIND_RECOUNT';
+  res.status(200).json({
+    success: true,
+    data: {
+      frame, turn,
+      expected: blind ? null : expected,
+      first: blind ? (first ? { countedBy: first.countedBy, countedByName: first.countedByName, createdAt: first.createdAt } : null) : first,
+      recount: blind ? (recount ? { countedBy: recount.countedBy, countedByName: recount.countedByName, createdAt: recount.createdAt } : null) : recount,
+      comparison: !blind && first && expected ? comparePocketCount(expected, first.counted, { bogie: frame.bogie, side: frame.side }) : null,
+      agree: !blind && first && recount ? countsAgree(first.counted, recount.counted) : null
+    },
+    meta: { timestamp: new Date().toISOString() }
+  });
+});
+
+photosRouter.post('/:photoId/pocket-count', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  const repo = new PocketCountRepository(getDatabase());
+  const frame = repo.frameFor(String(req.params?.photoId || ''));
+  if (!frame) {
+    res.status(404).json({ success: false, error: 'NOT_AN_ASSEMBLY_FRAME', message: 'No assembly photograph with that id. Only frames tagged as bogie assembly evidence can be counted.', statusCode: 404, timestamp: new Date().toISOString() });
+    return;
+  }
+  const taps = validateTaps(req.body?.taps);
+  if (!taps.ok) {
+    res.status(400).json({ success: false, error: 'INVALID_TAPS', message: taps.reason, statusCode: 400, timestamp: new Date().toISOString() });
+    return;
+  }
+  // The caller may send nothing that becomes the expected count. If they try, it is refused, not ignored.
+  for (const k of ['expected', 'expectedOuter', 'expectedInner', 'expectedSnubber', 'expectedTotal']) {
+    if (req.body && k in req.body) {
+      res.status(400).json({ success: false, error: 'EXPECTED_NOT_ACCEPTED', message: `${k} is not accepted: the expected count is derived from the wagon designation on the frame, never from the counter.`, statusCode: 400, timestamp: new Date().toISOString() });
+      return;
+    }
+  }
+  try {
+    const result = repo.record(frame, taps.taps, { id: req.user!.id, name: req.user!.name });
+    res.status(201).json({ success: true, data: result, meta: { timestamp: new Date().toISOString() } });
+  } catch (err: any) {
+    const status = err?.code === 'SAME_PERSON' ? 409 : err?.code === 'UNKNOWN_DESIGNATION' ? 422 : 500;
+    res.status(status).json({ success: false, error: err?.code || 'POCKET_COUNT_FAILED', message: err?.message || 'Could not record the count', statusCode: status, timestamp: new Date().toISOString() });
+  }
+});
 
 /*
  * Registered BEFORE '/:photoId'.

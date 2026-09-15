@@ -9,8 +9,10 @@ could answer it with a photograph instead — **were all the spring pockets
 occupied when the bogie was closed up** — and, just as importantly, fixes the
 boundaries it must not cross.
 
-It is a scope, not a plan of work in progress. Nothing here is built. The first
-code change is named at the end and needs its own go-ahead.
+It was written as a scope before anything existed. Phase 0 (the capture path
+and the dataset endpoint) and the counting that Phase 1 needs are now built;
+the section at the end says what is in the code and what is still not. The
+boundaries in the middle are unchanged and are the reason the rest exists.
 
 ## Why this check and not a visual verdict
 
@@ -168,11 +170,47 @@ Nothing here needs new infrastructure:
   [`objectDetection.ts`](../client/src/services/objectDetection.ts), which
   already crops people out of evidence photographs.
 
-## The first code change
+## What is built
 
-Phase 0 only: an assembly-stage capture path that stores a bogie photograph
-tagged with wagon designation and bogie side, plus a dataset sibling endpoint
-that reports what has accumulated. It adds no verdict, no advisory and no model,
-and it is independently useful if Phases 1 and 2 never happen.
+**Phase 0 — capture and dataset.** `AssemblyEvidenceCapture` stores the four
+frames (two bogies, two sides) tagged with the designation, bogie and side
+through `buildAssemblyTags()`; `GET /api/photos/dataset/assembly` reports
+whole-bogie coverage. No count is stored on a photograph.
 
-It is not started. It needs its own approval.
+**Counting — by a person, as the labelled dataset.** A count is a set of taps
+on one frame, each tap a kind (outer / inner / snubber), made on the
+`PocketCounter` screen and stored in `bogie_pocket_counts` (append-only).
+The rules from this document are in code, in
+[`shared/assembly/pocketCount.ts`](../shared/assembly/pocketCount.ts):
+
+- **The expected number never comes from the counter.** The screen does not
+  show it before the count; the request refuses any field that could carry
+  it; the server derives it from the designation on the frame's tags
+  (`expectedPerSide()`, half the registry's per-bogie count, and it refuses
+  rather than rounds if a registry entry is ever odd).
+- **A match produces nothing.** No tick, no "verified" flag anywhere in the
+  response or on the screen. A count is a reading of the photograph.
+- **Short raises an advisory** at the exit gate — `POCKETS_SHORT`, naming
+  the bogie, side and kind, acknowledged by name at sign-off like the parts
+  ledger. **Over** raises `POCKET_COUNT_OVER`: check the count and the wagon
+  type on record. Never a blocker.
+- **The second count is blind.** It must be by a different person, who is
+  shown neither the first count nor the expected figure; two people who saw
+  each other's marks do not "agree". Disagreement is its own advisory
+  (`POCKET_COUNT_DISAGREES`): the frame decides.
+
+**The dataset and the gate for a model.** `GET /api/photos/dataset/pocket-counts`
+reports labelled frames, bogies counted on both sides, blind recounts and
+the agreement rate, and a sentence saying whether a model may be attempted.
+The gate needs both ≥ 300 covered bogies and ≥ 95 % agreement over ≥ 30
+recounts — the agreement figure is what a model would be measured against,
+and a model that "agrees 90 % of the time" with people who agree 80 % of the
+time has been measured against noise. The model today is `NONE`, said in
+code (`POCKET_MODEL`) and on the DRM dashboard.
+
+**What is still not built, deliberately:** the model. When the gate opens, a
+model produces taps like a person's, is measured per bogie against the blind
+recounts, must beat the always-full baseline, and is allowed exactly what a
+person is allowed here — to raise a question.
+
+Driven end to end by `scripts/pocket-count-drive.mjs`.

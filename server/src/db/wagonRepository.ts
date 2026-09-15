@@ -13,6 +13,7 @@ import { signCertificate } from '../reports/certificateSigning.ts';
 import * as analytics from './wagonAnalytics.ts';
 import { CASNUB_CHECKLIST_TEMPLATE } from './checklistTemplate.ts';
 import { validateSpringNests } from '../../../shared/classification/nestGrouping.ts';
+import { PocketCountRepository } from './pocketCountRepository.ts';
 import { PartLedgerRepository, expectedPartsFor } from './partLedgerRepository.ts';
 import { getSpringCountOptions, buildSpringQueue } from '../../../shared/classification/springCounts.ts';
 import { evaluateSwt } from '../../../shared/classification/swtSpec.ts';
@@ -121,6 +122,12 @@ export interface ExitGateBlockerDetail {
     | 'CTRB_CYCLE_MISMATCH'
     // Something came off and was never recorded going back on, or vice versa.
     | 'PARTS_NOT_ACCOUNTED'
+    // A person counted fewer springs on an assembly photograph than the wagon type carries,
+    // or more, or two people counting the same frame disagreed. Advisory only, never a blocker:
+    // a count is a reading of a photograph, and the photograph is the evidence.
+    | 'POCKETS_SHORT'
+    | 'POCKET_COUNT_OVER'
+    | 'POCKET_COUNT_DISAGREES'
     | 'SWT_NOT_PERFORMED'
     | 'SWT_FAILED'
     // Nest grouping violations, from NestViolationType.
@@ -1743,6 +1750,55 @@ export class WagonRepository {
        * evaluate — every other check is unaffected, and a wagon cannot be held
        * at the gate because a feature was added after it arrived.
        */
+    }
+
+    /*
+     * What a person counted on the assembly photographs.
+     *
+     * shared/assembly/pocketCount.ts: a count that matches produces nothing
+     * here — no tick, because a count is not evidence that the pockets were
+     * full; the photograph is. A count that falls SHORT names the frame and
+     * the kind, and the supervisor acknowledges it by name, as with the
+     * parts ledger. A count that runs OVER is a different question (the
+     * wagon type on record, or the count) and says so. Two people
+     * disagreeing on one frame is its own finding: somebody looks again.
+     */
+    try {
+      for (const frame of new PocketCountRepository(this.db).wagonSummary(normalizedWagonNumber)) {
+        const at = `${frame.bogie.replace('_', ' ')} ${frame.side.replace('_', ' ')}`;
+        const key = `${frame.bogie}_${frame.side}`.toLowerCase();
+        const worst = [frame.comparison, frame.recountComparison].filter(Boolean).find((c) => c!.verdict === 'SHORT')
+          ?? [frame.comparison, frame.recountComparison].filter(Boolean).find((c) => c!.verdict === 'OVER');
+        if (worst) {
+          advisories.push(worst.message);
+          advisoryDetails.push({
+            id: `pockets_${worst.verdict.toLowerCase()}_${key}`,
+            category: 'SPRINGS',
+            partName: `Bogie assembly — ${at}`,
+            issueType: worst.verdict === 'SHORT' ? 'POCKETS_SHORT' : 'POCKET_COUNT_OVER',
+            description: worst.message,
+            severity: 'ADVISORY',
+            remediationAction: worst.verdict === 'SHORT'
+              ? 'Open the photograph and look at the pockets named. If a spring is missing, fit it and photograph the bogie again; if the count was wrong, have a second person recount.'
+              : 'Check the wagon type on record against the wagon, and have a second person recount the frame.'
+          });
+        }
+        if (frame.agree === false) {
+          const message = `${at}: two people counted this frame and disagreed (${frame.first!.counted.total} and ${frame.recount!.counted.total} springs).`;
+          advisories.push(message);
+          advisoryDetails.push({
+            id: `pockets_disagree_${key}`,
+            category: 'SPRINGS',
+            partName: `Bogie assembly — ${at}`,
+            issueType: 'POCKET_COUNT_DISAGREES',
+            description: message,
+            severity: 'ADVISORY',
+            remediationAction: 'Look at the photograph. The two counts are both on record; the frame decides.'
+          });
+        }
+      }
+    } catch {
+      // A database from before the counts table. The gate evaluates without it.
     }
 
     // Check if supervisor signoff exists

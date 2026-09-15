@@ -1463,6 +1463,24 @@ export class ApiClient {
     return this.request(`/photos/dataset/assembly${limit ? `?limit=${limit}` : ''}`);
   }
 
+  // Pocket counts on assembly frames. The expected number is never sent:
+  // the server derives it from the designation on the frame's tags.
+  public async getPocketCounts(photoId: string): Promise<{ success: boolean; data: any }> {
+    return this.request(`/photos/${encodeURIComponent(photoId)}/pocket-counts`);
+  }
+
+  public async recordPocketCount(photoId: string, taps: Array<{ x: number; y: number; kind: 'OUTER' | 'INNER' | 'SNUBBER' }>): Promise<{ success: boolean; data: any }> {
+    return this.request(`/photos/${encodeURIComponent(photoId)}/pocket-count`, { method: 'POST', body: JSON.stringify({ taps }) });
+  }
+
+  public async getWagonPocketCounts(wagonNumber: string): Promise<{ success: boolean; data: any[] }> {
+    return this.request(`/photos/pocket-counts?wagonNumber=${encodeURIComponent(wagonNumber)}`);
+  }
+
+  public async getPocketDataset(): Promise<{ success: boolean; data: any }> {
+    return this.request('/photos/dataset/pocket-counts');
+  }
+
   public async getSortingThroughput(date?: string): Promise<{ success: boolean; data: { date: string; total: number; passed: number; condemned: number; firstAt: string | null; lastAt: string | null } }> {
     const params = date ? `?date=${encodeURIComponent(date)}` : '';
     return this.request(`/sorting/throughput${params}`);

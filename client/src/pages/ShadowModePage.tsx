@@ -221,7 +221,7 @@ export const ShadowModePage: React.FC<Props> = ({ lang, user }) => {
               <label className="flex items-center gap-2 text-xs text-ink-body"><input type="checkbox" checked={d.wouldHaveStoppedAWagon} onChange={(e) => setField('wouldHaveStoppedAWagon', e.target.checked)} />{t('Would have stopped a wagon', 'वैगन रोक देता')}</label>
             </div>
             <div className="col-span-2 md:col-span-4 flex justify-end">
-              <button type="submit" disabled={saving} className="px-4 py-2 rounded-control bg-ink text-canvas text-xs font-bold" data-testid="discrepancy-submit">{t('Record the discrepancy', 'विसंगति दर्ज करें')}</button>
+              <button type="submit" disabled={saving} className="px-4 py-2 rounded-control bg-accent text-white text-xs font-bold" data-testid="discrepancy-submit">{t('Record the discrepancy', 'विसंगति दर्ज करें')}</button>
             </div>
           </form>
         )}
@@ -264,7 +264,7 @@ export const ShadowModePage: React.FC<Props> = ({ lang, user }) => {
             <div className="col-span-2 md:col-span-4"><label className={label}>{t('3. What slowed anyone down?', '3. किसी को क्या धीमा किया?')}</label><input className={input} value={s.whatSlowed} onChange={(e) => setSum('whatSlowed', e.target.value)} /></div>
             <div className="col-span-2 md:col-span-4"><label className={label}>{t('Anything that would have stopped a wagon leaving, and did not', 'कुछ ऐसा जो वैगन को जाने से रोकता, और नहीं रोका')}</label><input className={input} value={s.wouldHaveStoppedAWagon} onChange={(e) => setSum('wouldHaveStoppedAWagon', e.target.value)} /></div>
             <div className="col-span-2 md:col-span-4 flex justify-end">
-              <button type="submit" disabled={saving} className="px-4 py-2 rounded-control bg-ink text-canvas text-xs font-bold" data-testid="summary-submit">{t('Record the shift summary', 'शिफ्ट सारांश दर्ज करें')}</button>
+              <button type="submit" disabled={saving} className="px-4 py-2 rounded-control bg-accent text-white text-xs font-bold" data-testid="summary-submit">{t('Record the shift summary', 'शिफ्ट सारांश दर्ज करें')}</button>
             </div>
           </form>
         )}

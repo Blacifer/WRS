@@ -14,6 +14,7 @@ import { PhotoCaptureModal } from '../components/PhotoCaptureModal.tsx';
 import AutoJudgePart from '../components/AutoJudgePart.tsx';
 import { PhotoGallery } from '../components/PhotoGallery.tsx';
 import { AssemblyEvidenceCapture } from '../components/AssemblyEvidenceCapture.tsx';
+import { PocketCountPanel } from '../components/PocketCountPanel.tsx';
 import { parseAssemblyTags } from '../../../shared/assembly/assemblyCapture.ts';
 import { WagonConditionReport } from '../components/WagonConditionReport.tsx';
 import { PartsLedger } from '../components/PartsLedger.tsx';
@@ -1496,7 +1497,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                 <button
                   data-testid="voice-confirm-model-reading"
                   onClick={() => voiceNote.confirm!.run().catch((err: any) => setVoiceNote({ tone: 'warn', text: err?.message || 'Could not record that.' }))}
-                  className="shrink-0 rounded-control bg-ink text-canvas text-xs font-bold px-3 py-1.5"
+                  className="shrink-0 rounded-control bg-accent text-white text-xs font-bold px-3 py-1.5"
                 >
                   {voiceNote.confirm.label}
                 </button>
@@ -2131,12 +2132,18 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
               <div>
                 <h4 className="text-sm font-bold text-warn-ink flex items-center gap-2">
                   <CoilIcon size={16} />{' '}
-                  {isHi ? 'स्प्रिंग नेस्ट समूहन' : 'Spring Nest Grouping'} ({gateStatus.advisories.length})
+                  {isHi ? 'सलाह — हस्ताक्षर से पहले देखें' : 'Advisories — to look at before signing'} ({gateStatus.advisories.length})
                 </h4>
+                {/*
+                  * This box was titled "Spring Nest Grouping" when nest grouping
+                  * was the only advisory. The parts ledger and the pocket counts
+                  * now arrive here too, and a short spring count under a heading
+                  * about nest bands reads as the wrong kind of problem.
+                  */}
                 <p className="text-[11px] text-ink-muted mt-1.5 leading-relaxed">
                   {isHi
-                    ? 'केवल सलाहकारी — विमुक्ति नहीं रोकता। एक नेस्ट की सभी स्प्रिंग एक ही 3 मि.मी. बैंड में होनी चाहिए ताकि भार समान रूप से बँटे, भले ही प्रत्येक स्प्रिंग अलग-अलग उत्तीर्ण हो।'
-                    : 'Advisory only — does not block release. Springs in one nest should sit within a single 3 mm band so they share load evenly, even when each spring passes on its own.'}
+                    ? 'केवल सलाहकारी — विमुक्ति नहीं रोकता। नेस्ट समूहन (एक नेस्ट की स्प्रिंग एक ही 3 मि.मी. बैंड में), पुर्जों का खाता, और असेंबली फ़ोटो पर गिनी गई स्प्रिंग। हस्ताक्षर करते समय हर एक को नाम से स्वीकार करना होता है।'
+                    : 'Advisory only — does not block release. Nest grouping (springs in one nest within a single 3 mm band), the parts ledger, and springs counted on the assembly photographs. Each is acknowledged by name at sign-off.'}
                 </p>
               </div>
               <div className="space-y-2">
@@ -2272,6 +2279,8 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
               </div>
             );
           })()}
+
+          <PocketCountPanel wagonNumber={wagonNumber} photos={photos} lang={(lang || 'en') as 'en' | 'hi'} />
 
           <PhotoGallery
             photos={photos}

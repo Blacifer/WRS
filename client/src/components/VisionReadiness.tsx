@@ -75,6 +75,7 @@ export const VisionReadiness: React.FC<VisionReadinessProps> = ({ lang }) => {
    * A shop that has photographed springs but never a bogie is the normal
    * starting state, and it must not blank the spring figures beside it.
    */
+  const [pockets, setPockets] = useState<any>(null);
   const [assembly, setAssembly] = useState<{
     completeBogies: number;
     partialBogies: number;
@@ -175,6 +176,10 @@ export const VisionReadiness: React.FC<VisionReadinessProps> = ({ lang }) => {
         });
       })
       .catch(() => { /* no assembly evidence yet, or not permitted — say nothing */ });
+
+    api.getPocketDataset()
+      .then((res: any) => { if (!cancelled && res?.data) setPockets(res.data); })
+      .catch(() => { /* not permitted, or an older server — say nothing */ });
 
     return () => { cancelled = true; };
   }, [isHi]);
@@ -324,6 +329,27 @@ export const VisionReadiness: React.FC<VisionReadinessProps> = ({ lang }) => {
                 : `Counted over the most recent ${ASSEMBLY_LIMIT} photographs — these figures are a floor, not a total.`}
             </p>
           )}
+        </div>
+      )}
+
+      {/*
+        * The pocket-count dataset: every count a person made on an assembly
+        * frame is a label, and the blind recounts are the agreement figure a
+        * model would be measured against. The model is NONE, and the server
+        * says so; the gate sentence is the server's, not computed here.
+        */}
+      {pockets && pockets.labelledPhotos > 0 && (
+        <div className="rounded-control border border-line bg-raised p-4 space-y-1.5" data-testid="pocket-dataset">
+          <p className="text-sm font-bold text-white">
+            {isHi ? 'पॉकेट गिनती — लेबल किए फ़्रेम और दो लोगों की सहमति' : 'Pocket counts — labelled frames, and how often two people agree'}
+          </p>
+          <p className="text-2xl font-black text-white tabular-nums leading-none">
+            {pockets.labelledPhotos}
+            <span className="text-xs font-bold text-ink-muted">{isHi ? ' फ़्रेम गिने' : ' frames counted'}</span>
+            <span className="text-xs font-bold text-ink-muted">{' · '}{pockets.coveredBogies}{isHi ? ' बोगी दोनों ओर से' : ' bogies both sides'}</span>
+            <span className="text-xs font-bold text-ink-muted">{' · '}{pockets.recounts}{isHi ? ' दोबारा गिनती' : ' blind recounts'}{pockets.agreementPct !== null ? `, ${pockets.agreementPct}% ${isHi ? 'सहमत' : 'agree'}` : ''}</span>
+          </p>
+          <p className="text-xs text-ink-body leading-relaxed">{isHi ? 'मॉडल' : 'Model'}: {pockets.model}. {pockets.gate?.why}</p>
         </div>
       )}
     </section>

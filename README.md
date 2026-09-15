@@ -53,7 +53,10 @@ The **WRS Raipur Quality Control Platform** is an enterprise-grade web applicati
 10. **Ask the records, with citations**
    - "Which wagon type condemns the most snubbers this quarter, out of how many?" — answered from a closed catalogue of fifteen questions, each fixed SQL over the shop's own tables, every figure with its `n` and the rows and query it came from. A bilingual matcher reads the sentence offline; a model, if one is configured (and it can be one on the shop PC), only gets a turn when the matcher cannot tell, and only to pick the question — it never sees a record and never writes a number. When nothing can tell, the list is offered rather than a guess.
 
-11. **Built for the shop floor**
+11. **Pocket occupancy from a photograph — counted, not classified**
+   - The one thing a photograph can honestly settle here: were all the spring pockets occupied when the bogie was closed up. A person taps each spring on the assembly frame; the expected number comes from the wagon designation and nothing else, and the counter is never shown it. A matching count produces nothing — no tick, no "verified". A short count reaches the exit gate as an advisory the supervisor acknowledges by name. A second person recounts blind; the counts are the labelled dataset, the agreement rate is what any model would be measured against, and the model today is NONE — the code and the dashboard both say so.
+
+12. **Built for the shop floor**
    - Offline-first PWA with an IndexedDB queue; work continues without a network and syncs without duplicating.
    - Bilingual throughout (English / Hindi).
    - Hands-free voice checklist entry, and acoustic bearing/leak diagnostics using real Web Audio FFT.
