@@ -1565,6 +1565,7 @@ export type NavigationTab =
   | 'smart_vision'
   | 'users'
   | 'learning'
+  | 'shadow'
   | 'audit'
   | 'manual'
   | 'checklist_config';
@@ -1620,6 +1621,8 @@ const TAB_CAPABILITY: Record<string, Capability> = {
   analytics: 'analytics.read',
   dashboard: 'analytics.read',
   learning: 'learning.view',
+  // The shadow run: the app beside the register, and whether to trust it.
+  shadow: 'shadow.view',
   // The audit-trail export dialog, which is not a page — see App.tsx.
   admin: 'certificate.export',
   // Administration

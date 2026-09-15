@@ -46,7 +46,10 @@ The **WRS Raipur Quality Control Platform** is an enterprise-grade web applicati
    - The **Audit Chain** screen (supervisor and above), or `GET /api/audit/verify`, re-derives the whole chain and names the first altered entry. A changed *role* breaks it, not just changed data. The screen also states what a pass does *not* prove: that no record was altered after it was written is not the same as every measurement having been correct.
    - Release certificates carry an **Ed25519 public-key signature** over their own contents. The public key is printed on the certificate by fingerprint and served from `/api/audit/certificate-key`, and the exact signed bytes are published with the certificate — so a receiving railway or an auditor verifies it themselves, without this server and without being able to issue one.
 
-9. **Built for the shop floor**
+9. **The shadow run, in the app**
+   - For the first weeks the app runs beside the register, and the register governs. The *Shadow Run* screen is the discrepancy log and the shift summary from `docs/SHADOW_MODE_FORMS.md`, with the app's half of every figure filled in from its own records and the supervisor writing only what the app cannot know — what the register said, who was right, why. The end-of-week reading is computed, with the one non-negotiable first: a case where the app passed what the register condemned blocks going live on its own. Append-only, exportable, and the same code as `scripts/shadow-report.mjs`.
+
+10. **Built for the shop floor**
    - Offline-first PWA with an IndexedDB queue; work continues without a network and syncs without duplicating.
    - Bilingual throughout (English / Hindi).
    - Hands-free voice checklist entry, and acoustic bearing/leak diagnostics using real Web Audio FFT.

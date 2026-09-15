@@ -66,4 +66,6 @@ Inspectors should be told plainly, in the day-0 briefing, that answering "the re
 
 The discrepancy log and daily summary this document asks for are in
 [SHADOW_MODE_FORMS.md](SHADOW_MODE_FORMS.md), along with how to read them at
-the end of the first week.
+the end of the first week — and they are the *Shadow Run* screen in the app,
+where the app's own counts are already filled in and the end-of-week reading
+is computed from what was written down.

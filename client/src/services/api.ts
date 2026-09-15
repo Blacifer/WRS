@@ -1650,6 +1650,20 @@ export class ApiClient {
     return this.request('/shift/handover', { method: 'POST', body: JSON.stringify(payload) });
   }
 
+  // -- the shadow run ---------------------------------------------------------
+  public async getShadowReport(days = 7): Promise<{ success: boolean; data: any }> {
+    return this.request(`/shadow/report?days=${days}`);
+  }
+  public async recordShadowDiscrepancy(payload: Record<string, unknown>): Promise<{ success: boolean; data: { id: string } }> {
+    return this.request('/shadow/discrepancies', { method: 'POST', body: JSON.stringify(payload) });
+  }
+  public async recordShadowSummary(payload: Record<string, unknown>): Promise<{ success: boolean; data: { id: string } }> {
+    return this.request('/shadow/summaries', { method: 'POST', body: JSON.stringify(payload) });
+  }
+  public async exportShadowRun(days = 60): Promise<string> {
+    return this.request<string>(`/shadow/export.csv?days=${days}`);
+  }
+
   public async getShiftHandovers(limit = 10): Promise<{
     success: boolean;
     data: Array<{ id: string; shiftDate: string; body: string; draftSource: string; edited: boolean; recordedByName: string; createdAt: string }>;

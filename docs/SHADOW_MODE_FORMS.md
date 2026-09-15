@@ -2,9 +2,15 @@
 
 `SHADOW_MODE_ROLLOUT.md` asks for the discipline of cross-checking the app
 against the existing paper process. These are the two forms that discipline
-needs. Print them, or keep them as a shared sheet — either works, the point is
-that disagreements get written down at the moment they happen rather than
-remembered at the end of the shift.
+needs. **They are also a screen** — *Shadow Run*, for supervisors, admins and
+the DRM — with the app's half of every figure already filled in from its own
+records, the verdict at the top computed the way the last section of this
+document describes, and an export of the completed logs for whoever asks how
+the system was validated. Print these, or use the screen — either works; the
+point is that disagreements get written down at the moment they happen rather
+than remembered at the end of the shift. What is written on the screen cannot
+be edited afterwards; a mistake is corrected by a second line pointing at the
+first, and both survive.
 
 Shadow mode means the app and the register run side by side and the **register
 still governs**. Nothing the app says releases a wagon during this period.
@@ -95,6 +101,9 @@ app rather than about the inspector.
 > "out of how many?" is worse than no number.
 
     node --experimental-strip-types scripts/shadow-report.mjs 7
+
+> The script and the screen are the same code. The script is for a PC with
+> the database file and no browser.
 
 **Three questions, answered in a sentence each:**
 

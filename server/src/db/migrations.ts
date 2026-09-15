@@ -1545,6 +1545,71 @@ export function runMigrations(db: DatabaseSync): void {
   }
 
   /*
+   * The shadow run, written down where it happens.
+   *
+   * docs/SHADOW_MODE_FORMS.md asked for two paper forms: one line per
+   * disagreement between the app and the register, and one summary per
+   * shift. Paper is fine, and these are the same forms as screens, with
+   * the app's half of every figure filled in from its own records — the
+   * supervisor writes only what the app cannot know: what the register
+   * said, who was right, why, and the minutes on paper.
+   *
+   * Append-only, like every other record here. A discrepancy written down
+   * and later found to be wrong is corrected by another row that
+   * `supersedes` it; both survive, because a log that can be tidied after
+   * the fact is not the evidence CRIS or RDSO will be shown.
+   */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS shadow_discrepancies (
+      id TEXT PRIMARY KEY,
+      occurred_on TEXT NOT NULL,
+      shift TEXT NOT NULL,
+      inspector_name TEXT NOT NULL,
+      wagon_number TEXT DEFAULT NULL,
+      location TEXT DEFAULT NULL,
+      register_says TEXT NOT NULL,
+      app_says TEXT NOT NULL,
+      register_verdict TEXT NOT NULL CHECK(register_verdict IN ('PASS', 'CONDEMNED', 'OTHER')),
+      app_verdict TEXT NOT NULL CHECK(app_verdict IN ('PASS', 'CONDEMNED', 'OTHER')),
+      who_was_right TEXT NOT NULL CHECK(who_was_right IN ('APP', 'REGISTER', 'BOTH_WRONG', 'UNRESOLVED')),
+      cause TEXT NOT NULL CHECK(cause IN ('BAND_MISREAD', 'WRONG_SPRING', 'OFF_STRIP_JUDGEMENT', 'CONFIGURATION', 'NEST_GROUPING', 'APP_COULD_NOT_ANSWER', 'DEVICE', 'OTHER')),
+      why TEXT DEFAULT NULL,
+      would_have_stopped_a_wagon INTEGER NOT NULL DEFAULT 0 CHECK(would_have_stopped_a_wagon IN (0, 1)),
+      supersedes TEXT DEFAULT NULL,
+      reported_by TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      FOREIGN KEY (reported_by) REFERENCES users(id) ON DELETE RESTRICT
+    );
+    CREATE INDEX IF NOT EXISTS idx_shadow_disc_day ON shadow_discrepancies(occurred_on);
+    CREATE TRIGGER IF NOT EXISTS trg_shadow_disc_no_update BEFORE UPDATE ON shadow_discrepancies
+    BEGIN SELECT RAISE(ABORT, 'The shadow-run log is evidence and cannot be rewritten; add a correcting row.'); END;
+    CREATE TRIGGER IF NOT EXISTS trg_shadow_disc_no_delete BEFORE DELETE ON shadow_discrepancies
+    BEGIN SELECT RAISE(ABORT, 'The shadow-run log is evidence and cannot be deleted.'); END;
+
+    CREATE TABLE IF NOT EXISTS shadow_daily_summaries (
+      id TEXT PRIMARY KEY,
+      summary_date TEXT NOT NULL,
+      shift TEXT NOT NULL,
+      supervisor_id TEXT NOT NULL,
+      -- The register's half. The app's half is computed at read time.
+      register_minutes_one_wagon REAL DEFAULT NULL,
+      app_minutes_one_wagon REAL DEFAULT NULL,
+      transcription_errors_box_missed INTEGER NOT NULL DEFAULT 0,
+      what_app_got_wrong TEXT DEFAULT NULL,
+      what_app_caught TEXT DEFAULT NULL,
+      what_slowed TEXT DEFAULT NULL,
+      would_have_stopped_a_wagon TEXT DEFAULT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      FOREIGN KEY (supervisor_id) REFERENCES users(id) ON DELETE RESTRICT
+    );
+    CREATE INDEX IF NOT EXISTS idx_shadow_sum_day ON shadow_daily_summaries(summary_date, shift);
+    CREATE TRIGGER IF NOT EXISTS trg_shadow_sum_no_update BEFORE UPDATE ON shadow_daily_summaries
+    BEGIN SELECT RAISE(ABORT, 'A shift summary is evidence and cannot be rewritten; write another for the same shift.'); END;
+    CREATE TRIGGER IF NOT EXISTS trg_shadow_sum_no_delete BEFORE DELETE ON shadow_daily_summaries
+    BEGIN SELECT RAISE(ABORT, 'A shift summary is evidence and cannot be deleted.'); END;
+  `);
+
+  /*
    * What the offline queue has already delivered.
    *
    * A tablet that loses the wifi between the server committing a batch and

@@ -27,7 +27,7 @@ const STAGE_LABEL: Record<string, [string, string]> = {
   RELEASE: ['Release', 'रिलीज़']
 };
 
-const days = (h: number) => (Math.abs(h) >= 48 ? `${(h / 24).toFixed(1)} d` : `${Math.round(h)} h`);
+const days = (h: number) => (Math.abs(h) >= 48 ? `${(h / 24).toFixed(1)} days` : `${Math.round(h)} h`);
 const dateOnly = (iso: string | null) => (iso ? iso.slice(0, 10) : '—');
 
 export const WhereWagonsWait: React.FC<{ lang: 'en' | 'hi' }> = ({ lang }) => {

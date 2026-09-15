@@ -30,144 +30,75 @@
  * The paper side cannot be measured from here at all. It needs a supervisor
  * with a tally sheet, and the report says so rather than leaving a blank that
  * looks like a zero.
+ *
+ * SINCE THE SHADOW RUN MOVED INTO THE APP
+ * ---------------------------------------
+ * The figures here are the figures on the Shadow Run screen, computed by the
+ * same code (server/src/db/shadowRepository.ts over shared/analysis/). This
+ * script is the version for a terminal — a supervisor's PC with the database
+ * file and no browser — and the paper side it cannot measure is now the two
+ * forms on that screen, whose entries it prints when they exist.
  */
 
 import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
+import { ShadowRepository } from '../server/src/db/shadowRepository.ts';
 
 const DB_PATH = process.env.DB_PATH || path.resolve(import.meta.dirname, '../server/data/wrs_inspections.db');
 const DAYS = Number(process.argv[2]) || 7;
 
-/** A pause longer than this ends a working run rather than counting toward it. */
-const IDLE_GAP_MINUTES = 15;
-
-/*
- * Rates above these are not people working.
- *
- * WMM records the sorting bench at roughly seven hundred springs a shift, which
- * is about ninety an hour. Seeded and test data is written in bursts of
- * milliseconds, so running this against a development database produces figures
- * like five hundred springs an hour and four thousand checklist items an hour.
- *
- * Those numbers are not merely wrong, they are the kind of wrong that destroys
- * a pilot's credibility the moment somebody senior does the arithmetic in their
- * head. So the report says plainly when a rate cannot have come from a person,
- * rather than printing it next to the honest ones and letting the reader assume
- * they are alike.
- */
-const PLAUSIBLE_SPRINGS_PER_HOUR = 200;
-const PLAUSIBLE_ITEMS_PER_HOUR = 400;
-
-let implausible = false;
-function rate(perHour, ceiling) {
-  if (!Number.isFinite(perHour) || perHour <= 0) return '—';
-  if (perHour > ceiling) {
-    implausible = true;
-    return `${perHour.toFixed(1)}  ← not human work; seeded or test data`;
-  }
-  return perHour.toFixed(1);
-}
-
 const db = new DatabaseSync(DB_PATH, { readOnly: true });
-const since = new Date(Date.now() - DAYS * 86400_000).toISOString();
+const r = new ShadowRepository(db).report(DAYS);
 
 const fmt = (n, d = 1) => (Number.isFinite(n) ? n.toFixed(d) : '—');
 const line = (label, value) => console.log('  ' + String(label).padEnd(46) + value);
-
-/**
- * Total worked minutes across a sorted list of instants, splitting on idle gaps.
- * A single reading is worth no time at all — one instant has no duration.
- */
-function workedMinutes(instants) {
-  const t = instants.map((s) => new Date(s).getTime()).filter(Number.isFinite).sort((a, b) => a - b);
-  if (t.length < 2) return 0;
-  let total = 0;
-  for (let i = 1; i < t.length; i++) {
-    const gap = (t[i] - t[i - 1]) / 60000;
-    if (gap <= IDLE_GAP_MINUTES) total += gap;
-  }
-  return total;
-}
+const rate = (x) => (x.perHour === null ? '—' : x.plausible ? `${fmt(x.perHour)}/h` : `${fmt(x.perHour)}/h  ⚠ NOT PLAUSIBLE FOR A PERSON`);
 
 console.log();
 console.log(`  WRS Raipur — shadow run, last ${DAYS} day(s)`);
 console.log('  ' + '-'.repeat(52));
-console.log(`  Idle gaps over ${IDLE_GAP_MINUTES} min are excluded from worked time.`);
+console.log(`  Idle gaps over ${r.idleGapMinutes} min are excluded from worked time.`);
 console.log();
 
-// --- The sorting bench -----------------------------------------------------
-const springs = db.prepare(`
-  SELECT created_at, inspector_id, status
-  FROM spring_sorting_records
-  WHERE created_at >= ? AND (voided IS NULL OR voided = 0)
-  ORDER BY created_at
-`).all(since);
-
-console.log('  SPRING SORTING');
-if (springs.length === 0) {
-  line('springs sorted', '0 — nothing to measure yet');
-} else {
-  const minutes = workedMinutes(springs.map((r) => r.created_at));
-  const condemned = springs.filter((r) => r.status === 'CONDEMNED').length;
-  line('springs sorted', springs.length);
-  line('condemned', `${condemned} (${fmt((condemned / springs.length) * 100)}%)`);
-  line('worked time at the bench', `${fmt(minutes)} min`);
-  line('springs per hour', minutes > 0 ? rate((springs.length / minutes) * 60, PLAUSIBLE_SPRINGS_PER_HOUR) : '—');
-  line('inspectors involved', new Set(springs.map((r) => r.inspector_id)).size);
+const total = (k) => r.days.reduce((a, d) => a + d[k], 0);
+console.log('  THE APP\'S HALF');
+line('springs recorded (bench + wagons)', total('springsRecorded'));
+line('condemned', total('springsCondemned'));
+line('wagons swept', total('wagonsSwept'));
+line('nests flagged', total('nestsFlagged'));
+line('supervisor overrides recorded', total('overrides'));
+line('readings withdrawn and re-taken', total('withdrawn'));
+console.log();
+console.log('  DAY BY DAY');
+for (const d of r.days) {
+  line(d.date, `${d.springsRecorded} springs, ${d.bench.workedMinutes} min at the bench (${rate(d.bench.springsPerHour)}), ${d.checklists.verdicts} verdicts on ${d.checklists.wagons} wagon(s)`);
 }
 console.log();
 
-// --- Wagon checklists ------------------------------------------------------
-const verdicts = db.prepare(`
-  SELECT wagon_number, COALESCE(manual_verdict_at, updated_at) AS at, inspector_id
-  FROM checklist_items
-  WHERE status != 'PENDING' AND COALESCE(manual_verdict_at, updated_at) >= ?
-  ORDER BY wagon_number, at
-`).all(since);
-
-console.log('  WAGON CHECKLISTS');
-if (verdicts.length === 0) {
-  line('verdicts recorded', '0 — nothing to measure yet');
-} else {
-  const byWagon = new Map();
-  for (const v of verdicts) {
-    if (!byWagon.has(v.wagon_number)) byWagon.set(v.wagon_number, []);
-    byWagon.get(v.wagon_number).push(v.at);
-  }
-  const perWagon = [...byWagon.entries()]
-    .map(([wagon, times]) => ({ wagon, items: times.length, minutes: workedMinutes(times) }))
-    .filter((w) => w.items > 1);
-
-  line('verdicts recorded', verdicts.length);
-  line('wagons touched', byWagon.size);
-
-  if (perWagon.length > 0) {
-    const totals = perWagon.reduce((a, w) => a + w.minutes, 0);
-    const median = perWagon.map((w) => w.minutes).sort((a, b) => a - b)[Math.floor(perWagon.length / 2)];
-    line('worked time on checklists', `${fmt(totals)} min across ${perWagon.length} wagon(s)`);
-    line('median per wagon (upper bound on effort)', `${fmt(median)} min`);
-    line('items per hour', totals > 0 ? rate((verdicts.length / totals) * 60, PLAUSIBLE_ITEMS_PER_HOUR) : '—');
-  } else {
-    line('per-wagon timing', 'needs a wagon with more than one verdict');
-  }
-}
+console.log('  THE AMBER BOX');
+line('raised', r.verdict.amber.raised);
+line('answered: re-measured, it was wrong', r.verdict.amber.reMeasured);
+line('answered: the reading stands', r.verdict.amber.stands);
+line('not answered at all', r.verdict.amber.unanswered);
 console.log();
 
-// --- Corrections, which are the quality argument ---------------------------
-const overrides = db.prepare(
-  `SELECT COUNT(*) AS c FROM inspections WHERE supervisor_override = 1 AND created_at >= ?`
-).get(since);
-const anomalies = db.prepare(
-  `SELECT COUNT(*) AS c FROM spring_sorting_records WHERE supersedes IS NOT NULL AND created_at >= ?`
-).get(since);
-
-console.log('  WHAT THE APP CAUGHT');
-line('supervisor overrides recorded', overrides.c);
-line('readings withdrawn and re-taken', anomalies.c);
+console.log('  THE PAPER SIDE — from the two forms on the Shadow Run screen');
+line('discrepancies logged', r.verdict.discrepancies.total);
+line('  the app was right', r.verdict.discrepancies.appRight);
+line('  the register was right', r.verdict.discrepancies.registerRight);
+line('  would have stopped a wagon', r.verdict.discrepancies.wouldHaveStoppedAWagon);
+line('shift summaries', r.summaries.length);
+line('one wagon, both ways (paired)', r.verdict.timing.pairs === 0 ? 'none yet' : `${r.verdict.timing.medianRegisterMinutes} min on paper → ${r.verdict.timing.medianAppMinutes} min in the app (${r.verdict.timing.pairs})`);
+line('transcription errors the box missed', r.verdict.transcriptionErrorsBoxMissed);
 console.log();
 
-// --- The half that cannot be measured from here ----------------------------
-if (implausible) {
+console.log('  READING THE LOG');
+line('app passed what the register condemned', r.verdict.appPassedRegisterCondemned + (r.verdict.blocking ? '  ← BLOCKS GOING LIVE' : ''));
+for (const f of r.verdict.findings) console.log('  • ' + f);
+if (r.verdict.findings.length === 0) console.log('  nothing to raise from what has been written down so far');
+console.log();
+
+if (r.anyImplausible) {
   console.log('  ⚠ THESE FIGURES ARE NOT FROM REAL WORK');
   console.log('  At least one rate above is faster than a person can work, which');
   console.log('  means this database holds seeded or test records. Run this against');
@@ -175,16 +106,11 @@ if (implausible) {
   console.log('  these numbers in front of the DRM.');
   console.log();
 }
-
-console.log('  THE PAPER SIDE — NOT MEASURABLE FROM THIS DATABASE');
-console.log('  A supervisor has to record these by hand during the parallel run,');
-console.log('  or the comparison has only one side and proves nothing:');
-console.log('    1. Minutes to complete one wagon on paper, start to finish.');
-console.log('    2. Springs measured and written up per hour, on paper.');
-console.log('    3. Discrepancies found between the two records — what, and why.');
-console.log('    4. Anything the paper process caught that the app did not.');
-console.log();
-console.log('  Item 4 matters most and is the one people forget to record.');
-console.log('  A pilot that only counts the app\'s wins is a pilot nobody senior');
-console.log('  will believe.');
-console.log();
+if (r.verdict.discrepancies.total === 0 && r.summaries.length === 0) {
+  console.log('  The paper side is empty. A supervisor has to write it down during the');
+  console.log('  parallel run — on the Shadow Run screen, or on the printed forms — or');
+  console.log('  the comparison has only one side and proves nothing. The entry people');
+  console.log('  forget is the one that matters most: anything the register caught');
+  console.log('  that the app did not.');
+  console.log();
+}
