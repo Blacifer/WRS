@@ -9,7 +9,7 @@ import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.ts';
 import { requireCapability } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
-import { getObservedCondemnationRates } from '../db/wagonAnalytics.ts';
+import { getObservedCondemnationRates, getAnalyticsDwell } from '../db/wagonAnalytics.ts';
 import { verifyAuditChain } from '../db/auditLog.ts';
 import { GaugeRepository } from '../db/gaugeRepository.ts';
 import { InspectionRepository } from '../db/repository.ts';
@@ -77,6 +77,21 @@ analyticsRouter.get('/tat', authMiddleware, requireCapability('analytics.read'),
 // -------------------------------------------------------------------------
 // 3. Workshop Throughput Analytics (Daily/Weekly/Monthly)
 // -------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// GET /api/analytics/dwell
+//
+// Per-stage dwell (median, p90, how many intervals), the bottleneck stage,
+// and for every active wagon the computed release date against its target —
+// with the per-stage arithmetic, and a stated reason where it cannot be done.
+// ---------------------------------------------------------------------------
+analyticsRouter.get('/dwell', authMiddleware, requireCapability('analytics.read'), async (_req: Request, res: Response) => {
+  try {
+    res.status(200).json({ success: true, data: getAnalyticsDwell(getDatabase()), meta: { timestamp: new Date().toISOString() } });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: 'DWELL_FAILED', message: err?.message || 'Could not compute stage dwell', statusCode: 500, timestamp: new Date().toISOString() });
+  }
+});
 
 analyticsRouter.get('/throughput', authMiddleware, requireCapability('analytics.read'), async (req: Request, res: Response) => {
   const repo = getRepo();

@@ -1216,6 +1216,32 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
               <span className="px-3 py-1 bg-raised border border-line rounded-control text-xs font-bold text-ink-body">
                 {wagon?.owningRailway}
               </span>
+              {/*
+                * When it is due out. The dashboard's "will miss its date" is
+                * computed against this; without it the wagon is listed as
+                * having no date. A supervisor may set or move it, and the
+                * move is on the audit trail.
+                */}
+              <span className="px-3 py-1 bg-raised border border-line rounded-control text-xs font-bold text-ink-body flex items-center gap-2" data-testid="target-release-date">
+                {isHi ? 'निर्धारित' : 'Due out'}: {wagon?.targetReleaseDate ? String(wagon.targetReleaseDate).slice(0, 10) : (isHi ? 'तय नहीं' : 'not set')}
+                {isSupervisor && !isReleased && (
+                  <input
+                    type="date"
+                    aria-label={isHi ? 'रिलीज़ तिथि बदलें' : 'Change due-out date'}
+                    defaultValue={wagon?.targetReleaseDate ? String(wagon.targetReleaseDate).slice(0, 10) : ''}
+                    onChange={async (e) => {
+                      const v = e.target.value || null;
+                      try {
+                        await api.setTargetReleaseDate(wagonNumber, v);
+                        loadWagonData();
+                      } catch (err: any) {
+                        alert(err?.message || 'Could not change the date.');
+                      }
+                    }}
+                    className="bg-page border border-line rounded px-1.5 py-0.5 text-[11px] text-white"
+                  />
+                )}
+              </span>
             </div>
           </div>
 

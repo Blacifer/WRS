@@ -16,6 +16,7 @@
 import type { DatabaseSync } from 'node:sqlite';
 import type { LifecycleStage, CASNUBCategory } from '../../../shared/types.ts';
 import type { ObservedRate } from '../../../shared/knowledge/consumptionForecast.ts';
+import { dwellReport, type DwellReport } from '../../../shared/analysis/stageDwell.ts';
 
 // -------------------------------------------------------------------------
 // Analytics & DRM Dashboards
@@ -126,6 +127,27 @@ export function getAnalyticsTAT(db: DatabaseSync): any {
     completedWagonsCount: durations.length,
     trends
   };
+}
+
+/**
+ * Where wagons wait, and which one will miss its date. The arithmetic is in
+ * shared/analysis/stageDwell.ts; this reads it the two tables it needs.
+ */
+export function getAnalyticsDwell(db: DatabaseSync, now = new Date().toISOString()): DwellReport {
+  const transitions = db.prepare(`
+    SELECT t.wagon_number AS wagonNumber, w.wagon_type AS wagonType,
+           t.from_stage AS fromStage, t.to_stage AS toStage, t.created_at AS createdAt
+    FROM wagon_transitions t
+    JOIN wagons w ON w.id = t.wagon_id
+    ORDER BY t.created_at ASC, t.rowid ASC
+  `).all() as any[];
+  const wagons = db.prepare(`
+    SELECT wagon_number AS wagonNumber, wagon_type AS wagonType,
+           current_stage AS currentStage, target_release_date AS targetReleaseDate
+    FROM wagons
+    WHERE current_stage <> 'RELEASE'
+  `).all() as any[];
+  return dwellReport(transitions, wagons, now);
 }
 
 export function getAnalyticsThroughput(db: DatabaseSync): any {

@@ -481,11 +481,21 @@ export class ApiClient {
     owningRailway: string;
     entryNotes?: string;
     conditionNotes?: string;
+    /** When the wagon is due out, YYYY-MM-DD. Optional; the shop may not know at the gate. */
+    targetReleaseDate?: string | null;
   }): Promise<{ success: boolean; data: WagonRecord }> {
     return this.request<{ success: boolean; data: WagonRecord }>('/wagons/register', {
       method: 'POST',
       body: JSON.stringify(payload)
     });
+  }
+
+  public async setTargetReleaseDate(wagonNumber: string, targetReleaseDate: string | null, reason?: string): Promise<{ success: boolean; data: WagonRecord }> {
+    return this.request(`/wagons/${encodeURIComponent(wagonNumber)}/target-release-date`, { method: 'PUT', body: JSON.stringify({ targetReleaseDate, reason }) });
+  }
+
+  public async getAnalyticsDwell(): Promise<{ success: boolean; data: import('../../../shared/analysis/stageDwell.ts').DwellReport }> {
+    return this.request('/analytics/dwell');
   }
 
   public async queryWagons(filter: {

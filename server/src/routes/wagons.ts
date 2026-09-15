@@ -56,9 +56,79 @@ function getRepos() {
  * people who identified themselves is not a check.
  */
 
+/** A date, or null for absent, or false for something that is not a date. */
+function parseTargetDate(raw: unknown): string | null | false {
+  if (raw === undefined || raw === null || raw === '') return null;
+  if (typeof raw !== 'string') return false;
+  const t = Date.parse(raw);
+  if (!Number.isFinite(t)) return false;
+  // A bare date is taken as the end of that working day, Indian time, so a
+  // wagon due "on the 20th" is not counted late at one minute past midnight.
+  return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? new Date(`${raw}T17:00:00+05:30`).toISOString() : new Date(t).toISOString();
+}
+
+// ---------------------------------------------------------------------------
+// PUT /:wagonNumber/target-release-date
+//
+// Set or change when a wagon is due out. A supervisor's call, not an
+// inspector's; on the audit trail, because moving a date is how a late wagon
+// stops looking late.
+// ---------------------------------------------------------------------------
+wagonsRouter.put('/:wagonNumber/target-release-date', authMiddleware, requireCapability('wagon.release'), async (req: Request, res: Response) => {
+  const { wagonRepo } = getRepos();
+  const wagonNumber = String(req.params?.wagonNumber || '').trim().toUpperCase();
+  const target = parseTargetDate(req.body?.targetReleaseDate);
+  if (target === false) {
+    res.status(400).json({ success: false, error: 'INVALID_TARGET_DATE', message: 'targetReleaseDate must be a date, or null to clear it.', statusCode: 400, timestamp: new Date().toISOString() });
+    return;
+  }
+  const wagon = wagonRepo.getWagonByNumber(wagonNumber);
+  if (!wagon) {
+    res.status(404).json({ success: false, error: 'WAGON_NOT_FOUND', message: `Wagon ${wagonNumber} was not found.`, statusCode: 404, timestamp: new Date().toISOString() });
+    return;
+  }
+  const before = wagon.targetReleaseDate ?? null;
+  getDatabase().prepare('UPDATE wagons SET target_release_date = ?, updated_at = ? WHERE id = ?').run(target, new Date().toISOString(), wagon.id);
+  /*
+   * Filed as a supervisor override, with the kind in the payload. The audit
+   * table's event vocabulary is a CHECK constraint on an append-only,
+   * hash-chained table; widening it means rebuilding that table, which is
+   * not a thing to do for a date field. A supervisor moving a wagon's due
+   * date is, in substance, a supervisory decision overriding the plan the
+   * wagon was registered with — and it is on the chain either way.
+   */
+  logAuditEvent(getDatabase(), {
+    eventType: 'SUPERVISOR_OVERRIDE_RECORDED',
+    userId: (req as AuthenticatedRequest).user!.id,
+    userRole: (req as AuthenticatedRequest).user?.role ?? undefined,
+    payload: { kind: 'TARGET_RELEASE_DATE', wagonNumber, before, after: target, reason: typeof req.body?.reason === 'string' ? req.body.reason.slice(0, 500) : null }
+  });
+  res.status(200).json({ success: true, data: wagonRepo.getWagonByNumber(wagonNumber), meta: { timestamp: new Date().toISOString() } });
+});
+
 wagonsRouter.post('/register', authMiddleware, async (req: Request, res: Response) => {
   const { wagonRepo } = getRepos();
   const { wagonNumber, wagonType, owningRailway, entryNotes, conditionNotes, entryDate } = req.body;
+
+  /*
+   * The date the wagon is due out. The column has been in the schema since
+   * the first migration and the repository has always stored it; this route
+   * never read it from the body, so it was NULL on every wagon ever
+   * registered, and "which wagon will miss its date" had nothing to work
+   * from. Optional — the shop may not know at the gate — and refused rather
+   * than guessed at if it is not a date.
+   */
+  const targetReleaseDate = parseTargetDate(req.body?.targetReleaseDate);
+  if (targetReleaseDate === false) {
+    res.status(400).json({
+      success: false,
+      error: 'INVALID_TARGET_DATE',
+      message: 'targetReleaseDate must be a date (YYYY-MM-DD or ISO 8601), or omitted.',
+      statusCode: 400,
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
 
   if (!wagonNumber || typeof wagonNumber !== 'string' || wagonNumber.trim() === '') {
     res.status(400).json({
@@ -105,6 +175,7 @@ wagonsRouter.post('/register', authMiddleware, async (req: Request, res: Respons
       entryNotes,
       conditionNotes,
       entryDate,
+      targetReleaseDate,
       createdBy
     });
 

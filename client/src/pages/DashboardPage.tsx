@@ -29,6 +29,7 @@ import { ShopFloorNow } from '../components/ShopFloorNow.tsx';
 import { SystemStorage } from '../components/SystemStorage.tsx';
 import DeploymentReadiness from '../components/DeploymentReadiness.tsx';
 import { RecurringFindings } from '../components/RecurringFindings.tsx';
+import { WhereWagonsWait } from '../components/WhereWagonsWait.tsx';
 import { VisionReadiness } from '../components/VisionReadiness.tsx';
 import { ActivityIcon, BanIcon, BarChartIcon, CoilIcon, DownloadIcon, LayersIcon, SearchIcon, TrainIcon, UserIcon } from '../components/Icons.tsx';
 
@@ -228,6 +229,8 @@ export const DashboardPage: React.FC = () => {
         * in a workshop sees one wagon at a time, so a part failing on one
         * wagon in three is invisible without this.
         */}
+      <WhereWagonsWait lang={lang} />
+
       <RecurringFindings lang={lang} />
 
       {/*

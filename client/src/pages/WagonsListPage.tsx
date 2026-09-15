@@ -36,6 +36,7 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
   const [newWagonType, setNewWagonType] = useState<string>('BOXNHL');
   const [newOwningRailway, setNewOwningRailway] = useState<string>('SECR');
   const [newEntryNotes, setNewEntryNotes] = useState<string>('');
+  const [newTargetDate, setNewTargetDate] = useState<string>('');
   const [registering, setRegistering] = useState<boolean>(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
   /*
@@ -117,7 +118,8 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
           wagonNumber: newWagonNumber.trim().toUpperCase(),
           wagonType: newWagonType,
           owningRailway: newOwningRailway,
-          entryNotes: newEntryNotes
+          entryNotes: newEntryNotes,
+          targetReleaseDate: newTargetDate || null
         });
 
         /*
@@ -177,13 +179,15 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
           wagonNumber: newWagonNumber.trim().toUpperCase(),
           wagonType: newWagonType,
           owningRailway: newOwningRailway,
-          entryNotes: newEntryNotes
+          entryNotes: newEntryNotes,
+          targetReleaseDate: newTargetDate || null
         });
       }
 
       setShowRegisterModal(false);
       setNewWagonNumber('');
       setNewEntryNotes('');
+      setNewTargetDate('');
       setReadFromPhoto(null);
       loadWagons();
     } catch (err: any) {
@@ -511,6 +515,22 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
                     <option value="NR">{isHi ? 'NR (उत्तर रेलवे)' : 'NR (Northern Railway)'}</option>
                   </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-ink-body mb-1">
+                  {isHi ? 'निर्धारित रिलीज़ तिथि (वैकल्पिक)' : 'Due out by (optional)'}
+                </label>
+                <input
+                  type="date"
+                  value={newTargetDate}
+                  onChange={(e) => setNewTargetDate(e.target.value)}
+                  data-testid="register-target-date"
+                  className="w-full bg-raised border border-line rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-accent-hover"
+                />
+                <p className="text-[11px] text-ink-faint mt-1">
+                  {isHi ? 'डैशबोर्ड इसी तिथि के विरुद्ध गणना करता है कि कौन सा वैगन देर से निकलेगा।' : 'The dashboard computes which wagons will miss their date against this. Leave it blank if it is not known at the gate.'}
+                </p>
               </div>
 
               <div>

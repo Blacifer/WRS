@@ -46,6 +46,7 @@ export interface PendingWagon {
   /** What the person at the gate saw. Lost entirely before this store existed. */
   entryNotes?: string;
   entryDate?: string;
+  targetReleaseDate?: string | null;
   createdAt: string;
 }
 

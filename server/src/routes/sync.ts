@@ -160,6 +160,7 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
               owningRailway: w.owningRailway || 'SECR',
               entryNotes: w.entryNotes || w.conditionNotes,
               entryDate: w.entryDate,
+              targetReleaseDate: typeof w.targetReleaseDate === 'string' && Number.isFinite(Date.parse(w.targetReleaseDate)) ? new Date(Date.parse(w.targetReleaseDate)).toISOString() : null,
               createdBy: actorId
             });
           }

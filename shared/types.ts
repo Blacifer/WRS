@@ -606,6 +606,8 @@ export interface WagonRecord {
   currentStage: LifecycleStage;
   status?: 'IN_PROGRESS' | 'BLOCKED' | 'RELEASED' | 'CONDEMNED' | 'HELD' | string;
   entryDate: string;   // ISO timestamp
+  /** When the wagon is due out, if the shop set one. The dashboard's "will miss its date" is computed against it. */
+  targetReleaseDate?: string | null;
   releaseDate?: string | null;
   conditionNotes?: string | null;
   isReleased: boolean;
