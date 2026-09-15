@@ -1494,4 +1494,42 @@ export function runMigrations(db: DatabaseSync): void {
     "INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, employee_id, is_active) " +
     "VALUES ('usr_system', 'system', 'NO_LOGIN', 'ADMIN', 'System (automated actions)', 'WRS-SYSTEM', 0);"
   );
+
+  /*
+   * What the offline queue has already delivered.
+   *
+   * A tablet that loses the wifi between the server committing a batch and
+   * the 200 arriving keeps the whole batch queued and sends it again — that
+   * is correct, because the alternative is losing an inspector's work. What
+   * must then be true is that sending it again changes nothing. For spring
+   * readings it always was: inspections and sorting records carry a sync_id
+   * with a UNIQUE index. Stage transitions, spoken verdicts and photographs
+   * carried nothing, so a resend moved the wagon twice, re-recorded the
+   * verdict with a second audit entry, and stored the photograph again.
+   *
+   * One receipt per (entity, device id) the queue has delivered. The sync
+   * route checks it before applying, and writes it after. Append-only, like
+   * the record it protects; a receipt that could be deleted would be a
+   * duplicate waiting to happen.
+   */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS sync_receipts (
+      entity TEXT NOT NULL CHECK(entity IN ('TRANSITION', 'VOICE_ACTION', 'PHOTO')),
+      client_temp_id TEXT NOT NULL,
+      server_id TEXT DEFAULT NULL,
+      actor_id TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      PRIMARY KEY (entity, client_temp_id)
+    ) WITHOUT ROWID;
+    CREATE TRIGGER IF NOT EXISTS trg_sync_receipts_no_update
+    BEFORE UPDATE ON sync_receipts
+    BEGIN
+      SELECT RAISE(ABORT, 'A sync receipt records a delivery and cannot be rewritten.');
+    END;
+    CREATE TRIGGER IF NOT EXISTS trg_sync_receipts_no_delete
+    BEFORE DELETE ON sync_receipts
+    BEGIN
+      SELECT RAISE(ABORT, 'A sync receipt records a delivery and cannot be deleted.');
+    END;
+  `);
 }

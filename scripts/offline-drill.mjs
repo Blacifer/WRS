@@ -153,5 +153,87 @@ console.log('after reconnecting, queued:', drained, drained === 0 ? '— drained
 // Context only — nothing here asserts on it, and a shift with no open batch
 // is a normal state. Said plainly so "batch: null" is not read as a fault.
 console.log('batch on screen:', batchId || 'none open (not a failure — informational)');
+
+/*
+ * ACT TWO — the 200 that never arrived.
+ *
+ * A wagon is moved to its next stage with no signal, so the move is queued.
+ * On the first reconnect the batch REACHES the server, which commits it, and
+ * then the response is lost — a wifi drop between the write and the 200. The
+ * queue rightly keeps the move and sends it again.
+ *
+ * What must be true afterwards: the wagon moved ONCE. Before receipts, the
+ * resend inserted a second transition and a second audit entry, and current
+ * stage was whichever landed last. The server is asked directly.
+ */
+const WAGON = `SECR/BOXNHL/${80000 + Math.floor(Math.random() * 9000)}`;
+const api = async (p, path, init = {}) =>
+  p.evaluate(async ({ path, init }) => {
+    const r = await fetch(path, { ...init, headers: { 'content-type': 'application/json', authorization: `Bearer ${localStorage.getItem('wrs_token')}`, ...(init.headers || {}) } });
+    return { status: r.status, body: await r.json().catch(() => null) };
+  }, { path, init });
+
+const reg = await api(page2, '/api/wagons/register', { method: 'POST', body: JSON.stringify({ wagonNumber: WAGON, wagonType: 'BOXNHL', owningRailway: 'SECR' }) });
+if (reg.status !== 201) { console.error(`Could not register ${WAGON}: ${reg.status}`); process.exit(1); }
+
+// Open it the way an inspector does: the wagon list, the row, "Continue checklist".
+await page2.getByRole('button', { name: /A wagon/i }).first().click();
+await page2.waitForTimeout(2500);
+await page2.getByText(WAGON, { exact: true }).first().click();
+await page2.waitForTimeout(2000);
+await page2.getByRole('button', { name: /Continue checklist/i }).first().click();
+await page2.waitForTimeout(3000);
+
+// Lose the signal, advance the stage — queued.
+await ctx.setOffline(true);
+await page2.waitForTimeout(800);
+await page2.getByRole('button', { name: /Advance to Next Stage/i }).first().click();
+await page2.waitForTimeout(1200);
+const queuedMove = await page2.evaluate(async () => {
+  const db = await new Promise((res, rej) => { const r = indexedDB.open('wrs_raipur_pwa_offline_db_v2'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  const n = await new Promise((res) => { const t = db.transaction('pending_stage_transitions').objectStore('pending_stage_transitions').count(); t.onsuccess = () => res(t.result); });
+  db.close();
+  return n;
+});
+console.log('after advancing a stage offline, transitions queued:', queuedMove);
+
+// The first sync reaches the server and the reply is dropped on the floor.
+let lost = 0;
+await ctx.route('**/api/sync/batch', async (route) => {
+  if (lost === 0) {
+    lost++;
+    await route.fetch();          // the server receives and commits it
+    await route.abort('failed');  // ...and the tablet hears nothing
+    return;
+  }
+  await route.continue();
+});
+await ctx.setOffline(false);
+await page2.waitForTimeout(4000);
+console.log('first reconnect: the server got the batch, the reply was lost —', lost === 1 ? 'as staged' : 'NOT STAGED');
+
+// The queue retries on its own interval; press "sync now" rather than wait for it.
+await page2.locator('button[title*="Sync" i], button[title*="सिंक" i]').first().click().catch(() => undefined);
+await page2.waitForTimeout(5000);
+await ctx.unroute('**/api/sync/batch');
+
+const timeline = await api(page2, `/api/wagons/${encodeURIComponent(WAGON)}/timeline`);
+const moves = (timeline.body?.data?.transitions || timeline.body?.data || []).filter((t) => t.fromStage !== t.toStage);
+const detail = await api(page2, `/api/wagons/${encodeURIComponent(WAGON)}`);
+const stage = detail.body?.data?.currentStage ?? detail.body?.data?.wagon?.currentStage;
+const stillQueued = await page2.evaluate(async () => {
+  const db = await new Promise((res, rej) => { const r = indexedDB.open('wrs_raipur_pwa_offline_db_v2'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  const n = await new Promise((res) => { const t = db.transaction('pending_stage_transitions').objectStore('pending_stage_transitions').count(); t.onsuccess = () => res(t.result); });
+  db.close();
+  return n;
+});
+console.log(`after the resend: ${WAGON} is at ${stage}, moved ${moves.length} time(s), ${stillQueued} still queued`);
+
 console.log('ERRORS:', errs.length ? errs.slice(0, 4).join(' ;; ') : 'none');
 await b.close();
+
+const ok = drained === 0 && moves.length === 1 && stage === 'DISMANTLING' && stillQueued === 0;
+console.log(ok
+  ? '\nPASS — twelve springs arrived once; a stage move whose 200 was lost was applied once.'
+  : '\nFAIL — see above.');
+process.exit(ok ? 0 : 1);

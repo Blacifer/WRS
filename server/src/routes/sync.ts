@@ -11,6 +11,9 @@ import { WagonRepository } from '../db/wagonRepository.ts';
 import { authMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { applyVoiceAction } from '../voice/action.ts';
+import { LifecycleEngine } from '../lifecycle/engine.ts';
+import { SyncReceipts, requireClientTempId } from '../db/syncReceipts.ts';
+import type { LifecycleStage } from '../../../shared/types.ts';
 
 export const syncRouter = Router();
 
@@ -56,6 +59,19 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
     const db = getDatabase();
     const inspectionRepo = new InspectionRepository(db);
     const wagonRepo = new WagonRepository(db);
+    /*
+     * Why the three entities below need receipts and the two above do not.
+     *
+     * A batch the server commits and the tablet never hears about — wifi
+     * gone between the write and the 200 — is kept queued and sent again.
+     * Inspections and sorting records carry a sync_id with a UNIQUE index,
+     * so the resend is a no-op and counted as a duplicate. Transitions,
+     * spoken verdicts and photographs had no such key: a resend moved the
+     * wagon a second time, recorded the verdict again with a second audit
+     * entry, and stored the photograph twice. The receipt is checked before
+     * each is applied and written after, so a resend records nothing.
+     */
+    const receipts = new SyncReceipts(db);
 
     let insertedCount = 0;
     let duplicateCount = 0;
@@ -279,6 +295,11 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
           if (!va?.wagonNumber || !va?.status || !va?.transcript) {
             throw new Error('A queued voice action needs a wagon, a status and the transcript.');
           }
+          const clientTempId = requireClientTempId(va, 'voice action');
+          if (receipts.find('VOICE_ACTION', clientTempId)) {
+            duplicateCount++;
+            continue;
+          }
           applyVoiceAction(
             getDatabase(),
             wagonRepo,
@@ -298,6 +319,7 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
             },
             { inspectorId: actorId, inspectorName: actorName, userRole: actorRole }
           );
+          receipts.record('VOICE_ACTION', clientTempId, va.itemId ?? null, actorId);
           syncedVoiceActions++;
         } catch (err: any) {
           errors.push({
@@ -310,24 +332,98 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
     }
 
     // 4. Process Transitions
+    //
+    // A stage move judged on a tablet that could not see the wagon. Three
+    // things the live route does that this one did not, and each of them
+    // let a queued move rewrite a wagon's history:
+    //
+    //   - The live route validates against the wagon's CURRENT stage through
+    //     the lifecycle engine. This one wrote from_stage/to_stage as sent.
+    //     Two tablets that both queued INSPECTION -> REPAIR both inserted, and
+    //     a move queued from a stage the wagon had since left was applied
+    //     anyway, with current_stage becoming whichever synced last.
+    //   - The live route requires a second factor for an override. Offline,
+    //     there is no live factor to check, so an override cannot be queued:
+    //     it is refused here with the reason, to be done with the network on.
+    //   - A resend re-applied it. Now it carries a receipt.
+    //
+    // A queued move that no longer fits is a CONFLICT, not an error: the
+    // wagon has moved on, the tablet is told so in words that name the stage
+    // it is actually at, and the item leaves the queue.
     if (Array.isArray(transitions)) {
       for (const tr of transitions) {
         try {
-          wagonRepo.recordTransition({
+          const clientTempId = requireClientTempId(tr, 'stage transition');
+          if (receipts.find('TRANSITION', clientTempId)) {
+            duplicateCount++;
+            continue;
+          }
+          if (tr.isOverride || (tr.transitionType && tr.transitionType !== 'NORMAL')) {
+            conflicts.push({
+              clientTempId,
+              entity: 'TRANSITION',
+              wagonNumber: tr.wagonNumber,
+              attempted: `${tr.fromStage} -> ${tr.toStage}`,
+              kept: null,
+              reason:
+                `A supervisor override of ${tr.wagonNumber} cannot be queued offline: it needs a live ` +
+                `second factor. Make the move with the network on.`
+            });
+            continue;
+          }
+
+          const wagon = wagonRepo.getWagonByNumber(tr.wagonNumber);
+          if (!wagon) throw new Error(`Wagon ${tr.wagonNumber} not found.`);
+          const currentStage = wagon.currentStage as LifecycleStage;
+
+          if (tr.fromStage && tr.fromStage !== currentStage) {
+            conflicts.push({
+              clientTempId,
+              entity: 'TRANSITION',
+              wagonNumber: tr.wagonNumber,
+              attempted: `${tr.fromStage} -> ${tr.toStage}`,
+              kept: currentStage,
+              reason:
+                `${tr.wagonNumber} is now at ${currentStage}, not ${tr.fromStage} — it was moved by someone else ` +
+                `after this was queued. The queued move to ${tr.toStage} was not applied.`
+            });
+            continue;
+          }
+
+          const validation = LifecycleEngine.validateTransition({
+            currentStage,
+            targetStage: tr.toStage as LifecycleStage,
+            userRole: actorRole,
+            isOverride: false
+          });
+          if (!validation.valid) {
+            conflicts.push({
+              clientTempId,
+              entity: 'TRANSITION',
+              wagonNumber: tr.wagonNumber,
+              attempted: `${currentStage} -> ${tr.toStage}`,
+              kept: currentStage,
+              reason: validation.error || 'The lifecycle engine refused this move.'
+            });
+            continue;
+          }
+
+          const transition = wagonRepo.recordTransition({
             wagonNumber: tr.wagonNumber,
-            fromStage: tr.fromStage,
+            fromStage: currentStage,
             toStage: tr.toStage,
-            transitionType: tr.transitionType || 'NORMAL',
-            // These previously took the body's value FIRST, so a caller could
-            // name any performer and claim any role, including SUPERVISOR on
-            // an override.
+            transitionType: validation.transitionType,
+            // From the token, never the body: a caller could otherwise name
+            // any performer and claim any role.
             performedBy: actorId,
             performerName: actorName,
             performerRole: actorRole,
-            isOverride: Boolean(tr.isOverride),
-            overrideReason: tr.overrideJustification || tr.overrideReason,
-            notes: tr.notes
+            isOverride: false,
+            notes: tr.notes,
+            // The moment it happened on the floor, not the moment it synced.
+            createdAt: tr.createdAt || tr.timestamp || undefined
           });
+          receipts.record('TRANSITION', clientTempId, transition.id, actorId);
           syncedTransitions++;
         } catch (err: any) {
           errors.push({
@@ -343,8 +439,15 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
     if (Array.isArray(photos)) {
       for (const p of photos) {
         try {
-          wagonRepo.insertPhoto({
-            id: p.id,
+          const clientTempId = requireClientTempId(p, 'photograph');
+          if (receipts.find('PHOTO', clientTempId)) {
+            duplicateCount++;
+            continue;
+          }
+          const photo = wagonRepo.insertPhoto({
+            // The device id IS the row id, so even a receipt lost to a crash
+            // between the write and the receipt cannot store it twice.
+            id: p.id || clientTempId,
             wagonNumber: p.wagonNumber,
             checklistItemId: p.checklistItemId,
             category: p.partCategory || p.category,
@@ -359,8 +462,15 @@ syncRouter.post('/batch', authMiddleware, (req: AuthenticatedRequest, res: Respo
             inspectorName: req.user?.name || p.inspectorName || 'Inspector',
             tags: p.tags
           });
+          receipts.record('PHOTO', clientTempId, photo?.id ?? (p.id || clientTempId), actorId);
           syncedPhotos++;
         } catch (err: any) {
+          if (String(err?.message || '').includes('UNIQUE constraint failed: wagon_photos.id')) {
+            // Already stored under this id: the receipt was the casualty of
+            // an earlier crash, not the photograph.
+            duplicateCount++;
+            continue;
+          }
           errors.push({
             clientTempId: p.clientTempId || p.id,
             entity: 'PHOTO',

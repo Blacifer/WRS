@@ -194,6 +194,9 @@ describe('Phase 2 R4, R5, R6: DRM Analytics, Photo Evidence & Batch Sync', () =>
       ],
       transitions: [
         {
+          // The device's own key, as the queue always sends it: without one a
+          // resend could not be told from a second move.
+          clientTempId: 'trn-offline-001',
           wagonNumber: 'WR/BOXNHL/66001',
           fromStage: 'ENTRY_REGISTRATION',
           toStage: 'DISMANTLING',

@@ -421,6 +421,8 @@ describe('M5 Adversarial Security & Penetration Testing Suite', () => {
 
       const res = await mockFetch(expressApp, 'POST', '/api/sync/batch', {
         transitions: [{
+          // The queue's own key; a move without one is refused outright.
+          clientTempId: 'trn-pen-02g',
           wagonNumber,
           fromStage: 'ENTRY_REGISTRATION',
           toStage: 'DISMANTLING',
