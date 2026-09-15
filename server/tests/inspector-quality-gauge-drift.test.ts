@@ -69,8 +69,8 @@ describe('inspector quality', () => {
     const app = createApp(':memory:');
     const drm = await signIn(app, 'drm1');
     const sup = await signIn(app, 'supervisor1');
-    assert.strictEqual((await call(app, 'GET', '/api/analytics/inspector-quality', undefined, auth(drm))).status, 200);
-    assert.strictEqual((await call(app, 'GET', '/api/analytics/inspector-quality', undefined, auth(sup))).status, 403);
+    assert.strictEqual((await call(app, 'GET', '/api/analytics/inspectors', undefined, auth(drm))).status, 200);
+    assert.strictEqual((await call(app, 'GET', '/api/analytics/inspectors', undefined, auth(sup))).status, 403);
   });
 });
 

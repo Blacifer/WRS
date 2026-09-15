@@ -93,16 +93,6 @@ analyticsRouter.get('/dwell', authMiddleware, requireCapability('analytics.read'
   }
 });
 
-// GET /api/analytics/inspector-quality — rates with denominators, beside the shop's
-analyticsRouter.get('/inspector-quality', authMiddleware, requireCapability('analytics.read'), async (req: Request, res: Response) => {
-  try {
-    const since = typeof (req.query || {}).since === 'string' && Number.isFinite(Date.parse((req.query as any).since)) ? new Date(Date.parse((req.query as any).since)).toISOString() : undefined;
-    res.status(200).json({ success: true, data: getAnalyticsInspectorQuality(getDatabase(), since), meta: { timestamp: new Date().toISOString() } });
-  } catch (err: any) {
-    res.status(500).json({ success: false, error: 'INSPECTOR_QUALITY_FAILED', message: err?.message || 'Could not compute inspector quality', statusCode: 500, timestamp: new Date().toISOString() });
-  }
-});
-
 analyticsRouter.get('/throughput', authMiddleware, requireCapability('analytics.read'), async (req: Request, res: Response) => {
   const repo = getRepo();
   const throughput = repo.getAnalyticsThroughput();
@@ -152,13 +142,26 @@ analyticsRouter.get('/findings', authMiddleware, requireCapability('analytics.re
 // 5. Inspector Productivity & Quality Metrics
 // -------------------------------------------------------------------------
 
+/*
+ * Quality with denominators, not a count. The earlier shape — one row per
+ * inspector with components checked, passed, failed, condemned — is a
+ * subset of what this now returns; nothing that read it loses a field.
+ * `?since=` narrows the window (default: the last 90 days).
+ */
 analyticsRouter.get('/inspectors', authMiddleware, requireCapability('analytics.read'), async (req: Request, res: Response) => {
-  const repo = getRepo();
-  const inspectors = repo.getAnalyticsInspectors();
+  const since = typeof (req.query || {}).since === 'string' && Number.isFinite(Date.parse((req.query as any).since)) ? new Date(Date.parse((req.query as any).since)).toISOString() : undefined;
+  const quality = getAnalyticsInspectorQuality(getDatabase(), since);
+  const legacy = getRepo().getAnalyticsInspectors();
 
   res.status(200).json({
     success: true,
-    data: inspectors,
+    data: {
+      ...quality,
+      inspectors: quality.inspectors.map((p: any) => {
+        const l = (legacy.inspectors || []).find((x: any) => x.inspectorId === p.inspectorId);
+        return { ...p, inspectionsCompleted: l?.inspectionsCompleted ?? p.checklist.verdicts, partsPassed: l?.partsPassed ?? 0, partsFailed: l?.partsFailed ?? p.checklist.failed, partsCondemned: l?.partsCondemned ?? p.checklist.condemned };
+      })
+    },
     meta: { timestamp: new Date().toISOString() }
   });
 });

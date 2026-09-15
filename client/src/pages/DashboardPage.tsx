@@ -116,7 +116,7 @@ export const DashboardPage: React.FC = () => {
         api.getAnalyticsTAT(),
         api.getAnalyticsThroughput(),
         api.getAnalyticsParts(),
-        api.getAnalyticsInspectorQuality(),
+        api.getAnalyticsInspectors(),
         api.getAnalyticsBlockers(),
         api.getInspectionStats().catch(() => null)
       ]);

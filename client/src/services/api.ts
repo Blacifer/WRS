@@ -498,10 +498,6 @@ export class ApiClient {
     return this.request(`/gauges/drift?days=${days}`);
   }
 
-  public async getAnalyticsInspectorQuality(): Promise<{ success: boolean; data: any }> {
-    return this.request('/analytics/inspector-quality');
-  }
-
   public async getAnalyticsDwell(): Promise<{ success: boolean; data: import('../../../shared/analysis/stageDwell.ts').DwellReport }> {
     return this.request('/analytics/dwell');
   }
@@ -801,6 +797,7 @@ export class ApiClient {
     return this.request<{ success: boolean; data: any }>(`/analytics/forecast?days=${days}`);
   }
 
+  /** Quality with denominators, beside the shop's own figures — see getAnalyticsInspectorQuality on the server. */
   public async getAnalyticsInspectors(): Promise<{ success: boolean; data: any }> {
     return this.request<{ success: boolean; data: any }>('/analytics/inspectors');
   }
