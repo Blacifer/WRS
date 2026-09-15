@@ -18,6 +18,8 @@ data/*.db-wal
 server/data/*.db
 server/data/*.db-shm
 server/data/*.db-wal
+# Photographs are files beside the database — evidence, never in git
+server/data/photos/
 
 # Environment variables
 .env
