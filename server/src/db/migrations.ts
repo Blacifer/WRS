@@ -1610,6 +1610,41 @@ export function runMigrations(db: DatabaseSync): void {
   `);
 
   /*
+   * Passports from other shops — or this one, earlier.
+   *
+   * See server/src/reports/wagonPassport.ts. A wagon arriving for its next
+   * overhaul may bring the file its last shop sealed. The whole file is kept
+   * as it came, with what the import found: the issuing key's fingerprint,
+   * whether the chain and seal verified, and whether that key is this
+   * server's own. Nothing from the file is merged into this shop's tables —
+   * it is the previous shop's record and is shown as such, alongside this
+   * shop's. Append-only: a passport once imported is part of the wagon's
+   * history here.
+   */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS wagon_passports (
+      id TEXT PRIMARY KEY,
+      wagon_number TEXT NOT NULL,
+      issuer_name TEXT NOT NULL,
+      issuer_fingerprint TEXT NOT NULL,
+      issued_by_this_server INTEGER NOT NULL CHECK(issued_by_this_server IN (0, 1)),
+      exported_at TEXT NOT NULL,
+      events INTEGER NOT NULL,
+      terminal_hash TEXT NOT NULL,
+      passport_jsonl TEXT NOT NULL,
+      imported_by TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      UNIQUE (wagon_number, terminal_hash),
+      FOREIGN KEY (imported_by) REFERENCES users(id) ON DELETE RESTRICT
+    );
+    CREATE INDEX IF NOT EXISTS idx_wagon_passports_wagon ON wagon_passports(wagon_number);
+    CREATE TRIGGER IF NOT EXISTS trg_wagon_passports_no_update BEFORE UPDATE ON wagon_passports
+    BEGIN SELECT RAISE(ABORT, 'An imported passport is another shop\'\'s record and cannot be rewritten.'); END;
+    CREATE TRIGGER IF NOT EXISTS trg_wagon_passports_no_delete BEFORE DELETE ON wagon_passports
+    BEGIN SELECT RAISE(ABORT, 'An imported passport is another shop\'\'s record and cannot be deleted.'); END;
+  `);
+
+  /*
    * What the offline queue has already delivered.
    *
    * A tablet that loses the wifi between the server committing a batch and

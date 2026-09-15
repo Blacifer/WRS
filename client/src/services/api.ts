@@ -494,6 +494,21 @@ export class ApiClient {
     return this.request(`/wagons/${encodeURIComponent(wagonNumber)}/target-release-date`, { method: 'PUT', body: JSON.stringify({ targetReleaseDate, reason }) });
   }
 
+  // -- the wagon passport ------------------------------------------------------
+  public async exportWagonPassport(wagonNumber: string): Promise<string> {
+    return this.request<string>(`/wagons/${encodeURIComponent(wagonNumber)}/passport`);
+  }
+  public async importWagonPassport(passport: string): Promise<{ success: boolean; data: { id?: string; alreadyImported: boolean; wagonNumber: string; events: number; issuer: string; keyFingerprint: string; issuedByThisServer: boolean } }> {
+    return this.request('/wagons/passports/import', { method: 'POST', body: JSON.stringify({ passport }) });
+  }
+  public async getWagonPassports(wagonNumber: string): Promise<{ success: boolean; data: any[] }> {
+    return this.request(`/wagons/${encodeURIComponent(wagonNumber)}/passports`);
+  }
+
+  public async getStandardReport(days = 365): Promise<{ success: boolean; data: import('../../../shared/analysis/standardReport.ts').StandardReport & { days: number } }> {
+    return this.request(`/analytics/standard?days=${days}`);
+  }
+
   public async getGaugeDrift(days = 90): Promise<{ success: boolean; data: { flagged: any[]; lines: any[]; summary: string; readings: number } }> {
     return this.request(`/gauges/drift?days=${days}`);
   }

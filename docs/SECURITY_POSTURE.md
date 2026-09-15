@@ -90,6 +90,18 @@ receiving the wagon verifies a certificate independently, while remaining
 unable to issue one. The signed bytes are stored alongside the signature, so
 verification does not depend on reconstructing a serialisation correctly.
 
+Since 15 September 2026 the certificate JSON carries the public key inline,
+and `/verify.html` — a static page, precached, making no request — checks
+the signature in the browser. A copy saved on a laptop at another railway
+verifies a year from now with the shop's server switched off. The same page
+verifies a **wagon passport** (`GET /api/wagons/:n/passport`): the wagon's
+whole record here, hash-linked event by event and sealed by the same key, for
+the wagon to carry to its next overhaul. The receiving shop imports it, the
+server re-verifies it against the key inside it, keeps it whole, and shows
+it beside its own record — and says whether the key is its own. Whether the
+key is WRS Raipur's remains a question answered by the published fingerprint,
+not by the file.
+
 What it is still not is a legally recognised digital signature. Under the IT
 Act 2000 that requires a certificate from a CCA-licensed Certifying Authority
 binding the key to an identity. Here the key is the workshop's own. If release

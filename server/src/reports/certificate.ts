@@ -13,7 +13,7 @@ import { ComponentRepository } from '../db/componentRepository.ts';
 import { getDatabase } from '../db/connection.ts';
 import { PartLedgerRepository, expectedPartsFor } from '../db/partLedgerRepository.ts';
 import qrcode from 'qrcode-generator';
-import { SIGNATURE_ALGORITHM, certificateKeyFingerprint } from './certificateSigning.ts';
+import { SIGNATURE_ALGORITHM, certificateKeyFingerprint, certificatePublicKeyPem } from './certificateSigning.ts';
 
 /**
  * Advisory wording is machine-generated today, but it is the one part of this
@@ -349,7 +349,18 @@ export class CertificateGenerator {
                 })
               : null,
             publicKeyFingerprint: certificateKeyFingerprint(),
-            publicKeyUrl: '/api/audit/certificate-key'
+            publicKeyUrl: '/api/audit/certificate-key',
+            /*
+             * The key itself, inline. With it the JSON is self-contained:
+             * /verify.html checks the signature in the browser with no
+             * request to this server, and a copy saved on a laptop at
+             * another railway verifies a year from now. What the inline key
+             * cannot tell a reader is whether it is WRS Raipur's key; the
+             * fingerprint printed on the certificate and published at the
+             * URL above is what settles that.
+             */
+            publicKeyPem: certificatePublicKeyPem(),
+            verifyPage: '/verify.html'
           }
         : null,
       qrData

@@ -317,6 +317,9 @@ jobs:
       - name: A tablet on the LAN gets the camera over https
         run: node scripts/lan-cert-drill.mjs
 
+      - name: A certificate and a passport verify in a browser with no server
+        run: DRILL_URL=http://localhost:3000 node scripts/verify-page-drill.mjs
+
   # ---------------------------------------------------------------------------
   # Proves the thing that actually ships still builds. `npm run build` runs the
   # type check first by design, so this also guards the root build wiring.

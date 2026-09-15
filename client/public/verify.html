@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verify — WRS Raipur</title>
+<!--
+  A certificate that verifies itself anywhere — Indian Railways WRS Raipur
+
+  This page checks a release certificate, or a wagon passport, using nothing
+  but the browser's own cryptography. It makes no network request, so it works
+  with the shop's server switched off, on a laptop at another railway, or on a
+  phone in a yard. Save it (File > Save) and it still works.
+
+  What it proves: that the file was signed by whoever holds the private half of
+  the key whose fingerprint is shown, and has not been altered since. What it
+  does not prove: that the key is WRS Raipur's. For that, compare the
+  fingerprint with the one printed on the certificate, or published at the
+  shop's /api/audit/certificate-key.
+-->
+<style>
+  :root { color-scheme: light dark; font-family: system-ui, "Segoe UI", Roboto, sans-serif; }
+  body { margin: 0; padding: 24px 16px; max-width: 880px; margin-inline: auto; line-height: 1.45; }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  p.sub { margin: 0 0 20px; opacity: .75; font-size: .92rem; }
+  textarea { width: 100%; min-height: 140px; font-family: ui-monospace, Menlo, monospace; font-size: 12px; box-sizing: border-box; padding: 8px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin: 10px 0 18px; }
+  button { padding: 8px 14px; font-weight: 700; cursor: pointer; }
+  .verdict { padding: 14px 16px; border-radius: 10px; border: 2px solid; margin-bottom: 14px; font-weight: 700; }
+  .ok { border-color: #1a7f37; background: rgba(26,127,55,.08); }
+  .bad { border-color: #b3261e; background: rgba(179,38,30,.08); }
+  .neutral { border-color: #888; background: rgba(128,128,128,.08); font-weight: 400; }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; font-size: .92rem; }
+  dt { opacity: .7; }
+  dd { margin: 0; overflow-wrap: anywhere; }
+  code { font-family: ui-monospace, Menlo, monospace; font-size: .85em; }
+  table { border-collapse: collapse; font-size: .85rem; width: 100%; }
+  th, td { text-align: left; padding: 4px 8px; border-bottom: 1px solid rgba(128,128,128,.3); vertical-align: top; }
+  details { margin-top: 12px; }
+  ul.reasons { margin: 6px 0 0 18px; font-weight: 400; }
+  .small { font-size: .8rem; opacity: .7; }
+</style>
+</head>
+<body>
+<h1>Verify a release certificate or a wagon passport</h1>
+<p class="sub">Checked here, in this browser, with no request to any server. Paste the certificate's JSON, or the passport file's text — or open the file.</p>
+
+<textarea id="input" placeholder='Paste here. A certificate is one JSON document with a "verification" block; a passport is one JSON object per line, starting {"type":"PASSPORT"…}'></textarea>
+<div class="row">
+  <input type="file" id="file" accept=".json,.jsonl,.txt,application/json">
+  <button id="go">Verify</button>
+  <span id="cryptoNote" class="small"></span>
+</div>
+
+<div id="out"></div>
+
+<details>
+  <summary>What this proves, and what it does not</summary>
+  <p>A pass means: the bytes shown were signed by whoever holds the private half of the key whose fingerprint is shown, and nothing in them has changed since. A fail names what is wrong.</p>
+  <p>It does <b>not</b> prove the key belongs to WRS Raipur. The certificate prints the shop's key fingerprint; the shop publishes the key at <code>/api/audit/certificate-key</code>. If the fingerprint here matches the one you got from the shop by another route, the document is theirs.</p>
+  <p>Nothing you paste leaves this page.</p>
+</details>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const out = $('out');
+  const enc = new TextEncoder();
+  const hasEd25519 = !!(window.crypto && crypto.subtle);
+  $('cryptoNote').textContent = hasEd25519 ? '' : 'This browser has no WebCrypto (open the page over https or from localhost).';
+
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  const hex = (buf) => [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  const pemToDer = (pem) => b64(pem.replace(/-----[^-]+-----/g, '').replace(/\s+/g, ''));
+
+  async function sha256(s) { return hex(await crypto.subtle.digest('SHA-256', enc.encode(s))); }
+
+  async function importKey(pem) {
+    return crypto.subtle.importKey('spki', pemToDer(pem), { name: 'Ed25519' }, true, ['verify']);
+  }
+  async function fingerprintOf(pem) { return (await sha256Bytes(pemToDer(pem))).slice(0, 16).toUpperCase(); }
+  async function sha256Bytes(bytes) { return hex(await crypto.subtle.digest('SHA-256', bytes)); }
+  async function verifySig(pem, signature, text) {
+    const [alg, sig] = String(signature).split(':');
+    if (alg !== 'Ed25519' || !sig) return false;
+    try { return await crypto.subtle.verify({ name: 'Ed25519' }, await importKey(pem), b64(sig), enc.encode(text)); } catch { return false; }
+  }
+
+  // The same canonical form the server uses for a passport's events.
+  function canonical(v) {
+    if (v === undefined) return 'null';
+    if (v === null || typeof v !== 'object') return JSON.stringify(v);
+    if (Array.isArray(v)) return '[' + v.map((x) => canonical(x === undefined ? null : x)).join(',') + ']';
+    const keys = Object.keys(v).filter((k) => v[k] !== undefined).sort();
+    return '{' + keys.map((k) => JSON.stringify(k) + ':' + canonical(v[k])).join(',') + '}';
+  }
+
+  function show(ok, title, rows, extra) {
+    out.innerHTML = '<div class="verdict ' + (ok === null ? 'neutral' : ok ? 'ok' : 'bad') + '">' + esc(title) + (extra || '') + '</div>' +
+      (rows ? '<dl>' + rows.map(([k, v]) => '<dt>' + esc(k) + '</dt><dd>' + v + '</dd>').join('') + '</dl>' : '');
+  }
+
+  async function verifyCertificate(doc) {
+    const v = doc.verification;
+    if (!v || !v.signedContent || !v.signature) return show(false, 'Not a signed certificate: no verification block with signedContent and signature.');
+    if (!v.publicKeyPem) return show(false, 'This certificate JSON does not carry the public key. Fetch it from the shop (/api/audit/certificate-key) and paste it below the JSON as a line beginning PUBLICKEY: — or ask for a newer export, which includes it.');
+    const fp = await fingerprintOf(v.publicKeyPem);
+    const fpMatches = !v.publicKeyFingerprint || fp === String(v.publicKeyFingerprint).toUpperCase();
+    const sigOk = await verifySig(v.publicKeyPem, v.signature, v.signedContent);
+    let signed = {};
+    try { signed = JSON.parse(v.signedContent); } catch {}
+    const certHash = await sha256(v.signedContent);
+    const printed = doc.certificate || doc.data?.certificate || {};
+    const consistent = !printed.wagonNumber || printed.wagonNumber === signed.wagonNumber;
+    const ok = sigOk && fpMatches && consistent;
+    show(ok,
+      ok ? 'VERIFIED — signed by the key with fingerprint ' + fp + ', and unaltered.' : 'NOT VERIFIED',
+      [
+        ['Wagon', esc(signed.wagonNumber)],
+        ['Certificate', esc(signed.certificateNumber)],
+        ['Signed at', esc(signed.signedAt)],
+        ['Supervisor', esc(signed.supervisorEmployeeId || signed.supervisorId)],
+        ['Key fingerprint', '<code>' + esc(fp) + '</code>' + (fpMatches ? '' : ' — does not match the fingerprint the file claims (' + esc(v.publicKeyFingerprint) + ')')],
+        ['Certificate hash', '<code>' + esc(certHash) + '</code> <span class="small">(the QR on the printed certificate carries its first 16 characters: ' + esc(certHash.slice(0, 16)) + ')</span>'],
+        ['Signature', sigOk ? 'valid Ed25519 over the signed content' : 'INVALID — the content or the signature has been changed, or this is not the signing key'],
+        ['Advisories accepted', esc(JSON.stringify(signed.summary?.acknowledgedAdvisories ?? '—'))]
+      ],
+      ok ? '' : '<ul class="reasons">' + [!sigOk && '<li>The signature does not verify.</li>', !fpMatches && '<li>The key in the file is not the key the file claims.</li>', !consistent && '<li>The printed wagon number differs from the signed one.</li>'].filter(Boolean).join('') + '</ul>'
+    );
+    out.insertAdjacentHTML('beforeend', '<details><summary>The signed content, exactly</summary><pre><code>' + esc(v.signedContent) + '</code></pre></details>');
+  }
+
+  async function verifyPassport(lines) {
+    const reasons = [];
+    let header = null, seal = null; const events = [];
+    lines.forEach((line, i) => {
+      let o; try { o = JSON.parse(line); } catch { reasons.push('Line ' + (i + 1) + ' is not JSON.'); return; }
+      if (o.type === 'PASSPORT') header = o; else if (o.type === 'EVENT') events.push(o); else if (o.type === 'SEAL') seal = o; else reasons.push('Line ' + (i + 1) + ' has an unknown type.');
+    });
+    if (!header) reasons.push('No PASSPORT line.');
+    if (!seal) reasons.push('No SEAL line.');
+    let prev = 'GENESIS';
+    for (let i = 0; i < events.length; i++) {
+      const e = events[i];
+      if (e.seq !== i + 1) reasons.push('Event ' + (i + 1) + ' carries seq ' + e.seq + ' — a line is missing or out of order.');
+      if (e.prevHash !== prev) reasons.push('Event ' + e.seq + ' does not follow the previous line.');
+      const expected = await sha256(prev + '|' + canonical({ seq: e.seq, kind: e.kind, at: e.at, payload: e.payload }));
+      if (e.hash !== expected) reasons.push('Event ' + e.seq + ' (' + e.kind + ') has been altered.');
+      prev = e.hash;
+    }
+    let fp = null, sigOk = false;
+    if (header && seal) {
+      if (seal.events !== events.length) reasons.push('The seal says ' + seal.events + ' events; the file holds ' + events.length + '.');
+      if (seal.terminalHash !== prev) reasons.push("The seal's terminal hash is not the hash of the last event.");
+      const expectedSigned = header.wagonNumber + '|' + header.exportedAt + '|' + events.length + '|' + prev;
+      if (seal.signed !== expectedSigned) reasons.push('The sealed text does not match the header and the chain.');
+      try {
+        fp = await fingerprintOf(header.issuer.publicKeyPem);
+        if (fp !== header.issuer.keyFingerprint) reasons.push('The key fingerprint in the file does not match the key in the file.');
+        sigOk = await verifySig(header.issuer.publicKeyPem, seal.signature, seal.signed);
+        if (!sigOk) reasons.push("The seal's signature does not verify against the issuer's key.");
+      } catch { reasons.push("The issuer's public key in the file is not a valid key."); }
+    }
+    const ok = reasons.length === 0;
+    show(ok,
+      ok ? 'VERIFIED — ' + events.length + ' events, sealed by the key with fingerprint ' + fp + ', unaltered.' : 'NOT VERIFIED',
+      header ? [
+        ['Wagon', esc(header.wagonNumber) + ' · ' + esc(header.wagonType) + ' · ' + esc(header.owningRailway)],
+        ['Issued by', esc(header.issuer?.name)],
+        ['Key fingerprint', '<code>' + esc(fp || header.issuer?.keyFingerprint) + '</code>'],
+        ['Exported', esc(header.exportedAt) + ' by ' + esc(header.exportedBy?.name) + ' (' + esc(header.exportedBy?.role) + ')'],
+        ['Events', String(events.length)]
+      ] : null,
+      ok ? '' : '<ul class="reasons">' + reasons.map((r) => '<li>' + esc(r) + '</li>').join('') + '</ul>'
+    );
+    if (events.length) {
+      out.insertAdjacentHTML('beforeend', '<details open><summary>What the passport records</summary><table><thead><tr><th>#</th><th>When</th><th>What</th><th>Detail</th></tr></thead><tbody>' +
+        events.map((e) => '<tr><td>' + e.seq + '</td><td>' + esc(String(e.at).replace('T', ' ').slice(0, 16)) + '</td><td>' + esc(e.kind) + '</td><td><code>' + esc(summarise(e)) + '</code></td></tr>').join('') +
+        '</tbody></table></details>');
+    }
+  }
+
+  function summarise(e) {
+    const p = e.payload || {};
+    switch (e.kind) {
+      case 'REGISTERED': return p.wagonType + ' · ' + p.owningRailway;
+      case 'STAGE_TRANSITION': return p.fromStage + ' → ' + p.toStage + ' (' + p.performerName + ')';
+      case 'SPRING_INSPECTION': return p.springPosition + ' ' + p.measuredHeightMm + ' mm → ' + (p.classifiedBand || '') + ' ' + p.status + ' (' + p.inspectorName + ')';
+      case 'CHECKLIST_VERDICT': return p.partName + ' · ' + p.status + (p.repairAction ? ' · ' + p.repairAction : '') + (p.verdictBy ? ' (' + p.verdictBy + ')' : '');
+      case 'PART_EVENT': return p.event + ' · ' + p.partName + (p.reason ? ' — ' + p.reason : '');
+      case 'SINGLE_WAGON_TEST': return (p.passed ? 'PASS' : 'FAIL') + ' · ' + p.pipeType + '/' + p.loadCondition + (p.failedRefs?.length ? ' · failed ' + p.failedRefs.join(',') : '');
+      case 'PHOTO': return (p.partName || '') + ' · ' + (p.evidenceStage || '') + ' · sha256 ' + String(p.sha256 || '').slice(0, 12);
+      case 'GATE_SIGNOFF': return p.certificateNumber + ' · ' + p.supervisorName;
+      case 'CERTIFICATE': return p.certificateNumber + ' · ' + p.algorithm;
+      default: return JSON.stringify(p).slice(0, 80);
+    }
+  }
+
+  async function run(text) {
+    text = String(text || '').trim();
+    if (!text) return show(null, 'Paste a certificate or a passport first.');
+    if (!hasEd25519) return show(false, 'This browser cannot verify: WebCrypto is unavailable here. Open the page over https, or from the shop PC itself.');
+    try {
+      if (text.startsWith('{"type":"PASSPORT"') || /"type":"SEAL"/.test(text)) return await verifyPassport(text.split(/\r?\n/).filter((l) => l.trim()));
+      const doc = JSON.parse(text);
+      const cert = doc.data && doc.data.verification ? doc.data : doc;
+      return await verifyCertificate(cert);
+    } catch (e) {
+      show(false, 'Could not read that: ' + (e && e.message ? e.message : e));
+    }
+  }
+
+  $('go').addEventListener('click', () => run($('input').value));
+  $('file').addEventListener('change', async (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    const text = await f.text();
+    $('input').value = text;
+    run(text);
+  });
+  // A certificate handed over as a link: /verify.html#c=<base64 JSON>
+  if (location.hash.startsWith('#c=')) {
+    try { const text = new TextDecoder().decode(b64(decodeURIComponent(location.hash.slice(3)))); $('input').value = text; run(text); } catch {}
+  }
+})();
+</script>
+</body>
+</html>

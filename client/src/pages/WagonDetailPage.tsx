@@ -17,6 +17,7 @@ import { AssemblyEvidenceCapture } from '../components/AssemblyEvidenceCapture.t
 import { parseAssemblyTags } from '../../../shared/assembly/assemblyCapture.ts';
 import { WagonConditionReport } from '../components/WagonConditionReport.tsx';
 import { PartsLedger } from '../components/PartsLedger.tsx';
+import { WagonPassport } from '../components/WagonPassport.tsx';
 import { ReleaseCertificateModal } from '../components/ReleaseCertificateModal.tsx';
 import { SoundDiagnosticTool } from '../components/SoundDiagnosticTool.tsx';
 import { VoiceInspectionToolbar } from '../components/VoiceInspectionToolbar.tsx';
@@ -75,7 +76,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
    * still exactly what happened — reported a second time, correctly. The tab
    * within the wagon is the part somebody is actually looking at.
    */
-  const [activeTab, setActiveTab] = useState<'CHECKLIST' | 'GATE' | 'PHOTOS' | 'TIMELINE' | 'ACOUSTIC' | 'COMPONENTS' | 'SWT' | 'REPORT' | 'PARTS'>(() => {
+  const [activeTab, setActiveTab] = useState<'CHECKLIST' | 'GATE' | 'PHOTOS' | 'TIMELINE' | 'ACOUSTIC' | 'COMPONENTS' | 'SWT' | 'REPORT' | 'PARTS' | 'PASSPORT'>(() => {
     try {
       const saved = sessionStorage.getItem('wrs-wagon-tab');
       const known = ['CHECKLIST', 'GATE', 'PHOTOS', 'TIMELINE', 'ACOUSTIC', 'COMPONENTS', 'SWT', 'PARTS'];
@@ -1364,6 +1365,18 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
         </button>
 
         <button
+          onClick={() => setActiveTab('PASSPORT')}
+          data-testid="tab-passport"
+          className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
+            activeTab === 'PASSPORT'
+              ? 'border-accent-line text-accent-ink'
+              : 'border-transparent text-ink-muted hover:text-ink-body'
+          }`}
+        >
+          {isHi ? 'पासपोर्ट' : 'Passport'}
+        </button>
+
+        <button
           onClick={() => setActiveTab('PARTS')}
           data-testid="tab-parts"
           className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
@@ -2190,6 +2203,10 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
           gateStatus={gateStatus}
           lang={lang}
         />
+      )}
+
+      {activeTab === 'PASSPORT' && wagon && (
+        <WagonPassport wagonNumber={wagon.wagonNumber} released={isReleased} lang={lang} />
       )}
 
       {activeTab === 'PARTS' && wagon && (

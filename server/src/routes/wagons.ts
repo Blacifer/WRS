@@ -20,6 +20,7 @@ import { parseClaimedSource } from '../../../shared/vision/autoCommit.ts';
 import { labelForPart } from '../../../shared/vision/knn.ts';
 import { judgeAutoCommit, recordAutoDecision, type GateResult } from '../vision/serverBrain.ts';
 import { CertificateGenerator } from '../reports/certificate.ts';
+import { buildPassport, verifyPassport } from '../reports/wagonPassport.ts';
 import { otpService } from '../auth/otpService.ts';
 import { TotpService } from '../auth/totpService.ts';
 import { verifySecondFactor } from '../auth/secondFactor.ts';
@@ -104,6 +105,89 @@ wagonsRouter.put('/:wagonNumber/target-release-date', authMiddleware, requireCap
     payload: { kind: 'TARGET_RELEASE_DATE', wagonNumber, before, after: target, reason: typeof req.body?.reason === 'string' ? req.body.reason.slice(0, 500) : null }
   });
   res.status(200).json({ success: true, data: wagonRepo.getWagonByNumber(wagonNumber), meta: { timestamp: new Date().toISOString() } });
+});
+
+// ---------------------------------------------------------------------------
+// The wagon passport. See server/src/reports/wagonPassport.ts.
+//
+// GET  /:wagonNumber/passport         — the sealed file, for the wagon to carry
+// POST /passports/import              — a file from another shop, verified and kept
+// GET  /:wagonNumber/passports        — what previous shops sealed for this wagon
+// ---------------------------------------------------------------------------
+wagonsRouter.get('/:wagonNumber/passport', authMiddleware, requireCapability('certificate.export'), async (req: Request, res: Response) => {
+  const wagonNumber = String(req.params?.wagonNumber || '').trim().toUpperCase();
+  const user = (req as AuthenticatedRequest).user!;
+  try {
+    const jsonl = buildPassport(getDatabase(), wagonNumber, { id: user.id, name: user.name || user.username || user.id, role: user.role || '' });
+    logAuditEvent(getDatabase(), {
+      eventType: 'BATCH_EXPORTED',
+      userId: user.id,
+      userRole: user.role ?? undefined,
+      payload: { kind: 'WAGON_PASSPORT', wagonNumber, lines: jsonl.split('\n').filter(Boolean).length }
+    });
+    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${wagonNumber.replace(/[^A-Za-z0-9]+/g, '_')}.passport.jsonl"`);
+    res.status(200).send(jsonl);
+  } catch (err: any) {
+    res.status(err?.message?.includes('not found') ? 404 : 500).json({ success: false, error: 'PASSPORT_FAILED', message: err?.message || 'Could not build the passport', statusCode: 500, timestamp: new Date().toISOString() });
+  }
+});
+
+wagonsRouter.post('/passports/import', authMiddleware, requireCapability('wagon.release'), async (req: Request, res: Response) => {
+  const text = typeof req.body?.passport === 'string' ? req.body.passport : '';
+  if (!text.trim()) {
+    res.status(400).json({ success: false, error: 'VALIDATION_ERROR', message: 'passport (the JSON Lines text of the file) is required.', statusCode: 400, timestamp: new Date().toISOString() });
+    return;
+  }
+  const v = verifyPassport(text);
+  if (!v.ok || !v.header || !v.seal) {
+    // Refused, and every reason named. A file that does not verify is not a
+    // passport; keeping it would be keeping a claim nobody vouched for.
+    res.status(422).json({ success: false, error: 'PASSPORT_NOT_VERIFIED', message: `The passport did not verify: ${v.reasons.join(' ')}`, data: { reasons: v.reasons, header: v.header ? { wagonNumber: v.header.wagonNumber, issuer: { name: v.header.issuer?.name, keyFingerprint: v.header.issuer?.keyFingerprint } } : null }, statusCode: 422, timestamp: new Date().toISOString() });
+    return;
+  }
+  const user = (req as AuthenticatedRequest).user!;
+  const id = `wpp_${crypto.randomUUID()}`;
+  try {
+    getDatabase().prepare(`
+      INSERT INTO wagon_passports (id, wagon_number, issuer_name, issuer_fingerprint, issued_by_this_server, exported_at, events, terminal_hash, passport_jsonl, imported_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(id, v.header.wagonNumber, v.header.issuer.name, v.header.issuer.keyFingerprint, v.issuedByThisServer ? 1 : 0, v.header.exportedAt, v.events.length, v.seal.terminalHash, text, user.id);
+  } catch (err: any) {
+    if (String(err?.message || '').includes('UNIQUE')) {
+      res.status(200).json({ success: true, data: { alreadyImported: true, wagonNumber: v.header.wagonNumber, events: v.events.length, issuer: v.header.issuer.name, keyFingerprint: v.header.issuer.keyFingerprint, issuedByThisServer: v.issuedByThisServer }, meta: { timestamp: new Date().toISOString() } });
+      return;
+    }
+    throw err;
+  }
+  logAuditEvent(getDatabase(), {
+    eventType: 'INSPECTION_SYNCED',
+    userId: user.id,
+    userRole: user.role ?? undefined,
+    payload: { kind: 'WAGON_PASSPORT_IMPORTED', id, wagonNumber: v.header.wagonNumber, issuer: v.header.issuer.name, keyFingerprint: v.header.issuer.keyFingerprint, issuedByThisServer: v.issuedByThisServer, events: v.events.length, terminalHash: v.seal.terminalHash }
+  });
+  res.status(201).json({ success: true, data: { id, alreadyImported: false, wagonNumber: v.header.wagonNumber, events: v.events.length, issuer: v.header.issuer.name, keyFingerprint: v.header.issuer.keyFingerprint, issuedByThisServer: v.issuedByThisServer, exportedAt: v.header.exportedAt }, meta: { timestamp: new Date().toISOString() } });
+});
+
+wagonsRouter.get('/:wagonNumber/passports', authMiddleware, requireCapability('wagon.view'), async (req: Request, res: Response) => {
+  const wagonNumber = String(req.params?.wagonNumber || '').trim().toUpperCase();
+  const rows = getDatabase().prepare(`
+    SELECT p.*, u.full_name AS imported_by_name FROM wagon_passports p LEFT JOIN users u ON u.id = p.imported_by
+    WHERE p.wagon_number = ? ORDER BY p.exported_at ASC
+  `).all(wagonNumber) as any[];
+  res.status(200).json({
+    success: true,
+    data: rows.map((r) => {
+      // Re-verified on every read, so a row is never trusted on the strength of the flag it was stored with.
+      const v = verifyPassport(r.passport_jsonl);
+      return {
+        id: r.id, wagonNumber: r.wagon_number, issuer: r.issuer_name, keyFingerprint: r.issuer_fingerprint, issuedByThisServer: r.issued_by_this_server === 1,
+        exportedAt: r.exported_at, exportedBy: v.header?.exportedBy ?? null, events: v.events.map((e) => ({ seq: e.seq, kind: e.kind, at: e.at, payload: e.payload })),
+        verifiesNow: v.ok, reasons: v.reasons, importedAt: r.created_at, importedBy: r.imported_by_name ?? r.imported_by
+      };
+    }),
+    meta: { timestamp: new Date().toISOString() }
+  });
 });
 
 wagonsRouter.post('/register', authMiddleware, async (req: Request, res: Response) => {
