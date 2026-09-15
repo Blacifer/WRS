@@ -166,6 +166,22 @@ are a developer and this is not a shop's machine.
   process.exit(2);
 }
 
+/*
+ * The server leaves drawn examples out of what the camera knows unless it was
+ * started with VISION_COUNT_SYNTHETIC=1 — which production refuses. This
+ * drive teaches nothing else, so without that flag it would teach parts the
+ * server then ignores and report a camera that never learns. Say so at the door.
+ */
+const synth = await page.evaluate(async () => {
+  const r = await fetch('/api/vision/auto/status?domain=SPRING', { headers: { authorization: `Bearer ${localStorage.getItem('wrs_token')}` } });
+  const b = await r.json().catch(() => null);
+  return b?.data?.countSynthetic === true;
+});
+if (!synth) {
+  console.error('REFUSING TO RUN: the server is not counting drawn examples. Start it with VISION_COUNT_SYNTHETIC=1 for this drive (never in production).');
+  process.exit(2);
+}
+
 const panel = page.locator('[data-testid="teach-the-camera"]');
 await panel.waitFor({ timeout: 15000 });
 console.log('The teaching panel is on the sorting page.');

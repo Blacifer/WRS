@@ -22,6 +22,7 @@ import { allocateNests } from '../../../shared/sorting/nestAllocation.ts';
 import { findMeasurementAnomaly } from '../../../shared/analysis/measurementAnomaly.ts';
 import { LearningService } from '../learning/learningService.ts';
 import { parseClaimedSource } from '../../../shared/vision/autoCommit.ts';
+import { judgeAutoCommit, recordAutoDecision, type GateResult } from '../vision/serverBrain.ts';
 
 export const sortingRouter = Router();
 
@@ -117,6 +118,39 @@ sortingRouter.post('/record', authMiddleware, (req: AuthenticatedRequest, res: R
       return bad(res, 'measurementSource must be MANUAL, CAMERA_ASSISTED or CAMERA_AUTO.');
     }
 
+    /*
+     * A camera decision is not taken on the bench's word. The server rebuilds
+     * the camera from the examples it holds, re-runs the vote on the
+     * embedding the bench judged, re-scores every head, and puts the result
+     * through the same rule the bench used. Anything short of AUTO is
+     * refused with the reason, and the bench asks the person.
+     *
+     * The position being recorded is what the band table is chosen by, so
+     * it is what the server's camera must agree names this spring. The
+     * bench's own expected position is a second, client-side check on top.
+     */
+    let gate: Extract<GateResult, { ok: true }> | null = null;
+    if (measurementSource === 'CAMERA_AUTO') {
+      const g = judgeAutoCommit(getDatabase(), {
+        domain: 'SPRING',
+        evidence: b.autoEvidence,
+        measurementPassed: verdict.status === 'PASS',
+        expected: { CATEGORY: springPosition }
+      });
+      if (!g.ok) {
+        res.status(g.status).json({
+          success: false,
+          error: g.code,
+          message: g.message,
+          data: g.decision ? { decision: g.decision } : undefined,
+          statusCode: g.status,
+          timestamp: new Date().toISOString()
+        });
+        return;
+      }
+      gate = g;
+    }
+
     const { id, alreadyRecorded } = r.record({
       batchId: String(b.batchId),
       measurementSource,
@@ -164,6 +198,15 @@ sortingRouter.post('/record', authMiddleware, (req: AuthenticatedRequest, res: R
       },
       timestamp: new Date().toISOString()
     });
+
+    // The camera's decision, on the record beside the row it produced.
+    if (gate && !alreadyRecorded) {
+      recordAutoDecision(getDatabase(), 'SPRING', gate, {
+        recordId: id,
+        userId: req.user.id,
+        userRole: req.user.role ?? null
+      });
+    }
 
     /*
      * Logged after the response so the ledger can never delay a tap. Records

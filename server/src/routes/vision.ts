@@ -34,8 +34,12 @@ import { config } from '../config/index.ts';
 import { requireCapability } from '../middleware/rbac.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { LearningService } from '../learning/learningService.ts';
+import { serverAccuracy } from '../vision/serverBrain.ts';
 
 export const visionRouter = Router();
+
+/** Drawn examples are left out unless the server was started to count them. */
+const listOpts = () => ({ includeSynthetic: config.visionCountSynthetic });
 
 const repo = () => new VisionBrainRepository(getDatabase());
 
@@ -71,13 +75,16 @@ visionRouter.get('/brain', authMiddleware, (req: AuthenticatedRequest, res: Resp
     }
 
     const r = repo();
-    const examples = r.list(domain);
+    const examples = r.list(domain, listOpts());
 
     res.status(200).json({
       success: true,
       data: {
         domain,
-        counts: r.counts(domain),
+        counts: r.counts(domain, listOpts()),
+        // Said on every load, so a bench never has to wonder whether the
+        // cartoons a drive taught are in what it is comparing against.
+        countSynthetic: config.visionCountSynthetic,
         examples: examples.map((e) => ({
           id: e.id,
           head: e.head,
@@ -87,7 +94,8 @@ visionRouter.get('/brain', authMiddleware, (req: AuthenticatedRequest, res: Resp
           sourceImageId: e.sourceImageId,
           partName: e.partName,
           taughtBy: e.taughtBy,
-          createdAt: e.createdAt
+          createdAt: e.createdAt,
+          captureGroup: e.captureGroup
         }))
       },
       meta: { total: examples.length, timestamp: new Date().toISOString() }
@@ -167,7 +175,13 @@ visionRouter.post(
         partName: typeof b.partName === 'string' ? b.partName : null,
         bogiePosition: typeof b.bogiePosition === 'string' ? b.bogiePosition : null,
         proposedLabel,
-        taughtBy: req.user!.id
+        taughtBy: req.user!.id,
+        // One id per physical part per sitting. Free text is refused: it is
+        // a join key for the leave-one-out score, not a note.
+        captureGroup:
+          typeof b.captureGroup === 'string' && /^[A-Za-z0-9_\-]{1,64}$/.test(b.captureGroup)
+            ? b.captureGroup
+            : null
       });
 
       /*
@@ -257,7 +271,7 @@ visionRouter.get(
         data: {
           domain,
           head: head ?? null,
-          counts: r.counts(domain),
+          counts: r.counts(domain, listOpts()),
           weeks: trend,
           /*
            * Stated in words so a reader cannot mistake a rising example count
@@ -324,30 +338,49 @@ visionRouter.get('/auto/status', authMiddleware, (req: AuthenticatedRequest, res
      */
     const master = config.visionAutoCommit;
     const agreement = liveAgreement(getDatabase(), domain, 200, AUTO_AGREEMENT_MIN_SAMPLE);
+    /*
+     * The server's own leave-one-out score per head — the figure it will
+     * actually judge a CAMERA_AUTO write by. Served so the bench can show
+     * the number that decides, not only the one it computed itself.
+     */
+    const measured = serverAccuracy(getDatabase(), domain);
 
     const heads = BRAIN_HEADS.map((head) => {
       const a = agreement[head];
-      const allowed = master && a.rate !== null && a.rate >= AUTO_AGREEMENT_FLOOR;
+      const m = measured[head]!;
+      const allowed = master && a.rate !== null && a.rate >= AUTO_AGREEMENT_FLOOR && m.verdict === 'ASSIST';
       return {
         head,
         sampled: a.sampled,
         kept: a.kept,
         rate: a.rate,
         newestAt: a.newestAt,
+        measured: {
+          verdict: m.verdict,
+          taught: m.taught,
+          answered: m.answered,
+          accuracy: m.accuracy,
+          answerRate: m.answerRate,
+          twinsHeldOut: m.twinsHeldOut
+        },
         allowed,
         reason: !master
           ? 'Switched off in the server configuration (VISION_AUTO_COMMIT=off).'
-          : a.rate === null
-            ? `Not enough recent proposals to judge (${a.sampled} of ${AUTO_AGREEMENT_MIN_SAMPLE}).`
-            : a.rate < AUTO_AGREEMENT_FLOOR
-              ? `Inspectors kept ${Math.round(a.rate * 100)}% of recent answers; needs ${Math.round(AUTO_AGREEMENT_FLOOR * 100)}%.`
-              : `Inspectors kept ${Math.round(a.rate * 100)}% of the last ${a.sampled}.`
+          : m.verdict !== 'ASSIST'
+            ? m.verdict === 'INSUFFICIENT'
+              ? `Too few of this shop's photographs to score it yet (${m.answered} answered of 30 needed).`
+              : `Measured ${Math.round(m.accuracy * 100)}% on this shop's photographs, answering ${Math.round(m.answerRate * 100)}% of them; ${m.verdict.replace(/_/g, ' ').toLowerCase()}.`
+            : a.rate === null
+              ? `Not enough recent proposals to judge (${a.sampled} of ${AUTO_AGREEMENT_MIN_SAMPLE}).`
+              : a.rate < AUTO_AGREEMENT_FLOOR
+                ? `Inspectors kept ${Math.round(a.rate * 100)}% of recent answers; needs ${Math.round(AUTO_AGREEMENT_FLOOR * 100)}%.`
+                : `Inspectors kept ${Math.round(a.rate * 100)}% of the last ${a.sampled}.`
       };
     });
 
     res.status(200).json({
       success: true,
-      data: { domain, master, heads },
+      data: { domain, master, countSynthetic: config.visionCountSynthetic, heads },
       meta: { window: 200, minSample: AUTO_AGREEMENT_MIN_SAMPLE, floor: AUTO_AGREEMENT_FLOOR, timestamp: new Date().toISOString() }
     });
   } catch (err: any) {
@@ -361,53 +394,11 @@ visionRouter.get('/auto/status', authMiddleware, (req: AuthenticatedRequest, res
   }
 });
 
-// ---------------------------------------------------------------------------
-// POST /api/vision/auto/record
-//
-// The camera decided and nobody confirmed. Logged so the decision is on the
-// record with its confidence and neighbours — and logged with auto: true so
-// it is EXCLUDED from the live agreement, because the camera agreeing with
-// itself is not evidence. It is deliberately not a teaching: a brain that
-// remembers its own unconfirmed answers reinforces its own mistakes.
-// ---------------------------------------------------------------------------
-visionRouter.post(
-  '/auto/record',
-  authMiddleware,
-  requireCapability('wagon.inspect'),
-  (req: AuthenticatedRequest, res: Response) => {
-    try {
-      const b = req.body || {};
-      const domain = b.domain as BrainDomain;
-      if (!BRAIN_DOMAINS.includes(domain)) return bad(res, `domain must be one of ${BRAIN_DOMAINS.join(', ')}.`);
-      if (!Array.isArray(b.heads) || b.heads.length === 0) return bad(res, 'heads[] is required.');
-
-      const ls = new LearningService(getDatabase());
-      const ids: string[] = [];
-      for (const h of b.heads) {
-        if (!BRAIN_HEADS.includes(h?.head)) continue;
-        const label = normaliseLabel(h.label);
-        if (!label) continue;
-        const { id } = ls.recordOutcome({
-          subsystem: domain === 'SPRING' ? 'SPRING_VISION' : 'PART_VISION',
-          machineOutput: { head: h.head, label },
-          machineConfidence:
-            typeof h.confidence === 'number' && h.confidence >= 0 && h.confidence <= 1 ? h.confidence : null,
-          humanOutput: null,
-          wasCorrected: false,
-          context: {
-            auto: true,
-            recordId: typeof b.recordId === 'string' ? b.recordId : null,
-            wagonNumber: typeof b.wagonNumber === 'string' ? b.wagonNumber : null,
-            neighbours: Array.isArray(h.neighbours) ? h.neighbours.slice(0, 5) : null
-          },
-          userId: req.user!.id,
-          userRole: req.user!.role ?? null
-        });
-        ids.push(id);
-      }
-      res.status(201).json({ success: true, data: { logged: ids.length }, meta: { timestamp: new Date().toISOString() } });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: 'AUTO_RECORD_FAILED', message: err?.message || 'Could not log the camera decision', statusCode: 500, timestamp: new Date().toISOString() });
-    }
-  }
-);
+/*
+ * There is deliberately no POST /api/vision/auto/record any more. A camera
+ * decision is put on the ledger by the route that writes the verdict, in the
+ * same request, from the server's own judgement — see
+ * server/src/vision/serverBrain.ts. A client-writable "the camera decided"
+ * endpoint would let the ledger say the camera decided something the server
+ * never checked.
+ */

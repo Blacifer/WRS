@@ -77,6 +77,15 @@ export interface AppConfig {
    * then says a person did that.
    */
   visionAutoCommit: boolean;
+
+  /**
+   * Whether examples a drive taught with drawn parts (part_name =
+   * SYNTHETIC_DRIVE) count as things the camera knows. Off by default, and
+   * refused in production: cartoons must never be the evidence that lets the
+   * camera pass a real spring. The drives set it so they can prove the
+   * pipeline on a fresh database.
+   */
+  visionCountSynthetic: boolean;
 }
 
 const nodeEnv = process.env.NODE_ENV || 'development';
@@ -99,6 +108,15 @@ if (nodeEnv === 'production' && (!process.env.CORS_ORIGIN || process.env.CORS_OR
   console.warn(
     '[config] WARNING: CORS_ORIGIN is "*" in production. Set it to the exact origin ' +
     'the workshop tablets load the app from.'
+  );
+}
+
+// Drawn springs may prove the pipeline on a developer's machine. They may not
+// be what the shop's camera compares a real spring against.
+if (nodeEnv === 'production' && /^(1|on|true|yes)$/i.test(String(process.env.VISION_COUNT_SYNTHETIC || '').trim())) {
+  throw new Error(
+    'VISION_COUNT_SYNTHETIC is set in production. It lets examples a drive taught with drawn ' +
+    'parts count as the camera\'s knowledge and as readiness evidence. Unset it.'
   );
 }
 
@@ -138,6 +156,7 @@ export const config: AppConfig = {
   zapheitBaseUrl: process.env.ZAPHEIT_BASE_URL || 'https://api.zapheit.com/v1',
   zapheitModel: process.env.ZAPHEIT_MODEL || 'gpt-4o-mini',
   visionAutoCommit: !/^(off|false|0|no)$/i.test(String(process.env.VISION_AUTO_COMMIT || 'on').trim()),
+  visionCountSynthetic: /^(1|on|true|yes)$/i.test(String(process.env.VISION_COUNT_SYNTHETIC || '').trim()),
 
   nodeEnv
 };

@@ -1247,6 +1247,16 @@ export function runMigrations(db: DatabaseSync): void {
   if (vexCols.length > 0 && !vexCols.some((c) => c.name === 'thumbnail')) {
     db.exec('ALTER TABLE vision_examples ADD COLUMN thumbnail TEXT DEFAULT NULL;');
   }
+  /*
+   * One id per physical part per sitting, shared by every frame and head
+   * taught from it, so the leave-one-out score can hide the whole sitting
+   * rather than one row and be answered by its twin. NULL on anything taught
+   * before this existed; shared/vision/knn.ts falls back to a similarity
+   * check for those, and reports how many it had to hide that way.
+   */
+  if (vexCols.length > 0 && !vexCols.some((c) => c.name === 'capture_group')) {
+    db.exec('ALTER TABLE vision_examples ADD COLUMN capture_group TEXT DEFAULT NULL;');
+  }
 
   /*
    * What came off the wagon, and what went back on.

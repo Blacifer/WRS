@@ -98,8 +98,12 @@ fi
 # developer's machine that is harmless. On the shop's machine, where this
 # script is exactly what somebody would run before go-live, it would seed the
 # camera's memory with cartoons that can never be removed. It refuses a
-# database holding anything real, and it is run deliberately:
+# database holding anything real, and it is run deliberately — against a
+# server started with VISION_COUNT_SYNTHETIC=1, because otherwise the server
+# leaves drawn examples out of what the camera knows (production refuses the
+# flag, so a shop's server can never count them):
 #
+#   VISION_COUNT_SYNTHETIC=1 npm run dev --prefix server
 #   node scripts/teach-camera-drive.mjs
 
 # The backup path, which had never been run by anybody. It needs no browser

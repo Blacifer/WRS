@@ -257,6 +257,72 @@ describe('the accuracy it reports about itself', () => {
   });
 });
 
+describe('a score that cannot be answered by a copy of the question', () => {
+  /*
+   * The number on the wall is "hide one, ask the rest". It is honest only if
+   * the rest do not contain the hidden one under another id. Two ways that
+   * happens — the same sitting taught several times, and an ungrouped twin —
+   * and both must be hidden along with the example itself.
+   */
+
+  it('TC-VB-30 a head that is only ever taught one spring three times over scores nothing, not 100%', () => {
+    // Thirty "examples" that are really ten springs, each taught three times
+    // from one frame. Before capture groups, every one of them found its own
+    // twin and the head read as perfect.
+    const examples: BrainExample[] = [];
+    for (let i = 0; i < 10; i++) {
+      const frame = vec(0, 0.04, i);
+      for (let k = 0; k < 3; k++) examples.push({ ...ex('CATEGORY', 'OUTER', frame), captureGroup: `spring_${i}` });
+    }
+    for (let i = 0; i < 10; i++) {
+      const frame = vec(400, 0.04, 100 + i);
+      for (let k = 0; k < 3; k++) examples.push({ ...ex('CATEGORY', 'INNER', frame), captureGroup: `spring_${100 + i}` });
+    }
+    const brain = new VisionBrain(examples);
+    const acc = brain.evaluate('CATEGORY');
+    // With the whole sitting hidden, each spring is judged against the other
+    // nine of its kind — a real test, and one that passes here because the
+    // classes are well separated. What must NOT happen is the twins being
+    // consulted: none should have needed the distance check.
+    expect(acc.twinsHeldOut).toBe(0);
+    for (const e of examples) {
+      const p = brain.predict('CATEGORY', e.embedding, { id: e.id, captureGroup: e.captureGroup });
+      expect(p.neighbours.some((n) => examples.find((x) => x.id === n.exampleId)?.captureGroup === e.captureGroup)).toBe(false);
+    }
+  });
+
+  it('TC-VB-31 an ungrouped twin is hidden by distance, and counted so the flattery is visible', () => {
+    const examples: BrainExample[] = [...cluster('OUTER', 0, 20), ...cluster('INNER', 400, 20)];
+    // One more OUTER, taught three times from the very same frame, no group.
+    const frame = vec(0, 0.04, 777);
+    for (let k = 0; k < 3; k++) examples.push(ex('CATEGORY', 'OUTER', frame));
+    const brain = new VisionBrain(examples);
+    const acc = brain.evaluate('CATEGORY');
+    // Each of the three hides the other two: 3 × 2.
+    expect(acc.twinsHeldOut).toBe(6);
+    const twin = examples[examples.length - 1];
+    const p = brain.predict('CATEGORY', twin.embedding, { id: twin.id, embedding: twin.embedding });
+    expect(p.neighbours.every((n) => n.similarity < 0.98)).toBe(true);
+  });
+
+  it('TC-VB-32 a genuinely similar neighbour is not mistaken for a twin', () => {
+    // Same class, different springs: about 0.92 apart. Must still be found.
+    const brain = new VisionBrain([...cluster('OUTER', 0, 20), ...cluster('INNER', 400, 20)]);
+    const acc = brain.evaluate('CATEGORY');
+    expect(acc.twinsHeldOut).toBe(0);
+    expect(acc.answered).toBe(40);
+  });
+
+  it('TC-VB-33 a head that mostly declines has not earned ASSIST, however right it is when it speaks', () => {
+    expect(gradeAccuracy(30, 1.0, 0.49)).toBe('FLAG_ONLY');
+    expect(gradeAccuracy(30, 1.0, 0.5)).toBe('ASSIST');
+    // The answer rate only ever demotes; it cannot rescue a poor score.
+    expect(gradeAccuracy(30, 0.7, 1.0)).toBe('STOP');
+    // Callers with no notion of abstention are graded as before.
+    expect(gradeAccuracy(30, 0.96)).toBe('ASSIST');
+  });
+});
+
 describe('adapting to the machine it actually finds', () => {
   it('TC-VB-17 crops the middle when the detector is not affordable, not the whole frame', async () => {
     // Most of a shed photograph is floor. Falling back to the WHOLE frame

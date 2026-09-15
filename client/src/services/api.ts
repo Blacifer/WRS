@@ -61,6 +61,33 @@ const NOT_A_SESSION_PROBLEM = new Set([
   'INCORRECT_CODE'        // the emailed/inline OTP digits are wrong
 ]);
 
+/**
+ * A refusal the server explained, as distinct from a network that failed.
+ *
+ * Most screens only ever read .message. The sorting bench needs more: when
+ * the server refuses a camera decision it says WHY and with which code, and
+ * the bench must fall back to asking the person rather than reporting an
+ * error — a refusal is the system working, not the system failing.
+ */
+/** What a CAMERA_AUTO write carries so the server can judge it itself. */
+export interface AutoEvidence {
+  embedding: string;
+  heads: Array<{ head: 'CATEGORY' | 'SURFACE' | 'DAMAGE' | 'PART_ID'; label: string; confidence: number }>;
+}
+
+export class ApiError extends Error {
+  status: number;
+  code: string | null;
+  data: any;
+  constructor(message: string, status: number, code: string | null, data: any) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+    this.data = data;
+  }
+}
+
 export class ApiClient {
   private token: string | null = null;
   private user: User | null = null;
@@ -130,6 +157,10 @@ export class ApiClient {
   }
 
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
+    return this.requestOrThrow<T>(path, options);
+  }
+
+  private async requestOrThrow<T>(path: string, options: RequestInit = {}): Promise<T> {
     const headers = new Headers(options.headers || {});
     if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
       headers.set('Content-Type', 'application/json');
@@ -193,7 +224,7 @@ export class ApiClient {
     }
 
     if (!res.ok) {
-      throw new Error(json.message || json.error || `HTTP error ${res.status}`);
+      throw new ApiError(json.message || json.error || `HTTP error ${res.status}`, res.status, json.error ?? null, json.data ?? null);
     }
 
     return json as T;
@@ -562,6 +593,8 @@ export class ApiClient {
     photoId?: string;
     /** How the verdict was reached. Defaults to MANUAL on the server. */
     verdictSource?: 'MANUAL' | 'CAMERA_ASSISTED' | 'CAMERA_AUTO';
+    /** Required with CAMERA_AUTO. See recordSortedSpring. */
+    autoEvidence?: AutoEvidence;
   }): Promise<{ success: boolean; data: ChecklistItem }> {
     return this.request<{ success: boolean; data: ChecklistItem }>(`/wagons/${wagonNumber}/checklist/items/${itemId}`, {
       method: 'PUT',
@@ -1195,8 +1228,13 @@ export class ApiClient {
     syncId?: string;
     /** The gauge the reading was taken with, when one is named. */
     gaugeCode?: string | null;
-      /** How the verdict was reached. Defaults to MANUAL on the server. */
+    /** How the verdict was reached. Defaults to MANUAL on the server. */
     measurementSource?: 'MANUAL' | 'CAMERA_ASSISTED' | 'CAMERA_AUTO';
+    /**
+     * Required with CAMERA_AUTO: what the bench judged and what it saw, so
+     * the server can re-judge it on its own examples before writing anything.
+     */
+    autoEvidence?: AutoEvidence;
   }): Promise<{ success: boolean; data: { id: string; band: string | null; bandRoman: string | null; status: string; tableReference: string | null; condemnationReason: string | null } }> {
     return this.request('/sorting/record', { method: 'POST', body: JSON.stringify(payload) });
   }
@@ -1496,6 +1534,8 @@ export class ApiClient {
     data: {
       domain: string;
       counts: Record<string, Record<string, number>>;
+      /** Whether drawn (drive-taught) examples are included. Never in production. */
+      countSynthetic: boolean;
       examples: Array<{
         id: string;
         head: 'CATEGORY' | 'SURFACE' | 'DAMAGE' | 'PART_ID';
@@ -1506,6 +1546,7 @@ export class ApiClient {
         partName: string | null;
         taughtBy: string;
         createdAt: string;
+        captureGroup: string | null;
       }>;
     };
     meta: { total: number };
@@ -1534,6 +1575,8 @@ export class ApiClient {
     sourceImageId?: string | null;
     partName?: string | null;
     bogiePosition?: string | null;
+    /** One id per physical part per sitting, so a leave-one-out score can hide the whole sitting. */
+    captureGroup?: string | null;
   }): Promise<{ success: boolean; data: { id: string; head: string; label: string; wasCorrection: boolean } }> {
     return this.request('/vision/brain/teach', { method: 'POST', body: JSON.stringify(payload) });
   }
@@ -1563,23 +1606,21 @@ export class ApiClient {
     data: {
       domain: string;
       master: boolean;
-      heads: Array<{ head: 'CATEGORY' | 'SURFACE' | 'DAMAGE' | 'PART_ID'; sampled: number; kept: number; rate: number | null; newestAt: string | null; allowed: boolean; reason: string }>;
+      countSynthetic: boolean;
+      heads: Array<{
+        head: 'CATEGORY' | 'SURFACE' | 'DAMAGE' | 'PART_ID';
+        sampled: number;
+        kept: number;
+        rate: number | null;
+        newestAt: string | null;
+        /** The server's own leave-one-out score — the one a CAMERA_AUTO write is judged by. */
+        measured: { verdict: 'INSUFFICIENT' | 'ASSIST' | 'FLAG_ONLY' | 'STOP'; taught: number; answered: number; accuracy: number; answerRate: number; twinsHeldOut: number };
+        allowed: boolean;
+        reason: string;
+      }>;
     };
   }> {
     return this.request(`/vision/auto/status?domain=${encodeURIComponent(domain)}`);
-  }
-
-  /**
-   * The camera decided and nobody confirmed. Logged as such — excluded from
-   * its own agreement score, and never a teaching.
-   */
-  public async recordVisionAutoDecision(payload: {
-    domain: 'SPRING' | 'WAGON_PART';
-    recordId?: string | null;
-    wagonNumber?: string | null;
-    heads: Array<{ head: 'CATEGORY' | 'SURFACE' | 'DAMAGE' | 'PART_ID'; label: string; confidence: number; neighbours?: string[] }>;
-  }): Promise<{ success: boolean; data: { logged: number } }> {
-    return this.request('/vision/auto/record', { method: 'POST', body: JSON.stringify(payload) });
   }
 
   public async draftShiftHandover(date?: string): Promise<{

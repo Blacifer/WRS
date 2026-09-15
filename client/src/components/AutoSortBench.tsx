@@ -38,12 +38,13 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '../services/api.ts';
+import { api, ApiError } from '../services/api.ts';
 import {
   VisionBrain,
   decodeEmbedding,
   encodeEmbedding,
   readFrame,
+  newCaptureGroup,
   SUGGESTED_LABELS,
   type BrainHead,
   type Proposal
@@ -93,7 +94,12 @@ export default function AutoSortBench({ lang, batchId, bogieType, condition, gau
   const streamRef = useRef<MediaStream | null>(null);
   const heightRef = useRef<HTMLInputElement | null>(null);
   const brainRef = useRef(new VisionBrain());
-  const frameRef = useRef<{ embedding: Float32Array; proposals: Record<string, Proposal> } | null>(null);
+  /*
+   * One id per spring judged, shared by every head taught from that frame,
+   * so the leave-one-out score can hide the whole sitting. Made when the
+   * frame is read, because that is when a new spring is in front of the lens.
+   */
+  const frameRef = useRef<{ embedding: Float32Array; proposals: Record<string, Proposal>; captureGroup: string } | null>(null);
 
   const [on, setOn] = useState(false);
   const [ready, setReady] = useState(false);
@@ -119,7 +125,8 @@ export default function AutoSortBench({ lang, batchId, bogieType, condition, gau
       for (const e of brain.data.examples) {
         b.remember({
           id: e.id, domain: 'SPRING', head: e.head, label: e.label,
-          embedding: decodeEmbedding(e.embedding), sourceImageId: e.sourceImageId
+          embedding: decodeEmbedding(e.embedding), sourceImageId: e.sourceImageId,
+          captureGroup: e.captureGroup
         });
       }
       brainRef.current = b;
@@ -168,7 +175,7 @@ export default function AutoSortBench({ lang, batchId, bogieType, condition, gau
       const { embedding } = await readFrame(video);
       const ps: Record<string, Proposal> = {};
       for (const head of HEADS) ps[head] = brainRef.current.predict(head, embedding);
-      frameRef.current = { embedding, proposals: ps };
+      frameRef.current = { embedding, proposals: ps, captureGroup: newCaptureGroup() };
       setProposals(ps);
 
       const position = positionFor(ps.CATEGORY.label);
@@ -197,23 +204,39 @@ export default function AutoSortBench({ lang, batchId, bogieType, condition, gau
       setChosen({ CATEGORY: ps.CATEGORY.label, SURFACE: ps.SURFACE.label, DAMAGE: ps.DAMAGE.label });
 
       if (d.mode === 'AUTO' && position) {
-        // The whole point. No tap.
-        const res = await api.recordSortedSpring({
-          batchId, bogieType, condition, springPosition: position,
-          measuredFreeHeight: h, heightIsApproximate: false,
-          damageType: damageType ?? undefined, gaugeCode: gaugeCode || null,
-          measurementSource: 'CAMERA_AUTO'
-        });
-        // On the record as the camera's decision — and NOT a teaching.
-        void api.recordVisionAutoDecision({
-          domain: 'SPRING', recordId: res.data.id,
-          heads: HEADS.map((head) => ({ head, label: ps[head].label!, confidence: ps[head].confidence, neighbours: ps[head].neighbours.map((n) => n.exampleId) }))
-        }).catch(() => undefined);
-        setBin({ label: `${position} · ${res.data.band ?? 'PASS'}`, tone: 'good' });
-        setTally((t) => ({ ...t, auto: t.auto + 1 }));
-        onRecorded(res.data.status as 'PASS' | 'CONDEMNED', res.data.band ?? null, true);
-        setHeight('');
-        heightRef.current?.focus();
+        /*
+         * The whole point. No tap — but not on this screen's word alone. The
+         * server re-judges the same embedding on the examples IT holds and
+         * writes the row only if its own answer is AUTO. Its refusal is not
+         * an error; it is the camera being asked to ask, and the reason it
+         * gives goes on screen in place of this screen's own.
+         */
+        try {
+          const res = await api.recordSortedSpring({
+            batchId, bogieType, condition, springPosition: position,
+            measuredFreeHeight: h, heightIsApproximate: false,
+            damageType: damageType ?? undefined, gaugeCode: gaugeCode || null,
+            measurementSource: 'CAMERA_AUTO',
+            autoEvidence: {
+              embedding: encodeEmbedding(embedding),
+              heads: HEADS.map((head) => ({ head, label: ps[head].label!, confidence: ps[head].confidence }))
+            }
+          });
+          setBin({ label: `${position} · ${res.data.band ?? 'PASS'}`, tone: 'good' });
+          setTally((t) => ({ ...t, auto: t.auto + 1 }));
+          onRecorded(res.data.status as 'PASS' | 'CONDEMNED', res.data.band ?? null, true);
+          setHeight('');
+          heightRef.current?.focus();
+        } catch (err: any) {
+          if (err instanceof ApiError && (err.code === 'AUTO_COMMIT_REFUSED' || err.code === 'AUTO_COMMIT_OFF' || err.code === 'AUTO_LABELS_DISAGREE' || err.code === 'AUTO_EVIDENCE_MISSING')) {
+            setDecision(err.data?.decision ?? { mode: 'ASK', outcome: 'PASS', reason: err.message, stoppedBy: err.code === 'AUTO_COMMIT_OFF' ? 'AGREEMENT_FELL' : 'NOT_EARNED' });
+            setTally((t) => ({ ...t, asked: t.asked + 1 }));
+            // The bench's examples may be behind the server's. Catch up quietly.
+            if (err.code === 'AUTO_LABELS_DISAGREE') void reload();
+          } else {
+            throw err;
+          }
+        }
       } else {
         setTally((t) => ({ ...t, asked: t.asked + 1 }));
       }
@@ -222,7 +245,7 @@ export default function AutoSortBench({ lang, batchId, bogieType, condition, gau
     } finally {
       setBusy(false);
     }
-  }, [ready, bogieType, condition, batchId, gaugeCode, live, master, expectedPosition, onRecorded]);
+  }, [ready, bogieType, condition, batchId, gaugeCode, live, master, expectedPosition, onRecorded, reload]);
 
   /** The person's answer when asked: record it, and teach every head from it. */
   const confirm = useCallback(async () => {
@@ -249,9 +272,10 @@ export default function AutoSortBench({ lang, batchId, bogieType, condition, gau
         if (!label) continue;
         void api.teachVisionBrain({
           domain: 'SPRING', head, label, embedding: encodeEmbedding(f.embedding),
-          proposedLabel: f.proposals[head].label, confidence: f.proposals[head].confidence
+          proposedLabel: f.proposals[head].label, confidence: f.proposals[head].confidence,
+          captureGroup: f.captureGroup
         }).catch(() => undefined);
-        brainRef.current.remember({ id: `local_${Date.now()}_${head}`, domain: 'SPRING', head, label, embedding: f.embedding });
+        brainRef.current.remember({ id: `local_${Date.now()}_${head}`, domain: 'SPRING', head, label, embedding: f.embedding, captureGroup: f.captureGroup });
       }
       setBin({ label: res.data.status === 'CONDEMNED' ? (isHi ? 'कंडम' : 'CONDEMNED') : `${position} · ${res.data.band ?? 'PASS'}`, tone: res.data.status === 'CONDEMNED' ? 'bad' : 'good' });
       onRecorded(res.data.status as 'PASS' | 'CONDEMNED', res.data.band ?? null, false);

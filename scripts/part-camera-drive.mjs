@@ -84,6 +84,22 @@ if (before.real > 0 && process.env.TEACH_DRIVE_ALLOW_REAL_DB !== '1') {
   process.exit(2);
 }
 
+/*
+ * The server leaves drawn examples out of what the camera knows unless it was
+ * started with VISION_COUNT_SYNTHETIC=1 — which production refuses. This
+ * drive teaches nothing else, so without that flag it would teach parts the
+ * server then ignores and report a camera that never learns. Say so at the door.
+ */
+const synth = await page.evaluate(async () => {
+  const r = await fetch('/api/vision/auto/status?domain=WAGON_PART', { headers: { authorization: `Bearer ${localStorage.getItem('wrs_token')}` } });
+  const b = await r.json().catch(() => null);
+  return b?.data?.countSynthetic === true;
+});
+if (!synth) {
+  console.error('REFUSING TO RUN: the server is not counting drawn examples. Start it with VISION_COUNT_SYNTHETIC=1 for this drive (never in production).');
+  process.exit(2);
+}
+
 // Open the wagon the way an inspector does (see parts-ledger-drive.mjs).
 await page.getByRole('button', { name: /A wagon/i }).first().click();
 await page.waitForTimeout(2500);

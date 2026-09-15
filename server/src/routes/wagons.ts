@@ -17,6 +17,8 @@ import { InspectionRepository } from '../db/repository.ts';
 import { LifecycleEngine } from '../lifecycle/engine.ts';
 import { ExitGateValidator } from '../gate/validator.ts';
 import { parseClaimedSource } from '../../../shared/vision/autoCommit.ts';
+import { labelForPart } from '../../../shared/vision/knn.ts';
+import { judgeAutoCommit, recordAutoDecision, type GateResult } from '../vision/serverBrain.ts';
 import { CertificateGenerator } from '../reports/certificate.ts';
 import { otpService } from '../auth/otpService.ts';
 import { TotpService } from '../auth/totpService.ts';
@@ -760,6 +762,55 @@ wagonsRouter.put('/:wagonNumber/checklist/items/:itemId', authMiddleware, async 
     return;
   }
 
+  /*
+   * See the sorting route. A camera decision on a wagon part is re-judged
+   * here from the server's own examples before anything is written — and
+   * it may only ever be a PASS. A FAIL or CONDEMN is a person's decision
+   * with a reason, whatever the source claims.
+   */
+  let gate: Extract<GateResult, { ok: true }> | null = null;
+  if (verdictSource === 'CAMERA_AUTO') {
+    if (status !== 'PASS' || (reinspectedStatus !== undefined && reinspectedStatus !== 'PASS')) {
+      res.status(422).json({
+        success: false,
+        error: 'AUTO_COMMIT_REFUSED',
+        message: 'The camera may record a PASS without a tap. It may never record a fault: a FAIL or CONDEMN needs a person and a reason.',
+        statusCode: 422,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+    const existing = wagonRepo.getChecklistItemById(itemId);
+    if (!existing) {
+      res.status(404).json({
+        success: false,
+        error: 'NOT_FOUND',
+        message: `Checklist item ${itemId} not found`,
+        statusCode: 404,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+    const g = judgeAutoCommit(getDatabase(), {
+      domain: 'WAGON_PART',
+      evidence: req.body?.autoEvidence,
+      measurementPassed: null,
+      expected: { PART_ID: labelForPart(existing.partName) }
+    });
+    if (!g.ok) {
+      res.status(g.status).json({
+        success: false,
+        error: g.code,
+        message: g.message,
+        data: g.decision ? { decision: g.decision } : undefined,
+        statusCode: g.status,
+        timestamp: new Date().toISOString()
+      });
+      return;
+    }
+    gate = g;
+  }
+
   try {
     const item = wagonRepo.updateChecklistItem(
       itemId,
@@ -780,6 +831,15 @@ wagonsRouter.put('/:wagonNumber/checklist/items/:itemId', authMiddleware, async 
         verdictSource
       }
     );
+
+    if (gate) {
+      recordAutoDecision(getDatabase(), 'WAGON_PART', gate, {
+        recordId: item.id,
+        wagonNumber: item.wagonNumber ?? req.params?.wagonNumber ?? null,
+        userId: (req as any).user?.id,
+        userRole: (req as any).user?.role ?? null
+      });
+    }
 
     res.status(200).json({
       success: true,

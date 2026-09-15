@@ -28,3 +28,16 @@ export const BRAIN_DOMAINS: readonly BrainDomain[] = ['SPRING', 'WAGON_PART'] as
  * is not a threshold.
  */
 export type BrainVerdict = 'INSUFFICIENT' | 'ASSIST' | 'FLAG_ONLY' | 'STOP';
+
+/**
+ * The part_name a drive stamps on every example it teaches with a DRAWN
+ * spring or part, so that the shop's counts never include cartoons.
+ *
+ * The drives that prove the camera pipeline (scripts/*-drive.mjs) teach it
+ * canvas drawings, because a test cannot photograph a real spring. Those rows
+ * are append-only like every other, so they cannot be removed afterwards —
+ * they can only be recognised. The server leaves them out of what the camera
+ * compares against and out of the readiness figures unless it was started
+ * with VISION_COUNT_SYNTHETIC=1, which production refuses.
+ */
+export const SYNTHETIC_PART_NAME = 'SYNTHETIC_DRIVE';

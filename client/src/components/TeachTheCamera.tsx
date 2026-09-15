@@ -45,6 +45,7 @@ import {
   readUnsent,
   rememberUnsent,
   readFrame,
+  newCaptureGroup,
   type BrainAccuracy,
   type BrainHead,
   type Proposal
@@ -120,6 +121,16 @@ export default function TeachTheCamera({
     /** A small JPEG of the crop, kept so an answer can be shown, not just stated. */
     thumbnail: string | null;
   } | null>(null);
+  /*
+   * Which physical part is in front of the lens, as far as this screen can
+   * tell. Several looks before an answer are the same part; the first look
+   * after an answer is a new one. Every teaching carries it, so the
+   * leave-one-out score can hide the whole sitting instead of one frame and
+   * be answered by that frame's twin. A part re-shot after it was taught
+   * starts a new group — the similarity check in shared/vision/knn.ts is
+   * what catches that case.
+   */
+  const groupRef = useRef<{ id: string; spent: boolean }>({ id: newCaptureGroup(), spent: false });
 
   const [on, setOn] = useState(false);
   const [ready, setReady] = useState(false);
@@ -165,7 +176,8 @@ export default function TeachTheCamera({
               label: t.label,
               embedding: t.embedding,
               proposedLabel: t.proposedLabel,
-              confidence: t.confidence
+              confidence: t.confidence,
+              captureGroup: t.captureGroup ?? null
             })
             .then(() => undefined)
         );
@@ -183,7 +195,8 @@ export default function TeachTheCamera({
             sourceImageId: e.sourceImageId,
             partName: e.partName,
             taughtBy: e.taughtBy,
-            createdAt: e.createdAt
+            createdAt: e.createdAt,
+            captureGroup: e.captureGroup
           });
         }
         brainRef.current = brain;
@@ -272,6 +285,7 @@ export default function TeachTheCamera({
       setStrategy(used);
       const next: Record<string, Proposal> = {};
       for (const h of heads) next[h] = brainRef.current.predict(h, embedding);
+      if (groupRef.current.spent) groupRef.current = { id: newCaptureGroup(), spent: false };
       lastRef.current = { embedding, proposals: next, thumbnail: thumbnailOf(crop) };
       setProposals(next);
       setShot(crop.toDataURL('image/jpeg', 0.7));
@@ -296,13 +310,16 @@ export default function TeachTheCamera({
       const proposed = last.proposals[head]?.label ?? null;
       const confidence = last.proposals[head]?.confidence ?? null;
 
+      const captureGroup = groupRef.current.id;
+      groupRef.current.spent = true;
       const localId = `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       brainRef.current.remember({
         id: localId,
         domain,
         head,
         label,
-        embedding: last.embedding
+        embedding: last.embedding,
+        captureGroup
       });
       refreshStats();
       setJustTaught(
@@ -323,7 +340,8 @@ export default function TeachTheCamera({
           embedding: encodeEmbedding(last.embedding),
           thumbnail: last.thumbnail,
           proposedLabel: proposed,
-          confidence
+          confidence,
+          captureGroup
         });
       } catch {
         /*
@@ -338,6 +356,7 @@ export default function TeachTheCamera({
           embedding: encodeEmbedding(last.embedding),
           proposedLabel: proposed,
           confidence,
+          captureGroup,
           at: new Date().toISOString()
         });
         setUnsent(readUnsent().length);

@@ -86,109 +86,36 @@ export const SUGGESTED_LABELS: Record<BrainHead, string[]> = {
   PART_ID: []
 };
 
+import { l2Normalise } from '../../../shared/vision/knn.ts';
 
-/**
- * A part name as a label the brain will accept.
- *
- * "Axle Box Adapter Crown Lug Wear (Max 4.0mm)" cannot be a label as written —
- * the server allows only letters, digits, underscore and hyphen, because a
- * label is a join key and punctuation makes two spellings of one part into two
- * classes. This is the single place that rule is applied on the way in, so the
- * camera and the ledger cannot disagree about what a part is called.
+/*
+ * The judgement itself — the vote among remembered photographs, the floors
+ * below which it declines, and the leave-one-out score — lives in
+ * shared/vision/knn.ts, because the server now runs the same arithmetic on the
+ * same embedding before it will accept a verdict the camera reached alone.
+ * Re-exported here so the components that grew up importing it from this file
+ * keep working, and so there is still one place in the client to read.
  */
-export function labelForPart(partName: string): string {
-  return partName
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 64);
-}
-
-/** One remembered photograph: what it looked like, and what a person called it. */
-export interface BrainExample {
-  id: string;
-  domain: BrainDomain;
-  head: BrainHead;
-  /** The person's answer. This is the truth; the camera only ever guesses at it. */
-  label: string;
-  embedding: Float32Array;
-  sourceImageId?: string | null;
-  partName?: string | null;
-  taughtBy?: string | null;
-  createdAt?: string | null;
-}
-
-/** One of the remembered photographs that produced an answer. */
-export interface Neighbour {
-  exampleId: string;
-  label: string;
-  similarity: number;
-  sourceImageId?: string | null;
-}
-
-export interface Proposal {
-  head: BrainHead;
-  /** null means "I do not recognise this" — a real answer, not a failure. */
-  label: string | null;
-  /** Share of the weighted vote held by the winner, 0..1. */
-  confidence: number;
-  /** Why it said that: the remembered photographs it matched. */
-  neighbours: Neighbour[];
-  /** Populated when label is null, in words an inspector can act on. */
-  reason?: string;
-  /** How many examples this head has been taught. */
-  taught: number;
-}
-
-// ---------------------------------------------------------------------------
-// The floors below which it says "I do not know"
-//
-// Both are needed, and they catch different failures.
-//
-// SIMILARITY_FLOOR catches the part it has never seen. Ask a brain that knows
-// only springs about a brake block and the nearest spring is still the nearest
-// *something* — a vote among neighbours alone would answer confidently. So the
-// nearest match must actually be near before any vote is counted.
-//
-// CONFIDENCE_FLOOR catches the genuinely ambiguous frame — a spring half in
-// shadow that sits between two classes. The neighbours are close, but they
-// disagree, and disagreement is information worth showing rather than
-// resolving by majority.
-// ---------------------------------------------------------------------------
-
-/** Cosine similarity the nearest remembered photograph must reach. */
-export const SIMILARITY_FLOOR = 0.62;
-
-/**
- * Share of the weighted vote the winning label must hold.
- *
- * 0.65 rather than a rounder 0.6, and the reason is arithmetic rather than
- * taste. With five neighbours and two candidate labels the closest possible
- * split is three against two, which is 0.6 exactly — so a floor set at 0.6
- * would reject nothing at all and the check would be decoration. Writing the
- * tests is what surfaced that.
- *
- * At 0.65 the rule becomes one an inspector can state: four of the five
- * nearest photographs must agree. Three against two is a disagreement, and a
- * disagreement is worth showing rather than resolving by majority.
- */
-export const CONFIDENCE_FLOOR = 0.65;
-
-/** Neighbours consulted. Odd, and small, because early on there are few. */
-export const K = 5;
-
-/**
- * Below this it will not answer at all.
- *
- * Two labels because one label can only ever say that one label, which is not
- * recognition. Eight examples because a vote among fewer is noise wearing a
- * percentage.
- */
-export const MIN_EXAMPLES = 8;
-export const MIN_LABELS = 2;
-
-/** Where a head stops being a demonstration and starts being useful. */
-export const USEFUL_PER_LABEL = 20;
+export {
+  VisionBrain,
+  l2Normalise,
+  similarity,
+  encodeEmbedding,
+  decodeEmbedding,
+  gradeAccuracy,
+  labelForPart,
+  newCaptureGroup,
+  SIMILARITY_FLOOR,
+  CONFIDENCE_FLOOR,
+  K,
+  MIN_EXAMPLES,
+  MIN_LABELS,
+  USEFUL_PER_LABEL,
+  TWIN_SIMILARITY,
+  MIN_ANSWER_RATE,
+  VERDICT_MEANING
+} from '../../../shared/vision/knn.ts';
+export type { BrainExample, Neighbour, Proposal, BrainAccuracy, HoldOut } from '../../../shared/vision/knn.ts';
 
 // ---------------------------------------------------------------------------
 // Embeddings
@@ -253,263 +180,6 @@ export async function embed(
     tensor.dispose?.();
   }
 }
-
-export function l2Normalise(v: Float32Array): Float32Array {
-  let sum = 0;
-  for (let i = 0; i < v.length; i++) sum += v[i] * v[i];
-  const norm = Math.sqrt(sum);
-  if (norm === 0) return new Float32Array(v.length);
-  const out = new Float32Array(v.length);
-  for (let i = 0; i < v.length; i++) out[i] = v[i] / norm;
-  return out;
-}
-
-/** Both vectors are unit length, so the dot product IS the cosine. */
-export function similarity(a: Float32Array, b: Float32Array): number {
-  if (a.length !== b.length) return -1;
-  let dot = 0;
-  for (let i = 0; i < a.length; i++) dot += a[i] * b[i];
-  return dot;
-}
-
-// ---------------------------------------------------------------------------
-// Storage form
-//
-// We keep the 1280 numbers and throw the photograph away — for the brain, at
-// least; the photograph itself is already kept as evidence elsewhere and under
-// its own append-only rules. An embedding is about 5 KB, so three thousand of
-// them is 15 MB, which fits inside the database the weekly backup already
-// carries off this machine. What the camera has learned therefore survives the
-// machine being formatted, and is shared by every bench rather than each one
-// starting from nothing.
-// ---------------------------------------------------------------------------
-
-export function encodeEmbedding(v: Float32Array): string {
-  const bytes = new Uint8Array(v.buffer, v.byteOffset, v.byteLength);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-  return btoa(binary);
-}
-
-export function decodeEmbedding(b64: string): Float32Array {
-  const binary = atob(b64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4);
-}
-
-// ---------------------------------------------------------------------------
-// The brain
-// ---------------------------------------------------------------------------
-
-export class VisionBrain {
-  private byHead = new Map<BrainHead, BrainExample[]>();
-
-  constructor(examples: BrainExample[] = []) {
-    for (const e of examples) this.remember(e);
-  }
-
-  /** Add one remembered photograph. Takes effect on the very next frame. */
-  remember(example: BrainExample): void {
-    const list = this.byHead.get(example.head) || [];
-    list.push(example);
-    this.byHead.set(example.head, list);
-  }
-
-  examples(head: BrainHead): BrainExample[] {
-    return this.byHead.get(head) || [];
-  }
-
-  /** How many of each label this head has been taught. */
-  counts(head: BrainHead): Record<string, number> {
-    const out: Record<string, number> = {};
-    for (const e of this.examples(head)) out[e.label] = (out[e.label] || 0) + 1;
-    return out;
-  }
-
-  /**
-   * The honest readiness figure: the thinnest class, not the total.
-   *
-   * A head holding two thousand outer springs and eleven snubbers has seen
-   * two thousand and eleven photographs and has not really seen a snubber.
-   * Reporting the total would flatter it.
-   */
-  thinnestClass(head: BrainHead): { label: string; count: number } | null {
-    const counts = this.counts(head);
-    const entries = Object.entries(counts);
-    if (entries.length === 0) return null;
-    entries.sort((a, b) => a[1] - b[1]);
-    return { label: entries[0][0], count: entries[0][1] };
-  }
-
-  /**
-   * Ask what this looks like.
-   *
-   * Excluding an example by id is what makes an honest score possible: leave
-   * one out, ask about it, and see whether the rest of the brain gets it
-   * right. Scoring a brain on photographs it has memorised measures nothing.
-   */
-  predict(head: BrainHead, query: Float32Array, excludeId?: string): Proposal {
-    const all = this.examples(head).filter((e) => e.id !== excludeId);
-    const labels = new Set(all.map((e) => e.label));
-    const base = { head, neighbours: [] as Neighbour[], taught: all.length };
-
-    if (all.length < MIN_EXAMPLES || labels.size < MIN_LABELS) {
-      return {
-        ...base,
-        label: null,
-        confidence: 0,
-        reason:
-          labels.size < MIN_LABELS
-            ? `Only ${labels.size} kind${labels.size === 1 ? '' : 's'} taught so far — it needs at least ${MIN_LABELS} to tell anything apart.`
-            : `${all.length} of ${MIN_EXAMPLES} examples taught. Keep going.`
-      };
-    }
-
-    const scored = all
-      .map((e) => ({
-        exampleId: e.id,
-        label: e.label,
-        similarity: similarity(e.embedding, query),
-        sourceImageId: e.sourceImageId ?? null
-      }))
-      .sort((a, b) => b.similarity - a.similarity);
-
-    const neighbours = scored.slice(0, Math.min(K, scored.length));
-
-    if (neighbours[0].similarity < SIMILARITY_FLOOR) {
-      return {
-        ...base,
-        label: null,
-        confidence: 0,
-        neighbours,
-        reason:
-          'This does not look like anything it has been shown. Tap the right answer and it will know next time.'
-      };
-    }
-
-    // Nearer neighbours count for more. Weighting by similarity rather than
-    // counting heads stops five distant examples of a common class from
-    // outvoting one near-identical example of a rare one — which is the whole
-    // failure mode of a plain vote on an unbalanced set, and the set here is
-    // always unbalanced because a shop sees far more outer springs.
-    const votes = new Map<string, number>();
-    let total = 0;
-    for (const n of neighbours) {
-      const w = Math.max(0, n.similarity);
-      votes.set(n.label, (votes.get(n.label) || 0) + w);
-      total += w;
-    }
-
-    let best = '';
-    let bestWeight = -1;
-    for (const [label, w] of votes) {
-      if (w > bestWeight) {
-        best = label;
-        bestWeight = w;
-      }
-    }
-
-    const confidence = total > 0 ? bestWeight / total : 0;
-
-    if (confidence < CONFIDENCE_FLOOR) {
-      return {
-        ...base,
-        label: null,
-        confidence,
-        neighbours,
-        reason: `The closest matches disagree (${[...votes.keys()].join(' / ')}). Worth a second look.`
-      };
-    }
-
-    return { ...base, label: best, confidence, neighbours };
-  }
-
-  /**
-   * Score the brain against itself, honestly.
-   *
-   * Leave-one-out: for every remembered photograph, hide it, ask the rest what
-   * it is, and compare. Every photograph is a test case and none of them is
-   * one the answer was taken from. This is the number that goes on the wall,
-   * and it is allowed to be disappointing.
-   *
-   * Abstentions are counted separately rather than as failures. A camera that
-   * says "I do not know" on a bad frame is behaving correctly, and folding
-   * that into the error rate would push us towards a brain that guesses.
-   */
-  evaluate(head: BrainHead): BrainAccuracy {
-    const all = this.examples(head);
-    let correct = 0;
-    let wrong = 0;
-    let abstained = 0;
-    const confusion: Record<string, Record<string, number>> = {};
-
-    for (const e of all) {
-      const p = this.predict(head, e.embedding, e.id);
-      if (p.label === null) {
-        abstained++;
-        continue;
-      }
-      confusion[e.label] = confusion[e.label] || {};
-      confusion[e.label][p.label] = (confusion[e.label][p.label] || 0) + 1;
-      if (p.label === e.label) correct++;
-      else wrong++;
-    }
-
-    const answered = correct + wrong;
-    return {
-      head,
-      taught: all.length,
-      answered,
-      abstained,
-      correct,
-      wrong,
-      /** Of the ones it was willing to answer, how many it got right. */
-      accuracy: answered > 0 ? correct / answered : 0,
-      /** How often it was willing to answer at all. */
-      answerRate: all.length > 0 ? answered / all.length : 0,
-      confusion,
-      thinnest: this.thinnestClass(head),
-      verdict: gradeAccuracy(answered, answered > 0 ? correct / answered : 0)
-    };
-  }
-}
-
-export interface BrainAccuracy {
-  head: BrainHead;
-  taught: number;
-  answered: number;
-  abstained: number;
-  correct: number;
-  wrong: number;
-  accuracy: number;
-  answerRate: number;
-  confusion: Record<string, Record<string, number>>;
-  thinnest: { label: string; count: number } | null;
-  verdict: BrainVerdict;
-}
-
-
-/**
- * The thresholds, fixed here in advance and in code.
- *
- * They are the same three used for the blind spring read, deliberately: a
- * threshold chosen after seeing the result is not a threshold, and using the
- * shop's existing numbers means nobody has to be talked into a new set.
- */
-export function gradeAccuracy(answered: number, accuracy: number): BrainVerdict {
-  if (answered < 30) return 'INSUFFICIENT';
-  if (accuracy >= 0.95) return 'ASSIST';
-  if (accuracy >= 0.8) return 'FLAG_ONLY';
-  return 'STOP';
-}
-
-export const VERDICT_MEANING: Record<BrainVerdict, string> = {
-  INSUFFICIENT: 'Too few examples to score it yet. It will not be trusted until it has been.',
-  ASSIST: 'Accurate enough to pre-select an answer for the inspector to confirm.',
-  FLAG_ONLY: 'Not accurate enough to propose an answer. It may only say "this looks unlike the others".',
-  STOP: 'Measured as unreliable on this shop\'s photographs. It proposes nothing, and we say so.'
-};
 
 // ---------------------------------------------------------------------------
 // From a camera frame to a proposal
@@ -728,6 +398,8 @@ export interface UnsentTeaching {
   embedding: string;
   proposedLabel: string | null;
   confidence: number | null;
+  /** Absent on anything queued before sittings were recorded. */
+  captureGroup?: string | null;
   at: string;
 }
 

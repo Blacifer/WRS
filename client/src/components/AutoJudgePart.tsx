@@ -20,7 +20,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api } from '../services/api.ts';
+import { api, ApiError } from '../services/api.ts';
 import {
   VisionBrain,
   decodeEmbedding,
@@ -88,7 +88,7 @@ export default function AutoJudgePart({ wagonNumber, item, stage, lang, onClose,
         if (cancelled) return;
         const b = new VisionBrain();
         for (const e of brain.data.examples) {
-          b.remember({ id: e.id, domain: 'WAGON_PART', head: e.head, label: e.label, embedding: decodeEmbedding(e.embedding) });
+          b.remember({ id: e.id, domain: 'WAGON_PART', head: e.head, label: e.label, embedding: decodeEmbedding(e.embedding), captureGroup: e.captureGroup });
         }
         brainRef.current = b;
         const l: Partial<Record<BrainHead, LiveAgreement>> = {};
@@ -183,21 +183,38 @@ export default function AutoJudgePart({ wagonNumber, item, stage, lang, onClose,
     const chosenDamage = source === 'CAMERA_AUTO' ? ps.DAMAGE.label : chosen.DAMAGE;
     const notes = `Camera: surface ${chosenSurface ?? '?'}, damage ${chosenDamage ?? '?'}`;
 
-    await api.updateChecklistItem(wagonNumber, item.id, {
-      status: 'PASS', reinspectedStatus: 'PASS', conditionNotes: notes, photoId,
-      expectedUpdatedAt: item.updatedAt, verdictSource: source
-    });
+    /*
+     * A camera decision is re-judged by the server on its own examples, and
+     * refused with a reason if it does not agree. That refusal is the camera
+     * being told to ask, not an error: the reason replaces this screen's
+     * own, and the person answers as they would have anyway.
+     */
+    try {
+      await api.updateChecklistItem(wagonNumber, item.id, {
+        status: 'PASS', reinspectedStatus: 'PASS', conditionNotes: notes, photoId,
+        expectedUpdatedAt: item.updatedAt, verdictSource: source,
+        autoEvidence: source === 'CAMERA_AUTO'
+          ? {
+              embedding: encodeEmbedding(embedding),
+              heads: [...HEADS, 'PART_ID' as BrainHead]
+                .filter((head) => ps[head]?.label)
+                .map((head) => ({ head, label: ps[head].label!, confidence: ps[head].confidence }))
+            }
+          : undefined
+      });
+    } catch (err: any) {
+      if (source === 'CAMERA_AUTO' && err instanceof ApiError && String(err.code).startsWith('AUTO_')) {
+        setDecision(err.data?.decision ?? { mode: 'ASK', outcome: 'PASS', reason: err.message, stoppedBy: 'NOT_EARNED' });
+        return;
+      }
+      throw err;
+    }
 
-    if (source === 'CAMERA_AUTO') {
-      void api.recordVisionAutoDecision({
-        domain: 'WAGON_PART', wagonNumber,
-        heads: HEADS.map((head) => ({ head, label: ps[head].label!, confidence: ps[head].confidence, neighbours: ps[head].neighbours.map((n) => n.exampleId) }))
-      }).catch(() => undefined);
-    } else {
+    if (source !== 'CAMERA_AUTO') {
       for (const head of HEADS) {
         const label = head === 'SURFACE' ? chosenSurface : chosenDamage;
         if (!label) continue;
-        void api.teachVisionBrain({ domain: 'WAGON_PART', head, label, embedding: encodeEmbedding(embedding), proposedLabel: ps[head].label, confidence: ps[head].confidence, partName: item.partName }).catch(() => undefined);
+        void api.teachVisionBrain({ domain: 'WAGON_PART', head, label, embedding: encodeEmbedding(embedding), proposedLabel: ps[head].label, confidence: ps[head].confidence, partName: item.partName, captureGroup: item.id }).catch(() => undefined);
       }
     }
     setDone(source === 'CAMERA_AUTO' ? (isHi ? 'पास — बिना टैप' : 'PASS — recorded with no tap, photograph attached.') : (isHi ? 'पास दर्ज' : 'PASS recorded, photograph attached.'));
@@ -222,12 +239,12 @@ export default function AutoJudgePart({ wagonNumber, item, stage, lang, onClose,
       for (const head of HEADS) {
         const label = chosen[head];
         if (!label) continue;
-        await api.teachVisionBrain({ domain: 'WAGON_PART', head, label, embedding: encodeEmbedding(f.embedding), proposedLabel: f.proposals[head].label, confidence: f.proposals[head].confidence, partName: item.partName }).catch(() => undefined);
-        brainRef.current.remember({ id: `local_${Date.now()}_${head}`, domain: 'WAGON_PART', head, label, embedding: f.embedding });
+        await api.teachVisionBrain({ domain: 'WAGON_PART', head, label, embedding: encodeEmbedding(f.embedding), proposedLabel: f.proposals[head].label, confidence: f.proposals[head].confidence, partName: item.partName, captureGroup: item.id }).catch(() => undefined);
+        brainRef.current.remember({ id: `local_${Date.now()}_${head}`, domain: 'WAGON_PART', head, label, embedding: f.embedding, captureGroup: item.id });
       }
       setDone(isHi ? 'सिखाया गया — अब FAIL/CONDEMN दर्ज करें।' : 'Taught. Now record the FAIL or CONDEMN on the item, with the reason.');
     } finally { setBusy(false); }
-  }, [chosen, item.partName, isHi]);
+  }, [chosen, item.id, item.partName, isHi]);
 
   const confirm = useCallback(async () => {
     const f = frameRef.current;

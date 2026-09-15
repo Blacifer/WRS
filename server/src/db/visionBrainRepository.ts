@@ -16,7 +16,7 @@ import { randomUUID } from 'node:crypto';
 
 export type { BrainDomain, BrainHead } from '../../../shared/vision/types.ts';
 export { BRAIN_DOMAINS, BRAIN_HEADS } from '../../../shared/vision/types.ts';
-import { BRAIN_HEADS } from '../../../shared/vision/types.ts';
+import { BRAIN_HEADS, SYNTHETIC_PART_NAME } from '../../../shared/vision/types.ts';
 import type { BrainDomain, BrainHead } from '../../../shared/vision/types.ts';
 
 /**
@@ -44,6 +44,13 @@ export interface TeachInput {
   bogiePosition?: string | null;
   proposedLabel?: string | null;
   taughtBy: string;
+  /** See migrations.ts: one id per physical part per sitting. */
+  captureGroup?: string | null;
+}
+
+/** Whether rows a drive taught with drawn parts are to be returned at all. */
+export interface ListOptions {
+  includeSynthetic?: boolean;
 }
 
 export interface StoredExample {
@@ -60,6 +67,9 @@ export interface StoredExample {
   wasCorrection: boolean;
   taughtBy: string;
   createdAt: string;
+  captureGroup: string | null;
+  /** part_name is the synthetic mark: a drawn part, not one of the shop's. */
+  synthetic: boolean;
 }
 
 /**
@@ -111,8 +121,9 @@ export class VisionBrainRepository {
       .prepare(
         `INSERT INTO vision_examples
            (id, domain, head, label, embedding, source_image_id, thumbnail,
-            part_name, bogie_position, proposed_label, was_correction, taught_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            part_name, bogie_position, proposed_label, was_correction, taught_by,
+            capture_group)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       )
       .run(
         id,
@@ -126,7 +137,8 @@ export class VisionBrainRepository {
         input.bogiePosition ?? null,
         input.proposedLabel ?? null,
         wasCorrection,
-        input.taughtBy
+        input.taughtBy,
+        input.captureGroup ?? null
       );
 
     return this.get(id)!;
@@ -146,14 +158,27 @@ export class VisionBrainRepository {
    * beyond what a shop will reach in years, and `limit` exists so that if it
    * ever does, the failure is a stated cap rather than a stalled bench.
    */
-  list(domain: BrainDomain, limit = 20000): StoredExample[] {
+  list(domain: BrainDomain, opts: ListOptions = {}, limit = 20000): StoredExample[] {
     const rows = this.db
       .prepare(
         `SELECT * FROM vision_examples WHERE domain = ?
+         ${opts.includeSynthetic ? '' : 'AND COALESCE(part_name, \'\') <> ?'}
          ORDER BY created_at ASC, rowid ASC LIMIT ?`
       )
-      .all(domain, limit) as any[];
+      .all(...(opts.includeSynthetic ? [domain, limit] : [domain, SYNTHETIC_PART_NAME, limit])) as any[];
     return rows.map((r) => this.map(r));
+  }
+
+  /**
+   * Something cheap that changes whenever the list above would: the table is
+   * append-only, so a count and the newest rowid together are a version.
+   * The server-side brain uses this to know when to reload.
+   */
+  version(domain: BrainDomain): string {
+    const r = this.db
+      .prepare('SELECT COUNT(*) AS n, COALESCE(MAX(rowid), 0) AS top FROM vision_examples WHERE domain = ?')
+      .get(domain) as any;
+    return `${r.n}:${r.top}`;
   }
 
   /**
@@ -162,13 +187,14 @@ export class VisionBrainRepository {
    * A head holding two thousand outer springs and eleven snubbers has not
    * really seen a snubber, and a total would hide that.
    */
-  counts(domain: BrainDomain): Record<string, Record<string, number>> {
+  counts(domain: BrainDomain, opts: ListOptions = {}): Record<string, Record<string, number>> {
     const rows = this.db
       .prepare(
         `SELECT head, label, COUNT(*) AS c FROM vision_examples
-         WHERE domain = ? GROUP BY head, label`
+         WHERE domain = ? ${opts.includeSynthetic ? '' : 'AND COALESCE(part_name, \'\') <> ?'}
+         GROUP BY head, label`
       )
-      .all(domain) as any[];
+      .all(...(opts.includeSynthetic ? [domain] : [domain, SYNTHETIC_PART_NAME])) as any[];
     const out: Record<string, Record<string, number>> = {};
     for (const r of rows) {
       out[r.head] = out[r.head] || {};
@@ -234,7 +260,9 @@ export class VisionBrainRepository {
       proposedLabel: r.proposed_label ?? null,
       wasCorrection: Number(r.was_correction) === 1,
       taughtBy: r.taught_by,
-      createdAt: r.created_at
+      createdAt: r.created_at,
+      captureGroup: r.capture_group ?? null,
+      synthetic: r.part_name === SYNTHETIC_PART_NAME
     };
   }
 }
