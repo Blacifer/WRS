@@ -58,7 +58,9 @@ export const PILOT_SCOPE = {
     'audit',
     // The shadow run is the pilot: the supervisor designated for the week
     // writes the discrepancy log here, so it has to be reachable from the floor.
-    'shadow'
+    'shadow',
+    // A supervisor's questions about the shop's own records, answered by arithmetic.
+    'ask'
   ] as const
 };
 

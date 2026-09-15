@@ -494,6 +494,17 @@ export class ApiClient {
     return this.request(`/wagons/${encodeURIComponent(wagonNumber)}/target-release-date`, { method: 'PUT', body: JSON.stringify({ targetReleaseDate, reason }) });
   }
 
+  // -- ask the records ---------------------------------------------------------
+  public async askRecords(body: Record<string, unknown>): Promise<{ success: boolean; data: any }> {
+    return this.request('/ask', { method: 'POST', body: JSON.stringify(body) });
+  }
+  public async getAskCatalogue(lang: 'en' | 'hi' = 'en'): Promise<{ success: boolean; data: Array<{ id: string; describe: string; params: string[] }> }> {
+    return this.request(`/ask/catalogue?lang=${lang}`);
+  }
+  public async getAskPosture(): Promise<{ success: boolean; data: { configured: boolean; local: boolean; baseUrl: string | null } }> {
+    return this.request('/ask/posture');
+  }
+
   // -- the wagon passport ------------------------------------------------------
   public async exportWagonPassport(wagonNumber: string): Promise<string> {
     return this.request<string>(`/wagons/${encodeURIComponent(wagonNumber)}/passport`);

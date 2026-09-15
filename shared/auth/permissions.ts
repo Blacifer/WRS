@@ -55,6 +55,7 @@ export type Capability =
   | 'certificate.export'
   | 'shadow.view'            // the shadow-mode log and its verdict
   | 'shadow.record'          // write a discrepancy or a day's summary — the designated reviewer
+  | 'records.ask'            // ask the shop's own records a question, with citations
   // System administration
   | 'users.manage'
   | 'system.configure';
@@ -89,7 +90,8 @@ const SUPERVISOR: Capability[] = [
   'audit.read',
   'certificate.export',
   'shadow.view',
-  'shadow.record'
+  'shadow.record',
+  'records.ask'
   /*
    * No analytics.read. The DRM dashboard and the spring analytics are the
    * divisional view, and that separation predates this matrix — a supervisor
@@ -112,7 +114,8 @@ const DRM: Capability[] = [
   'analytics.read',
   'learning.view',
   'certificate.export',
-  'shadow.view'
+  'shadow.view',
+  'records.ask'
 ];
 
 /*
@@ -134,7 +137,8 @@ const ADMIN: Capability[] = [
   'learning.approve',
   'learning.view',
   'shadow.view',
-  'shadow.record'
+  'shadow.record',
+  'records.ask'
 ];
 
 export const ROLE_CAPABILITIES: Record<Role, readonly Capability[]> = {

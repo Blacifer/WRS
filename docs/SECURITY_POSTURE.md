@@ -183,6 +183,19 @@ handover draft is discarded if it contains any number not in the facts it was
 given. Unset the key and the application is fully self-contained; the health
 endpoint reports which posture it is in.
 
+A fourth kind since 15 September 2026: a question typed on the *Ask the
+Records* screen, **only when the offline matcher could not tell which
+catalogue question it was**, and then only the sentence and the list of
+questions — the model picks a question id; it never sees a record and never
+writes a number. The answer is fixed SQL over the shop's own tables, shown
+with the rows and the query.
+
+**The model can be on the shop PC.** The client speaks the OpenAI request
+shape, so `ZAPHEIT_BASE_URL=http://localhost:11434/v1` with a local runtime
+(Ollama and a small model) and any non-empty `ZAPHEIT_API_KEY` keeps every
+sentence on the machine. `/api/ask/posture` and the screen say which posture
+is in force; the health panel's Zapheit row calls whatever is configured.
+
 For a government deployment, treat the key as a decision: a CERT-In auditor
 will ask where the text goes, and "an inspector's spoken sentence goes to a
 commercial API" is an answer to have ready rather than discover.

@@ -1566,6 +1566,7 @@ export type NavigationTab =
   | 'users'
   | 'learning'
   | 'shadow'
+  | 'ask'
   | 'audit'
   | 'manual'
   | 'checklist_config';
@@ -1623,6 +1624,8 @@ const TAB_CAPABILITY: Record<string, Capability> = {
   learning: 'learning.view',
   // The shadow run: the app beside the register, and whether to trust it.
   shadow: 'shadow.view',
+  // The shop's own records, questioned — with citations, never a model's number.
+  ask: 'records.ask',
   // The audit-trail export dialog, which is not a page — see App.tsx.
   admin: 'certificate.export',
   // Administration

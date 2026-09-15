@@ -50,7 +50,10 @@ The **WRS Raipur Quality Control Platform** is an enterprise-grade web applicati
 9. **The shadow run, in the app**
    - For the first weeks the app runs beside the register, and the register governs. The *Shadow Run* screen is the discrepancy log and the shift summary from `docs/SHADOW_MODE_FORMS.md`, with the app's half of every figure filled in from its own records and the supervisor writing only what the app cannot know — what the register said, who was right, why. The end-of-week reading is computed, with the one non-negotiable first: a case where the app passed what the register condemned blocks going live on its own. Append-only, exportable, and the same code as `scripts/shadow-report.mjs`.
 
-10. **Built for the shop floor**
+10. **Ask the records, with citations**
+   - "Which wagon type condemns the most snubbers this quarter, out of how many?" — answered from a closed catalogue of fifteen questions, each fixed SQL over the shop's own tables, every figure with its `n` and the rows and query it came from. A bilingual matcher reads the sentence offline; a model, if one is configured (and it can be one on the shop PC), only gets a turn when the matcher cannot tell, and only to pick the question — it never sees a record and never writes a number. When nothing can tell, the list is offered rather than a guess.
+
+11. **Built for the shop floor**
    - Offline-first PWA with an IndexedDB queue; work continues without a network and syncs without duplicating.
    - Bilingual throughout (English / Hindi).
    - Hands-free voice checklist entry, and acoustic bearing/leak diagnostics using real Web Audio FFT.

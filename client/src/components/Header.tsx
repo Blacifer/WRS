@@ -211,6 +211,7 @@ export const Header: React.FC<HeaderProps> = ({
     { tab: 'manual', testId: 'nav-manual-sup', label: dict.nav.manual || 'Ask the Manual', icon: <BookIcon size={18} /> },
     { tab: 'learning', testId: 'nav-learning', label: dict.nav.learning || 'System Learning', icon: <SparklesIcon size={18} /> },
     { tab: 'shadow', testId: 'nav-shadow', label: isHi ? 'छाया संचालन' : 'Shadow Run', icon: <ClipboardIcon size={18} /> },
+    { tab: 'ask', testId: 'nav-ask', label: isHi ? 'रिकॉर्ड से पूछें' : 'Ask the Records', icon: <BookIcon size={18} /> },
     { tab: 'audit', testId: 'nav-audit', label: dict.nav.audit || 'Audit Chain', icon: <LinkIcon size={18} /> },
     { tab: 'users', testId: 'nav-users', label: dict.nav.users || 'User Accounts', icon: <UserIcon size={18} /> },
     { tab: 'checklist_config', testId: 'nav-checklist-config', label: isHi ? 'जाँच सूची' : 'Checklist Rules', icon: <ClipboardIcon size={18} /> }

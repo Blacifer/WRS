@@ -58,6 +58,9 @@ const ChecklistConfigPage = lazy(() =>
 const LearningDashboardPage = lazy(() =>
   import('./pages/LearningDashboardPage.tsx').then((m) => ({ default: m.LearningDashboardPage }))
 );
+const AskRecordsPage = lazy(() =>
+  import('./pages/AskRecordsPage.tsx').then((m) => ({ default: m.AskRecordsPage }))
+);
 const ShadowModePage = lazy(() =>
   import('./pages/ShadowModePage.tsx').then((m) => ({ default: m.ShadowModePage }))
 );
@@ -433,6 +436,7 @@ export const App: React.FC = () => {
         )}
         {activeTab === 'learning' && !isInspector && <LearningDashboardPage lang={currentLang} user={user} />}
         {activeTab === 'shadow' && !isInspector && <ShadowModePage lang={currentLang} user={user} />}
+        {activeTab === 'ask' && !isInspector && <AskRecordsPage lang={currentLang} />}
         {activeTab === 'manual' && <ManualSearchPage lang={currentLang} />}
         {activeTab === 'audit' && !isInspector && <AuditVerificationPage lang={currentLang} />}
         {activeTab === 'inspection' && <InspectionPage lang={currentLang} user={user} />}
