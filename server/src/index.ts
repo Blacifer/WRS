@@ -4,11 +4,33 @@
  */
 
 import fs from 'node:fs';
+import path from 'node:path';
 import { createApp } from './app.ts';
 import { config } from './config/index.ts';
 import { getDatabase, closeDatabase } from './db/connection.ts';
+import { STARTS_LOG } from './routes/health.ts';
 
 const app = createApp();
+
+/*
+ * Every start, on the record.
+ *
+ * This server exits on purpose when something goes badly wrong, and
+ * START.cmd brings it back five seconds later — so a fault that recurs looks,
+ * from a tablet, like nothing at all: the app answers, mostly. One line per
+ * start beside the database lets the readiness panel say "restarted eleven
+ * times since yesterday", which is the sentence that gets somebody to open
+ * the log. Appended, never rotated: a line a day is nothing, and eleven in a
+ * night is the point.
+ */
+try {
+  fs.appendFileSync(
+    path.join(path.dirname(config.dbPath), STARTS_LOG),
+    `${new Date().toISOString()} pid=${process.pid} node=${process.version} tls=${!!(process.env.TLS_KEY_PATH && process.env.TLS_CERT_PATH)}\n`
+  );
+} catch {
+  // A start that cannot be written down is still a start.
+}
 
 // Serve over TLS when a certificate is provided. Camera and voice input are
 // both gated behind a secure context, so a phone reaching this over plain HTTP

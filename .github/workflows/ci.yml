@@ -314,6 +314,9 @@ jobs:
       - name: The wagon-number reader works with every off-origin request refused
         run: DRILL_URL=http://localhost:3000 node --experimental-strip-types scripts/ocr-offline-drill.mjs
 
+      - name: A tablet on the LAN gets the camera over https
+        run: node scripts/lan-cert-drill.mjs
+
   # ---------------------------------------------------------------------------
   # Proves the thing that actually ships still builds. `npm run build` runs the
   # type check first by design, so this also guards the root build wiring.

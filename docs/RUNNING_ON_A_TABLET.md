@@ -97,9 +97,11 @@ the URL reaches the app, and the only thing between them and the data is the
 login. That is acceptable for a demo on a shop floor for an afternoon. It is
 not acceptable as the way the pilot runs.
 
-For anything longer, use a named tunnel tied to a Cloudflare account with
-Access in front of it, or put the app behind a real certificate on a machine
-the workshop controls. `deploy/README.md` covers the hosting options.
+For anything longer, run the bundle on the workshop PC: `START.cmd` makes a
+certificate for the PC's LAN address and serves `https`, and each tablet
+installs `server\certs\lan-cert.crt` once (`TABLET_TRUST.md`). No tunnel, no
+internet, and the camera works from every tablet. `deploy/README.md` covers
+hosting beyond the LAN.
 
 
 ## Keeping it up

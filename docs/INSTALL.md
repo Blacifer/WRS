@@ -26,8 +26,12 @@ Node installer, copy the folder, double-click `START.cmd`.
 
 No Git, no npm, no internet on the shop PC. `START.cmd` checks that Node is
 present and new enough, creates the settings file with a generated secret on
-first run, and starts the server. Sections 5–8 below still apply afterwards —
-the manual, the gauges, the scheduled backup, and checking your work.
+first run, makes a certificate for this PC's address (so tablets get the
+camera — see `TABLET_TRUST.md`), starts the server over `https`, and starts it
+again within five seconds if it ever stops, writing everything to
+`logs\wrs-<date>.log`. Sections 5–9 below still apply afterwards — the
+manual, the gauges, the scheduled backup, checking your work, and starting at
+boot.
 
 ## 1. What the machine needs
 
@@ -298,12 +302,16 @@ row hashes real passwords. Nothing is read back from a setting.
 A fresh installation that has done steps 1–4 and nothing else reports:
 
 ```
-5 passed, 3 warned, 1 failed
+6 passed, 3 warned, 1 failed
   FAIL  A recent encrypted backup exists      → step 7
   WARN  A calibrated gauge for every position → step 6
   WARN  The manual is indexed and searchable  → step 5
   WARN  Zapheit answers from this machine     → optional; see below
 ```
+
+"The server has not been restarting" counts how many times it came up in the
+last 24 hours. One is a boot. More than three means something is stopping it
+and `START.cmd` is bringing it back — read `logs\wrs-<date>.log` for why.
 
 Work down that list until it is green. A Zapheit warning can also be a passing
 network blip — press **Check now** again before investigating.
@@ -312,18 +320,29 @@ network blip — press **Check now** again before investigating.
 
 The server must come back after a power cut without anybody logging in.
 
-**Windows** — run it as a service. Task Scheduler with "At startup", running as
-SYSTEM, restarting on failure, is enough:
+**Windows, the bundle** — `START.cmd` already restarts the server five seconds
+after any exit and writes to `logs\`. What it cannot do is start itself after
+a reboot. Task Scheduler does that. In an *administrator* Command Prompt, with
+the folder at `C:\wrs-raipur`:
 
 ```
-schtasks /Create /TN "WRS Raipur" /SC ONSTART /RU SYSTEM /TR "npm start" /RL HIGHEST
+schtasks /Create /TN "WRS Raipur" /SC ONSTART /RU SYSTEM /RL HIGHEST ^
+  /TR "cmd /c C:\wrs-raipur\START.cmd"
 ```
+
+Then `schtasks /Run /TN "WRS Raipur"` to start it now without rebooting, and
+close the window you had it running in. From then on it starts with the PC.
+Three things the earlier version of this section got wrong, kept here so they
+are not repeated: `npm start` does not exist in the bundle; SYSTEM's PATH may
+not include Node, which `START.cmd` now allows for; and a scheduled task has
+no console, so without the log file a crash would leave no trace.
 
 **Linux** — `systemd` with `Restart=always`. **macOS** — `launchd`.
 
-> This is the one section not exercised end to end here, because it depends on
-> the machine you install on. Verify it the only way that means anything: pull
-> the power, and check the app is answering when the PC comes back.
+> Verify it the only way that means anything: pull the power, and check the
+> app is answering from a tablet when the PC comes back. Then open the
+> dashboard's readiness panel — "The server has not been restarting" should
+> say it started once.
 
 A minimal systemd unit:
 

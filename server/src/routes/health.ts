@@ -18,6 +18,9 @@ import { verifyAuditChain } from '../db/auditLog.ts';
 import { isZapheitConfigured, askZapheit } from '../ai/zapheit.ts';
 import { EXPECTED_MANUAL_SOURCES, indexedSources } from '../manual/manualIndex.ts';
 
+/** One line per server start, beside the database. Written by index.ts, read by the readiness panel. */
+export const STARTS_LOG = 'starts.log';
+
 /** The password published in the README. Login refuses it in production. */
 const DEMO_PASSWORD = 'password123';
 
@@ -376,6 +379,39 @@ healthRouter.get(
             'Point the backup at another drive, a network share, or a USB disk kept elsewhere — ' +
             `set WRS_BACKUP_DIR in .env (currently ${backupDir}) and in the scheduled task.`
           : `${backupCount} backup(s) retained on a separate disk, newest ${Math.floor(backupAgeHours)} hour(s) ago.`
+    });
+
+    /*
+     * How often the server has come up lately — which is how often it went
+     * down. index.ts appends a line per start; START.cmd restarts it within
+     * five seconds of an exit, so a crash that recurs is invisible from a
+     * tablet and visible only here. One start in a day is a boot. Two or
+     * three is a config change, or a power cut. More is a fault somebody
+     * needs to read the log for.
+     */
+    const starts24h = (() => {
+      try {
+        const cutoff = Date.now() - 24 * 3_600_000;
+        return fs.readFileSync(path.join(path.dirname(config.dbPath), STARTS_LOG), 'utf8')
+          .split('\n')
+          .filter((line) => {
+            const t = Date.parse(line.slice(0, 24));
+            return Number.isFinite(t) && t >= cutoff;
+          }).length;
+      } catch { return null; }
+    })();
+    checks.push({
+      id: 'restarts',
+      label: 'The server has not been restarting',
+      state: starts24h === null ? 'WARN' : starts24h <= 3 ? 'PASS' : 'WARN',
+      detail: starts24h === null
+        ? `No record of starts beside the database (${STARTS_LOG}). The server may not be able to write there.`
+        : starts24h <= 1
+          ? 'Started once in the last 24 hours.'
+          : starts24h <= 3
+            ? `Started ${starts24h} times in the last 24 hours — a reboot or a settings change, most likely.`
+            : `Started ${starts24h} times in the last 24 hours. Something is stopping it and START.cmd is bringing it back. ` +
+              'Read logs\\wrs-<date>.log beside START.cmd for the reason each time it stopped; the tablets will not have noticed.'
     });
 
     const chain = verifyAuditChain(db);

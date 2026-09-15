@@ -87,6 +87,10 @@ step "Concurrent lifecycle drill" node --experimental-strip-types scripts/concur
 # appear at Raipur rather than here.
 if node -e "import('playwright')" >/dev/null 2>&1; then
   step "Vision model proof" node scripts/vision-brain-proof.mjs
+  # A tablet on the LAN gets the camera only over https. This makes the
+  # certificate the way START.cmd does, serves with it, and checks from a
+  # real browser at the LAN address. Needs no server running.
+  step "LAN certificate drill"  node scripts/lan-cert-drill.mjs
 else
   skip "Vision model proof" "playwright not installed"
 fi

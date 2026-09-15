@@ -185,6 +185,12 @@ else
   WRS_BACKUP_KEY_FILE="$WORK/wrong.key" node server/scripts/backup-db.mjs --restore "$NODE_ENC" "$WORK/node-wrongkey.db" >/dev/null 2>&1
   check "the wrong key is refused" "1" "$?"
   check "  and no file is written" "absent" "$([ -f "$WORK/node-wrongkey.db" ] && echo present || echo absent)"
+  # Found by the cross-machine restore drill: this restore copied straight
+  # over a live database. The shell version had always refused.
+  BEFORE_SUM="$(shasum "$WORK/node-restored.db" | cut -c1-16)"
+  WRS_BACKUP_KEY_FILE="$WORK/backup.key" node server/scripts/backup-db.mjs --restore "$NODE_ENC" "$WORK/node-restored.db" >/dev/null 2>&1
+  check "a restore over an existing database is refused" "1" "$?"
+  check "  and the existing database is untouched" "$BEFORE_SUM" "$(shasum "$WORK/node-restored.db" | cut -c1-16)"
 fi
 
 node server/scripts/backup-db.mjs "$DB" "$WORK/node-nokey" >/dev/null 2>&1

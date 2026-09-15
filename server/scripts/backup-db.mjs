@@ -224,6 +224,19 @@ function restore(encPath, targetDb) {
     log('WARNING: no .hmac file beside this backup, so tampering cannot be ruled out.');
   }
 
+  /*
+   * Never over a live database. The shell restore has always refused this;
+   * this one copied straight over whatever was there, and the cross-machine
+   * restore drill (docs/RESTORE_DRILL.md) is what found it — the fresh
+   * database a first start had made was silently replaced. Move the old
+   * file aside yourself, deliberately, and say so in the drill record.
+   */
+  for (const suffix of ['', '-wal', '-shm']) {
+    if (fs.existsSync(targetDb + suffix)) {
+      fail(`${targetDb + suffix} already exists. A restore never writes over a database that is there; move it aside first, on purpose.`);
+    }
+  }
+
   const work = fs.mkdtempSync(path.join(os.tmpdir(), 'wrs-restore-'));
   const plain = path.join(work, 'restored.db');
   try {

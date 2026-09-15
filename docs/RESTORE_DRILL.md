@@ -71,12 +71,16 @@ were intact.
 
 ## What this drill has not proved
 
-It ran on the same machine, from a backup taken minutes earlier. Before the
-pilot carries real inspections, run it once **onto a different machine**,
-from a backup at least a day old, with the key fetched from wherever it will
-actually live. That is the version that tests the thing most likely to fail:
-not the script, but whether the key is somewhere a person can reach at the
-moment they need it.
+The first two runs were on the same machine, from a backup taken minutes
+earlier. The 15 September run below restored onto a **separate installation
+of the shipped bundle**, with the key fetched from a directory neither
+machine's backup volume held. What is still not proved: a backup at least a
+day old, and two physically separate PCs — the "second machine" was a copy
+of the USB bundle in its own directory, run exactly as `START.cmd` runs it,
+but on the developer's laptop. Before the pilot carries real inspections,
+run the 15 September procedure once more with the second PC being the second
+PC. The script is now proven; the remaining question is whether the key is
+somewhere a person can reach at the moment they need it.
 
 
 ## The 6 September 2026 run
@@ -124,6 +128,70 @@ appended at the same moment, both are present, nothing was removed.
 
 This is what a drill is for. Nothing in the test suite would have found it,
 because every suite writes from a single process.
+
+## The 15 September 2026 run — onto the shipped bundle, as a second machine
+
+**Machine one** was the developer database (`server/data/`, 33 wagons, 494
+sorting records, 2,897 audit entries) with photographs beside it. **Machine
+two** was `dist-shop/wrs-raipur/` — the folder the USB stick carries — copied
+to a directory with no access to the repository, configured and started the
+way `START.cmd` does: `.env` from the template with a generated secret, a
+certificate made by `server/scripts/make-lan-cert.mjs`, the server over
+`https`, output to `logs/wrs-2026-09-15.log`. The key lived in a third
+directory, on neither the database's nor the backup's path.
+
+What was done, and what each step showed:
+
+```
+MACHINE ONE  backup-db.mjs <db> <backup_dir> <photo_dir>
+  Verified: encrypted, decrypts, and the result is a valid database (6.9M plaintext)
+  Photographs: 1 carried this run, 0 already there            <- a photograph taken that day
+
+MACHINE TWO  backup-db.mjs --restore <file.db.enc> server/data/wrs_inspections.db
+  ERROR: server/data/wrs_inspections.db already exists. A restore never writes
+  over a database that is there; move it aside first, on purpose.
+                                                              <- see the fault below
+  (moved aside)
+  HMAC verified.
+  Restored to server/data/wrs_inspections.db
+             backup-db.mjs --restore-photos <backup_dir>/photos server/data/photos
+  Photographs: 1 restored, 45 already present and identical, 0 different, 0 refused.
+
+  sign in over https as admin.shop           an account created on machine one that day: ok, ADMIN
+  sign in as admin1 (demo)                   DEMO_CREDENTIAL_REFUSED — production, correctly
+  GET /api/photos/photo_5fecb095-…            imageVerified: true, imageSource: FILE,
+                                              sha256 3abeb9d02c32fb4c… — the same hash machine one recorded
+  GET /api/audit/verify                       verified: false, entries 2897, first break rowid 153,
+                                              CONCURRENT_APPEND, 2026-09-05
+  readiness                                   "The server has not been restarting": WARN,
+                                              started 5 times in the last 24 hours
+```
+
+**The chain result is a pass, read carefully.** Machine one's chain, checked
+directly before the backup, breaks at the same rowid 153 for the same reason:
+a fork on 5 September, from before concurrent appends were serialised (commit
+`aebf996`), which the verifier names and says "nothing has been removed". The
+restore carried the record across in exactly the state it left — a restore
+that came back *cleaner* would be the alarming one. The shop's own database
+will have no such fork; it starts after that fix.
+
+**The restarts figure is a pass too.** The server was started five times on
+machine two during the drill; the panel said five. That check exists so that
+a crash `START.cmd` keeps recovering from is visible somewhere.
+
+**The fault this run found.** `backup-db.mjs --restore` — the one Windows
+uses — copied straight over the database that machine two's first start had
+made. The shell restore had always refused this, and this document said the
+restore "refuses to write over an existing file" as if both did. It refuses
+now, `scripts/backup-drill.sh` checks that it does, and the bundle carries
+the fixed script from this commit on. Anyone restoring with an older bundle
+should move the live database aside themselves before running it.
+
+**Also noted.** Forty-five orphan photograph files from test runs made before
+the temporary-directory guard existed were carried in the first backup of the
+day and restored alongside. Harmless — no row points at them — and cleaned
+from machine one afterwards. A photograph directory is only ever what the
+rows say it is.
 
 ## Photographs
 
