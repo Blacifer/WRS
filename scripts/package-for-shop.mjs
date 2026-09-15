@@ -85,6 +85,16 @@ for (const m of ['coco-ssd', 'mobilenet']) {
 console.log('   both present');
 
 // ---------------------------------------------------------------------------
+step('Check the OCR engine and the interface font are present — same reason');
+for (const f of ['tesseract/worker.min.js', 'tesseract/tesseract-core-lstm.wasm.js', 'tesseract/eng.traineddata.gz', 'fonts/InterVariable.woff2']) {
+  if (!fs.existsSync(path.join(ROOT, 'client', 'public', f))) {
+    console.error(`   client/public/${f} is missing. Run: node scripts/vendor-ocr.mjs`);
+    process.exit(1);
+  }
+}
+console.log('   present');
+
+// ---------------------------------------------------------------------------
 step('Build the client');
 run('npm run build --prefix client');
 

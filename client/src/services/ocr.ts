@@ -5,6 +5,7 @@
 
 
 import type { CaliperOCRResult } from '../../../shared/types.ts';
+import { OCR_WORKER_OPTIONS } from './ocrAssets.ts';
 
 export interface SampleFixture {
   id: string;
@@ -181,7 +182,8 @@ export async function processCaliperImage(input: string, range: MeasurementRange
      * through, and never otherwise.
      */
     const { default: Tesseract } = await import('tesseract.js');
-    const worker = await Tesseract.createWorker('eng');
+    // From this origin, never a CDN. See ocrAssets.ts.
+    const worker = await Tesseract.createWorker('eng', 1, OCR_WORKER_OPTIONS);
     await worker.setParameters({
       tessedit_char_whitelist: '0123456789.',
     });

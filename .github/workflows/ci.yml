@@ -308,6 +308,12 @@ jobs:
       - name: A shift survives going offline and closing the tab
         run: DRILL_URL=http://localhost:4173 node scripts/offline-drill.mjs
 
+      # Against the Node server, not the preview: that is the topology the
+      # shop runs, and the one whose static handler serves the .gz language
+      # data as raw bytes.
+      - name: The wagon-number reader works with every off-origin request refused
+        run: DRILL_URL=http://localhost:3000 node --experimental-strip-types scripts/ocr-offline-drill.mjs
+
   # ---------------------------------------------------------------------------
   # Proves the thing that actually ships still builds. `npm run build` runs the
   # type check first by design, so this also guards the root build wiring.

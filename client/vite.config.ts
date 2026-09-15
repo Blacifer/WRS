@@ -49,7 +49,7 @@ export default defineConfig({
          * glob above, having neither a listed extension nor any extension at
          * all — this keeps the code consistent with the weights it needs.
          */
-        globIgnores: ['**/tensorflow-*.js'],
+        globIgnores: ['**/tensorflow-*.js', '**/tesseract/**'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         runtimeCaching: [
           /*
@@ -87,34 +87,29 @@ export default defineConfig({
               rangeRequests: true
             }
           },
+          /*
+           * The OCR engine, on the same footing as the weights. Its three
+           * WASM cores end in .js and would otherwise be precached — 11 MB
+           * into every install, for a reader most visitors never open. Kept
+           * out of the precache and cached on first use instead. See
+           * scripts/vendor-ocr.mjs for why the files are here at all.
+           */
           {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+            urlPattern: /\/tesseract\/.*/i,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'google-fonts-cache',
+              cacheName: 'ocr-engine-cache',
               expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // <== 365 days
+                maxEntries: 8,
+                maxAgeSeconds: 60 * 60 * 24 * 365
               },
               cacheableResponse: {
                 statuses: [0, 200]
               }
             }
           },
-          {
-            urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'gstatic-fonts-cache',
-              expiration: {
-                maxEntries: 10,
-                maxAgeSeconds: 60 * 60 * 24 * 365 // <== 365 days
-              },
-              cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          }
+          // The interface font is served from this origin and precached with
+          // the rest of the bundle; nothing is fetched from Google Fonts.
         ]
       }
     })
@@ -207,6 +202,9 @@ export default defineConfig({
          */
         manualChunks(id: string) {
           if (id.includes('@tensorflow')) return 'tensorflow';
+          // Named so scripts/ocr-offline-drill.mjs can load the app's own
+          // copy of the engine and prove it reads with the network cut.
+          if (id.includes('node_modules/tesseract.js')) return 'tesseract';
           if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) return 'charts';
           return undefined;
         }

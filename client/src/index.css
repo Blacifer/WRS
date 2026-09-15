@@ -5,9 +5,22 @@
  * font-bold, font-extrabold and font-black. Every one of those was being
  * synthesised by the browser from the 600 weight — smeared, uneven, and
  * noticeably worse on the shop tablets than on the machine it was designed on.
- * 400..800 is the real range, delivered as one variable file.
+ * 100..900 is the real range, delivered as one variable file.
+ *
+ * Served from this origin, not Google Fonts. The @import that used to be
+ * here was a render-blocking request to the internet on every cold load —
+ * on a shop LAN with no route out, that is a blank page until the request
+ * gives up, and it was the one thing left in the app that still asked for
+ * the internet. The file is Inter's own release (SIL Open Font License,
+ * client/public/fonts/LICENSE-Inter.txt); the service worker precaches it.
  */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap');
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/InterVariable.woff2') format('woff2');
+}
 
 @tailwind base;
 @tailwind components;

@@ -27,13 +27,15 @@
     "test:all": "bash tests/run_e2e.sh --all",
     "generate-fixtures": "node tests/fixtures/generate_fixtures.js",
     "vendor:models": "node scripts/vendor-vision-models.mjs",
+    "vendor:ocr": "node scripts/vendor-ocr.mjs",
     "proof:vision": "node scripts/vision-brain-proof.mjs",
     "drive:camera": "node scripts/teach-camera-drive.mjs",
     "drive:parts": "node scripts/parts-ledger-drive.mjs",
     "drive:part-camera": "node scripts/part-camera-drive.mjs",
     "package:shop": "node scripts/package-for-shop.mjs",
     "drive:auto-sort": "node scripts/auto-sort-drive.mjs",
-    "drive:auto-judge": "node scripts/auto-judge-drive.mjs"
+    "drive:auto-judge": "node scripts/auto-judge-drive.mjs",
+    "drill:ocr-offline": "node --experimental-strip-types scripts/ocr-offline-drill.mjs"
   },
   "engines": {
     "node": ">=22"
