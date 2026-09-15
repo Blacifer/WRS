@@ -183,19 +183,20 @@ describe('Deployment readiness', () => {
 
   it('TC-RDY-05c: storage is reported with what a backup of it would cost', async () => {
     /*
-     * Photographs live inside the database file, so the evidence the shop is
-     * asked to collect is also what makes the weekly backup impossible.
-     * Measured at 11.1 MB/s: 20 GB is a two-hour backup on shop hardware and
-     * 80 GB is eight. Nothing warned about this before — SystemStorage
-     * displayed the number and no check acted on it.
+     * Photographs used to live inside the database file, so the evidence the
+     * shop is asked to collect was also what made the weekly backup
+     * impossible. Measured at 11.1 MB/s: 20 GB is a two-hour backup on shop
+     * hardware and 80 GB is eight. New photographs are files beside the
+     * database now, and the check must say both what the database costs to
+     * back up and where the photographs are.
      */
     const token = await signIn(app, 'admin1');
     const res = await call(app, 'GET', '/api/system/readiness', undefined, { authorization: `Bearer ${token}` });
     const storage = findCheck(res.body, 'storage');
 
     assert.ok(storage, 'storage must be one of the checks');
-    assert.match(storage.detail, /photographs/, 'it must say how much of the file is photographs');
-    assert.match(storage.detail, /minute/, 'and what a backup of it would cost');
+    assert.match(storage.detail, /photograph file\(s\)/, 'it must say where the photographs are and how many');
+    assert.match(storage.detail, /minute/, 'and what a backup of the database would cost');
     // A fresh in-memory installation is small, so this is the green case.
     assert.strictEqual(storage.state, 'PASS');
   });

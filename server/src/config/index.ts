@@ -53,6 +53,8 @@ export interface AppConfig {
    */
   backupDir: string;
   corsOrigin: string;
+  /** Where photographs are written as files. Default: photos/ beside the database. */
+  photoDir: string;
   otpDelivery: 'INLINE' | 'SMS';
   nodeEnv: string;
 
@@ -165,6 +167,9 @@ export const config: AppConfig = {
     process.env.WRS_BACKUP_DIR ||
     path.resolve(path.dirname(process.env.DB_PATH || path.resolve(__dirname, '..', '..', 'data', 'wrs_inspections.db')), 'backups'),
   corsOrigin: process.env.CORS_ORIGIN || '*',
+  photoDir:
+    process.env.WRS_PHOTO_DIR ||
+    path.resolve(path.dirname(process.env.DB_PATH || path.resolve(__dirname, '..', '..', 'data', 'wrs_inspections.db')), 'photos'),
   // How a supervisor receives their one-time code.
   //
   // 'INLINE' returns the code in the API response to whoever asked for it.

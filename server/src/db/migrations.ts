@@ -1528,6 +1528,23 @@ export function runMigrations(db: DatabaseSync): void {
   );
 
   /*
+   * Photographs as files, with their hash on the row.
+   *
+   * See server/src/db/photoStore.ts. New photographs are written beside the
+   * database and image_data holds `file:<path>`; the SHA-256 of the bytes
+   * lives here so a reader can tell an altered file from the evidence. Rows
+   * written before this keep their inline base64 and a NULL hash — they are
+   * read as they always were. spring_images is append-only, so its rows
+   * could not be rewritten in any case.
+   */
+  for (const table of ['wagon_photos', 'spring_images']) {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all() as any[];
+    if (cols.length > 0 && !cols.some((c) => c.name === 'sha256')) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN sha256 TEXT DEFAULT NULL;`);
+    }
+  }
+
+  /*
    * What the offline queue has already delivered.
    *
    * A tablet that loses the wifi between the server committing a batch and

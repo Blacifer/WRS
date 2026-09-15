@@ -17,6 +17,7 @@ import { runMigrations } from './db/migrations.ts';
 import { seedUsers } from './db/seed.ts';
 
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -31,6 +32,18 @@ export function createApp(dbPath?: string): ExpressApp {
   const db = getDatabase(dbPath);
   runMigrations(db);
   seedUsers(db);
+
+  /*
+   * An in-memory database is a throwaway, and its photographs must be too.
+   * Photographs are files beside the database (db/photoStore.ts); a test
+   * or drill that opens ':memory:' would otherwise write its evidence into
+   * the real photo directory of whatever machine it ran on. Each such app
+   * gets its own temporary directory instead, and only once, so tests that
+   * read config.photoDir see the same one for the life of the process.
+   */
+  if (dbPath === ':memory:' && !process.env.WRS_PHOTO_DIR && !config.photoDir.includes('wrs-photos-')) {
+    config.photoDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wrs-photos-'));
+  }
 
   // Core Middleware
   // Opened first, so every later handler — and every audit write beneath it —

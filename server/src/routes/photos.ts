@@ -12,6 +12,7 @@ import { getDatabase } from '../db/connection.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
 import { logAuditEvent } from '../db/auditLog.ts';
 import { MAX_STORED_PHOTO_BYTES } from '../../../shared/media/imageLimits.ts';
+import { photoStore } from '../db/photoStore.ts';
 import {
   ASSEMBLY_EVIDENCE_TAG,
   ASSEMBLY_NEGATIVES_WARNING,
@@ -168,7 +169,11 @@ photosRouter.post('/upload', authMiddleware, async (req: Request, res: Response)
         category: effectiveCategory,
         partName: partName || 'Component Inspection',
         checklistItemId: checklistItemId || null,
-        evidenceStage: evidenceStage || null
+        evidenceStage: evidenceStage || null,
+        // The photograph's own hash, inside the chain. The bytes live on
+        // disk now; this is what makes them evidence rather than a file.
+        sha256: photo.sha256 ?? null,
+        fileSize: photo.fileSize ?? null
       }
     });
 
@@ -225,7 +230,7 @@ photosRouter.get(
 
       const rows = db.prepare(`
         SELECT id, wagon_number, category, part_name, tags_json, created_at,
-               inspector_name${includeImages ? ', image_data' : ''}
+               inspector_name${includeImages ? ', image_data, sha256, mime_type' : ''}
         FROM wagon_photos
         WHERE tags_json LIKE '%DEFECT_EVIDENCE%'
         ORDER BY created_at DESC, rowid DESC
@@ -250,7 +255,7 @@ photosRouter.get(
           tags,
           capturedAt: r.created_at,
           capturedBy: r.inspector_name,
-          ...(includeImages ? { imageBase64: r.image_data } : {})
+          ...(includeImages ? { imageBase64: photoStore().resolve(r.image_data, r.sha256, r.mime_type).dataUrl } : {})
         };
       });
 
@@ -313,7 +318,7 @@ photosRouter.get(
 
       const rows = db.prepare(`
         SELECT id, wagon_number, category, part_name, tags_json, created_at,
-               inspector_name${includeImages ? ', image_data' : ''}
+               inspector_name${includeImages ? ', image_data, sha256, mime_type' : ''}
         FROM wagon_photos
         WHERE tags_json LIKE '%${ASSEMBLY_EVIDENCE_TAG}%'
         ORDER BY created_at DESC, rowid DESC
@@ -352,7 +357,7 @@ photosRouter.get(
           expectedPerBogie: config ? springsPerBogie(config) : null,
           capturedAt: r.created_at,
           capturedBy: r.inspector_name,
-          ...(includeImages ? { imageBase64: r.image_data } : {})
+          ...(includeImages ? { imageBase64: photoStore().resolve(r.image_data, r.sha256, r.mime_type).dataUrl } : {})
         });
       }
 

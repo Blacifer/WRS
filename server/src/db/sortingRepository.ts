@@ -16,6 +16,7 @@
 
 import { DatabaseSync } from 'node:sqlite';
 import crypto from 'node:crypto';
+import { photoStore } from './photoStore.ts';
 import { logAuditEvent } from './auditLog.ts';
 import type { BogieType, SpringCondition, SpringPosition, BandColor, MeasurementSource } from '../../../shared/types.ts';
 import { GaugeRepository } from './gaugeRepository.ts';
@@ -321,12 +322,14 @@ export class SortingRepository {
     }
 
     const id = `simg_${crypto.randomUUID()}`;
+    // To disk, with the hash on the row. See photoStore.ts.
+    const stored = photoStore().put(id, input.imageData, input.mimeType);
     this.db.prepare(`
       INSERT INTO spring_images (
         id, sorting_record_id, batch_id, bogie_type, spring_condition,
         spring_position, labelled_band, labelled_status, measured_height,
-        mime_type, image_data, width, height, inspector_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        mime_type, image_data, width, height, inspector_id, sha256
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       input.sortingRecordId ?? null,
@@ -337,11 +340,12 @@ export class SortingRepository {
       input.labelledBand ?? null,
       input.labelledStatus,
       input.measuredHeight ?? null,
-      input.mimeType || 'image/jpeg',
-      input.imageData,
+      stored.mimeType,
+      stored.ref,
       input.width ?? null,
       input.height ?? null,
-      input.inspectorId
+      input.inspectorId,
+      stored.sha256
     );
     return { id };
   }
@@ -399,13 +403,17 @@ export class SortingRepository {
   public nextBlindImage(readerId: string): { id: string; bogieType: string; springPosition: string; imageData: string; mimeType: string } | null {
     const row = this.db.prepare(`
       SELECT id, bogie_type AS bogieType, spring_position AS springPosition,
-             image_data AS imageData, mime_type AS mimeType
+             image_data AS imageData, mime_type AS mimeType, sha256
       FROM spring_images
       WHERE inspector_id != ?
         AND id NOT IN (SELECT image_id FROM spring_image_blind_reads WHERE reader_id = ?)
       ORDER BY RANDOM() LIMIT 1
     `).get(readerId, readerId) as any;
-    return row || null;
+    if (!row) return null;
+    const image = photoStore().resolve(row.imageData, row.sha256, row.mimeType);
+    // A photograph that is missing or altered on disk is not one to be read blind.
+    if (!image.dataUrl) return null;
+    return { id: row.id, bogieType: row.bogieType, springPosition: row.springPosition, imageData: image.dataUrl, mimeType: row.mimeType };
   }
 
   /** Record what a reader saw, and whether it matched what the bench recorded. */
@@ -490,17 +498,22 @@ export class SortingRepository {
     if (options?.condemnedOnly) clauses.push("labelled_status = 'CONDEMNED'");
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
 
-    return this.db.prepare(`
+    const rows = this.db.prepare(`
       SELECT id, sorting_record_id AS sortingRecordId, bogie_type AS bogieType,
              spring_position AS springPosition, labelled_band AS band,
              labelled_status AS status, measured_height AS measuredHeight,
-             image_data AS imageData, inspector_id AS inspectorId,
+             image_data AS imageData, mime_type AS mimeType, sha256, inspector_id AS inspectorId,
              created_at AS createdAt
       FROM spring_images
       ${where}
       ORDER BY created_at DESC, rowid DESC
       LIMIT ?
     `).all(...params, limit) as any[];
+    return rows.map((r) => {
+      const image = photoStore().resolve(r.imageData, r.sha256, r.mimeType);
+      const { mimeType: _m, sha256: _h, ...rest } = r;
+      return { ...rest, imageData: image.dataUrl, imageVerified: image.verified };
+    });
   }
 
   /**

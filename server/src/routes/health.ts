@@ -12,6 +12,7 @@ import { authMiddleware } from '../middleware/auth.ts';
 import { requireCapability } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { config } from '../config/index.ts';
+import { photoStore } from '../db/photoStore.ts';
 import { verifyPassword } from '../auth/password.ts';
 import { verifyAuditChain } from '../db/auditLog.ts';
 import { isZapheitConfigured, askZapheit } from '../ai/zapheit.ts';
@@ -274,10 +275,13 @@ healthRouter.get(
     /*
      * How big this has grown, and what that costs the backup.
      *
-     * Photographs are stored as base64 inside the database file, so the
-     * evidence a shop is asked to collect is also the thing that makes the
-     * weekly backup impossible. Nothing warned about this: SystemStorage
-     * displayed the figure and no check acted on it.
+     * Photographs used to be stored as base64 inside the database file, so
+     * the evidence a shop is asked to collect was also the thing that made
+     * the weekly backup impossible. New photographs are files beside the
+     * database now (server/src/db/photoStore.ts), so two figures are
+     * reported: the database, whose size decides whether the weekly backup
+     * is still feasible; and the photo directory, which the backup script
+     * carries file by file and only ever grows by what was added since.
      *
      * The thresholds come from a measurement rather than a guess. Backing up
      * a 514 MB database — snapshot, encrypt, verify — ran at 11.1 MB/s on a
@@ -295,29 +299,34 @@ healthRouter.get(
       }
       return total;
     })();
-    const photoBytes = (() => {
+    // Photographs written before they became files, still inside the database.
+    const inlinePhotoBytes = (() => {
       try {
-        const a = db.prepare('SELECT COALESCE(SUM(LENGTH(image_data)), 0) AS b FROM wagon_photos').get() as { b: number };
-        const c = db.prepare('SELECT COALESCE(SUM(LENGTH(image_data)), 0) AS b FROM spring_images').get() as { b: number };
+        const a = db.prepare("SELECT COALESCE(SUM(LENGTH(image_data)), 0) AS b FROM wagon_photos WHERE image_data NOT LIKE 'file:%'").get() as { b: number };
+        const c = db.prepare("SELECT COALESCE(SUM(LENGTH(image_data)), 0) AS b FROM spring_images WHERE image_data NOT LIKE 'file:%'").get() as { b: number };
         return Number(a?.b || 0) + Number(c?.b || 0);
       } catch { return 0; }
     })();
+    const onDisk = photoStore().sizeOnDisk();
     const gb = dbBytes / (1024 ** 3);
     const BACKUP_MB_PER_SEC = 11.1;
     const shopMinutes = Math.round(((dbBytes / (1024 * 1024)) / BACKUP_MB_PER_SEC) * 4 / 60);
-    const photoShare = dbBytes > 0 ? Math.round((photoBytes / dbBytes) * 100) : 0;
-    const sizeText = gb >= 1 ? `${gb.toFixed(1)} GB` : `${Math.round(dbBytes / (1024 * 1024))} MB`;
+    const inlineShare = dbBytes > 0 ? Math.round((inlinePhotoBytes / dbBytes) * 100) : 0;
+    const fmt = (b: number) => (b >= 1024 ** 3 ? `${(b / 1024 ** 3).toFixed(1)} GB` : `${Math.round(b / (1024 * 1024))} MB`);
+    const sizeText = fmt(dbBytes);
+    const photosText = `${onDisk.files} photograph file(s), ${fmt(onDisk.bytes)}, under ${config.photoDir}`;
 
     checks.push({
       id: 'storage',
       label: 'The database is small enough to keep backing up',
       state: gb >= 8 ? 'FAIL' : gb >= 2 ? 'WARN' : 'PASS',
       detail: gb >= 2
-        ? `${sizeText}, of which ${photoShare}% is photographs. A backup of this runs about ${shopMinutes} minute(s) on shop hardware, ` +
+        ? `${sizeText}` + (inlineShare > 0 ? `, of which ${inlineShare}% is photographs written before they became files` : '') +
+          `. A backup of this runs about ${shopMinutes} minute(s) on shop hardware, ` +
           'and the disk needs roughly three times the database free to take and restore one. ' +
-          'Photographs are stored inside the database file: if "Photograph springs while sorting" has been left on past the ' +
-          'point the training set needed, turning it off stops the growth. Nothing already recorded is affected.'
-        : `${sizeText}, of which ${photoShare}% is photographs. A backup of this takes about ${Math.max(shopMinutes, 1)} minute(s) on shop hardware.`
+          `Photographs taken now are files, not rows: ${photosText}. They do not add to this figure.`
+        : `${sizeText}. A backup of this takes about ${Math.max(shopMinutes, 1)} minute(s) on shop hardware. ` +
+          `Photographs are files beside it — ${photosText} — carried by the same backup, file by file.`
     });
 
     // --- the record, and whether a copy of it exists ---

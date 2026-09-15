@@ -124,3 +124,14 @@ appended at the same moment, both are present, nothing was removed.
 
 This is what a drill is for. Nothing in the test suite would have found it,
 because every suite writes from a single process.
+
+## Photographs
+
+Since photographs became files beside the database (`server/src/db/photoStore.ts`),
+a database restore alone brings back every row and every hash but not the
+pictures. `scripts/backup-drill.sh` now also carries three photographs, adds
+one, carries only that one, restores them byte for byte, and proves a restore
+over a live directory with a differing file names it and leaves it alone.
+The command is `backup-db.mjs --restore-photos`; see `INSTALL.md` §7. The
+next real drill should restore both halves and open a wagon's photographs in
+the app — `imageVerified: true` on each is the row vouching for the file.

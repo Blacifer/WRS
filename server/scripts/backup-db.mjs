@@ -2,8 +2,9 @@
  * Encrypted, verified backup of the WRS Raipur database — on any operating system
  * Indian Railways WRS Raipur
  *
- *   node --experimental-strip-types server/scripts/backup-db.mjs [source_db] [backup_dir]
+ *   node --experimental-strip-types server/scripts/backup-db.mjs [source_db] [backup_dir] [photo_dir]
  *   node --experimental-strip-types server/scripts/backup-db.mjs --restore <file.enc> [target_db]
+ *   node --experimental-strip-types server/scripts/backup-db.mjs --restore-photos <backup_dir/photos> [target_photo_dir]
  *
  * WHY THIS EXISTS ALONGSIDE backup-db.sh
  * --------------------------------------
@@ -137,7 +138,7 @@ Then back that key up separately. Without it, no backup can be restored.
   return keyFile;
 }
 
-function backup(sourceDb, backupDir) {
+function backup(sourceDb, backupDir, photoDir) {
   const keyFile = requireKeyFile();
   if (!fs.existsSync(sourceDb)) fail(`the database ${sourceDb} does not exist.`);
   fs.mkdirSync(backupDir, { recursive: true });
@@ -195,6 +196,8 @@ function backup(sourceDb, backupDir) {
   } finally {
     cleanup();
   }
+
+  backupPhotos(photoDir, backupDir, keyFile);
 }
 
 function restore(encPath, targetDb) {
@@ -242,17 +245,133 @@ function restore(encPath, targetDb) {
   }
 }
 
+/** Every file under a directory, relative, sorted. */
+function walk(dir) {
+  const out = [];
+  const rec = (d, rel) => {
+    let entries;
+    try { entries = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) rec(path.join(d, e.name), r);
+      else if (e.isFile() && !e.name.endsWith('.tmp')) out.push(r);
+    }
+  };
+  rec(dir, '');
+  return out.sort();
+}
+
+const sha256Of = (p) => crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+
+/**
+ * Carry the photo directory, file by file, skipping what is already there.
+ *
+ * A file counts as carried when its .enc exists and its .hmac verifies —
+ * checked without decrypting, so a run over ten thousand photographs that
+ * adds forty reads forty. Each new one is encrypted, HMACed, then decrypted
+ * again and compared by hash to the original, for the same reason the
+ * database is: an unrestorable backup should fail on the night it is taken.
+ */
+function backupPhotos(photoDir, backupDir, keyFile) {
+  if (!fs.existsSync(photoDir)) {
+    log(`No photo directory at ${photoDir} — nothing to carry.`);
+    return { carried: 0, already: 0 };
+  }
+  const dest = path.join(backupDir, 'photos');
+  const passphrase = readPassphrase(keyFile);
+  const hkey = hmacKey(keyFile);
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'wrs-photo-backup-'));
+  let carried = 0;
+  let already = 0;
+  try {
+    for (const rel of walk(photoDir)) {
+      const src = path.join(photoDir, rel);
+      const enc = path.join(dest, `${rel}.enc`);
+      if (fs.existsSync(enc) && fs.existsSync(`${enc}.hmac`) &&
+          fileHmac(enc, hkey) === fs.readFileSync(`${enc}.hmac`, 'utf8').trim()) {
+        already++;
+        continue;
+      }
+      fs.mkdirSync(path.dirname(enc), { recursive: true });
+      encryptFile(src, enc, passphrase);
+      fs.writeFileSync(`${enc}.hmac`, fileHmac(enc, hkey) + '\n');
+      const check = path.join(work, 'check.bin');
+      try {
+        decryptFile(enc, check, passphrase);
+        if (sha256Of(check) !== sha256Of(src)) throw new Error('mismatch');
+      } catch {
+        fs.rmSync(enc, { force: true }); fs.rmSync(`${enc}.hmac`, { force: true });
+        fail(`the photograph ${rel} could not be carried intact — removed its backup`);
+      }
+      carried++;
+    }
+  } finally {
+    try { fs.rmSync(work, { recursive: true, force: true }); } catch { /* nothing to undo */ }
+  }
+  log(`Photographs: ${carried} carried this run, ${already} already there, under ${dest}`);
+  return { carried, already };
+}
+
+/**
+ * Put the photographs back. Never overwrites: a file already at the target
+ * with the same bytes is skipped, one with different bytes is left alone and
+ * named, because the target may be a live photo directory and the backup is
+ * not entitled to decide which copy is the evidence.
+ */
+function restorePhotos(encDir, targetDir) {
+  const keyFile = requireKeyFile();
+  if (!fs.existsSync(encDir)) fail(`the photo backup ${encDir} does not exist.`);
+  const passphrase = readPassphrase(keyFile);
+  const hkey = hmacKey(keyFile);
+  let restored = 0, same = 0, differs = 0, refused = 0;
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'wrs-photo-restore-'));
+  try {
+    for (const rel of walk(encDir)) {
+      if (!rel.endsWith('.enc')) continue;
+      const enc = path.join(encDir, rel);
+      const hmacPath = `${enc}.hmac`;
+      if (!fs.existsSync(hmacPath) || fileHmac(enc, hkey) !== fs.readFileSync(hmacPath, 'utf8').trim()) {
+        console.error(`[restore-photos] HMAC mismatch on ${rel} — not restoring it.`);
+        refused++;
+        continue;
+      }
+      const plain = path.join(work, 'p.bin');
+      try { decryptFile(enc, plain, passphrase); }
+      catch { console.error(`[restore-photos] could not decrypt ${rel} — check WRS_BACKUP_KEY_FILE.`); refused++; continue; }
+      const target = path.join(targetDir, rel.slice(0, -'.enc'.length));
+      if (fs.existsSync(target)) {
+        if (sha256Of(target) === sha256Of(plain)) same++;
+        else { console.error(`[restore-photos] ${target} exists with DIFFERENT bytes — left as it is.`); differs++; }
+        continue;
+      }
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.copyFileSync(plain, target);
+      restored++;
+    }
+  } finally {
+    try { fs.rmSync(work, { recursive: true, force: true }); } catch { /* nothing to undo */ }
+  }
+  log(`Photographs: ${restored} restored, ${same} already present and identical, ${differs} present and different (untouched), ${refused} refused.`);
+  if (differs > 0 || refused > 0) process.exit(2);
+}
+
 const args = process.argv.slice(2);
 const here = path.dirname(new URL(import.meta.url).pathname);
 if (args[0] === '--restore') {
   if (!args[1]) fail('usage: --restore <file.db.enc> [target_db]');
   restore(args[1], args[2] || path.join(here, '..', 'data', 'wrs_inspections.db'));
+} else if (args[0] === '--restore-photos') {
+  if (!args[1]) fail('usage: --restore-photos <backup_dir/photos> [target_photo_dir]');
+  restorePhotos(args[1], args[2] || process.env.WRS_PHOTO_DIR || path.join(here, '..', 'data', 'photos'));
 } else {
+  const sourceDb = args[0] || path.join(here, '..', 'data', 'wrs_inspections.db');
   backup(
-    args[0] || path.join(here, '..', 'data', 'wrs_inspections.db'),
+    sourceDb,
     // The same value the readiness panel reads, so the two cannot disagree
     // about where a backup lives. A positional argument still wins, for a
     // one-off to a USB stick.
-    args[1] || process.env.WRS_BACKUP_DIR || path.join(here, '..', 'data', 'backups')
+    args[1] || process.env.WRS_BACKUP_DIR || path.join(here, '..', 'data', 'backups'),
+    // And the same default the server uses for photographs: beside the database.
+    args[2] || process.env.WRS_PHOTO_DIR || path.join(path.dirname(path.resolve(sourceDb)), 'photos')
   );
 }

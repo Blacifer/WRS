@@ -8,6 +8,7 @@ import crypto from 'node:crypto';
 import { logAuditEvent } from './auditLog.ts';
 import type { MeasurementSource } from '../../../shared/types.ts';
 import { config } from '../config/index.ts';
+import { photoStore } from './photoStore.ts';
 import { signCertificate } from '../reports/certificateSigning.ts';
 import * as analytics from './wagonAnalytics.ts';
 import { CASNUB_CHECKLIST_TEMPLATE } from './checklistTemplate.ts';
@@ -2213,26 +2214,32 @@ export class WagonRepository {
   }): any {
     const id = data.id || `photo_${crypto.randomUUID()}`;
     const wagonNumber = data.wagonNumber.trim().toUpperCase();
-    const fileName = data.fileName || `${wagonNumber}_${Date.now()}.jpg`;
-    const mimeType = data.mimeType || 'image/jpeg';
-    const fileSize = data.fileSize || Buffer.byteLength(data.imageData, 'utf8');
     const tagsJson = JSON.stringify(data.tags || []);
     const now = new Date().toISOString();
 
     // Photo evidence is only evidence if it is attributable.
     this.requireActor(data.inspectorId, 'Photo evidence');
 
+    /*
+     * The bytes go to disk; the row keeps the reference and the hash. See
+     * photoStore.ts. Written before the row, so a crash between the two
+     * leaves an orphan file rather than a row pointing at nothing.
+     */
+    const stored = photoStore().put(id, data.imageData, data.mimeType, new Date(now));
+    const mimeType = stored.mimeType;
+    const fileName = data.fileName || `${wagonNumber}_${Date.now()}.${mimeType === 'image/png' ? 'png' : 'jpg'}`;
+
     this.db.prepare(`
       INSERT INTO wagon_photos (
         id, wagon_number, checklist_item_id, category, part_name, stage,
         file_name, mime_type, file_size, image_data, inspector_id,
-        inspector_name, tags_json, evidence_stage, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        inspector_name, tags_json, evidence_stage, created_at, sha256
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id, wagonNumber, data.checklistItemId || null, data.category || null,
-      data.partName || null, data.stage || null, fileName, mimeType, fileSize,
-      data.imageData, data.inspectorId, data.inspectorName, tagsJson,
-      data.evidenceStage || null, now
+      data.partName || null, data.stage || null, fileName, mimeType, stored.bytes,
+      stored.ref, data.inspectorId, data.inspectorName, tagsJson,
+      data.evidenceStage || null, now, stored.sha256
     );
 
     return this.getPhotoById(id);
@@ -2405,6 +2412,8 @@ export class WagonRepository {
     } catch {
       tags = [];
     }
+    // From disk, hash-checked, or inline as written before photographs were files.
+    const image = photoStore().resolve(row.image_data, row.sha256, row.mime_type);
 
     return {
       id: row.id,
@@ -2433,9 +2442,14 @@ export class WagonRepository {
       mime_type: row.mime_type,
       fileSize: row.file_size,
       file_size: row.file_size,
-      imageData: row.image_data,
-      image_data: row.image_data,
-      imageBase64: row.image_data,
+      imageData: image.dataUrl,
+      image_data: image.dataUrl,
+      imageBase64: image.dataUrl,
+      /** Hex SHA-256 of the bytes; null on rows written before photographs were files. */
+      sha256: row.sha256 ?? null,
+      /** true: bytes match the hash. false: file missing or altered. null: legacy inline row. */
+      imageVerified: image.verified,
+      imageSource: image.source,
       inspectorId: row.inspector_id,
       inspector_id: row.inspector_id,
       inspectorName: row.inspector_name,

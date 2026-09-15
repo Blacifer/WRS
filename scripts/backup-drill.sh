@@ -192,6 +192,36 @@ check "backup without a key refuses rather than write plaintext" "1" "$?"
 check "  and no plaintext is left behind" "absent" "$([ -n "$(ls "$WORK"/node-nokey/*.db 2>/dev/null)" ] && echo present || echo absent)"
 
 echo
+echo "  Photographs (files beside the database, carried by the same backup)"
+echo "  --------------------------------------------------------------------"
+# Three photographs in the shape the server writes them, one already carried
+# by a previous run, one added since, one altered on disk after it was backed up.
+PHOTOS="$WORK/photos"
+mkdir -p "$PHOTOS/2026/09"
+head -c 3000 /dev/urandom > "$PHOTOS/2026/09/photo_a.jpg"
+head -c 3000 /dev/urandom > "$PHOTOS/2026/09/photo_b.jpg"
+PHOTO_OUT="$WORK/photo-out"
+WRS_BACKUP_KEY_FILE="$WORK/backup.key" node server/scripts/backup-db.mjs "$DB" "$PHOTO_OUT" "$PHOTOS" >"$WORK/photo-backup-1.log" 2>&1
+check "a backup carries the photo directory" "0" "$?"
+check "  two photographs carried" "2" "$(grep -o 'Photographs: [0-9]* carried' "$WORK/photo-backup-1.log" | grep -o '[0-9]*')"
+check "  each as its own .enc with a .hmac" "4" "$(find "$PHOTO_OUT/photos" -type f \( -name '*.enc' -o -name '*.hmac' \) | wc -l | tr -d ' ')"
+head -c 3000 /dev/urandom > "$PHOTOS/2026/09/photo_c.jpg"
+WRS_BACKUP_KEY_FILE="$WORK/backup.key" node server/scripts/backup-db.mjs "$DB" "$PHOTO_OUT" "$PHOTOS" >"$WORK/photo-backup-2.log" 2>&1
+check "the next run carries only what was added" "1" "$(grep -o 'Photographs: [0-9]* carried' "$WORK/photo-backup-2.log" | grep -o '[0-9]*')"
+check "  and counts the rest as already there" "2" "$(grep -o '[0-9]* already there' "$WORK/photo-backup-2.log" | grep -o '^[0-9]*')"
+RESTORE_TO="$WORK/photos-restored"
+WRS_BACKUP_KEY_FILE="$WORK/backup.key" node server/scripts/backup-db.mjs --restore-photos "$PHOTO_OUT/photos" "$RESTORE_TO" >"$WORK/photo-restore.log" 2>&1
+check "photographs restore to an empty directory" "0" "$?"
+check "  byte for byte" "$(cd "$PHOTOS" && find . -type f | sort | xargs shasum | shasum | cut -c1-16)" "$(cd "$RESTORE_TO" && find . -type f | sort | xargs shasum | shasum | cut -c1-16)"
+# A live directory where one file has since changed: the backup must not decide.
+head -c 3000 /dev/urandom > "$RESTORE_TO/2026/09/photo_b.jpg"
+WRS_BACKUP_KEY_FILE="$WORK/backup.key" node server/scripts/backup-db.mjs --restore-photos "$PHOTO_OUT/photos" "$RESTORE_TO" >"$WORK/photo-restore-2.log" 2>&1
+check "a restore over a directory with a differing file exits non-zero" "2" "$?"
+check "  names it and leaves it alone" "1" "$(grep -c 'DIFFERENT bytes' "$WORK/photo-restore-2.log")"
+WRS_BACKUP_KEY_FILE="$WORK/wrong.key" node server/scripts/backup-db.mjs --restore-photos "$PHOTO_OUT/photos" "$WORK/photos-wrongkey" >/dev/null 2>&1
+check "the wrong key restores no photograph" "absent" "$([ -d "$WORK/photos-wrongkey" ] && [ -n "$(find "$WORK/photos-wrongkey" -type f 2>/dev/null)" ] && echo present || echo absent)"
+
+echo
 if [ "$fail" -gt 0 ]; then
   echo "  $fail check(s) FAILED — the backup path cannot be relied on."
   exit 1

@@ -33,11 +33,13 @@ These are real and should be read before deployment, not after.
 
 ### 1. The database is not encrypted at rest
 
-`server/data/wrs_inspections.db` is a plaintext SQLite file. Anyone who obtains
-it — a stolen laptop, a copied backup, a misconfigured share — can read
-everything in it with freely available tools:
+`server/data/wrs_inspections.db` is a plaintext SQLite file, and the
+photographs beside it in `server/data/photos/` are plain JPEGs. Anyone who
+obtains them — a stolen laptop, a copied backup, a misconfigured share — can
+read everything with freely available tools:
 
-- every defect photograph (stored base64 inside the file)
+- every defect photograph (files beside the database; each row carries the
+  file's SHA-256, so an altered photograph is detected, but not a read one)
 - every inspection, checklist verdict and release certificate
 - names, employee IDs and roles
 - the complete audit trail

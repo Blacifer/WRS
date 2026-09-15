@@ -270,11 +270,23 @@ panel should show the backup row green with "on a different disk".
 
 On macOS use `launchd` rather than `cron`.
 
-**To restore**, on any platform:
+**Photographs** are files in `server/data/photos/` (or `WRS_PHOTO_DIR`), not
+rows in the database — that is what keeps the weekly backup a few minutes long
+however many are taken. The same command carries them: every photograph is
+encrypted to `WRS_BACKUP_DIR\photos\` beside the database snapshot, and a
+photograph already carried is skipped, so a weekly run costs what the week
+added. They are never pruned.
+
+**To restore**, on any platform — the database, then the photographs:
 
 ```
 node server/scripts/backup-db.mjs --restore <file.db.enc> [target_db]
+node server/scripts/backup-db.mjs --restore-photos <backup_dir>\photos [target_photo_dir]
 ```
+
+The photo restore never overwrites: a file already present with different
+bytes is named and left alone, because the backup is not entitled to decide
+which copy is the evidence.
 
 ## 8. Check your work
 

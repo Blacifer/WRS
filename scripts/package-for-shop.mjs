@@ -146,6 +146,10 @@ JWT_SECRET=
 # here and flags the default (beside the database) as not protection.
 WRS_BACKUP_DIR=D:\\wrs-backups
 
+# Photographs are files in server\\data\\photos beside the database, carried
+# by the same backup. Leave this unset unless they should live elsewhere.
+# WRS_PHOTO_DIR=
+
 # The first administrator, used ONCE on the first start and then ignored.
 # Remove these two lines after signing in and changing the password.
 BOOTSTRAP_ADMIN_USERNAME=wrsadmin
