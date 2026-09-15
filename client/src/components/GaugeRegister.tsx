@@ -51,6 +51,7 @@ export const GaugeRegister: React.FC<{ lang: LanguageCode }> = ({ lang }) => {
   const isHi = lang === 'hi';
   const [gauges, setGauges] = useState<Gauge[]>([]);
   const [exposure, setExposure] = useState<{ total: number; summary: string } | null>(null);
+  const [drift, setDrift] = useState<{ flagged: any[]; lines: any[]; summary: string; readings: number } | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [calibratedOn, setCalibratedOn] = useState('');
   const [validUpto, setValidUpto] = useState('');
@@ -60,7 +61,8 @@ export const GaugeRegister: React.FC<{ lang: LanguageCode }> = ({ lang }) => {
 
   const load = async () => {
     try {
-      const [g, e] = await Promise.all([api.getGauges(), api.getGaugeExposure()]);
+      const [g, e, d] = await Promise.all([api.getGauges(), api.getGaugeExposure(), api.getGaugeDrift().catch(() => null)]);
+      if (d) setDrift(d.data);
       setGauges(g.data.gauges as Gauge[]);
       setExposure(e.data);
     } catch (err: any) {
@@ -145,6 +147,26 @@ export const GaugeRegister: React.FC<{ lang: LanguageCode }> = ({ lang }) => {
         >
           {exposure.summary}
         </p>
+      )}
+
+      {/*
+        * A gauge that reads high, seen in the distribution it leaves behind.
+        * Advisory — the answer is the master gauge, not this panel. Shown
+        * whenever there is anything to compare, so a clean result is also
+        * visible rather than an absence.
+        */}
+      {drift && drift.readings > 0 && (
+        <div
+          className={`text-[11px] rounded-control px-3 py-2 mb-4 border ${drift.flagged.length > 0 ? 'text-warn-ink/90 bg-warn-soft border-warn-line' : 'text-ink-muted bg-raised border-line'}`}
+          data-testid="gauge-drift"
+        >
+          <p className="font-semibold">{drift.summary}</p>
+          {drift.flagged.map((l) => (
+            <p key={`${l.gaugeCode}-${l.kind}`} className="mt-1">
+              <span className="font-bold">{l.gaugeCode}</span> · {l.kind.replace(/CASNUB_22_/, '').replace(/\|/g, ' ').toLowerCase()} — {l.note}
+            </p>
+          ))}
+        </div>
       )}
 
       {error && (

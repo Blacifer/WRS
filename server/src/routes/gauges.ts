@@ -17,6 +17,7 @@ import { authMiddleware } from '../middleware/auth.ts';
 import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { requireCapability } from '../middleware/rbac.ts';
 import { logAuditEvent } from '../db/auditLog.ts';
+import { gaugeDrift, DRIFT_THRESHOLD_MM, MIN_READINGS_EACH_SIDE } from '../../../shared/analysis/gaugeDrift.ts';
 
 export const gaugesRouter = Router();
 
@@ -49,6 +50,37 @@ gaugesRouter.get('/', authMiddleware, (req: AuthenticatedRequest, res: Response)
 });
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// GET /api/gauges/drift
+//
+// A gauge that reads high, seen in the distribution it leaves behind. See
+// shared/analysis/gaugeDrift.ts. Advisory: the answer is the master gauge.
+// ---------------------------------------------------------------------------
+gaugesRouter.get('/drift', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const days = Math.min(Math.max(Number(req.query?.days) || 90, 7), 366);
+    const since = new Date(Date.now() - days * 86400_000).toISOString();
+    const rows = getDatabase().prepare(`
+      SELECT gauge_code AS gaugeCode, bogie_type || '|' || spring_condition || '|' || spring_position AS kind, measured_height AS heightMm
+      FROM spring_sorting_records r
+      WHERE gauge_code IS NOT NULL AND measured_height IS NOT NULL AND height_is_approximate = 0
+        AND voided = 0 AND created_at >= ?
+        AND NOT EXISTS (SELECT 1 FROM spring_sorting_records l WHERE l.supersedes = r.id)
+    `).all(since) as any[];
+    const lines = gaugeDrift(rows);
+    ok(res, {
+      days, thresholdMm: DRIFT_THRESHOLD_MM, minReadingsEachSide: MIN_READINGS_EACH_SIDE,
+      readings: rows.length, lines,
+      flagged: lines.filter((l) => l.flagged),
+      summary: lines.filter((l) => l.flagged).length === 0
+        ? (lines.some((l) => l.shiftMm !== null) ? 'No gauge reads more than a millimetre from the others on the same kind of spring.' : 'Not enough readings on more than one gauge per kind to compare yet.')
+        : `${lines.filter((l) => l.flagged).length} gauge/kind pair(s) read a millimetre or more from the shop's other gauges. Put them against the master.`
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: 'GAUGE_DRIFT_FAILED', message: error?.message || 'Gauge drift could not be computed', statusCode: 500, timestamp: new Date().toISOString() });
+  }
+});
+
 // GET /api/gauges/exposure
 //
 // How much of the recorded work rests on an instrument nobody has verified.

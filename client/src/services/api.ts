@@ -494,6 +494,14 @@ export class ApiClient {
     return this.request(`/wagons/${encodeURIComponent(wagonNumber)}/target-release-date`, { method: 'PUT', body: JSON.stringify({ targetReleaseDate, reason }) });
   }
 
+  public async getGaugeDrift(days = 90): Promise<{ success: boolean; data: { flagged: any[]; lines: any[]; summary: string; readings: number } }> {
+    return this.request(`/gauges/drift?days=${days}`);
+  }
+
+  public async getAnalyticsInspectorQuality(): Promise<{ success: boolean; data: any }> {
+    return this.request('/analytics/inspector-quality');
+  }
+
   public async getAnalyticsDwell(): Promise<{ success: boolean; data: import('../../../shared/analysis/stageDwell.ts').DwellReport }> {
     return this.request('/analytics/dwell');
   }

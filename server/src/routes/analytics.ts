@@ -9,7 +9,7 @@ import { authMiddleware, optionalAuthMiddleware } from '../middleware/auth.ts';
 import { requireCapability } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
-import { getObservedCondemnationRates, getAnalyticsDwell } from '../db/wagonAnalytics.ts';
+import { getObservedCondemnationRates, getAnalyticsDwell, getAnalyticsInspectorQuality } from '../db/wagonAnalytics.ts';
 import { verifyAuditChain } from '../db/auditLog.ts';
 import { GaugeRepository } from '../db/gaugeRepository.ts';
 import { InspectionRepository } from '../db/repository.ts';
@@ -90,6 +90,16 @@ analyticsRouter.get('/dwell', authMiddleware, requireCapability('analytics.read'
     res.status(200).json({ success: true, data: getAnalyticsDwell(getDatabase()), meta: { timestamp: new Date().toISOString() } });
   } catch (err: any) {
     res.status(500).json({ success: false, error: 'DWELL_FAILED', message: err?.message || 'Could not compute stage dwell', statusCode: 500, timestamp: new Date().toISOString() });
+  }
+});
+
+// GET /api/analytics/inspector-quality — rates with denominators, beside the shop's
+analyticsRouter.get('/inspector-quality', authMiddleware, requireCapability('analytics.read'), async (req: Request, res: Response) => {
+  try {
+    const since = typeof (req.query || {}).since === 'string' && Number.isFinite(Date.parse((req.query as any).since)) ? new Date(Date.parse((req.query as any).since)).toISOString() : undefined;
+    res.status(200).json({ success: true, data: getAnalyticsInspectorQuality(getDatabase(), since), meta: { timestamp: new Date().toISOString() } });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: 'INSPECTOR_QUALITY_FAILED', message: err?.message || 'Could not compute inspector quality', statusCode: 500, timestamp: new Date().toISOString() });
   }
 });
 

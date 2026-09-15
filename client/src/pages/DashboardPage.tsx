@@ -100,7 +100,7 @@ export const DashboardPage: React.FC = () => {
   const [throughput, setThroughput] = useState<any>(null);
   const [parts, setParts] = useState<any>(null);
   const [springStats, setSpringStats] = useState<InspectionStats | null>(null);
-  const [inspectors, setInspectors] = useState<any[]>([]);
+  const [quality, setQuality] = useState<any>(null);
   const [blockers, setBlockers] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -116,7 +116,7 @@ export const DashboardPage: React.FC = () => {
         api.getAnalyticsTAT(),
         api.getAnalyticsThroughput(),
         api.getAnalyticsParts(),
-        api.getAnalyticsInspectors(),
+        api.getAnalyticsInspectorQuality(),
         api.getAnalyticsBlockers(),
         api.getInspectionStats().catch(() => null)
       ]);
@@ -125,7 +125,7 @@ export const DashboardPage: React.FC = () => {
       setTat(tatRes.data);
       setThroughput(tpRes.data);
       setParts(partsRes.data);
-      setInspectors(inspRes.data.inspectors || []);
+      setQuality(inspRes.data);
       setBlockers(blockRes.data.blockedWagons || []);
       if (statsRes) {
         setSpringStats(statsRes);
@@ -621,25 +621,61 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Inspector Productivity Table */}
-        <div className="bg-card border border-line rounded-card p-6 space-y-4">
+        {/*
+          * Who does what, and how well — with denominators.
+          *
+          * This table used to show one figure per person, "components
+          * checked", read off a field the API did not even return. What the
+          * records can say and the board cannot: how often each person
+          * condemns against the shop's rate; whether the amber box gets
+          * answered and how often it was right; how they read springs blind.
+          * Every rate carries its denominator and is quoted only from thirty
+          * observations. It is a view of the records, not a verdict on a
+          * person: someone on the condemnation bench all week condemns more.
+          */}
+        <div className="bg-card border border-line rounded-card p-6 space-y-3" data-testid="inspector-quality">
           <h3 className="text-base font-bold text-white flex items-center gap-2">
             <UserIcon size={17} className="text-accent-ink" /> {t('dashboard.inspectorsTitle')}
           </h3>
-
-          <div className="divide-y divide-line/80 max-h-80 overflow-y-auto pr-1">
-            {inspectors.map((insp, idx) => (
-              <div key={`${insp.inspectorId}-${idx}`} className="py-3 flex justify-between items-center">
-                <div>
-                  <h5 className="text-xs font-bold text-white">{insp.inspectorName}</h5>
-                  <p className="text-[11px] text-ink-muted">ID: {insp.inspectorId}</p>
-                </div>
-                <div className="text-right">
-                  <span className="text-sm font-extrabold text-accent-ink">{insp.itemsInspected}</span>
-                  <p className="text-[10px] text-ink-faint">{isHi ? 'जाँचे गए घटक' : 'Components Checked'}</p>
-                </div>
-              </div>
-            ))}
+          {quality && (
+            <p className="text-[11px] text-ink-muted">
+              {isHi
+                ? `पिछले 90 दिन। दुकान: कंडम दर ${quality.shop.condemnationRatePct ?? '—'}% (${quality.shop.springs.condemned}/${quality.shop.springs.inspected}) · एम्बर उत्तरित ${quality.shop.amberAnsweredPct ?? '—'}% · अंध पठन सहमति ${quality.shop.blindBandAgreementPct ?? '—'}%। ${quality.minForRate} से कम पर दर नहीं दी जाती।`
+                : `Last 90 days. The shop: condemnation ${quality.shop.condemnationRatePct ?? '—'}% (${quality.shop.springs.condemned} of ${quality.shop.springs.inspected}) · amber box answered ${quality.shop.amberAnsweredPct ?? '—'}% · blind-read band agreement ${quality.shop.blindBandAgreementPct ?? '—'}%. A rate is not quoted below ${quality.minForRate} observations; a person on the condemnation bench all week condemns more.`}
+            </p>
+          )}
+          <div className="overflow-x-auto max-h-96 overflow-y-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-ink-muted text-[10px] uppercase tracking-wide">
+                  <th className="text-left py-1.5 pr-2">{isHi ? 'निरीक्षक' : 'Inspector'}</th>
+                  <th className="text-right py-1.5 pr-2">{isHi ? 'स्प्रिंग' : 'Springs'}</th>
+                  <th className="text-right py-1.5 pr-2">{isHi ? 'कंडम %' : 'Condemned'}</th>
+                  <th className="text-right py-1.5 pr-2">{isHi ? 'निर्णय' : 'Verdicts'}</th>
+                  <th className="text-right py-1.5 pr-2">{isHi ? 'एम्बर उत्तरित' : 'Amber answered'}</th>
+                  <th className="text-right py-1.5 pr-2">{isHi ? 'बॉक्स सही' : 'Box was right'}</th>
+                  <th className="text-right py-1.5 pr-2">{isHi ? 'अंध पठन' : 'Blind reads'}</th>
+                  <th className="text-right py-1.5 pr-2">{isHi ? 'वापस लिए' : 'Taken back'}</th>
+                  <th className="text-right py-1.5">{isHi ? 'ओवरराइड' : 'Overrides'}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(quality?.inspectors || []).map((p: any) => (
+                  <tr key={p.inspectorId} className="border-t border-line tabular-nums">
+                    <td className="py-1.5 pr-2"><span className="font-bold text-white">{p.inspectorName}</span><br /><span className="text-[10px] text-ink-faint">{p.inspectorId}</span></td>
+                    <td className="py-1.5 pr-2 text-right">{p.springs.inspected}<span className="text-ink-faint text-[10px]"> ({p.springs.bench} {isHi ? 'बेंच' : 'bench'})</span></td>
+                    <td className="py-1.5 pr-2 text-right">{p.condemnationRatePct === null ? <span className="text-ink-faint">{p.springs.condemned}/{p.springs.inspected}</span> : <><span className={quality.shop.condemnationRatePct !== null && Math.abs(p.condemnationRatePct - quality.shop.condemnationRatePct) > 10 ? 'text-warn-ink font-bold' : ''}>{p.condemnationRatePct}%</span><span className="text-ink-faint text-[10px]"> ({p.springs.condemned}/{p.springs.inspected})</span></>}</td>
+                    <td className="py-1.5 pr-2 text-right">{p.checklist.verdicts}<span className="text-ink-faint text-[10px]"> ({p.checklist.condemned + p.checklist.failed} {isHi ? 'असफल' : 'fail/cond.'})</span></td>
+                    <td className="py-1.5 pr-2 text-right">{p.amber.raised === 0 ? '—' : p.amberAnsweredPct === null ? <span className="text-ink-faint">{p.amber.answered}/{p.amber.raised}</span> : <>{p.amberAnsweredPct}%<span className="text-ink-faint text-[10px]"> ({p.amber.answered}/{p.amber.raised})</span></>}</td>
+                    <td className="py-1.5 pr-2 text-right">{p.amber.answered === 0 ? '—' : p.amberBoxRightPct === null ? <span className="text-ink-faint">{p.amber.reMeasured}/{p.amber.answered}</span> : <>{p.amberBoxRightPct}%</>}</td>
+                    <td className="py-1.5 pr-2 text-right">{p.blind.reads === 0 ? '—' : p.blindBandAgreementPct === null ? <span className="text-ink-faint">{p.blind.bandAgreed}/{p.blind.reads}</span> : <>{p.blindBandAgreementPct}%<span className="text-ink-faint text-[10px]"> ({p.blind.reads})</span></>}</td>
+                    <td className="py-1.5 pr-2 text-right">{p.withdrawn}{p.withdrawnPerHundred !== null && <span className="text-ink-faint text-[10px]"> ({p.withdrawnPerHundred}/100)</span>}</td>
+                    <td className="py-1.5 text-right">{p.overrides}</td>
+                  </tr>
+                ))}
+                {quality && quality.inspectors.length === 0 && <tr><td colSpan={9} className="py-3 text-ink-muted">{isHi ? 'पिछले 90 दिनों में कोई रिकॉर्ड नहीं।' : 'No records in the last 90 days.'}</td></tr>}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

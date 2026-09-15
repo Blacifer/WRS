@@ -288,6 +288,105 @@ export function getAnalyticsInspectors(db: DatabaseSync): any {
   };
 }
 
+/** A rate is a fraction with both halves; below MIN_FOR_RATE it is not quoted. */
+export const MIN_FOR_RATE = 30;
+const rateOf = (num: number, den: number): number | null => (den >= MIN_FOR_RATE ? Math.round((num / den) * 1000) / 10 : null);
+
+/**
+ * Who does what, and how well — with denominators.
+ *
+ * The inspector table on the dashboard counted components checked and
+ * nothing else, which is a productivity figure a supervisor can read off
+ * the board. What the records can say and the board cannot: how often each
+ * person condemns against the shop's rate; how often the amber box asked
+ * them and they answered, and how often the box was right; how they read
+ * springs blind against the labels others gave; how many taps they took
+ * back; how many overrides they were part of. Each is a fraction with both
+ * halves shown, quoted only from thirty observations, and set beside the
+ * shop's own figure — because a condemnation rate of 22% means nothing until
+ * you know the shop's is 9%, or 24%.
+ *
+ * This is a quality view of the *records*, not a verdict on a person. An
+ * inspector on the condemnation bench all week will condemn more; one
+ * sorting new springs will condemn less. The numbers are what a supervisor
+ * asks about, not what they conclude from.
+ */
+export function getAnalyticsInspectorQuality(db: DatabaseSync, sinceIso?: string): any {
+  const since = sinceIso || new Date(Date.now() - 90 * 24 * 3600 * 1000).toISOString();
+  const people = new Map<string, any>();
+  const person = (id: string, name?: string | null) => {
+    if (!people.has(id)) people.set(id, { inspectorId: id, inspectorName: name || id, springs: { inspected: 0, condemned: 0, bench: 0, wagon: 0 }, checklist: { verdicts: 0, condemned: 0, failed: 0 }, amber: { raised: 0, answered: 0, reMeasured: 0 }, blind: { reads: 0, bandAgreed: 0, statusAgreed: 0 }, withdrawn: 0, overrides: 0 });
+    const p = people.get(id);
+    if (name && p.inspectorName === id) p.inspectorName = name;
+    return p;
+  };
+  const names = new Map((db.prepare('SELECT id, full_name FROM users').all() as any[]).map((u) => [u.id, u.full_name]));
+
+  for (const r of db.prepare(`
+    SELECT inspector_id AS id, COUNT(*) AS n, SUM(CASE WHEN status = 'CONDEMNED' THEN 1 ELSE 0 END) AS c, SUM(supervisor_override) AS o
+    FROM inspections WHERE created_at >= ? GROUP BY inspector_id`).all(since) as any[]) {
+    const p = person(r.id, names.get(r.id)); p.springs.inspected += r.n; p.springs.condemned += r.c; p.springs.wagon += r.n; p.overrides += Number(r.o || 0);
+  }
+  for (const r of db.prepare(`
+    SELECT inspector_id AS id, COUNT(*) AS n, SUM(CASE WHEN status = 'CONDEMNED' THEN 1 ELSE 0 END) AS c,
+           SUM(CASE WHEN supersedes IS NOT NULL THEN 1 ELSE 0 END) AS w
+    FROM spring_sorting_records r WHERE created_at >= ? AND voided = 0
+      AND NOT EXISTS (SELECT 1 FROM spring_sorting_records l WHERE l.supersedes = r.id)
+    GROUP BY inspector_id`).all(since) as any[]) {
+    const p = person(r.id, names.get(r.id)); p.springs.inspected += r.n; p.springs.condemned += r.c; p.springs.bench += r.n; p.withdrawn += Number(r.w || 0);
+  }
+  for (const r of db.prepare(`
+    SELECT COALESCE(manual_verdict_by, inspector_id) AS id, COUNT(*) AS n,
+           SUM(CASE WHEN status = 'CONDEMNED' THEN 1 ELSE 0 END) AS c, SUM(CASE WHEN status = 'FAIL' THEN 1 ELSE 0 END) AS f
+    FROM checklist_items WHERE status <> 'PENDING' AND COALESCE(manual_verdict_at, updated_at) >= ? GROUP BY 1`).all(since) as any[]) {
+    const p = person(r.id, names.get(r.id)); p.checklist.verdicts += r.n; p.checklist.condemned += r.c; p.checklist.failed += r.f;
+  }
+  // The amber box: each question is one unanswered row; each answer is a row with answered=1 for the same inspection.
+  for (const r of db.prepare(`
+    SELECT q.user_id AS id, COUNT(*) AS raised,
+           SUM(CASE WHEN a.inspection_id IS NOT NULL THEN 1 ELSE 0 END) AS answered,
+           SUM(CASE WHEN a.was_corrected = 1 THEN 1 ELSE 0 END) AS re_measured
+    FROM machine_learning_events q
+    LEFT JOIN machine_learning_events a
+      ON a.inspection_id = q.inspection_id AND a.subsystem = 'MEASUREMENT_ANOMALY' AND COALESCE(json_extract(a.context_json, '$.answered'), 0) = 1
+    WHERE q.subsystem = 'MEASUREMENT_ANOMALY' AND COALESCE(json_extract(q.context_json, '$.answered'), 0) = 0
+      AND q.created_at >= ? AND q.user_id IS NOT NULL
+    GROUP BY q.user_id`).all(since) as any[]) {
+    const p = person(r.id, names.get(r.id)); p.amber.raised += r.raised; p.amber.answered += r.answered; p.amber.reMeasured += r.re_measured;
+  }
+  for (const r of db.prepare(`
+    SELECT reader_id AS id, COUNT(*) AS n, SUM(COALESCE(band_agrees, 0)) AS b, SUM(COALESCE(status_agrees, 0)) AS s
+    FROM spring_image_blind_reads WHERE created_at >= ? GROUP BY reader_id`).all(since) as any[]) {
+    const p = person(r.id, names.get(r.id)); p.blind.reads += r.n; p.blind.bandAgreed += r.b; p.blind.statusAgreed += r.s;
+  }
+
+  const shop = { springs: { inspected: 0, condemned: 0 }, amber: { raised: 0, answered: 0, reMeasured: 0 }, blind: { reads: 0, bandAgreed: 0 } };
+  for (const p of people.values()) {
+    shop.springs.inspected += p.springs.inspected; shop.springs.condemned += p.springs.condemned;
+    shop.amber.raised += p.amber.raised; shop.amber.answered += p.amber.answered; shop.amber.reMeasured += p.amber.reMeasured;
+    shop.blind.reads += p.blind.reads; shop.blind.bandAgreed += p.blind.bandAgreed;
+  }
+  const rates = (p: any) => ({
+    condemnationRatePct: rateOf(p.springs.condemned, p.springs.inspected),
+    amberAnsweredPct: p.amber.raised >= 10 ? Math.round((p.amber.answered / p.amber.raised) * 1000) / 10 : null,
+    amberBoxRightPct: p.amber.answered >= 10 ? Math.round((p.amber.reMeasured / p.amber.answered) * 1000) / 10 : null,
+    blindBandAgreementPct: rateOf(p.blind.bandAgreed, p.blind.reads),
+    withdrawnPerHundred: p.springs.bench >= MIN_FOR_RATE ? Math.round((p.withdrawn / p.springs.bench) * 1000) / 10 : null
+  });
+
+  return {
+    since,
+    minForRate: MIN_FOR_RATE,
+    shop: {
+      ...shop,
+      condemnationRatePct: rateOf(shop.springs.condemned, shop.springs.inspected),
+      amberAnsweredPct: shop.amber.raised >= 10 ? Math.round((shop.amber.answered / shop.amber.raised) * 1000) / 10 : null,
+      blindBandAgreementPct: rateOf(shop.blind.bandAgreed, shop.blind.reads)
+    },
+    inspectors: [...people.values()].map((p) => ({ ...p, ...rates(p) })).sort((a, b) => b.springs.inspected + b.checklist.verdicts - (a.springs.inspected + a.checklist.verdicts))
+  };
+}
+
 /**
  * Blocker counts across the pipeline.
  *
