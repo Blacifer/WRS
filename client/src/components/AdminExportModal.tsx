@@ -199,7 +199,7 @@ export const AdminExportModal: React.FC<AdminExportModalProps> = ({
               <div className="space-y-2 pt-1">
                 {devOtpCode && (
                   <p className="text-[11px] text-warn-ink/80 bg-warn-soft p-2 rounded border border-warn-line">
-                    Workshop Demo Admin OTP: <strong className="font-mono text-warn-ink">{devOtpCode}</strong>
+                    Confirmation code: <strong className="font-mono text-warn-ink">{devOtpCode}</strong>
                   </p>
                 )}
                 <div className="flex items-center gap-2">

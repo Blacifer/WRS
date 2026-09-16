@@ -1637,8 +1637,11 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
           {/* Inspect by exception — the fast path.
               Flag what's wrong individually, then declare the rest serviceable
               in one attested action instead of tapping 50+ items to say "fine".
-              Springs and any already-recorded FAIL/CONDEMNED are never touched. */}
-          {pendingCount > 0 && !isReleased && (
+              Springs and any already-recorded FAIL/CONDEMNED are never touched.
+              The server accepts this from wagon.override only — the supervisor.
+              It was offered to inspectors too, who got a 403 on tapping it;
+              found on the production first-day drill. */}
+          {pendingCount > 0 && !isReleased && can(api.getUser()?.role, 'wagon.override') && (
             <div className="bg-card border border-accent-line rounded-card p-5 space-y-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>

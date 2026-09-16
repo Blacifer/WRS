@@ -182,11 +182,15 @@ and pass the `.txt` — the indexer only ever needs text.
 
 ## 6. The gauges
 
-Under **User Accounts → Gauge Register**, enter the instruments actually on the
-bench. There is no national list to copy from: WMM p.191 records that only local
-colour coding is in practice across zonal railways, so these codes belong to this
-workshop. Outer, inner and snubber are different strips and each needs its own
-entry, with its calibration date.
+Under **User Accounts → Gauge Register**, press **Add a gauge** for each
+instrument actually on the bench: its code, what it measures (outer, inner or
+snubber), the description and certificate number from its label, and the
+calibration dates. There is no national list to copy from: WMM p.191 records
+that only local colour coding is in practice across zonal railways, so these
+codes belong to this workshop. Outer, inner and snubber are different strips
+and each needs its own entry. The register ships with SSG-02, the snubber gauge
+photographed on the floor, with the blank dates its label carries — press
+**Record calibration** once it has been checked.
 
 ## 7. Backups
 
@@ -315,6 +319,32 @@ and `START.cmd` is bringing it back — read `logs\wrs-<date>.log` for why.
 
 Work down that list until it is green. A Zapheit warning can also be a passing
 network blip — press **Check now** again before investigating.
+
+### Ready to use — what has been proven, and what you still have to do
+
+`bash scripts/preflight.sh` on the build machine ends with a step called
+**Production first day (bundle)**. It packages this bundle, starts it the way
+`START.cmd` does — production mode, https, the bootstrap administrator, no
+demonstration accounts, an empty database — and drives the first day through
+it: the administrator changes the bootstrap password, creates a supervisor and
+an inspector on User Accounts (each confirmed with a one-time code), enters the
+gauges, the inspector sorts on the strip against a named gauge, a wagon goes
+from registration to a signed certificate with the one-time code the
+production configuration issues, a backup is written to another directory, and
+the readiness panel is read. If that step is green, the software is ready to
+use. What it cannot do for you:
+
+- **Delete the two BOOTSTRAP lines** from `.env` after the first sign-in.
+- **Change the administrator password** and write the roster's generated
+  passwords down for the people they belong to.
+- **Put the backup on another disk** (`WRS_BACKUP_DIR`) and the key somewhere
+  that is not this PC — the readiness panel says WARN until the backup is on a
+  different device from the database.
+- **Index the manual** (step 5) so that verdicts can cite a clause.
+- **Install the certificate on every tablet** ([TABLET_TRUST.md](TABLET_TRUST.md)).
+- **Never run `DEMO-DATA.cmd` on this machine.** It refuses a database that
+  holds wagons, but the demonstration switch it writes into `.env` lets the
+  published demo password sign in.
 
 ## 9. Keeping it running
 

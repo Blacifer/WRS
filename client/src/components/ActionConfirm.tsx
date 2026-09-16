@@ -126,15 +126,6 @@ export function ActionConfirm({ action, title, description, lang, onConfirmed, o
               <label className="block text-xs font-semibold text-ink-body">
                 {isHi ? 'प्रमाणक ऐप का कोड' : 'Code from your authenticator app'}
               </label>
-              {shownCode && (
-                <p className="text-xs text-warn-ink bg-warn-soft border border-warn-line rounded-control px-3 py-2 mb-2 leading-snug">
-                  Confirmation code: <strong className="font-mono tracking-widest text-warn-ink">{shownCode}</strong>
-                  <span className="block text-warn-ink/80 mt-1">
-                    Type it below. It is shown here rather than sent anywhere — this is a
-                    deliberate second step on a consequential action, not a second factor.
-                  </span>
-                </p>
-              )}
               <input
                 inputMode="numeric"
                 maxLength={6}
@@ -155,6 +146,23 @@ export function ActionConfirm({ action, title, description, lang, onConfirmed, o
               <label className="block text-xs font-semibold text-ink-body">
                 {isHi ? '6-अंकीय कोड' : '6-digit code'}
               </label>
+              {/*
+                * The issued code, shown so it can be typed. This block sat in
+                * the authenticator branch above — where no inline code is ever
+                * issued — so on a production bundle with no authenticator
+                * enrolled, "Request code" produced a code nobody could see and
+                * no account could be created. Found by the first-day drill.
+                */}
+              {shownCode && (
+                <p className="text-xs text-warn-ink bg-warn-soft border border-warn-line rounded-control px-3 py-2 mb-2 leading-snug" data-testid="inline-code">
+                  {isHi ? 'पुष्टि कोड' : 'Confirmation code'}: <strong className="font-mono tracking-widest text-warn-ink">{shownCode}</strong>
+                  <span className="block text-warn-ink/80 mt-1">
+                    {isHi
+                      ? 'इसे नीचे टाइप करें। यह कहीं भेजा नहीं गया, यहीं दिखाया गया है — यह एक जान-बूझकर दूसरा कदम है, दूसरा प्रमाण नहीं।'
+                      : 'Type it below. It is shown here rather than sent anywhere — this is a deliberate second step on a consequential action, not a second factor.'}
+                  </span>
+                </p>
+              )}
               <div className="flex gap-2">
                 <input
                   inputMode="numeric"

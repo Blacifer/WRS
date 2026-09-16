@@ -149,6 +149,10 @@ Access the application at `http://localhost:3000`.
 
 ---
 
+## Demonstration or production?
+
+One build. The bundle `npm run package:shop` produces is the production one — https, real accounts, an audit chain, encrypted backups, a restart loop — and the demonstration record is optional data written only by `DEMO-DATA.cmd` (or `npm run seed`) into an empty database. `bash scripts/preflight.sh` ends by packaging that bundle, starting it in production mode with no demonstration accounts, and driving the first day through it: bootstrap administrator, password change, roster, gauges, an inspector on the strip, a wagon released with a one-time code, a backup elsewhere. What remains before real use is listed in [docs/INSTALL.md §8](docs/INSTALL.md) — the things only the shop can do.
+
 ## 🧪 Testing
 
 Execute the end-to-end verification suite across all tiers:

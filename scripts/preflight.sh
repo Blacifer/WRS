@@ -229,6 +229,16 @@ else
     skip "Offline drill"    "client/dist/sw.js missing — the production build did not produce a service worker"
     skip "Parts ledger drive" "client/dist/sw.js missing — the production build did not produce a client"
   fi
+
+  # The production first day, on the built bundle: packaged, started the way
+  # START.cmd starts it (production mode, https, bootstrap administrator, no
+  # demo accounts, fresh database) and driven from the administrator's first
+  # sign-in to a released wagon and a backup. Every other drill uses the demo
+  # record; this is the one that says "ready to use" rather than "demos well".
+  # It found the gauge register with no way to add a gauge, the one-time code
+  # shown in the wrong branch of the confirmation modal, and a button offered
+  # to a role the server refuses.
+  step "Production first day (bundle)" bash scripts/first-day.sh
 fi
 
 echo

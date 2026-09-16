@@ -58,6 +58,11 @@ export const GaugeRegister: React.FC<{ lang: LanguageCode }> = ({ lang }) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
+  // Adding an instrument. INSTALL §6 tells the shop to "enter the instruments
+  // actually on the bench"; this register could only amend the one it shipped
+  // with. Found on the production first-day drill.
+  const [adding, setAdding] = useState(false);
+  const [newGauge, setNewGauge] = useState({ gaugeCode: '', description: '', appliesTo: 'OUTER', certificateNumber: '', issuedTo: '', calibratedOn: '', validUpto: '' });
 
   const load = async () => {
     try {
@@ -98,6 +103,30 @@ export const GaugeRegister: React.FC<{ lang: LanguageCode }> = ({ lang }) => {
       await load();
     } catch (err: any) {
       setError(err?.message || 'That calibration could not be saved.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const addGauge = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const code = newGauge.gaugeCode.trim().toUpperCase();
+      await api.saveGauge(code, {
+        description: newGauge.description.trim(),
+        appliesTo: newGauge.appliesTo,
+        certificateNumber: newGauge.certificateNumber.trim() || null,
+        issuedTo: newGauge.issuedTo.trim() || null,
+        calibratedOn: newGauge.calibratedOn || null,
+        validUpto: newGauge.validUpto || null
+      });
+      setAdding(false);
+      setSaved(code);
+      setNewGauge({ gaugeCode: '', description: '', appliesTo: 'OUTER', certificateNumber: '', issuedTo: '', calibratedOn: '', validUpto: '' });
+      await load();
+    } catch (err: any) {
+      setError(err?.message || 'That gauge could not be added.');
     } finally {
       setBusy(false);
     }
@@ -258,6 +287,43 @@ export const GaugeRegister: React.FC<{ lang: LanguageCode }> = ({ lang }) => {
           </div>
         ))}
       </div>
+
+      {!adding ? (
+        <button type="button" onClick={() => { setAdding(true); setError(null); setSaved(null); }}
+          className="mt-3 min-h-[40px] px-4 rounded-control border border-accent-line bg-accent-soft text-accent-ink text-xs font-bold" data-testid="gauge-add">
+          {isHi ? 'एक गेज जोड़ें' : 'Add a gauge'}
+        </button>
+      ) : (
+        <form onSubmit={(e) => { e.preventDefault(); void addGauge(); }} className="mt-3 rounded-control border border-line bg-raised p-3 space-y-2" data-testid="gauge-add-form">
+          <p className="text-[11px] text-ink-muted">
+            {isHi ? 'बेंच पर रखा असली उपकरण। कोड इसी शॉप का है; हर स्प्रिंग स्थिति (बाहरी, भीतरी, स्नबर) को अपना गेज चाहिए।' : 'The real instrument on the bench. The code is this shop\'s own; each spring position (outer, inner, snubber) needs its own gauge.'}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <input required value={newGauge.gaugeCode} onChange={(e) => setNewGauge({ ...newGauge, gaugeCode: e.target.value })} placeholder={isHi ? 'गेज कोड, जैसे OSG-01' : 'Gauge code, e.g. OSG-01'} data-testid="gauge-new-code"
+              className="min-h-[40px] px-3 bg-card border border-line rounded-control text-sm text-white" />
+            <select value={newGauge.appliesTo} onChange={(e) => setNewGauge({ ...newGauge, appliesTo: e.target.value })} data-testid="gauge-new-applies" className="min-h-[40px] px-3 bg-card border border-line rounded-control text-sm text-white">
+              <option value="OUTER">{isHi ? 'बाहरी स्प्रिंग' : 'Outer springs'}</option>
+              <option value="INNER">{isHi ? 'भीतरी स्प्रिंग' : 'Inner springs'}</option>
+              <option value="SNUBBER">{isHi ? 'स्नबर स्प्रिंग' : 'Snubber springs'}</option>
+              <option value="ALL">{isHi ? 'सभी स्थितियाँ' : 'All positions'}</option>
+            </select>
+            <input required value={newGauge.description} onChange={(e) => setNewGauge({ ...newGauge, description: e.target.value })} placeholder={isHi ? 'विवरण, जैसे Outer spring gauge (NLB/HS)' : 'Description, e.g. Outer spring gauge (NLB/HS)'} data-testid="gauge-new-description"
+              className="sm:col-span-2 min-h-[40px] px-3 bg-card border border-line rounded-control text-sm text-white" />
+            <input value={newGauge.certificateNumber} onChange={(e) => setNewGauge({ ...newGauge, certificateNumber: e.target.value })} placeholder={isHi ? 'प्रमाणपत्र संख्या (लेबल से)' : 'Certificate number (from the label)'} data-testid="gauge-new-certificate"
+              className="min-h-[40px] px-3 bg-card border border-line rounded-control text-sm text-white" />
+            <input value={newGauge.issuedTo} onChange={(e) => setNewGauge({ ...newGauge, issuedTo: e.target.value })} placeholder={isHi ? 'किसे जारी' : 'Issued to'}
+              className="min-h-[40px] px-3 bg-card border border-line rounded-control text-sm text-white" />
+            <label className="text-[11px] text-ink-muted flex flex-col gap-1">{isHi ? 'अंशांकन तिथि' : 'Calibrated on'}
+              <input type="date" value={newGauge.calibratedOn} onChange={(e) => setNewGauge({ ...newGauge, calibratedOn: e.target.value })} data-testid="gauge-new-calibrated" className="min-h-[40px] px-3 bg-card border border-line rounded-control text-sm text-white" /></label>
+            <label className="text-[11px] text-ink-muted flex flex-col gap-1">{isHi ? 'वैध तक' : 'Valid until'}
+              <input type="date" value={newGauge.validUpto} onChange={(e) => setNewGauge({ ...newGauge, validUpto: e.target.value })} data-testid="gauge-new-valid" className="min-h-[40px] px-3 bg-card border border-line rounded-control text-sm text-white" /></label>
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" disabled={busy || !newGauge.gaugeCode.trim() || !newGauge.description.trim()} className="min-h-[40px] px-4 rounded-control bg-accent text-white text-xs font-bold disabled:opacity-50" data-testid="gauge-add-save">{isHi ? 'गेज सहेजें' : 'Save gauge'}</button>
+            <button type="button" onClick={() => setAdding(false)} className="min-h-[40px] px-4 rounded-control border border-line text-xs font-bold text-ink-body">{isHi ? 'रद्द करें' : 'Cancel'}</button>
+          </div>
+        </form>
+      )}
 
       <p className="text-[10px] text-ink-faint mt-3 leading-relaxed">
         {isHi
