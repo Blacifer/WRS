@@ -45,6 +45,7 @@ export interface GaugeDriftLine {
   shiftMm: number | null;
   flagged: boolean;
   note: string;
+  noteHi: string;
 }
 
 const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); return s[Math.floor(s.length / 2)]; };
@@ -55,7 +56,11 @@ export function gaugeDrift(readings: Reading[]): GaugeDriftLine[] {
   for (const r of readings) {
     if (!r.gaugeCode || !Number.isFinite(r.heightMm)) continue;
     const g = byKind.get(r.kind) || new Map<string, number[]>();
-    g.set(r.gaugeCode, [...(g.get(r.gaugeCode) || []), r.heightMm]);
+    // Append in place. Copying the array on every reading is quadratic —
+    // fifteen seconds for a year of the bench in the standard report next door.
+    let arr = g.get(r.gaugeCode);
+    if (!arr) { arr = []; g.set(r.gaugeCode, arr); }
+    arr.push(r.heightMm);
     byKind.set(r.kind, g);
   }
   const out: GaugeDriftLine[] = [];
@@ -67,7 +72,8 @@ export function gaugeDrift(readings: Reading[]): GaugeDriftLine[] {
       const med = median(hs);
       if (others.length < MIN_READINGS_EACH_SIDE) {
         out.push({ gaugeCode, kind, n: hs.length, medianMm: r1(med), othersN: others.length, othersMedianMm: null, shiftMm: null, flagged: false,
-          note: others.length === 0 ? 'The only gauge used on this kind — nothing to compare it with.' : `Only ${others.length} readings on other gauges for this kind; ${MIN_READINGS_EACH_SIDE} needed to compare.` });
+          note: others.length === 0 ? 'The only gauge used on this kind — nothing to compare it with.' : `Only ${others.length} readings on other gauges for this kind; ${MIN_READINGS_EACH_SIDE} needed to compare.`,
+          noteHi: others.length === 0 ? 'इस प्रकार पर यही एक गेज इस्तेमाल हुआ — तुलना के लिए कुछ नहीं।' : `इस प्रकार पर दूसरे गेजों की केवल ${others.length} रीडिंग; तुलना के लिए ${MIN_READINGS_EACH_SIDE} चाहिए।` });
         continue;
       }
       const omed = median(others);
@@ -76,7 +82,10 @@ export function gaugeDrift(readings: Reading[]): GaugeDriftLine[] {
       out.push({ gaugeCode, kind, n: hs.length, medianMm: r1(med), othersN: others.length, othersMedianMm: r1(omed), shiftMm: shift, flagged,
         note: flagged
           ? `Reads ${Math.abs(shift)} mm ${shift > 0 ? 'higher' : 'lower'} than the shop's other gauges on this kind (median ${r1(med)} vs ${r1(omed)}, ${hs.length} vs ${others.length} readings). Put it against the master.`
-          : `Within ${DRIFT_THRESHOLD_MM} mm of the shop's other gauges (${shift >= 0 ? '+' : ''}${shift} mm over ${hs.length} readings).` });
+          : `Within ${DRIFT_THRESHOLD_MM} mm of the shop's other gauges (${shift >= 0 ? '+' : ''}${shift} mm over ${hs.length} readings).`,
+        noteHi: flagged
+          ? `इस प्रकार पर शॉप के दूसरे गेजों से ${Math.abs(shift)} मिमी ${shift > 0 ? 'ऊँचा' : 'नीचा'} पढ़ता है (मध्यमान ${r1(med)} बनाम ${r1(omed)}, ${hs.length} बनाम ${others.length} रीडिंग)। इसे मास्टर गेज से मिलाएँ।`
+          : `शॉप के दूसरे गेजों के ${DRIFT_THRESHOLD_MM} मिमी के भीतर (${hs.length} रीडिंग पर ${shift >= 0 ? '+' : ''}${shift} मिमी)।` });
     }
   }
   return out.sort((a, b) => Math.abs(b.shiftMm ?? 0) - Math.abs(a.shiftMm ?? 0));

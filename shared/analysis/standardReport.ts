@@ -80,7 +80,11 @@ export function standardReport(readings: StandardReading[], generatedAt = new Da
   for (const r of readings) {
     if (!Number.isFinite(r.heightMm)) continue;
     const key = `${r.bogieType}|${r.condition}|${normalizePosition(r.position)}`;
-    groups.set(key, [...(groups.get(key) || []), r]);
+    // Append in place, not copy-on-append: at 150,000 readings the copy was
+    // fifteen seconds of the DRM's page doing nothing (found by the soak drill).
+    let arr = groups.get(key);
+    if (!arr) { arr = []; groups.set(key, arr); }
+    arr.push(r);
   }
 
   const lines: StandardLine[] = [];

@@ -74,7 +74,10 @@ gaugesRouter.get('/drift', authMiddleware, (req: AuthenticatedRequest, res: Resp
       flagged: lines.filter((l) => l.flagged),
       summary: lines.filter((l) => l.flagged).length === 0
         ? (lines.some((l) => l.shiftMm !== null) ? 'No gauge reads more than a millimetre from the others on the same kind of spring.' : 'Not enough readings on more than one gauge per kind to compare yet.')
-        : `${lines.filter((l) => l.flagged).length} gauge/kind pair(s) read a millimetre or more from the shop's other gauges. Put them against the master.`
+        : `${lines.filter((l) => l.flagged).length} gauge/kind pair(s) read a millimetre or more from the shop's other gauges. Put them against the master.`,
+      summaryHi: lines.filter((l) => l.flagged).length === 0
+        ? (lines.some((l) => l.shiftMm !== null) ? 'एक ही प्रकार की स्प्रिंग पर कोई गेज दूसरों से एक मिलीमीटर से अधिक नहीं पढ़ता।' : 'तुलना के लिए अभी प्रति प्रकार एक से अधिक गेज पर पर्याप्त रीडिंग नहीं।')
+        : `${lines.filter((l) => l.flagged).length} गेज/प्रकार जोड़ी शॉप के दूसरे गेजों से एक मिलीमीटर या अधिक पढ़ती है। उन्हें मास्टर गेज से मिलाएँ।`
     });
   } catch (error: any) {
     res.status(500).json({ success: false, error: 'GAUGE_DRIFT_FAILED', message: error?.message || 'Gauge drift could not be computed', statusCode: 500, timestamp: new Date().toISOString() });

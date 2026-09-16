@@ -50,8 +50,8 @@ const STATE_WORD: Record<string, string> = {
 export const GaugeRegister: React.FC<{ lang: LanguageCode }> = ({ lang }) => {
   const isHi = lang === 'hi';
   const [gauges, setGauges] = useState<Gauge[]>([]);
-  const [exposure, setExposure] = useState<{ total: number; summary: string } | null>(null);
-  const [drift, setDrift] = useState<{ flagged: any[]; lines: any[]; summary: string; readings: number } | null>(null);
+  const [exposure, setExposure] = useState<{ total: number; summary: string; summaryHi?: string } | null>(null);
+  const [drift, setDrift] = useState<{ flagged: any[]; lines: any[]; summary: string; summaryHi?: string; readings: number } | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [calibratedOn, setCalibratedOn] = useState('');
   const [validUpto, setValidUpto] = useState('');
@@ -145,7 +145,7 @@ export const GaugeRegister: React.FC<{ lang: LanguageCode }> = ({ lang }) => {
           className="text-[11px] text-warn-ink/90 bg-warn-soft border border-warn-line rounded-control px-3 py-2 mb-4 font-semibold"
           data-testid="gauge-exposure"
         >
-          {exposure.summary}
+          {isHi ? (exposure.summaryHi || exposure.summary) : exposure.summary}
         </p>
       )}
 
@@ -160,10 +160,10 @@ export const GaugeRegister: React.FC<{ lang: LanguageCode }> = ({ lang }) => {
           className={`text-[11px] rounded-control px-3 py-2 mb-4 border ${drift.flagged.length > 0 ? 'text-warn-ink/90 bg-warn-soft border-warn-line' : 'text-ink-muted bg-raised border-line'}`}
           data-testid="gauge-drift"
         >
-          <p className="font-semibold">{drift.summary}</p>
+          <p className="font-semibold">{isHi ? (drift.summaryHi || drift.summary) : drift.summary}</p>
           {drift.flagged.map((l) => (
             <p key={`${l.gaugeCode}-${l.kind}`} className="mt-1">
-              <span className="font-bold">{l.gaugeCode}</span> · {l.kind.replace(/CASNUB_22_/, '').replace(/\|/g, ' ').toLowerCase()} — {l.note}
+              <span className="font-bold">{l.gaugeCode}</span> · {l.kind.replace(/CASNUB_22_/, '').replace(/\|/g, ' ').toLowerCase()} — {isHi ? (l.noteHi || l.note) : l.note}
             </p>
           ))}
         </div>

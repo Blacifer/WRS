@@ -453,6 +453,18 @@ export const SoundDiagnosticTool: React.FC<SoundDiagnosticToolProps> = ({
           <p className="text-xs text-ink-muted mt-1">
             {t('acoustic.subtitle')} — Wagon: <span className="font-mono text-white font-bold">{wagonNumber}</span>
           </p>
+          {/*
+            * Said here because it is the first thing an engineer will ask.
+            * The two rules were set from published bearing and leak signatures
+            * and from synthetic signals; no defective CTRB from this floor has
+            * been recorded yet. Until one is, a "nominal" reading is not a
+            * clean bill of health and the tool does not issue one.
+            */}
+          <p className="text-[11px] text-warn-ink mt-1.5" data-testid="acoustic-untuned">
+            {isHi
+              ? 'अभी तक इस शॉप के किसी असली ख़राब बेयरिंग पर परखा नहीं गया — नियम प्रकाशित संकेतों और कृत्रिम ध्वनि से बने हैं। एक ख़राब CTRB रिकॉर्ड होने तक यह केवल ध्यान दिलाता है, प्रमाणित नहीं करता।'
+              : 'Not yet tuned on a real defective bearing from this floor — the two rules come from published signatures and synthetic signals. Until one is recorded, this draws attention; it never certifies.'}
+          </p>
         </div>
 
         {/* Audio Output Mute / Audible Toggle */}

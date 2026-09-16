@@ -116,7 +116,7 @@ export class PocketCountRepository {
    */
   wagonSummary(wagonNumber: string): Array<{ photoId: string; bogie: BogiePosition; side: BogieSide; designation: string; first: PocketCountRow | null; recount: PocketCountRow | null; comparison: PocketComparison | null; recountComparison: PocketComparison | null; agree: boolean | null }> {
     const byPhoto = new Map<string, PocketCountRow[]>();
-    for (const c of this.countsForWagon(wagonNumber)) byPhoto.set(c.photoId, [...(byPhoto.get(c.photoId) || []), c]);
+    for (const c of this.countsForWagon(wagonNumber)) { const arr = byPhoto.get(c.photoId); if (arr) arr.push(c); else byPhoto.set(c.photoId, [c]); }
     const out: ReturnType<PocketCountRepository['wagonSummary']> = [];
     for (const [photoId, counts] of byPhoto) {
       const first = counts.find((c) => c.kind === 'FIRST') ?? null;
@@ -147,7 +147,7 @@ export class PocketCountRepository {
     const byDesignation: Record<string, number> = {};
     for (const f of firsts.values()) {
       const key = `${f.wagonNumber}::${f.bogie}`;
-      sidesByBogie.set(key, new Set([...(sidesByBogie.get(key) || []), f.side]));
+      const sides = sidesByBogie.get(key); if (sides) sides.add(f.side); else sidesByBogie.set(key, new Set([f.side]));
       byDesignation[f.designation] = (byDesignation[f.designation] || 0) + 1;
     }
     let coveredBogies = 0;

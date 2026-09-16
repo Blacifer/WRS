@@ -366,6 +366,11 @@ export class ApiClient {
     return this.request('/learning/analyze', { method: 'POST' });
   }
 
+  /** Confidence against outcome for one subsystem: when it said 0.9, how often was it right. */
+  public async getLearningAccuracy(subsystem: string, windowDays?: number): Promise<{ success: boolean; data: { accuracy: any; calibration: any } }> {
+    return this.request(`/learning/accuracy/${encodeURIComponent(subsystem)}${windowDays ? `?windowDays=${windowDays}` : ''}`);
+  }
+
   public async decideLearningProposal(
     paramKey: string,
     decision: 'APPROVE' | 'REJECT'
@@ -520,7 +525,7 @@ export class ApiClient {
     return this.request(`/analytics/standard?days=${days}`);
   }
 
-  public async getGaugeDrift(days = 90): Promise<{ success: boolean; data: { flagged: any[]; lines: any[]; summary: string; readings: number } }> {
+  public async getGaugeDrift(days = 90): Promise<{ success: boolean; data: { flagged: any[]; lines: any[]; summary: string; summaryHi?: string; readings: number } }> {
     return this.request(`/gauges/drift?days=${days}`);
   }
 

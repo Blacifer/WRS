@@ -27,7 +27,7 @@
  * spent its time removing.
  */
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { api } from '../services/api.ts';
 
 interface Props {
@@ -61,6 +61,8 @@ export function LearningMemory({ lang }: Props) {
   const isHi = lang === 'hi';
   const [memory, setMemory] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [open, setOpen] = useState<string | null>(null);
+  const [calibration, setCalibration] = useState<Record<string, any>>({});
 
   useEffect(() => {
     api.getLearningMemory()
@@ -118,9 +120,19 @@ export function LearningMemory({ lang }: Props) {
             </thead>
             <tbody>
               {observations.map((o) => (
-                <tr key={o.subsystem} className="border-t border-line">
+                <React.Fragment key={o.subsystem}>
+                <tr className={`border-t border-line ${o.total > 0 ? 'cursor-pointer hover:bg-raised' : ''}`} data-testid={`learning-row-${o.subsystem}`}
+                  onClick={() => {
+                    if (o.total === 0) return;
+                    const next = open === o.subsystem ? null : o.subsystem;
+                    setOpen(next);
+                    if (next && !calibration[next]) {
+                      api.getLearningAccuracy(next).then((r) => setCalibration((c) => ({ ...c, [next]: r.data }))).catch(() => { /* leave the row closed */ });
+                    }
+                  }}>
                   <td className="px-3 py-2 text-ink-body">
                     {(isHi ? SUBSYSTEM_LABEL[o.subsystem]?.hi : SUBSYSTEM_LABEL[o.subsystem]?.en) || o.subsystem}
+                    {o.total > 0 && <span className="ml-1 text-[10px] text-ink-faint">{open === o.subsystem ? '▾' : '▸'}</span>}
                     {o.total > 0 && !o.enoughToLearnFrom && (
                       <span className="block text-[10px] text-warn-ink">
                         {isHi ? 'निष्कर्ष हेतु पर्याप्त नहीं' : 'not yet enough to draw a conclusion from'}
@@ -143,6 +155,40 @@ export function LearningMemory({ lang }: Props) {
                     {o.total === 0 ? '—' : `${fmtDate(o.firstSeen)} – ${fmtDate(o.lastSeen)}`}
                   </td>
                 </tr>
+                {open === o.subsystem && (
+                  <tr className="border-t border-line/60 bg-raised/60" data-testid={`learning-calibration-${o.subsystem}`}>
+                    <td colSpan={5} className="px-3 py-3">
+                      {/*
+                        * Calibration: what the machine's stated confidence was
+                        * worth. A row per confidence bucket — how many times it
+                        * said "0.9", and how often the person then kept it.
+                        * This is the per-subsystem accuracy route, which had no
+                        * screen before.
+                        */}
+                      <p className="text-[11px] text-ink-muted mb-2">
+                        {isHi ? 'मशीन के बताए विश्वास के हर स्तर पर, व्यक्ति ने कितनी बार उसे रखा।' : 'For each level of confidence the machine stated, how often the person kept its answer.'}
+                      </p>
+                      {!calibration[o.subsystem] ? (
+                        <span className="text-[11px] text-ink-faint">…</span>
+                      ) : (
+                        <table className="text-[11px] w-full max-w-md">
+                          <thead><tr className="text-ink-muted"><th className="text-left py-1 pr-3">{isHi ? 'बताया गया विश्वास' : 'Stated confidence'}</th><th className="text-right py-1 pr-3">{isHi ? 'बार' : 'Times'}</th><th className="text-right py-1 pr-3">{isHi ? 'सुधारे' : 'Corrected'}</th><th className="text-right py-1">{isHi ? 'रखा गया' : 'Kept'}</th></tr></thead>
+                          <tbody>
+                            {(calibration[o.subsystem].calibration?.buckets || calibration[o.subsystem].calibration || []).map((b: any) => (
+                              <tr key={b.bucket} className="border-t border-line/60">
+                                <td className="py-1 pr-3 text-ink-body tabular-nums">{b.bucket}</td>
+                                <td className="py-1 pr-3 text-right tabular-nums text-white">{b.total}</td>
+                                <td className="py-1 pr-3 text-right tabular-nums text-ink-body">{b.corrected}</td>
+                                <td className="py-1 text-right tabular-nums text-white">{b.total > 0 ? `${Math.round(b.acceptanceRate * 100)}%` : '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      )}
+                    </td>
+                  </tr>
+                )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>

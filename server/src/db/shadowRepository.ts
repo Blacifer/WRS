@@ -218,7 +218,7 @@ export class ShadowRepository {
       ORDER BY wagon_number, at
     `).all(since, until) as any[];
     const byWagon = new Map<string, string[]>();
-    for (const v of verdicts) byWagon.set(v.wagon_number, [...(byWagon.get(v.wagon_number) || []), v.at]);
+    for (const v of verdicts) { const arr = byWagon.get(v.wagon_number); if (arr) arr.push(v.at); else byWagon.set(v.wagon_number, [v.at]); }
     // A wagon with one verdict has no duration to speak of.
     const perWagon = [...byWagon.values()].filter((ts) => ts.length > 1).map((ts) => workedMinutes(ts));
     const checklistMinutes = perWagon.reduce((a, b) => a + b, 0);

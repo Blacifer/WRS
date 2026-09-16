@@ -77,6 +77,10 @@ step "Production build"           npm run build
 # The one drill that needs neither a browser nor a server. It guards the
 # cross-process fault no suite can reach, so it is not optional.
 step "Concurrent lifecycle drill" node --experimental-strip-types scripts/concurrent-lifecycle-drill.mjs
+# A year of the bench, read by every screen. The suites never go past a few
+# thousand rows; this is where the quadratic things show up (an unindexed
+# self-join, a copy-on-append) — both found here, not in production.
+step "Soak drill (a year of the bench)" node --experimental-strip-types scripts/soak-drill.mjs
 
 # The camera's weights, proven to load from disk and to separate classes.
 #
