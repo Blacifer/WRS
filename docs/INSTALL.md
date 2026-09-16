@@ -180,6 +180,14 @@ npm run index-manual -- "docs/Quality_Audit_check-sheet_for_Wagon_Depot.pdf" ROH
 Needs `pdftotext` (poppler). If it is not installed, extract the text yourself
 and pass the `.txt` — the indexer only ever needs text.
 
+A third document is the shop's own and needs no PDF: the CBC and draft-gear
+section's wall charts, transcribed from the floor
+([docs/SITE_VISIT_2026-09.md](SITE_VISIT_2026-09.md)):
+
+```bash
+npm run index-manual -- "docs/shop-floor/cbc-draft-gear-wall-charts.txt" CBC_WALL
+```
+
 ## 6. The gauges
 
 Under **User Accounts → Gauge Register**, press **Add a gauge** for each

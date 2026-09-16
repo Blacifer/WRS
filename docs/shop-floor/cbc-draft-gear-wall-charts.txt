@@ -1,0 +1,151 @@
+WRS RAIPUR — CBC AND DRAFT GEAR SECTION — WALL CHARTS
+Transcribed from photographs of the boards above the reconditioning benches, September 2026.
+These are the shop's own gauges and limits as posted on the floor. Where a gauge number was
+not fully legible in the photograph it is marked (confirm on the board). Nothing here is from
+the manual; it is what the section works to. Source label in this index: CBC_WALL.
+
+BOARD 1 — CBC COMPONENT DROPPING FROM WAGON (FLOW CHART)
+
+Start: CBC component dropping from wagon.
+
+Knuckle and lock: removing of knuckle and lock from wagon; cleaning of knuckle and lock with
+the help of wire brush; inspection for manufacturer name, grade of material (HTEA/UHTE),
+casting no., year built — if manufacturer name and year built and material grade is not
+found: CONDEMNED; inspection for crack with the help of magnifying glass and wear with the
+help of gauges — ok; marking on knuckle (workshop code, dispatch no., POH date); fitted in
+wagon.
+
+Coupler body: removing of coupler body from wagon; cleaning of coupler body with the help of
+wire brush / grinding machine fitted with wire brush; inspection for manufacturer name and
+grade of material (HTEA/UHTE), casting no., year built — if not found: CONDEMNED; inspection
+for crack with the help of magnifying glass and wear with the help of gauges — ok; marking on
+coupler body (workshop code, dispatch no., POH date); fitted in wagon.
+
+Draft gear and yoke: removing of draft gear and yoke assembly from wagon; removing of draft
+gear and front follower from yoke; external cleaning of draft gear with the help of wire
+brush; inspection of manufacturer name, year built and inspection of housing and its
+components, gauging of housing — centre wedge, 30 degree shoe or rear wall crack for RF-361
+draft gear; if housing wear or crack: CONDEMNED; otherwise draft gear reconditioning;
+preshortening and gauging; marking on draft gear (workshop code, dispatch no., POH date);
+fitted in wagon.
+
+Yoke: removing of yoke from draft gear; cleaning of yoke with the help of wire brush;
+inspection of manufacturer name, year built and gauging — if manufacturer name, year built is
+not found: CONDEMNED; marking on yoke (workshop code, dispatch no., POH date); fitted in wagon.
+
+Models on the bench: model of CBC (coupler, striker casting, front follower, yoke, draft
+gear, back stopper, yoke pin support, yoke support plate, anchor support plate); cross section
+model of coupler; cross section model of knuckle; lock, lock lift and knuckle thrower.
+Draft gear cut-away models labelled MK-50 DG, RF-361, MK70E, MK325, POWER GUARD, F-325 G
+TWIN PACK.
+
+BOARD 2 — RF-361 DRAFT GEAR: SHOE AND WEDGE GAUGES
+
+SHOE 30 DEGREE THICKNESS GAUGES (GAUGE NO 27298)
+GO: 54.64 mm (maximum). NO GO: 52.27 mm (minimum).
+
+SHOE FACE GAUGE (GAUGE NO 27253 and 27254)
+Two angle gauges, 29 degrees 42 minutes and 26 degrees 42 minutes. Seat / no seat: the gauge
+must seat on the shoe face; a face that does not seat is rejected.
+
+SHOE OUTSIDE WIDTH GAUGE (GAUGE NO 27216 — confirm on the board)
+GO gauge: width 107.95 mm.
+
+WEDGE TOP TO TOP LUG DEPTH GAUGE (GAUGE NO 27267)
+The distance between locking lug to top of the bar is 103.05 mm. Bar must not seat.
+
+WEDGE LUG WIDTH (GAUGE NO 27215)
+GO gauge: maximum 39.68 mm. NO GO gauge: minimum 38.1 mm.
+
+WEDGE ANGLE GAUGE (GAUGE NO 27266)
+Parameters 59 degrees. No sit / seat / no seat / seat as marked on the board.
+
+BOARD 3 — RF-361 DRAFT GEAR: HOUSING GAUGES
+
+HOUSING WIDTH GAUGE (GO AND NO GO GAUGE) (GAUGE NO 27706) — to check the housing width
+GO: 320.66 mm. NO GO: 315.89 mm.
+
+HOUSING BASE FLATNESS GAUGE (GAUGE NO 27257) — to check the flatness of bottom face of
+housing.
+
+HOUSING CYLINDER (HEIGHT) LENGTH GAUGE (GAUGE NO 27244)
+On floor: GO 465.15 mm. In air: NO GO 461.90 mm.
+
+PRESHORTENING LENGTH GAUGE (GAUGE NO 27207)
+Pre-shortening length of draft gear: 558.8 mm.
+
+HOUSING BOX GAUGE (GAUGE NO 27200) — to check housing profile
+Size: 229.38 mm x 323.8 mm.
+
+BOARD 4 — MARK-50 DRAFT GEAR
+
+MARK-50 DRAFT GEAR — exploded view. Parts: housing, shortening device, corner coil springs,
+outer coil spring, inner coil spring, spring seat, corner spring seat, release spring, wedge
+shoe complete, centre wedge, tapered stationary plate, outer stationary plate, movable plate.
+Cut-away model on the bench labelled MK-50 DG with tags: outer stationary plate, release
+spring, inner coil spring, wedge shoe, tapered stationary plate, spring seat, corner spring
+seat, corner coil spring, outer coil spring, centre wedge, moveable plate.
+
+BOARD 5 — MARK-50 HOUSING RECONDITIONING GAUGES
+
+HOUSING RECOND GAUGE (HOUSING BOX GAUGE) (GAUGE NO BE/91-62-1)
+Size: 322.70 mm x 229.80 mm.
+
+HOUSING RECOND GAUGE (HOUSING WALL THICKNESS GAUGE) (GAUGE NO BE 91-62-6)
+NO GO: 15.88 mm.
+
+RECOND GAUGE (HOUSING CENTRE WEDGE LOCATION GAUGE) (BE/91-72-1)
+NO GO: 59.54 mm. GO: 61.11 mm.
+
+RECOND GAUGE (HOUSING MOVABLE PLATE LOCATION GAUGE) (BE/91-61-10)
+NO GO: 144.48 mm. GO: 141.27 mm.
+
+BOARD 6 — MARK-50 SPRING GAUGES
+
+CORNER COIL SPRING GAUGE (BE/91-61-7a)
+Free height 286 mm. Gauge should not contact surface; if contact — scrap.
+
+RELEASE SPRING GAUGE (BE/91-61-8)
+Free height 123 mm. Gauge should not contact surface; if contact — scrap.
+
+OUTER COIL SPRING GAUGE (BE/91-61-6)
+Free height 342 mm. Gauge should not contact surface; if contact — scrap.
+
+INNER COIL SPRING GAUGE (BE/91-61-7A)
+Free height 342 mm. Gauge should not contact surface; if contact — scrap.
+
+BOARD 7 — MARK-50 PLATE, WEDGE, SHOE AND SEAT GAUGES
+
+OUTER STATIONARY PLATE GAUGE (BE/91-61-3)
+Gap 0.38 mm or more — plate is scrapped. Size: 24.64 mm.
+
+WEDGE SHOE GAUGE (BE/91-61-2)
+Gap 0.38 mm or more — shoe is scrapped. Contact with the surface — shoe is scrapped.
+
+CENTRE WEDGE GAUGE (BE/91-61-1)
+Gap 0.38 mm or more — wedge is scrapped. Gauge should not contact; if contact — wedge is
+scrapped.
+
+SPRING SEAT GAUGE (BE/91-61-5)
+Gauge to contact here; if non contact — scrap spring seat. If 0.38 mm or more gap — scrap
+spring seat.
+
+TAPER STATIONARY PLATE GAUGE (BE/91-61-4)
+Gauge should not pass this line. NO GO gauge: 0.25 mm.
+
+MOVABLE PLATE GAUGE (BE/91-61-10)
+Place gauge with base at centre and rotate 180 degrees; if no contact of base with movable
+plate, it is scrap. NO GO gauge: 24.13 mm. NO GO gauge: 211.17 mm.
+
+BOARD 8 — SPRING SORTING BENCH (CASNUB), AS SEEN
+
+Snubber spring gauge SSG-02: a post with a collar; the spring is dropped over the post and its
+free height read against the marks. Label (ASKIB, at lab / on site): descr. SNUBBER SPRING
+(HS); ID SSG-02; issued to SSE/CWM RWSS Raipur SECR; cert no. 1251122-04-125; calibrated on:
+blank; calibration valid upto: blank.
+
+Sorted springs carry a painted ring on the coil in the band colour (green, yellow seen on the
+bogie), so the band a spring was sorted into is visible on the wagon after assembly.
+
+Wheel sets carry chalked measurements on the wheel disc (tread diameter and date) and the
+slack adjuster carries a painted identification number (K-1894 seen).

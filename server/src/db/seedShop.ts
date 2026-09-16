@@ -39,6 +39,7 @@ import { PartLedgerRepository, expectedPartsFor } from './partLedgerRepository.t
 import { PocketCountRepository } from './pocketCountRepository.ts';
 import { ShadowRepository } from './shadowRepository.ts';
 import { WagonRepository } from './wagonRepository.ts';
+import { indexManualText, indexedSources } from '../manual/manualIndex.ts';
 
 /** A small deterministic generator, so the demo record is the same on every machine. */
 function lcg(seed: number) {
@@ -203,6 +204,15 @@ export function seedShopFloor(db: DatabaseSync): void {
     shadow.recordDiscrepancy({ occurredOn: d(2), shift: 'B', inspectorName: 'Amit Sharma', wagonNumber: null, location: 'Bench 2, inner', registerSays: 'BLUE', appSays: 'GREEN', registerVerdict: 'PASS', appVerdict: 'PASS', whoWasRight: 'REGISTER', cause: 'DEVICE', why: 'Tablet tap landed on the wrong band; corrected on the bench.', wouldHaveStoppedAWagon: false, reportedBy: 'usr_sup_001' });
     shadow.recordSummary({ summaryDate: d(2), shift: 'B', supervisorId: 'usr_sup_001', registerMinutesOneWagon: 38, appMinutesOneWagon: 31, transcriptionErrorsBoxMissed: 1, whatAppGotWrong: 'One mistap on the band strip, corrected on the bench.', whatAppCaught: 'A snubber judged on the wrong table in the register.', whatSlowed: 'Photographing condemned springs adds a few seconds each.', wouldHaveStoppedAWagon: 'The snubber on NR/BOXN/60334 — the register would have passed it.' });
   }
+
+  // The CBC and draft-gear section's wall charts, transcribed from the site
+  // visit, so Ask the Manual has something of this shop's own to cite even
+  // before the RDSO manual is indexed. Skipped if already present.
+  try {
+    const have = indexedSources(db).CBC_WALL || 0;
+    const chartPath = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'docs', 'shop-floor', 'cbc-draft-gear-wall-charts.txt');
+    if (!have) indexManualText(db, readFileSync(chartPath, 'utf8'), 'cbc-draft-gear-wall-charts.txt', 'CBC_WALL');
+  } catch { /* the charts are a convenience; the seed is not */ }
 
   console.log(`   ↳ Shop floor: ${sorted} bench springs over 30 days (${condemned} condemned), parts ledger, air-brake tests, assembly frames with pocket counts, shadow-run entries.`);
 }

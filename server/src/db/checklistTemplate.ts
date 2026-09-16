@@ -77,7 +77,7 @@ export const CASNUB_CHECKLIST_TEMPLATE: ChecklistTemplateItem[] = [
   // implicated in train-parting/uncoupling incidents, not routine wear items.
   { category: 'COUPLERS_DRAFT_GEAR', partName: 'CBC Knuckle Nose Wear (100% Replace — POH, WD-70-BD-10)', bogiePosition: 'BODY', isMandatory: 1, std: 'WMM 2.0 Appx-V B-1' },
   { category: 'COUPLERS_DRAFT_GEAR', partName: 'CBC Lock (100% Replace — POH, WD-70-BD-10)', bogiePosition: 'BODY', isMandatory: 1, std: 'WMM 2.0 Appx-V B-2' },
-  { category: 'COUPLERS_DRAFT_GEAR', partName: 'Draft Gear Housing', bogiePosition: 'BODY', isMandatory: 1, std: 'RDSO 49-BD-08' },
+  { category: 'COUPLERS_DRAFT_GEAR', partName: 'Draft Gear Housing', bogiePosition: 'BODY', isMandatory: 1, std: 'RDSO 49-BD-08; shop gauges 27706 (width GO 320.66 / NO GO 315.89), 27244 (height GO 465.15 / NO GO 461.90), 27257 (base flatness), BE 91-62-6 (wall NO GO 15.88)' },
   { category: 'COUPLERS_DRAFT_GEAR', partName: 'Striker Casting Wear Plate (100% Replace — POH)', bogiePosition: 'BODY', isMandatory: 1, std: 'WMM 2.0 Appx-V B-7' },
   /*
    * The Mark-50 gauge checks that used to sit here have been removed.
@@ -111,7 +111,7 @@ export const CASNUB_CHECKLIST_TEMPLATE: ChecklistTemplateItem[] = [
    * shop's own gauge board for the new gear — they belong here, as measurable
    * items with their source cited.
    */
-  { category: 'COUPLERS_DRAFT_GEAR', partName: 'High Capacity Draft Gear — condition, free movement and seating', bogiePosition: 'BODY', isMandatory: 1, std: 'RDSO STR 49-BD-08 (type as fitted)' },
+  { category: 'COUPLERS_DRAFT_GEAR', partName: 'High Capacity Draft Gear — condition, free movement and seating', bogiePosition: 'BODY', isMandatory: 1, std: 'RDSO STR 49-BD-08 (type as fitted); preshortening length 558.8 mm (gauge 27207); wedge, shoe, plate and spring gauges per the CBC section wall charts' },
 
   // 6. BOGIE_FRAME_BOLSTER
   { category: 'BOGIE_FRAME_BOLSTER', partName: 'Side Frame Column Liners', bogiePosition: 'BOGIE_1', isMandatory: 1, std: 'RDSO G-95' },
