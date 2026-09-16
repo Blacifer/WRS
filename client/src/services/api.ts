@@ -1248,6 +1248,16 @@ export class ApiClient {
   // Single Wagon Test (air brake) — WMM 2.0 §720
   // =========================================================================
 
+  // Wheel readings: the caller sends readings, never limits — the server judges
+  // against the wagon's wheel family and the client shows the same judgement live.
+  public async getWheelReadings(wagonNumber: string): Promise<{ success: boolean; data: any }> {
+    return this.request(`/wagons/${encodeURIComponent(wagonNumber)}/wheels`);
+  }
+
+  public async recordWheelReading(wagonNumber: string, payload: { axle: number; side: 'L' | 'R'; treadDiameterMm: number; flangeThicknessMm?: number | null; flangeHeightMm?: number | null; rootRadiusMm?: number | null; flatMm?: number | null; hollowMm?: number | null; instrument?: string | null }): Promise<{ success: boolean; data: any }> {
+    return this.request(`/wagons/${encodeURIComponent(wagonNumber)}/wheels`, { method: 'POST', body: JSON.stringify(payload) });
+  }
+
   public async recordSwt(wagonNumber: string, payload: {
     wagonType: string;
     pipeType: 'SINGLE' | 'TWIN';

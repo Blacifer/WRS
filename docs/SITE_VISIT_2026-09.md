@@ -67,13 +67,27 @@ position, side frame window in frame" is what the floor already lets you do;
 the side view in the first photograph is close to the frame the pocket counter
 expects.
 
-**Changes.** The wheel measurements are recorded on the wheel in chalk and
-nowhere else. The checklist has "Wheel Tread Diameter (Axle 1-4)" as a verdict;
-it does not take the number. That is the next field worth adding — a numeric
-reading on that item, per axle — and it is deliberately **not** added here,
-because the limit table it would be judged against (WMM wheel condemning
-sizes per wagon type) is not yet in the app and a number without its limit is
-a number nobody can act on. Noted as the first item for the next round.
+**Changes.** The wheel measurements were recorded on the wheel in chalk and
+nowhere else; the checklist had "Wheel Tread Diameter (Axle 1-4)" as a verdict
+and never took the number. A number without the limit it is judged against is
+one nobody can act on, so the limits came first — from Indian Railways' own
+training material (IRIMEE, rskr.irimee.in), which publishes the tread-diameter
+table by wheel type with its drawing number (BCN/BOXN on CASNUB: new 1000,
+last shop issue 919, condemn 906 — WD-97037 S-01), the permitted variation
+within an axle (0.5), a bogie (13) and a wagon (25), and the flange and tread
+condemning limits. They are in
+[`shared/classification/wheelLimits.ts`](../shared/classification/wheelLimits.ts)
+with the source on every figure, and as a citable document
+([`docs/shop-floor/wheel-limits-irimee.txt`](shop-floor/wheel-limits-irimee.txt),
+indexed as WHEEL_LIMITS). The wagon's checklist tab now has **Wheels — what
+the gauge read**: eight wheels, the chalk figure typed once per wheel, judged
+as it is typed and recorded with the verdict it earned; the two wheel
+checklist items follow the readings the way the spring items follow the
+spring measurements; and a wheel below the issue limit, a condemned flange,
+or a set outside the variation rule holds the wagon at the gate by name.
+Three verdicts, because the workshop has its own figure: a wheel at 912 mm is
+legal on the line and may not leave a POH. The figures should be confirmed
+against IRCA Part III before a release relies on them, and the screen says so.
 
 ## The shop as an environment
 

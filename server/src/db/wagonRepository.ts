@@ -14,6 +14,7 @@ import * as analytics from './wagonAnalytics.ts';
 import { CASNUB_CHECKLIST_TEMPLATE } from './checklistTemplate.ts';
 import { validateSpringNests } from '../../../shared/classification/nestGrouping.ts';
 import { PocketCountRepository } from './pocketCountRepository.ts';
+import { WheelRepository } from './wheelRepository.ts';
 import { PartLedgerRepository, expectedPartsFor } from './partLedgerRepository.ts';
 import { getSpringCountOptions, buildSpringQueue } from '../../../shared/classification/springCounts.ts';
 import { evaluateSwt } from '../../../shared/classification/swtSpec.ts';
@@ -128,6 +129,11 @@ export interface ExitGateBlockerDetail {
     | 'POCKETS_SHORT'
     | 'POCKET_COUNT_OVER'
     | 'POCKET_COUNT_DISAGREES'
+    // A wheel read below the workshop's issue limit or the condemning limit, or a
+    // set whose diameters differ by more than the rule allows. Blockers: these are limits.
+    | 'WHEEL_CONDEMNED'
+    | 'WHEEL_BELOW_SHOP_ISSUE'
+    | 'WHEEL_VARIATION'
     | 'SWT_NOT_PERFORMED'
     | 'SWT_FAILED'
     // Nest grouping violations, from NestViolationType.
@@ -494,6 +500,7 @@ export class WagonRepository {
 
     // Sync Phase 1 spring inspection records into Category 1 ('SPRINGS')
     this.syncPhase1SpringsToChecklist(normalizedWagonNumber, rows);
+    this.syncWheelReadingsToChecklist(normalizedWagonNumber, rows);
 
     // Group by category
     const categoriesMap: Record<string, any[]> = {};
@@ -660,6 +667,57 @@ export class WagonRepository {
         // Anything reading checklist_items directly previously saw PENDING
         // even though the UI and gate showed the spring as cleared.
         persistStmt.run(newStatus, notes, matched.id, now, row.id, 'REPLACED');
+      }
+    }
+  }
+
+  /*
+   * The wheel items, from the wheel readings — the same way the spring items
+   * come from the spring measurements. "Wheel Tread Diameter (Axle 1-4)" is
+   * PASS only when all eight wheels have a reading and none is below the
+   * last-shop-issue or condemning diameter; CONDEMNED when any is. "Flange
+   * Thickness (Min 16.0mm)" likewise from the flange readings that exist.
+   * A hand-entered verdict is respected, as it is for springs; the readings
+   * are the evidence and the gate reads them directly.
+   */
+  private syncWheelReadingsToChecklist(wagonNumber: string, checklistRows: any[]): void {
+    let summary: ReturnType<WheelRepository['summary']>;
+    try { summary = new WheelRepository(this.db).summary(wagonNumber); } catch { return; }
+    if (summary.wheels.length === 0) return;
+    const persistStmt = this.db.prepare(`
+      UPDATE checklist_items SET status = ?, condition_notes = ?, updated_at = ? WHERE id = ? AND status != ?
+    `);
+    const now = new Date().toISOString();
+    for (const row of checklistRows) {
+      if (row.category !== 'WHEELS_AXLES' || row.manual_verdict_at) continue;
+      const name = String(row.part_name || '').toLowerCase();
+      let newStatus: string | null = null;
+      let notes = row.condition_notes;
+      if (name.includes('tread diameter')) {
+        const bad = summary.wheels.filter((w) => w.findings.some((f) => f.dimension === 'treadDiameterMm' && f.verdict !== 'PASS'));
+        if (bad.length > 0) {
+          newStatus = 'CONDEMNED';
+          notes = `Auto-linked from wheel readings: ${bad.map((w) => `A${w.axle}${w.side} ${w.treadDiameterMm} mm`).join(', ')} below limit (${summary.limits ? `issue ${summary.limits.lastShopIssueMm} / condemn ${summary.limits.condemnMm} mm, ${summary.limits.drawing}` : 'no table'}).`;
+        } else if (summary.wheels.length === 8 && summary.set.ok) {
+          const ds = summary.wheels.map((w) => w.treadDiameterMm);
+          newStatus = 'PASS';
+          notes = `Auto-linked from wheel readings: 8 wheels ${Math.min(...ds)}–${Math.max(...ds)} mm${summary.limits ? `, issue limit ${summary.limits.lastShopIssueMm} mm (${summary.limits.drawing})` : ''}; variation within limits.`;
+        }
+      } else if (name.includes('flange thickness')) {
+        const read = summary.wheels.filter((w) => w.flangeThicknessMm !== null);
+        const bad = read.filter((w) => w.findings.some((f) => f.dimension === 'flangeThicknessMm' && f.verdict !== 'PASS'));
+        if (bad.length > 0) {
+          newStatus = 'CONDEMNED';
+          notes = `Auto-linked from wheel readings: thin flange on ${bad.map((w) => `A${w.axle}${w.side} ${w.flangeThicknessMm} mm`).join(', ')} (limit 16 mm).`;
+        } else if (read.length === 8) {
+          newStatus = 'PASS';
+          notes = `Auto-linked from wheel readings: 8 flanges ${Math.min(...read.map((w) => w.flangeThicknessMm!))}–${Math.max(...read.map((w) => w.flangeThicknessMm!))} mm, all above 16 mm.`;
+        }
+      }
+      if (newStatus && row.status !== newStatus) {
+        row.status = newStatus;
+        row.condition_notes = notes;
+        persistStmt.run(newStatus, notes, now, row.id, 'REPLACED');
       }
     }
   }
@@ -1637,6 +1695,57 @@ export class WagonRepository {
           remediationAction: 'Replace spring and log a new Phase 1 inspection record.'
         });
       }
+    }
+
+    /*
+     * Wheels, where readings have been taken.
+     *
+     * shared/classification/wheelLimits.ts: a wheel below the condemning
+     * diameter, or with a thin, deep or sharp flange, a flat or a hollow past
+     * its limit, cannot leave; nor can one below the workshop's last-shop-issue
+     * diameter — that figure exists precisely so a POH does not send out a
+     * wheel that is legal on the line but has no life left. And a set whose
+     * diameters differ by more than the rule (0.5 mm on an axle, 13 mm in a
+     * bogie, 25 mm across the wagon) is a set that will not run true. All
+     * blockers: they are published limits, not judgement calls. A wagon with
+     * no wheel readings is not blocked here — the checklist item still has to
+     * be answered, and that is the item's job.
+     */
+    try {
+      const wheels = new WheelRepository(this.db).summary(normalizedWagonNumber);
+      for (const w of wheels.wheels) {
+        if (w.verdict === 'PASS') continue;
+        const bad = w.findings.filter((f) => f.verdict !== 'PASS').map((f) => `${f.dimension.replace(/Mm$/, '')} ${f.value} mm (${f.limit})`).join('; ');
+        const message = w.verdict === 'CONDEMN'
+          ? `Wheel axle ${w.axle} ${w.side === 'L' ? 'left' : 'right'} is condemned: ${bad}.`
+          : `Wheel axle ${w.axle} ${w.side === 'L' ? 'left' : 'right'} is below the last-shop-issue diameter: ${bad}. It may not leave a POH at this size.`;
+        blockers.push(message);
+        blockerDetails.push({
+          id: `wheel_${w.verdict.toLowerCase()}_a${w.axle}${w.side.toLowerCase()}`,
+          category: 'WHEELS_AXLES',
+          partName: `Wheel A${w.axle}${w.side}`,
+          issueType: w.verdict === 'CONDEMN' ? 'WHEEL_CONDEMNED' : 'WHEEL_BELOW_SHOP_ISSUE',
+          description: message,
+          severity: 'CRITICAL_BLOCKER',
+          remediationAction: w.verdict === 'CONDEMN' ? 'Change the wheel set and record the new wheels.' : 'Change the wheel set (or turn to profile only if the diameter stays at or above the issue limit) and record the new readings.'
+        });
+      }
+      for (const v of wheels.set.variations) {
+        if (v.ok) continue;
+        const message = `Wheel diameters on ${v.scope} differ by ${v.spreadMm} mm; the limit is ${v.limitMm} mm (${v.members.join(', ')}).`;
+        blockers.push(message);
+        blockerDetails.push({
+          id: `wheel_variation_${v.scope.replace(/\s+/g, '_')}`,
+          category: 'WHEELS_AXLES',
+          partName: `Wheels — ${v.scope}`,
+          issueType: 'WHEEL_VARIATION',
+          description: message,
+          severity: 'CRITICAL_BLOCKER',
+          remediationAction: 'Pair wheel sets so the diameters fall within the permitted variation, and record the readings again.'
+        });
+      }
+    } catch {
+      // A database from before the readings table. The gate evaluates without it.
     }
 
     // Check if stage is at FINAL_QC_GATE or RELEASE

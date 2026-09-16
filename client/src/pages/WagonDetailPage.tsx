@@ -15,6 +15,7 @@ import AutoJudgePart from '../components/AutoJudgePart.tsx';
 import { PhotoGallery } from '../components/PhotoGallery.tsx';
 import { AssemblyEvidenceCapture } from '../components/AssemblyEvidenceCapture.tsx';
 import { PocketCountPanel } from '../components/PocketCountPanel.tsx';
+import { WheelReadings } from '../components/WheelReadings.tsx';
 import { parseAssemblyTags } from '../../../shared/assembly/assemblyCapture.ts';
 import { WagonConditionReport } from '../components/WagonConditionReport.tsx';
 import { PartsLedger } from '../components/PartsLedger.tsx';
@@ -1467,6 +1468,17 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
               });
             }}
             onApplied={loadWagonData}
+          />
+
+          {/* The wheel readings — the chalk on the disc, typed once, judged
+              against the wagon's wheel family. The two wheel checklist items
+              follow these readings the way the spring items follow the
+              spring measurements. */}
+          <WheelReadings
+            wagonNumber={wagonNumber}
+            lang={isHi ? 'hi' : 'en'}
+            canRecord={can(api.getUser()?.role, 'wagon.inspect')}
+            onRecorded={loadWagonData}
           />
 
           {/* Hands-Free Voice Inspection Toolbar */}

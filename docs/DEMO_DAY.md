@@ -57,7 +57,10 @@ Order matters: the shop floor first, the dashboards second, the proofs last.
    the screen — the person counts what is in the photograph.
 3. **Release checks** (`supervisor1`). Same wagon, *Release checks*: the short
    count is waiting there as an advisory, by name. Then `SER/BOXNHL/30914` at
-   the final gate — blocked by a condemned spring, and the gate says which.
+   the final gate — blocked by a condemned spring and by the axle-3 wheel pair
+   at 917.5 mm, below the 919 mm last-shop-issue diameter; open its
+   *Checklist* tab and show *Wheels — what the gauge read*: the chalk figures
+   from the disc, the limit and the drawing number beside them.
 4. **Ask the Records** (`supervisor1`). Type *which wagon type condemns the
    most snubbers this quarter* and *is any gauge reading high*. Open *How this
    was computed* — the query, its parameters, the rows. OSG-02 reads about a

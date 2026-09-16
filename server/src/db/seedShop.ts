@@ -39,6 +39,7 @@ import { PartLedgerRepository, expectedPartsFor } from './partLedgerRepository.t
 import { PocketCountRepository } from './pocketCountRepository.ts';
 import { ShadowRepository } from './shadowRepository.ts';
 import { WagonRepository } from './wagonRepository.ts';
+import { WheelRepository } from './wheelRepository.ts';
 import { indexManualText, indexedSources } from '../manual/manualIndex.ts';
 
 /** A small deterministic generator, so the demo record is the same on every machine. */
@@ -205,6 +206,11 @@ export function seedShopFloor(db: DatabaseSync): void {
     shadow.recordSummary({ summaryDate: d(2), shift: 'B', supervisorId: 'usr_sup_001', registerMinutesOneWagon: 38, appMinutesOneWagon: 31, transcriptionErrorsBoxMissed: 1, whatAppGotWrong: 'One mistap on the band strip, corrected on the bench.', whatAppCaught: 'A snubber judged on the wrong table in the register.', whatSlowed: 'Photographing condemned springs adds a few seconds each.', wouldHaveStoppedAWagon: 'The snubber on NR/BOXN/60334 — the register would have passed it.' });
   }
 
+  // Wheel readings on the QC-gate wagon: eight wheels chalked on the disc,
+  // one of them below the last-shop-issue diameter, so the gate has a wheel
+  // to hold and the checklist item shows where the figures came from.
+  seedWheelReadings(db);
+
   // The CBC and draft-gear section's wall charts, transcribed from the site
   // visit, so Ask the Manual has something of this shop's own to cite even
   // before the RDSO manual is indexed. Skipped if already present.
@@ -212,6 +218,8 @@ export function seedShopFloor(db: DatabaseSync): void {
     const have = indexedSources(db).CBC_WALL || 0;
     const chartPath = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'docs', 'shop-floor', 'cbc-draft-gear-wall-charts.txt');
     if (!have) indexManualText(db, readFileSync(chartPath, 'utf8'), 'cbc-draft-gear-wall-charts.txt', 'CBC_WALL');
+    const wheelPath = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'docs', 'shop-floor', 'wheel-limits-irimee.txt');
+    if (!(indexedSources(db).WHEEL_LIMITS || 0)) indexManualText(db, readFileSync(wheelPath, 'utf8'), 'wheel-limits-irimee.txt', 'WHEEL_LIMITS');
   } catch { /* the charts are a convenience; the seed is not */ }
 
   console.log(`   ↳ Shop floor: ${sorted} bench springs over 30 days (${condemned} condemned), parts ledger, air-brake tests, assembly frames with pocket counts, shadow-run entries.`);
@@ -223,4 +231,22 @@ function tableFor(bogieType: BogieType, position: 'OUTER' | 'INNER' | 'SNUBBER')
   // Not every table publishes a nominal; the top of Band I is close enough for a demo distribution's centre.
   const nominal = typeof t.nominalFreeHeight === 'number' ? t.nominalFreeHeight : Math.max(...t.bands.map((b) => b.maxHeight)) - 2;
   return { nominal, condemnMin: t.condemningMinHeight };
+}
+
+function seedWheelReadings(db: DatabaseSync): void {
+  const wheels = new WheelRepository(db);
+  const wagon = 'SER/BOXNHL/30914'; // at the final gate
+  if (!db.prepare('SELECT 1 FROM wagons WHERE wagon_number = ?').get(wagon)) return;
+  if (wheels.history(wagon).length > 0) return;
+  // The chalk from the floor: a worn but matched set (wagon spread 20.5 mm,
+  // inside the 25), with the axle-3 pair at 917.5 / 917.8 — legal on the
+  // line, below the 919 mm last-shop-issue diameter, so it may not leave a
+  // POH. The gate holds the wagon for that pair and nothing else.
+  const readings: Array<[1 | 2 | 3 | 4, 'L' | 'R', number, number]> = [
+    [1, 'L', 938.0, 27.5], [1, 'R', 938.0, 27.0], [2, 'L', 936.5, 26.5], [2, 'R', 936.5, 27.5],
+    [3, 'L', 917.5, 24.0], [3, 'R', 917.8, 23.5], [4, 'L', 921.0, 25.0], [4, 'R', 921.0, 25.5]
+  ];
+  for (const [axle, side, d, flange] of readings) {
+    wheels.record({ wagonNumber: wagon, axle, side, reading: { treadDiameterMm: d, flangeThicknessMm: flange }, instrument: 'WDG-1', inspectorId: 'usr_insp_003', inspectorName: 'Amit Sharma' });
+  }
 }

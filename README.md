@@ -56,7 +56,10 @@ The **WRS Raipur Quality Control Platform** is an enterprise-grade web applicati
 11. **Pocket occupancy from a photograph — counted, not classified**
    - The one thing a photograph can honestly settle here: were all the spring pockets occupied when the bogie was closed up. A person taps each spring on the assembly frame; the expected number comes from the wagon designation and nothing else, and the counter is never shown it. A matching count produces nothing — no tick, no "verified". A short count reaches the exit gate as an advisory the supervisor acknowledges by name. A second person recounts blind; the counts are the labelled dataset, the agreement rate is what any model would be measured against, and the model today is NONE — the code and the dashboard both say so.
 
-12. **Built for the shop floor**
+12. **Wheels — the chalk on the disc, kept and judged**
+   - Tread diameter (and flange thickness, height, root radius, flat, hollow) typed once per wheel and judged as it is typed against the wagon's wheel family — BCN/BOXN on CASNUB: new 1000, last shop issue 919, condemn 906 mm (WD-97037 S-01); variation 0.5 / 13 / 25 mm within an axle, bogie and wagon — with the source on every figure. The checklist's wheel items follow the readings; a wheel below the issue limit or a set outside the variation rule holds the wagon at the gate by name. Three verdicts, because a wheel legal on the line may still not leave a POH.
+
+13. **Built for the shop floor**
    - Offline-first PWA with an IndexedDB queue; work continues without a network and syncs without duplicating.
    - Bilingual throughout (English / Hindi).
    - Hands-free voice checklist entry, and acoustic bearing/leak diagnostics using real Web Audio FFT.

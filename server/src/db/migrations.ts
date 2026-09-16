@@ -1696,6 +1696,44 @@ export function runMigrations(db: DatabaseSync): void {
   `);
 
   /*
+   * Wheel readings — the chalk on the wheel disc, kept.
+   *
+   * See shared/classification/wheelLimits.ts. Eight wheels per wagon, each
+   * read for tread diameter (and flange thickness, height, root radius, flat
+   * and hollow when taken), judged against the limits for the wagon's wheel
+   * family at write time and stored with that verdict, the way spring
+   * readings are. Append-only: a re-read is a new row, and the latest row per
+   * wheel is the one that counts.
+   */
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS wheel_readings (
+      id TEXT PRIMARY KEY,
+      wagon_number TEXT NOT NULL,
+      axle INTEGER NOT NULL CHECK(axle BETWEEN 1 AND 4),
+      side TEXT NOT NULL CHECK(side IN ('L', 'R')),
+      wheel_family TEXT DEFAULT NULL,
+      tread_diameter_mm REAL NOT NULL,
+      flange_thickness_mm REAL DEFAULT NULL,
+      flange_height_mm REAL DEFAULT NULL,
+      root_radius_mm REAL DEFAULT NULL,
+      flat_mm REAL DEFAULT NULL,
+      hollow_mm REAL DEFAULT NULL,
+      verdict TEXT NOT NULL CHECK(verdict IN ('PASS', 'BELOW_SHOP_ISSUE', 'CONDEMN')),
+      findings_json TEXT NOT NULL,
+      instrument TEXT DEFAULT NULL,
+      inspector_id TEXT NOT NULL,
+      inspector_name TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+      FOREIGN KEY (inspector_id) REFERENCES users(id) ON DELETE RESTRICT
+    );
+    CREATE INDEX IF NOT EXISTS idx_wheel_readings_wagon ON wheel_readings(wagon_number, axle, side, created_at);
+    CREATE TRIGGER IF NOT EXISTS trg_wheel_readings_no_update BEFORE UPDATE ON wheel_readings
+    BEGIN SELECT RAISE(ABORT, 'A wheel reading is a record and cannot be rewritten; take another.'); END;
+    CREATE TRIGGER IF NOT EXISTS trg_wheel_readings_no_delete BEFORE DELETE ON wheel_readings
+    BEGIN SELECT RAISE(ABORT, 'A wheel reading is a record and cannot be deleted.'); END;
+  `);
+
+  /*
    * What the offline queue has already delivered.
    *
    * A tablet that loses the wifi between the server committing a batch and

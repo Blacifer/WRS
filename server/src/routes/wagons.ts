@@ -13,6 +13,7 @@ import { can } from '../../../shared/auth/permissions.ts';
 import { getDatabase } from '../db/connection.ts';
 import { logAuditEvent } from '../db/auditLog.ts';
 import { WagonRepository } from '../db/wagonRepository.ts';
+import { WheelRepository } from '../db/wheelRepository.ts';
 import { InspectionRepository } from '../db/repository.ts';
 import { LifecycleEngine } from '../lifecycle/engine.ts';
 import { ExitGateValidator } from '../gate/validator.ts';
@@ -522,6 +523,68 @@ wagonsRouter.get('/:wagonNumber/gate/status', authMiddleware, async (req: Reques
 // -------------------------------------------------------------------------
 // Single Wagon Test (air brake) — WMM 2.0 §720
 // -------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Wheels — the chalk on the wheel disc, kept and judged
+//
+// POST /:wagonNumber/wheels        one wheel's readings; judged at write time
+// GET  /:wagonNumber/wheels        latest per wheel, the set-level variation
+//                                  check, and the limits they were held to
+//
+// The wheel family — and so the limit table — comes from the wagon's
+// designation. The caller sends readings, never limits. See
+// shared/classification/wheelLimits.ts for the figures and their source.
+// ---------------------------------------------------------------------------
+wagonsRouter.get('/:wagonNumber/wheels', authMiddleware, async (req: Request, res: Response) => {
+  const wagonNumber = req.params?.wagonNumber;
+  if (!wagonNumber) { res.status(400).json({ success: false, error: 'MISSING_PARAM', message: 'wagonNumber is required', statusCode: 400, timestamp: new Date().toISOString() }); return; }
+  try {
+    const repo = new WheelRepository(getDatabase());
+    res.status(200).json({ success: true, data: { ...repo.summary(wagonNumber), history: repo.history(wagonNumber) }, meta: { timestamp: new Date().toISOString() } });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: 'WHEELS_READ_FAILED', message: err?.message || 'Could not read the wheel readings', statusCode: 500, timestamp: new Date().toISOString() });
+  }
+});
+
+wagonsRouter.post('/:wagonNumber/wheels', authMiddleware, requireCapability('wagon.inspect'), async (req: Request, res: Response) => {
+  const wagonNumber = req.params?.wagonNumber;
+  const b = req.body || {};
+  const user = (req as any).user;
+  if (!wagonNumber) { res.status(400).json({ success: false, error: 'MISSING_PARAM', message: 'wagonNumber is required', statusCode: 400, timestamp: new Date().toISOString() }); return; }
+  const axle = Number(b.axle);
+  const side = String(b.side || '').toUpperCase();
+  const tread = Number(b.treadDiameterMm);
+  if (![1, 2, 3, 4].includes(axle) || !['L', 'R'].includes(side)) {
+    res.status(400).json({ success: false, error: 'VALIDATION_ERROR', message: 'axle must be 1–4 and side L or R.', statusCode: 400, timestamp: new Date().toISOString() }); return;
+  }
+  if (!Number.isFinite(tread) || tread < 700 || tread > 1100) {
+    res.status(400).json({ success: false, error: 'VALIDATION_ERROR', message: 'treadDiameterMm must be a number between 700 and 1100 — a wagon wheel, measured 66.5 mm from the rim face.', statusCode: 400, timestamp: new Date().toISOString() }); return;
+  }
+  // Limits are the registry's, not the caller's. Any attempt to send one is refused, not ignored.
+  for (const k of ['condemnMm', 'lastShopIssueMm', 'limit', 'limits', 'verdict']) {
+    if (k in b) { res.status(400).json({ success: false, error: 'LIMIT_NOT_ACCEPTED', message: `${k} is not accepted: the limits come from the wagon's wheel family, never from the reading.`, statusCode: 400, timestamp: new Date().toISOString() }); return; }
+  }
+  const opt = (k: string, lo: number, hi: number): number | null | 'bad' => {
+    if (b[k] === undefined || b[k] === null || b[k] === '') return null;
+    const n = Number(b[k]); return Number.isFinite(n) && n >= lo && n <= hi ? n : 'bad';
+  };
+  const reading = { treadDiameterMm: tread, flangeThicknessMm: opt('flangeThicknessMm', 5, 40), flangeHeightMm: opt('flangeHeightMm', 15, 45), rootRadiusMm: opt('rootRadiusMm', 5, 20), flatMm: opt('flatMm', 0, 200), hollowMm: opt('hollowMm', 0, 20) };
+  const bad = Object.entries(reading).find(([, v]) => v === 'bad');
+  if (bad) { res.status(400).json({ success: false, error: 'VALIDATION_ERROR', message: `${bad[0]} is outside a plausible range.`, statusCode: 400, timestamp: new Date().toISOString() }); return; }
+  try {
+    const result = new WheelRepository(getDatabase()).record({
+      wagonNumber, axle, side, reading: reading as any, instrument: b.instrument ? String(b.instrument).slice(0, 40) : null, inspectorId: user.id, inspectorName: user.name
+    });
+    logAuditEvent(getDatabase(), {
+      eventType: 'INSPECTION_CREATED', userId: user.id, userRole: user.role,
+      payload: { action: 'WHEEL_READING', wagonNumber: wagonNumber.toUpperCase(), axle, side, treadDiameterMm: tread, verdict: result.judgement.verdict, readingId: result.row.id }
+    });
+    res.status(201).json({ success: true, data: result, meta: { timestamp: new Date().toISOString() } });
+  } catch (err: any) {
+    const status = err?.code === 'WAGON_NOT_FOUND' ? 404 : err?.code === 'UNKNOWN_ACTOR' ? 401 : 500;
+    res.status(status).json({ success: false, error: err?.code || 'WHEEL_READING_FAILED', message: err?.message || 'Could not record the wheel reading', statusCode: status, timestamp: new Date().toISOString() });
+  }
+});
 
 wagonsRouter.post('/:wagonNumber/swt', authMiddleware, async (req: Request, res: Response) => {
   const { wagonRepo } = getRepos();

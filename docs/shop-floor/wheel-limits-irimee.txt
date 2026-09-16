@@ -1,0 +1,63 @@
+WHEEL SET LIMITS FOR C&W STOCK — FROM INDIAN RAILWAYS' OWN TRAINING NOTES
+Source: IRIMEE (Indian Railways Institute of Mechanical and Electrical Engineering) supervisors'
+training centre notes, "Wheel Set / Wheel Defects" (STC/NBQ) and "Types of Bogies in Wagon
+Stock" (rskr.irimee.in), read September 2026. Source label in this index: WHEEL_LIMITS.
+The workshop should confirm these against IRCA Part III / the Wagon Maintenance Manual before
+relying on them for a release; they are reproduced here so that every wheel reading can cite
+the figure it was judged against.
+
+WHEEL TREAD DIAMETER (all dimensions in mm)
+Type of wheel — initial diameter — last shop issue diameter — condemning limit — drawing no.
+BG/ICF solid — 915 — 837 — 825 — W/WL-1600/R
+BCN/BOXN (CASNUB) — 1000 — 919 — 906 — WD-97037 S-01
+BLC — 840 — 793 — 780 — CONTR-9404-S/13
+BG (diesel) — 1092 — 1020 — 1016 — W/WL-4849/R, W/WL-6061/R
+DEMU — 952 — 885 — 877 — SKETCH-K4004
+LHB — 915 — 862 — 855 — LW-02001
+
+For CASNUB bogies: wheel diameter 1000 mm new, 906 mm condemn, for all except CASNUB 22NLC and
+LCCF 20(C); 955 mm minimum for CASNUB 22NLC; 840 mm new and 780 mm condemn for LCCF 20(C).
+Diameter of wheel is measured at the tread at a distance of 66.5 mm from the rim face (or 63.5
+mm from the flange end). The V groove on the wheel is the marker for the condemning limit.
+
+VARIATION IN WHEEL TREAD DIAMETER (mm)
+Type of wheel set — on same axle — on same bogie/trolley — on same coach/wagon
+BG/ICF — 0.5 — 5 — 13
+BCN/BOXN (CASNUB) — 0.5 — 13 — 25
+BG (diesel) — 0.5 — 8 — 15
+DEMU — 0.5 — 5 — 13
+LHB — 0.5 — 5 — 13
+
+WHEEL GAUGE
+The wheel gauge distance for BG (C&W) wheel is 1600 +2/-1 mm.
+
+WHEEL PROFILE
+Flange thickness: 29.4 mm (worn wheel profile); condemning 16 mm, and 22 mm for high speed.
+Flange thickness is reckoned at a distance of approximately 13 mm from the flange tip.
+Flange height: new 28.5 mm.
+Radius at the root of flange: new 14 mm, condemning 13 mm.
+Radius at top of flange: 14.5 mm.
+Inclination of 1 in 2.5 on flange; 1 in 20 on tread.
+
+WHEEL DEFECTS — STANDARD AND CONDEMNING LIMIT
+Sharp flange — standard 14.5 mm — condemn at 5 mm or less.
+Thin flange — standard 29.4 mm — condemn at 16 mm or less (22 mm high speed).
+Less radius at root of flange — standard 14 mm — condemn at 13 mm or less.
+Hollow tyre — condemn at 5 mm or above.
+Deep flange — standard 28.5 mm — condemn at 35 mm or more (measured from the flange tip to a
+point on the wheel tread 63.5 mm from the back of the wheel).
+Flat tyre — condemn at 50 mm or more for coaching stock, 60 mm or more for goods stock (all BG
+wagons); locomotives 50 mm.
+
+OTHER REJECTABLE CONDITIONS (per CMI-K003)
+Shattered rim: a wheel with a fracture on the tread or flange must be withdrawn from service.
+Spread rim: rim widening for a short distance on the front face — an internal defect may be
+present; such wheels must be withdrawn.
+Thermal cracks: from severe brake binding; when a crack becomes visible on the outer face of
+the rim, reaches the outer edge of the rim, or is visible on the outer flange face, the wheel
+must be withdrawn and sent to workshop.
+Heat checks: fine superficial cracks on or near the braking surface; need not be withdrawn but
+must be distinguished from rejectable thermal cracks.
+Built-up tread: metal from tread or brake shoe dragged around the tread, associated with
+sliding on the rail.
+Wheel shelling: rolling contact fatigue; pieces of metal breaking out of the tread surface.

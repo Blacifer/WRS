@@ -186,6 +186,7 @@ section's wall charts, transcribed from the floor
 
 ```bash
 npm run index-manual -- "docs/shop-floor/cbc-draft-gear-wall-charts.txt" CBC_WALL
+npm run index-manual -- "docs/shop-floor/wheel-limits-irimee.txt" WHEEL_LIMITS
 ```
 
 ## 6. The gauges
