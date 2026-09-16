@@ -150,6 +150,9 @@ WRS_BACKUP_DIR=D:\\wrs-backups
 # by the same backup. Leave this unset unless they should live elsewhere.
 # WRS_PHOTO_DIR=
 
+# DEMO-DATA.cmd adds SEED_DEMO_USERS=true here so the published demonstration
+# accounts can sign in. Delete that line, and those accounts, before real use.
+
 # The first administrator, used ONCE on the first start and then ignored.
 # Remove these two lines after signing in and changing the password.
 BOOTSTRAP_ADMIN_USERNAME=wrsadmin
@@ -159,7 +162,10 @@ BOOTSTRAP_ADMIN_PASSWORD=CHANGE-ME-at-least-12-characters
 
 fs.writeFileSync(
   path.join(BUNDLE, 'START.cmd'),
-  `@echo off
+  // String.raw: a Windows path in an ordinary template literal loses its
+  // backslashes (\c, \s, \l are dropped; \n becomes a newline). The first
+  // shipped START.cmd read "servercertslan-cert.pem" and could not start.
+  String.raw`@echo off
 setlocal
 title WRS Raipur
 cd /d "%~dp0"
@@ -278,7 +284,10 @@ goto run
  */
 fs.writeFileSync(
   path.join(BUNDLE, 'DEMO-DATA.cmd'),
-  `@echo off
+  // String.raw: a Windows path in an ordinary template literal loses its
+  // backslashes (\c, \s, \l are dropped; \n becomes a newline). The first
+  // shipped START.cmd read "servercertslan-cert.pem" and could not start.
+  String.raw`@echo off
 setlocal
 title WRS Raipur — demonstration record
 cd /d "%~dp0"
@@ -295,9 +304,17 @@ if /i not "%GO%"=="DEMO" exit /b 1
 cd server
 set SEED_DEMO_USERS=true
 "%NODE%" --experimental-strip-types src\db\seed.ts
+if errorlevel 1 ( cd .. & echo. & echo   Nothing written. & pause & exit /b 1 )
 cd ..
+rem A production build refuses the published demo password at sign-in unless
+rem this switch is set for the server too. It goes into .env here, on purpose,
+rem and must come out again before the shop's real accounts are created.
+findstr /b /c:"SEED_DEMO_USERS=true" .env >nul 2>nul || echo SEED_DEMO_USERS=true>> .env
 echo.
 echo   Done. Start with START.cmd and sign in as drm1 / password123.
+echo.
+echo   SEED_DEMO_USERS=true was added to .env so the demo accounts can sign in.
+echo   DELETE THAT LINE, and the demo accounts, before real use.
 pause
 `
 );
@@ -335,6 +352,29 @@ If START.cmd says Node is missing or too old, the installer on the stick
 fixes it. Nothing else on this PC is needed, and nothing needs the internet.
 `
 );
+
+// ---------------------------------------------------------------------------
+step('Read the start scripts back the way cmd.exe will');
+/*
+ * The one check that would have caught the first shipped START.cmd: every
+ * Windows path in it must still have its backslashes. A template literal
+ * silently drops \c, \s and \l and turns \n into a newline, and the
+ * result looks fine in a diff and fails on the shop PC.
+ */
+for (const [file, needles] of [
+  ['START.cmd', ['server\\certs\\lan-cert.pem', 'src\\index.ts', '%ProgramFiles%\\nodejs\\node.exe', 'logs\\wrs-']],
+  ['DEMO-DATA.cmd', ['src\\db\\seed.ts', '%ProgramFiles%\\nodejs\\node.exe']]
+]) {
+  const text = fs.readFileSync(path.join(BUNDLE, file), 'utf8');
+  for (const needle of needles) {
+    if (!text.includes(needle)) {
+      console.error(`   ${file} lost a path: expected "${needle}"`);
+      process.exit(1);
+    }
+  }
+  if (/^odejs/m.test(text)) { console.error(`   ${file} has a newline where \\nodejs should be`); process.exit(1); }
+}
+console.log('   START.cmd and DEMO-DATA.cmd keep their backslashes');
 
 // ---------------------------------------------------------------------------
 step('Check nothing development-only leaked in');

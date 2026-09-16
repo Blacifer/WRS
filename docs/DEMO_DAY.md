@@ -18,7 +18,10 @@ command or a click; nothing needs the internet.
    thirteen wagons across all seven stages, a month of the sorting bench, one
    wagon's parts ledger, air-brake tests, assembly photographs with pocket
    counts, and a week of the shadow run. It refuses if the database already
-   holds wagons, so it cannot land on a real record by accident.
+   holds wagons, so it cannot land on a real record by accident. It also adds
+   `SEED_DEMO_USERS=true` to `.env`, because a production build otherwise
+   refuses the published demo password at sign-in — **delete that line, and
+   the demo accounts, before the shop's real accounts are created.**
 4. **Open `https://localhost:3000`**, sign in as `drm1 / password123`, and look
    at the DRM dashboard. The three tiles under *Shop Floor — Right Now* must
    show figures, not "Not yet known". If they do not, the seed did not run.
