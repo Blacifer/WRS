@@ -305,6 +305,29 @@ The photo restore never overwrites: a file already present with different
 bytes is named and left alone, because the backup is not entitled to decide
 which copy is the evidence.
 
+### 7a. A copy in the cloud
+
+A USB disk in another room protects against a dead PC. It does not protect
+against the room. Add these four lines to `.env` and every scheduled backup
+also pushes its **encrypted** files to an S3-compatible bucket and reads
+them back to check the bytes match:
+
+```
+WRS_CLOUD_ENDPOINT=https://s3.ap-south-1.amazonaws.com   # or the provider's
+WRS_CLOUD_BUCKET=wrs-raipur-backups
+WRS_CLOUD_ACCESS_KEY=…
+WRS_CLOUD_SECRET_KEY=…
+```
+
+Any storage that speaks the S3 API works: AWS in Mumbai, an Indian provider,
+or a MinIO server the railway runs on its own network (RailTel or NIC cloud
+both offer S3-compatible storage; ask for "S3-compatible object storage" and
+the four values above). The bucket only ever holds ciphertext; the key stays
+on this PC and its copy in the office. Push what is already on the disk once
+with `node server\scripts\backup-db.mjs --cloud`. The readiness panel row
+*The newest backup is also off-site (cloud)* says whether it worked, and
+keeps saying so every day.
+
 ## 8. Check your work
 
 Sign in as an administrator, open the dashboard, and press **Check now** on

@@ -382,6 +382,44 @@ healthRouter.get(
     });
 
     /*
+     * The off-site copy. A backup on a USB disk in another room protects
+     * against a dead PC; it does not protect against the room. When the
+     * cloud settings are present, backup-db.mjs pushes each encrypted file to
+     * an S3-compatible bucket and verifies it by ETag, recording the result in
+     * cloud-manifest.json beside the backups. This row reads that manifest —
+     * a cloud copy that has been failing for a week is a row here, not a
+     * surprise on the day the disk dies. Not configured is a WARN, not a
+     * FAIL: a shop with no internet has the USB disk, and the row says so.
+     */
+    const cloud = (() => {
+      const configured = Boolean(process.env.WRS_CLOUD_ENDPOINT && process.env.WRS_CLOUD_BUCKET && process.env.WRS_CLOUD_ACCESS_KEY && process.env.WRS_CLOUD_SECRET_KEY);
+      let manifest: any = null;
+      try { manifest = JSON.parse(fs.readFileSync(path.join(backupDir, 'cloud-manifest.json'), 'utf8')); } catch { manifest = null; }
+      return { configured, manifest };
+    })();
+    const cloudNewestInCloud = Boolean(cloud.manifest?.newestBackup?.inCloud);
+    const cloudLastRunHours = cloud.manifest?.lastRunAt ? (Date.now() - new Date(cloud.manifest.lastRunAt).getTime()) / 3_600_000 : null;
+    const cloudFailures = Array.isArray(cloud.manifest?.failures) ? cloud.manifest.failures.length : 0;
+    checks.push({
+      id: 'cloud_backup',
+      label: 'The newest backup is also off-site (cloud)',
+      state: !cloud.configured
+        ? 'WARN'
+        : cloudNewestInCloud && cloudFailures === 0 && cloudLastRunHours !== null && cloudLastRunHours <= 24 * 8 ? 'PASS' : 'WARN',
+      detail: !cloud.configured
+        ? 'No cloud copy is configured. Set WRS_CLOUD_ENDPOINT, WRS_CLOUD_BUCKET, WRS_CLOUD_ACCESS_KEY and WRS_CLOUD_SECRET_KEY in .env ' +
+          '(any S3-compatible storage — AWS Mumbai, an Indian provider, or a MinIO the railway runs) and the next scheduled backup pushes its ' +
+          'encrypted files there and verifies them. Until then the USB disk in another room is the only off-site copy.'
+        : !cloud.manifest
+          ? 'Cloud settings are present but no backup has run since they were set. Run the scheduled backup, or: node server/scripts/backup-db.mjs --cloud'
+          : `${Object.keys(cloud.manifest.uploads || {}).length} file(s) verified in ${cloud.manifest.bucket} at ${String(cloud.manifest.endpoint).replace(/^https?:\/\//, '')}; ` +
+            (cloudNewestInCloud ? `the newest backup (${cloud.manifest.newestBackup.file}) is there. ` : `the newest backup is NOT there yet. `) +
+            `Last run ${cloudLastRunHours === null ? 'unknown' : Math.floor(cloudLastRunHours) + ' hour(s) ago'}` +
+            (cloudFailures ? `; ${cloudFailures} upload(s) failed — see cloud-manifest.json beside the backups.` : '.') +
+            ' The files are encrypted before they leave; the key never does.'
+    });
+
+    /*
      * How often the server has come up lately — which is how often it went
      * down. index.ts appends a line per start; START.cmd restarts it within
      * five seconds of an exit, so a crash that recurs is invisible from a

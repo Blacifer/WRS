@@ -44,6 +44,25 @@ import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
+import { cloudSettings, syncBackupDirToCloud } from './cloud-upload.mjs';
+
+/*
+ * The bundle's .env, read here too.
+ *
+ * START.cmd writes WRS_BACKUP_DIR and the cloud settings into .env, and the
+ * scheduled backup task runs this script as SYSTEM with none of them in its
+ * environment. The server reads .env through its config; this script had to
+ * be told everything on the command line. Same file, same values, nothing
+ * already in the environment overridden.
+ */
+for (const candidate of [path.join(path.dirname(new URL(import.meta.url).pathname), '..', '.env'), path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', '.env')]) {
+  try {
+    for (const line of fs.readFileSync(candidate, 'utf8').split(/\r?\n/)) {
+      const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/.exec(line);
+      if (m && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^"(.*)"$/, '$1');
+    }
+  } catch { /* no .env here is normal */ }
+}
 
 const ITERATIONS = 210000;
 const DIGEST = 'sha512';
@@ -138,7 +157,7 @@ Then back that key up separately. Without it, no backup can be restored.
   return keyFile;
 }
 
-function backup(sourceDb, backupDir, photoDir) {
+async function backup(sourceDb, backupDir, photoDir) {
   const keyFile = requireKeyFile();
   if (!fs.existsSync(sourceDb)) fail(`the database ${sourceDb} does not exist.`);
   fs.mkdirSync(backupDir, { recursive: true });
@@ -198,6 +217,30 @@ function backup(sourceDb, backupDir, photoDir) {
   }
 
   backupPhotos(photoDir, backupDir, keyFile);
+  await cloudCopy(backupDir);
+}
+
+/*
+ * The cloud copy, when WRS_CLOUD_* is set.
+ *
+ * Runs after the local backup is written and verified, never instead of it,
+ * and a failure here does not fail the backup — the local copy exists — but
+ * is said plainly and recorded in the manifest the readiness panel reads,
+ * so "the cloud copy has not worked for a week" is a row on the dashboard
+ * rather than a surprise on the day the disk dies. Only encrypted files
+ * leave the machine; the key never does.
+ */
+async function cloudCopy(backupDir) {
+  const settings = cloudSettings();
+  if (!settings) { log('Cloud copy: not configured (WRS_CLOUD_ENDPOINT / BUCKET / ACCESS_KEY / SECRET_KEY). The USB disk is the off-site copy.'); return; }
+  try {
+    const r = await syncBackupDirToCloud(settings, backupDir, log);
+    log(`Cloud copy: ${r.uploaded} file(s) uploaded and verified, ${r.skipped} already there${r.failures.length ? `, ${r.failures.length} FAILED` : ''}.`);
+    for (const f of r.failures) console.error(`[backup-db]   cloud failure: ${f}`);
+    if (r.newestBackup && !r.newestBackup.inCloud) console.error('[backup-db]   The newest backup is NOT in the cloud. The local copy is fine; check the settings and the network.');
+  } catch (e) {
+    console.error(`[backup-db] Cloud copy failed: ${e.message}. The local backup is complete.`);
+  }
 }
 
 function restore(encPath, targetDb) {
@@ -373,12 +416,15 @@ const here = path.dirname(new URL(import.meta.url).pathname);
 if (args[0] === '--restore') {
   if (!args[1]) fail('usage: --restore <file.db.enc> [target_db]');
   restore(args[1], args[2] || path.join(here, '..', 'data', 'wrs_inspections.db'));
+} else if (args[0] === '--cloud') {
+  // Push what is already on the disk, without taking a new backup.
+  await cloudCopy(args[1] || process.env.WRS_BACKUP_DIR || path.join(here, '..', 'data', 'backups'));
 } else if (args[0] === '--restore-photos') {
   if (!args[1]) fail('usage: --restore-photos <backup_dir/photos> [target_photo_dir]');
   restorePhotos(args[1], args[2] || process.env.WRS_PHOTO_DIR || path.join(here, '..', 'data', 'photos'));
 } else {
   const sourceDb = args[0] || path.join(here, '..', 'data', 'wrs_inspections.db');
-  backup(
+  await backup(
     sourceDb,
     // The same value the readiness panel reads, so the two cannot disagree
     // about where a backup lives. A positional argument still wins, for a

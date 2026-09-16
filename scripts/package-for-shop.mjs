@@ -150,6 +150,19 @@ WRS_BACKUP_DIR=D:\\wrs-backups
 # by the same backup. Leave this unset unless they should live elsewhere.
 # WRS_PHOTO_DIR=
 
+# Off-site copy. With these four set, every scheduled backup also pushes its
+# ENCRYPTED files to an S3-compatible bucket and verifies them there — AWS
+# Mumbai (ap-south-1), an Indian provider that speaks S3, or a MinIO the
+# railway runs. The key never leaves this PC; the bucket only ever holds
+# ciphertext. The dashboard's readiness panel reports whether the newest
+# backup is in the cloud.
+# WRS_CLOUD_ENDPOINT=https://s3.ap-south-1.amazonaws.com
+# WRS_CLOUD_BUCKET=wrs-raipur-backups
+# WRS_CLOUD_ACCESS_KEY=
+# WRS_CLOUD_SECRET_KEY=
+# WRS_CLOUD_REGION=ap-south-1
+# WRS_CLOUD_PREFIX=raipur/
+
 # DEMO-DATA.cmd adds SEED_DEMO_USERS=true here so the published demonstration
 # accounts can sign in. Delete that line, and those accounts, before real use.
 
