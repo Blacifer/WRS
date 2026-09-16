@@ -1770,13 +1770,26 @@ export class WagonRepository {
         const worst = [frame.comparison, frame.recountComparison].filter(Boolean).find((c) => c!.verdict === 'SHORT')
           ?? [frame.comparison, frame.recountComparison].filter(Boolean).find((c) => c!.verdict === 'OVER');
         if (worst) {
-          advisories.push(worst.message);
+          /*
+           * Until a second person has counted, the figures stay out of the
+           * advisory. The gate evaluation is returned to every signed-in
+           * role, including the inspector who is about to make the blind
+           * recount, and "6 of 7 outer" here would have handed them the
+           * first count the photo routes go to some trouble to withhold.
+           * The supervisor still sees that a count fell short and what to
+           * do; the numbers arrive with the recount.
+           */
+          const blindPending = !frame.recount;
+          const message = blindPending
+            ? `${at}: the first count ${worst.verdict === 'SHORT' ? 'fell short of' : 'ran over'} what this wagon type carries. A second person must recount the frame blind before the figures are shown here.`
+            : worst.message;
+          advisories.push(message);
           advisoryDetails.push({
             id: `pockets_${worst.verdict.toLowerCase()}_${key}`,
             category: 'SPRINGS',
             partName: `Bogie assembly — ${at}`,
             issueType: worst.verdict === 'SHORT' ? 'POCKETS_SHORT' : 'POCKET_COUNT_OVER',
-            description: worst.message,
+            description: message,
             severity: 'ADVISORY',
             remediationAction: worst.verdict === 'SHORT'
               ? 'Open the photograph and look at the pockets named. If a spring is missing, fit it and photograph the bogie again; if the count was wrong, have a second person recount.'

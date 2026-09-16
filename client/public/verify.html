@@ -174,9 +174,13 @@
       ] : null,
       ok ? '' : '<ul class="reasons">' + reasons.map((r) => '<li>' + esc(r) + '</li>').join('') + '</ul>'
     );
-    if (events.length) {
+    // Only a passport that verified is rendered line by line. Every cell is
+    // escaped — including the sequence number, which once went in raw and
+    // was the one unescaped sink on this page: a link with a crafted file in
+    // the hash ran script on the app's origin.
+    if (ok && events.length) {
       out.insertAdjacentHTML('beforeend', '<details open><summary>What the passport records</summary><table><thead><tr><th>#</th><th>When</th><th>What</th><th>Detail</th></tr></thead><tbody>' +
-        events.map((e) => '<tr><td>' + e.seq + '</td><td>' + esc(String(e.at).replace('T', ' ').slice(0, 16)) + '</td><td>' + esc(e.kind) + '</td><td><code>' + esc(summarise(e)) + '</code></td></tr>').join('') +
+        events.map((e) => '<tr><td>' + esc(String(e.seq)) + '</td><td>' + esc(String(e.at).replace('T', ' ').slice(0, 16)) + '</td><td>' + esc(e.kind) + '</td><td><code>' + esc(summarise(e)) + '</code></td></tr>').join('') +
         '</tbody></table></details>');
     }
   }

@@ -229,6 +229,20 @@ a posture document that lists only strengths is not worth reading.
   re-attributed without breaking the chain. Now covered.
 - **Release sign-off**: OTP was optional, the "signature" was random bytes, and
   the signatory fell back to a hardcoded demo user. All fixed.
+- **One unescaped cell on `/verify.html`.** The passport events table
+  escaped every field but the sequence number, and the page auto-runs a file
+  from its URL hash — so a link with a crafted passport ran script on the
+  app's origin, where the session token lives, and no CSP stood in the way.
+  Found in a security review of the passport work. Now escaped, the table is
+  rendered only for a passport that verified, and `verify-page-drill.mjs`
+  feeds the page that exact forged file by paste and by link and refuses to
+  pass if anything renders or a dialog opens.
+- **The blind recount could be read off the exit gate.** The pocket-count
+  routes withhold the first count from whoever could still recount, but the
+  gate evaluation — returned to every signed-in role — carried "6 of 7 outer"
+  in its advisory text before any recount existed. Until a second person has
+  counted, the advisory now says only that a count fell short and a blind
+  recount is due; the figures arrive with the recount.
 
 ---
 

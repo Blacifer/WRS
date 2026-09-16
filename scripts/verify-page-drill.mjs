@@ -55,6 +55,23 @@ check('the released wagon\'s passport', await run(passport), 'VERIFIED');
 const lines = passport.trim().split('\n'); const ev = JSON.parse(lines[2]); ev.payload.toStage = 'RELEASE'; lines[2] = JSON.stringify(ev);
 const altered = await run(lines.join('\n'));
 check('one event altered', altered, 'NOT VERIFIED');
+/*
+ * A hostile file. The one unescaped cell on this page once ran script on
+ * the app's origin from a link alone (#c=<base64>). The forged passport
+ * below carries a payload in the sequence number; it must be refused, the
+ * payload must land nowhere in the DOM, and no dialog may open.
+ */
+let dialogs = 0; v.on('dialog', async (d) => { dialogs++; await d.dismiss(); });
+const hostile = ['{"type":"PASSPORT","version":1,"wagonNumber":"X","exportedAt":"","issuer":{}}',
+  '{"type":"EVENT","seq":"<img src=x onerror=alert(1)>","kind":"x","at":"x","payload":{}}', '{"type":"SEAL","events":1}'].join('\n');
+const hostileVerdict = await run(hostile);
+check('a forged passport with script in a field', hostileVerdict, 'NOT VERIFIED');
+const injected = await v.locator('img[src="x"]').count();
+check('the payload is not in the page', injected === 0 && dialogs === 0 ? 'refused, nothing rendered, no dialog' : `RENDERED (${injected} img, ${dialogs} dialogs)`, 'refused');
+await v.goto(`${BASE}/verify.html#c=${Buffer.from(hostile).toString('base64')}`).catch(() => {});
+await v.waitForTimeout(700);
+const injectedByLink = await v.locator('img[src="x"]').count();
+check('the same file arriving by link', injectedByLink === 0 && dialogs === 0 ? 'refused, nothing rendered, no dialog' : `RENDERED (${injectedByLink} img, ${dialogs} dialogs)`, 'refused');
 console.log(`  requests the page made while verifying: ${requests.length}`);
 results.push(requests.length === 0);
 await b.close();

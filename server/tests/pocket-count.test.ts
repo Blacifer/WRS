@@ -136,7 +136,16 @@ describe('the record', () => {
     const adv = gate.advisoryDetails.find((a) => a.id === 'pockets_short_bogie_2_side_b');
     assert.ok(adv, JSON.stringify(gate.advisoryDetails.map((a) => a.id)));
     assert.equal(adv!.issueType, 'POCKETS_SHORT'); assert.equal(adv!.severity, 'ADVISORY');
-    assert.match(adv!.description, /6 of 7 inner/);
+    // Before a recount the advisory names the frame and says a count fell short —
+    // but not by how much. The gate evaluation is returned to every signed-in
+    // role, and the figure would hand the blind recounter the first count.
+    assert.match(adv!.description, /fell short/);
+    assert.doesNotMatch(adv!.description, /\d+ of \d+/, 'no figures before the recount');
+    const wagonRead = await call(app, 'GET', `/api/wagons/${encodeURIComponent(wagon)}`, undefined, auth(insp2));
+    assert.ok(!JSON.stringify(wagonRead.body).includes('6 of 7'), 'the wagon read shows the potential recounter no figures');
+    await call(app, 'POST', `/api/photos/${photoId}/pocket-count`, { taps: taps(7, 7, 2) }, auth(insp2));
+    const after = new WagonRepository(getDatabase()).evaluateExitGate(wagon).advisoryDetails.find((a) => a.id === 'pockets_short_bogie_2_side_b');
+    assert.match(after!.description, /6 of 7 inner/, 'the figures arrive with the recount');
     assert.ok(!gate.blockerDetails.some((b) => b.id.startsWith('pockets_') || b.issueType.startsWith('POCKET')), 'never a blocker');
   });
 
