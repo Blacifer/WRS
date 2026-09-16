@@ -81,7 +81,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
    */
   const [days, setDays] = useState<Day[]>([]);
   const [sortingStock, setSortingStock] = useState<any[]>([]);
-  const [gaugeExposure, setGaugeExposure] = useState<{ total: number; summary: string } | null>(null);
+  const [gaugeExposure, setGaugeExposure] = useState<{ total: number; summary: string; summaryHi?: string } | null>(null);
   /*
    * What Stores should expect to issue. Held as whatever the server returned,
    * including its refusal to quote — a spring type without enough
@@ -333,20 +333,25 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
         {forecast && (
           <div className="bg-card border border-line rounded-control p-5 mb-6">
             <h3 className="text-sm font-bold text-white uppercase tracking-wide mb-1">
-              Expected spring replacements — next {forecast.periodDays} working days
+              {isHi ? `अपेक्षित स्प्रिंग प्रतिस्थापन — अगले ${forecast.periodDays} कार्य दिवस` : `Expected spring replacements — next ${forecast.periodDays} working days`}
             </h3>
-            <p className="text-[12px] text-ink-muted mb-3">{forecast.summary}</p>
+            {/* The English sentence is the server's; the Hindi is the same figures, phrased here. */}
+            <p className="text-[12px] text-ink-muted mb-3">
+              {!isHi ? forecast.summary : forecast.lines.length === 0
+                ? 'अभी किसी स्प्रिंग प्रकार के पीछे 30 कंडमनेशन नहीं हैं, इसलिए कोई ऑर्डर मात्रा नहीं दी गई। रिकॉर्ड बनने पर आँकड़ा दिखेगा।'
+                : `अगले ${forecast.periodDays} कार्य दिवसों में लगभग ${forecast.wagonsExpected} वैगन और ${forecast.lines.length} स्प्रिंग प्रकारों में अनुमानित ${forecast.totalReplacements} स्प्रिंग प्रतिस्थापन।`}
+            </p>
 
             {forecast.lines.length > 0 && (
               <div className="overflow-x-auto">
                 <table className="w-full text-[12.5px]">
                   <thead>
                     <tr className="text-ink-muted text-left border-b border-line">
-                      <th className="py-1.5 pr-3 font-semibold">Spring</th>
-                      <th className="py-1.5 pr-3 font-semibold text-right">Handled</th>
-                      <th className="py-1.5 pr-3 font-semibold text-right">Condemned</th>
-                      <th className="py-1.5 pr-3 font-semibold text-right">Order</th>
-                      <th className="py-1.5 font-semibold text-right">From</th>
+                      <th className="py-1.5 pr-3 font-semibold">{isHi ? 'स्प्रिंग' : 'Spring'}</th>
+                      <th className="py-1.5 pr-3 font-semibold text-right">{isHi ? 'संभाली' : 'Handled'}</th>
+                      <th className="py-1.5 pr-3 font-semibold text-right">{isHi ? 'कंडम' : 'Condemned'}</th>
+                      <th className="py-1.5 pr-3 font-semibold text-right">{isHi ? 'ऑर्डर' : 'Order'}</th>
+                      <th className="py-1.5 font-semibold text-right">{isHi ? 'आधार' : 'From'}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -361,7 +366,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
                         <td className="py-1.5 text-right text-ink-faint tabular-nums" title={`${l.basisFromWagons ?? l.basis} from wagon inspections, ${l.basisFromBench ?? 0} from the sorting bench`}>
                           {l.basis}
                           {typeof l.basisFromBench === 'number' && l.basisFromBench > 0 && (
-                            <span className="ml-1 text-[10.5px]">({l.basisFromBench} bench)</span>
+                            <span className="ml-1 text-[10.5px]">({l.basisFromBench} {isHi ? 'बेंच' : 'bench'})</span>
                           )}
                         </td>
                       </tr>
@@ -373,9 +378,9 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
 
             {forecast.notForecast.length > 0 && (
               <p className="text-[11px] text-ink-faint mt-3 leading-relaxed">
-                Not forecast yet: {forecast.notForecast
+                {isHi ? 'अभी पूर्वानुमान नहीं' : 'Not forecast yet'}: {forecast.notForecast
                   .map((n: any) => `${n.bogieType.replace('CASNUB_22_', '')} ${n.springPosition.toLowerCase()} (${n.condemned})`)
-                  .join(', ')}. A rate needs 30 condemnations behind it before an order quantity is offered.
+                  .join(', ')}. {isHi ? 'ऑर्डर मात्रा देने से पहले दर के पीछे 30 कंडमनेशन चाहिए।' : 'A rate needs 30 condemnations behind it before an order quantity is offered.'}
               </p>
             )}
           </div>
@@ -383,7 +388,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
 
         {gaugeExposure && gaugeExposure.total > 0 && (
           <p className="text-[11px] text-warn-ink/90 bg-warn-soft border border-warn-line rounded-control px-3 py-2 font-semibold">
-            {gaugeExposure.summary}
+            {isHi ? (gaugeExposure.summaryHi || gaugeExposure.summary) : gaugeExposure.summary}
           </p>
         )}
       </div>

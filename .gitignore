@@ -46,3 +46,8 @@ backups/
 # Locally generated TLS material for LAN testing — never commit
 server/certs/
 dist-shop/
+
+# scripts/screen-walk.mjs output — screenshots of every screen, for a person to read
+screen-walk/
+# Local demo database, logs and photographs (server/data/demo/) — never committed
+server/data/demo/

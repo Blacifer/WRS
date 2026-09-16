@@ -2363,8 +2363,11 @@ export class WagonRepository {
   // -------------------------------------------------------------------------
 
   private mapWagonRow(row: any): any {
+    // A released wagon stops accruing time at its release: the figure is its
+    // turnaround, not a dwell that grows for as long as the record exists.
+    const elapsedUntil = row.actual_release_date ? new Date(row.actual_release_date).getTime() : Date.now();
     const totalElapsedHours = row.entry_date
-      ? Math.max(0, Math.round(((Date.now() - new Date(row.entry_date).getTime()) / (1000 * 60 * 60)) * 10) / 10)
+      ? Math.max(0, Math.round(((elapsedUntil - new Date(row.entry_date).getTime()) / (1000 * 60 * 60)) * 10) / 10)
       : 0;
 
     /*

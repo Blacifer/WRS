@@ -98,7 +98,11 @@ gaugesRouter.get('/exposure', authMiddleware, (_req: AuthenticatedRequest, res: 
         ? 'Every recorded spring names a gauge with a valid calibration.'
         : `${total} recorded springs were judged with an instrument whose calibration ` +
           `is not established: ${counts.unrecorded} on a gauge with no calibration date, ` +
-          `${counts.expired} on a lapsed gauge, ${counts.noGauge} with no gauge named at all.`
+          `${counts.expired} on a lapsed gauge, ${counts.noGauge} with no gauge named at all.`,
+      summaryHi: total === 0
+        ? 'हर दर्ज स्प्रिंग एक वैध कैलिब्रेशन वाला गेज बताती है।'
+        : `${total} दर्ज स्प्रिंग ऐसे उपकरण से जाँची गईं जिसका कैलिब्रेशन स्थापित नहीं: ${counts.unrecorded} बिना कैलिब्रेशन तिथि वाले गेज पर, ` +
+          `${counts.expired} समय-सीमा पार गेज पर, ${counts.noGauge} बिना किसी गेज के नाम के।`
     });
   } catch (error: any) {
     res.status(500).json({

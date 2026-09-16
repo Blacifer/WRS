@@ -266,6 +266,42 @@ goto run
 `
 );
 
+/*
+ * DEMO-DATA.cmd — the demonstration record, on purpose only.
+ *
+ * A demonstration on an empty database shows a shop that has never sorted a
+ * spring. This writes the demo record (the demo accounts, thirteen wagons,
+ * a month of the sorting bench, one wagon's parts, tests and photographs)
+ * into THIS bundle's database, and refuses if the database already holds
+ * wagons — so it cannot be run by accident on the shop's real record. Not
+ * started by START.cmd, not scheduled, not mentioned on the install path.
+ */
+fs.writeFileSync(
+  path.join(BUNDLE, 'DEMO-DATA.cmd'),
+  `@echo off
+setlocal
+title WRS Raipur — demonstration record
+cd /d "%~dp0"
+set "NODE=node"
+if exist "%ProgramFiles%\nodejs\node.exe" set "NODE=%ProgramFiles%\nodejs\node.exe"
+echo.
+echo   This writes the DEMONSTRATION record into this bundle's database:
+echo   demo accounts (inspector1 / supervisor1 / drm1 / admin1, password123),
+echo   thirteen wagons, a month of the sorting bench, and one wagon's story.
+echo   It refuses if the database already holds wagons.
+echo.
+set /p GO=  Type DEMO and press Enter to continue, anything else to stop: 
+if /i not "%GO%"=="DEMO" exit /b 1
+cd server
+set SEED_DEMO_USERS=true
+"%NODE%" --experimental-strip-types src\db\seed.ts
+cd ..
+echo.
+echo   Done. Start with START.cmd and sign in as drm1 / password123.
+pause
+`
+);
+
 fs.writeFileSync(
   path.join(BUNDLE, 'READ-ME-FIRST.txt'),
   `WRS Raipur — installing on a workshop PC

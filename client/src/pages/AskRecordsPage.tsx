@@ -135,16 +135,24 @@ export const AskRecordsPage: React.FC<Props> = ({ lang }) => {
 
 const Picker: React.FC<{ catalogue: Array<{ id: string; describe: string; params: string[] }>; onPick: (id: string, params: Record<string, string>) => void; isHi: boolean }> = ({ catalogue, onPick, isHi }) => {
   const [values, setValues] = useState<Record<string, Record<string, string>>>({});
-  const hint: Record<string, string> = { wagonType: 'BOXNHL', springPosition: 'OUTER / INNER / SNUBBER', period: 'week / month / quarter / year / 30 days', wagonNumber: 'SECR/BOXNHL/12345', stage: 'REPAIR_REPLACEMENT', band: 'BLUE', partName: isHi ? 'पुर्जे का नाम' : 'part name' };
+  const label: Record<string, string> = { wagonType: isHi ? 'वैगन प्रकार' : 'wagon type', springPosition: isHi ? 'स्थिति' : 'position', period: isHi ? 'अवधि' : 'period', wagonNumber: isHi ? 'वैगन नंबर' : 'wagon number', stage: isHi ? 'चरण' : 'stage', band: isHi ? 'बैंड' : 'band', partName: isHi ? 'पुर्जा' : 'part' };
+  const hint: Record<string, string> = { wagonType: 'BOXNHL', springPosition: 'OUTER · INNER · SNUBBER', period: 'week · month · quarter · year · 30 days', wagonNumber: 'SECR/BOXNHL/12345', stage: 'REPAIR_REPLACEMENT', band: 'BLUE', partName: isHi ? 'पुर्जे का नाम' : 'part name' };
   return (
-    <ul className="space-y-1.5" data-testid="ask-picker">
+    <ul className="divide-y divide-line/60" data-testid="ask-picker">
       {catalogue.map((q) => (
-        <li key={q.id} className="flex flex-wrap items-center gap-2 text-xs">
-          <button type="button" onClick={() => onPick(q.id, values[q.id] || {})} className="text-left font-semibold text-white hover:text-accent-ink" data-testid={`ask-pick-${q.id}`}>{q.describe}</button>
-          {q.params.map((p) => (
-            <input key={p} placeholder={`${p} (${hint[p] || ''})`} value={values[q.id]?.[p] || ''} onChange={(e) => setValues((v) => ({ ...v, [q.id]: { ...(v[q.id] || {}), [p]: e.target.value } }))}
-              className="bg-raised border border-line rounded px-2 py-1 text-[11px] text-white w-52" />
-          ))}
+        <li key={q.id} className="py-2.5 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
+          <button type="button" onClick={() => onPick(q.id, values[q.id] || {})} className="text-left font-semibold text-white hover:text-accent-ink flex-1 min-w-[16rem]" data-testid={`ask-pick-${q.id}`}>{q.describe}</button>
+          {q.params.length > 0 && (
+            <span className="flex flex-wrap items-center gap-2">
+              {q.params.map((p) => (
+                <label key={p} className="flex items-center gap-1.5 text-[11px] text-ink-muted">
+                  {label[p] || p}
+                  <input placeholder={hint[p] || ''} title={hint[p] || ''} value={values[q.id]?.[p] || ''} onChange={(e) => setValues((v) => ({ ...v, [q.id]: { ...(v[q.id] || {}), [p]: e.target.value } }))}
+                    className="bg-raised border border-line rounded px-2 py-1 text-[11px] text-white w-36 placeholder:text-ink-faint" />
+                </label>
+              ))}
+            </span>
+          )}
         </li>
       ))}
     </ul>

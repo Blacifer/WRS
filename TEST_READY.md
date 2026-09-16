@@ -17,10 +17,24 @@ above and re-run the commands in §3 before relying on it.
   — **251 test cases**, 0 failing (~81s). The case count is quotable for the
   first time: the runner's metric parser was reading a reporter format these
   suites do not emit, so it reported 0 cases under a green pass until 3 Sep.
-- **Server unit/integration**: 953 tests in 97 files — **0 failing**.
-- **Client**: 173 tests across 15 files — **0 failing**.
+- **Server unit/integration**: 1042 tests — **0 failing** (`cd server && npm test`).
+- **Client**: 266 tests across 24 files — **0 failing** (`cd client && npx vitest run`).
 - **Total Verification Tiers**: 5 Tiers (Tier 1: Feature Coverage, Tier 2: Boundary & Corner Cases, Tier 3: Cross-Feature Flows, Tier 4: Real-World Scenarios, Tier 5: Adversarial Stress)
 - **Harness Framework**: Native Node.js 22 test runner (`node:test`, `node:assert`, `node:sqlite`) with zero runtime mock facades.
+
+### What the E2E tiers do and do not test
+
+Most of the 39 tier suites run against `tests/harness/` — a self-contained
+reimplementation of the server's rules (lifecycle, checklist, exit gate,
+analytics arithmetic) over its own SQLite schema — not against the server in
+`server/src`. They pin the *specification*: what a wagon may do at each stage,
+what blocks a release, how a band is decided. They cannot catch a bug in the
+shipped route handlers, repositories or migrations, because those are not
+loaded. The suites that exercise the real server are the ones under
+`server/tests/` (every route through `app.dispatch`, the real database, the
+real triggers) and the browser drives in `scripts/`, and those are what
+`scripts/preflight.sh` treats as the gate. Read a green tier run as "the rules
+are still what we said they are", not as "the server still does them".
 
 ### One caveat on the E2E result
 

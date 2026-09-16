@@ -106,7 +106,7 @@ npm install --prefix client
 
 ### Database Seeding
 
-Seed the SQLite database with rich demo data (13 multi-stage wagons, 40+ spring records, component passports, and audit trails):
+Seed an **empty** SQLite database with the demonstration record — 13 wagons across all seven stages, a month of the sorting bench (about 2,800 gauge-attributed readings on four gauges, one of which reads high on purpose), one wagon's parts ledger, air-brake tests, assembly photographs with pocket counts, a week of the shadow run, and release certificates signed by this server's own key. It refuses a database that already holds wagons. On a shop bundle the same thing is `DEMO-DATA.cmd`; the day itself is scripted in [docs/DEMO_DAY.md](docs/DEMO_DAY.md):
 
 ```bash
 npm run seed

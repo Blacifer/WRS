@@ -914,6 +914,14 @@ export function runMigrations(db: DatabaseSync): void {
   if (sortCols.length > 0 && !sortCols.some((c) => c.name === 'supersedes')) {
     db.exec('ALTER TABLE spring_sorting_records ADD COLUMN supersedes TEXT DEFAULT NULL;');
   }
+  /*
+   * Every live-record query excludes rows some later row supersedes, with
+   * NOT EXISTS (... WHERE l.supersedes = r.id). Without an index on that
+   * column the subquery is a full scan per row: 0.4 s at three thousand
+   * rows, and quadratic from there — minutes at one year of the bench.
+   * Found by timing the DRM dashboard on the demo record.
+   */
+  db.exec('CREATE INDEX IF NOT EXISTS idx_sorting_supersedes ON spring_sorting_records(supersedes);');
 
   /*
    * ...and whether the correcting record stands for a spring at all.

@@ -380,9 +380,9 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
           </div>
 
           <div className="p-3.5 bg-card border border-line rounded-control">
-            <p className="text-[11px] text-ink-muted font-semibold uppercase tracking-[0.07em]">{isHi ? 'औसत स्वास्थ्य' : 'Avg Health'}</p>
+            <p className="text-[11px] text-ink-muted font-semibold uppercase tracking-[0.07em]">{isHi ? 'औसत स्थिति ग्रेड' : 'Avg condition grade'}</p>
             <p className="text-xl font-extrabold text-white mt-1">{Math.round(stats.averageHealthScore)}%</p>
-            <p className="text-[10px] text-good-ink mt-0.5">{isHi ? 'बेड़ा सूचकांक' : 'Fleet Index'}</p>
+            <p className="text-[10px] text-good-ink mt-0.5">{isHi ? 'निरीक्षकों द्वारा दर्ज, गणना नहीं' : 'Entered by inspectors, not computed'}</p>
           </div>
 
           <div className="p-3.5 bg-card border border-line rounded-control">
@@ -484,7 +484,7 @@ export const ComponentPassportsPage: React.FC<ComponentPassportsPageProps> = ({ 
                   <tr className="bg-page border-b border-line text-[11px] text-ink-muted uppercase tracking-[0.07em] font-semibold">
                     <th className="p-3 sm:p-4">{isHi ? 'क्रम संख्या व प्रकार' : 'Serial Number & Type'}</th>
                     <th className="p-3 sm:p-4">{isHi ? 'स्थान / बोगी' : 'Placement / Bogie'}</th>
-                    <th className="p-3 sm:p-4">{isHi ? 'स्वास्थ्य स्कोर' : 'Health Score'}</th>
+                    <th className="p-3 sm:p-4">{isHi ? 'स्थिति ग्रेड (दर्ज)' : 'Condition grade (entered)'}</th>
                     <th className="p-3 sm:p-4">{isHi ? 'स्थिति' : 'Status'}</th>
                     <th className="p-3 sm:p-4">{isHi ? 'निर्माण / ओवरहॉल' : 'Mfg / Overhauls'}</th>
                     <th className="p-3 sm:p-4 text-right">{isHi ? 'क्रियाएँ' : 'Actions'}</th>

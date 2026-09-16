@@ -382,6 +382,8 @@ CREATE TABLE IF NOT EXISTS spring_sorting_records (
 CREATE INDEX IF NOT EXISTS idx_sorting_batch ON spring_sorting_records(batch_id);
 CREATE INDEX IF NOT EXISTS idx_sorting_group ON spring_sorting_records(bogie_type, spring_condition, spring_position, classified_band);
 CREATE INDEX IF NOT EXISTS idx_sorting_created ON spring_sorting_records(created_at);
+-- idx_sorting_supersedes is created in migrations.ts, after the supersedes
+-- column is added there; the column does not exist at this point.
 
 -- Sorted springs are measurements, and are append-only like every other
 -- measurement in this system.

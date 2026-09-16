@@ -49,7 +49,12 @@ const SUBSYSTEM_LABEL: Record<string, { en: string; hi: string }> = {
   SPRING_CLASSIFICATION: { en: 'Spring classification', hi: 'स्प्रिंग वर्गीकरण' },
   VOICE_COMMAND: { en: 'Voice commands', hi: 'ध्वनि आदेश' },
   ACOUSTIC_DIAGNOSTIC: { en: 'Acoustic diagnostics', hi: 'ध्वनिक निदान' },
-  DEFECT_SUGGESTION: { en: 'Defect suggestions', hi: 'दोष सुझाव' }
+  DEFECT_SUGGESTION: { en: 'Defect suggestions', hi: 'दोष सुझाव' },
+  // The four the ledger gained later, which rendered as blank rows.
+  MEASUREMENT_ANOMALY: { en: 'Measurement anomaly (amber box)', hi: 'माप विसंगति (अम्बर बॉक्स)' },
+  WAGON_NUMBER_OCR: { en: 'Wagon number reading (OCR)', hi: 'वैगन नंबर पठन (OCR)' },
+  SPRING_VISION: { en: 'Spring camera', hi: 'स्प्रिंग कैमरा' },
+  PART_VISION: { en: 'Part camera', hi: 'पुर्जा कैमरा' }
 };
 
 export function LearningMemory({ lang }: Props) {
@@ -115,7 +120,7 @@ export function LearningMemory({ lang }: Props) {
               {observations.map((o) => (
                 <tr key={o.subsystem} className="border-t border-line">
                   <td className="px-3 py-2 text-ink-body">
-                    {isHi ? SUBSYSTEM_LABEL[o.subsystem]?.hi : SUBSYSTEM_LABEL[o.subsystem]?.en}
+                    {(isHi ? SUBSYSTEM_LABEL[o.subsystem]?.hi : SUBSYSTEM_LABEL[o.subsystem]?.en) || o.subsystem}
                     {o.total > 0 && !o.enoughToLearnFrom && (
                       <span className="block text-[10px] text-warn-ink">
                         {isHi ? 'निष्कर्ष हेतु पर्याप्त नहीं' : 'not yet enough to draw a conclusion from'}

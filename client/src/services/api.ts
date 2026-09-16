@@ -1188,7 +1188,7 @@ export class ApiClient {
   /** How much recorded work rests on an instrument nobody has verified. */
   public async getGaugeExposure(): Promise<{
     success: boolean;
-    data: { unrecorded: number; expired: number; noGauge: number; total: number; summary: string };
+    data: { unrecorded: number; expired: number; noGauge: number; total: number; summary: string; summaryHi?: string };
   }> {
     return this.request('/gauges/exposure');
   }

@@ -154,13 +154,32 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         if (!live) return;
         const list = r.data.gauges;
         setGauges(list);
-        // One gauge on the bench is the common case; pre-select it rather
-        // than making somebody choose from a list of one every session.
-        setGaugeCode(prev => prev || (list.length === 1 ? list[0].gaugeCode : ''));
       })
       .catch(() => { /* the picker is degradable; sorting must not stop for it */ });
     return () => { live = false; };
   }, []);
+
+  /*
+   * Pre-select the gauge for the springs being sorted.
+   *
+   * The first version pre-selected the only gauge on the register, which was
+   * the snubber gauge — so every session opened on outer springs with a
+   * mismatch warning already showing, and the record for the first spring
+   * carried a snubber gauge against an outer reading unless somebody noticed.
+   * A gauge is chosen for the person only when it applies to the position in
+   * front of them (or to all); a mismatched one is never chosen on their
+   * behalf, and switching position switches gauge if a matching one exists.
+   */
+  useEffect(() => {
+    if (gauges.length === 0) return;
+    const fits = (g: { appliesTo: string | null }) => !g.appliesTo || g.appliesTo === 'ALL' || String(position).startsWith(g.appliesTo);
+    setGaugeCode(prev => {
+      const current = gauges.find(g => g.gaugeCode === prev);
+      if (current && fits(current)) return prev;
+      const match = gauges.find(fits);
+      return match ? match.gaugeCode : (current ? prev : '');
+    });
+  }, [gauges, position]);
 
   useEffect(() => {
     try {

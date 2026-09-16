@@ -580,14 +580,12 @@ export const StoresInventoryPage: React.FC = () => {
                     <th className="py-3.5 px-4">{t('inventory.wagonNumber', 'Wagon Number')}</th>
                     <th className="py-3.5 px-4">{t('inventory.partCode', 'Part Code & Name')}</th>
                     <th className="py-3.5 px-4">{t('inventory.source', 'Source / Reason')}</th>
-                    <th className="py-3.5 px-4 text-center">{t('inventory.confidence', 'AI Confidence')}</th>
                     <th className="py-3.5 px-4 text-center">{t('inventory.resStatus', 'Status')}</th>
                     <th className="py-3.5 px-4 text-right">{t('inventory.actions', 'Actions')}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line/60">
                   {filteredReservations.map((res) => {
-                    const isOMRS = res.source === 'OMRS_AI_TRIAGE';
                     const isIssued = res.status === 'ISSUED_TO_FLOOR';
 
                     return (
@@ -623,17 +621,6 @@ export const StoresInventoryPage: React.FC = () => {
                             <div className="text-xs font-medium text-ink-body mt-1">
                               {res.predictedDefect}
                             </div>
-                          )}
-                        </td>
-
-                        {/* Confidence Score */}
-                        <td className="py-3.5 px-4 text-center">
-                          {res.confidenceScore !== null && res.confidenceScore !== undefined ? (
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-page border border-line text-xs font-mono font-bold text-good-ink">
-                              <span>{(res.confidenceScore * 100).toFixed(0)}%</span>
-                            </div>
-                          ) : (
-                            <span className="text-ink-faint font-mono">—</span>
                           )}
                         </td>
 

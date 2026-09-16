@@ -340,7 +340,7 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
                 <div className="space-y-1">
                   <div className="flex justify-between text-[11px] text-ink-muted font-medium">
                     <span>{t(`lifecycle.stages.${wagon.currentStage}` as any) || wagon.currentStage}</span>
-                    <span>{wagon.totalElapsedHours ? `${wagon.totalElapsedHours}h dwell` : 'Active'}</span>
+                    <span>{wagon.totalElapsedHours ? `${wagon.totalElapsedHours}h ${isReleased ? (isHi ? 'टर्नअराउंड' : 'turnaround') : (isHi ? 'ठहराव' : 'dwell')}` : (isHi ? 'सक्रिय' : 'Active')}</span>
                   </div>
                   <div className="w-full h-2 bg-selected rounded-full overflow-hidden">
                     <div

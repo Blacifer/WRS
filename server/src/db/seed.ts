@@ -14,6 +14,8 @@ import { DatabaseSync } from 'node:sqlite';
 import crypto from 'node:crypto';
 import { getDatabase } from './connection.ts';
 import { runMigrations } from './migrations.ts';
+import { seedShopFloor } from './seedShop.ts';
+import { WagonRepository } from './wagonRepository.ts';
 import { hashPassword } from '../auth/password.ts';
 import { classifySpring } from '../../../shared/classification/engine.ts';
 import { CASNUB_CHECKLIST_TEMPLATE } from './checklistTemplate.ts';
@@ -1984,58 +1986,44 @@ export function seedDemoData(db?: DatabaseSync): void {
     }
   }
 
-  // 7. Seed Gate Signoffs for RELEASED Wagons
-  const checkSignoffStmt = database.prepare(`
-    SELECT id FROM gate_signoffs 
-    WHERE id = ? OR wagon_number = ? COLLATE NOCASE OR certificate_number = ?
-  `);
-  const insertSignoffStmt = database.prepare(`
-    INSERT INTO gate_signoffs (
-      id, wagon_id, wagon_number, supervisor_id, supervisor_name, supervisor_employee_id,
-      digital_signature, otp_token_ref, signoff_notes, checks_summary_json,
-      certificate_number, certificate_hash, signed_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  for (const w of DEMO_WAGONS) {
-    if (w.hasSignoff && w.signoffCertificate) {
+  /*
+   * 7. Sign off the released wagons — through the real gate.
+   *
+   * These rows used to be written directly, with a digital_signature of
+   * "DIGISIG_VERMA_…": a string shaped like a signature over nothing. The
+   * certificate page rendered it, and /verify.html correctly refused it — so
+   * the one screen whose purpose is being checkable failed on the demo data.
+   * The released wagons are now signed by recordGateSignoff, which evaluates
+   * the gate, acknowledges every advisory it raises by name, and signs the
+   * canonical certificate with this server's Ed25519 key. The signature
+   * verifies anywhere the public key does.
+   */
+  {
+    const repo = new WagonRepository(database);
+    for (const w of DEMO_WAGONS) {
+      if (!w.hasSignoff) continue;
       const normWagonNumber = w.wagonNumber.trim().toUpperCase();
-      const signoffId = `signoff_${w.id}`;
-      if (!checkSignoffStmt.get(signoffId, normWagonNumber, w.signoffCertificate)) {
-        const wagonRow = checkWagonStmt.get(w.id, normWagonNumber) as any;
-        const wagonId = wagonRow ? wagonRow.id : w.id;
-        const signedAt = getIsoDate(w.releaseDaysAgo || 0, 6);
-
-        const summaryJson = JSON.stringify({
-          wagonNumber: normWagonNumber,
+      if (database.prepare('SELECT id FROM gate_signoffs WHERE wagon_number = ?').get(normWagonNumber)) continue;
+      const evaluation = repo.evaluateExitGate(normWagonNumber);
+      repo.recordGateSignoff({
+        wagonNumber: normWagonNumber,
+        supervisorId: 'usr_sup_001',
+        supervisorName: 'S. K. Verma',
+        supervisorEmployeeId: 'WRS-SUP-2019',
+        otpTokenRef: `demo-seed-${w.id}`,
+        acknowledgedAdvisoryIds: (evaluation.advisoryDetails || []).map((x: any) => x.id),
+        signoffNotes: 'All 8 CASNUB component categories and coil springs inspected, repaired, and certified zero-defect. Approved for line service.',
+        checksSummary: {
           wagonType: w.wagonType,
           owningRailway: w.owningRailway,
-          certificateNumber: w.signoffCertificate,
           totalCategoriesChecked: 8,
-          mandatoryItemsPassed: 31,
-          springsCertified: 4,
-          condemnedItems: 0,
           turnaroundDays: (w.entryDaysAgo - (w.releaseDaysAgo || 0)).toFixed(1)
-        });
-
-        const certHash = crypto.createHash('sha256').update(summaryJson + signedAt).digest('hex');
-
-        insertSignoffStmt.run(
-          signoffId,
-          wagonId,
-          normWagonNumber,
-          'usr_sup_001',
-          'S. K. Verma',
-          'WRS-SUP-2019',
-          `DIGISIG_VERMA_${normWagonNumber.replace(/[^A-Z0-9]/g, '_')}`,
-          `OTP-SIG-${w.id}`,
-          'All 8 CASNUB component categories and coil springs inspected, repaired, and certified zero-defect. Approved for line service.',
-          summaryJson,
-          w.signoffCertificate,
-          certHash,
-          signedAt
-        );
-      }
+        }
+      });
+      // The gate stamps the release "now". The demo wagon left when the seed
+      // says it did; the signed certificate keeps its own (seed-time) date.
+      database.prepare('UPDATE wagons SET actual_release_date = ? WHERE wagon_number = ?')
+        .run(getIsoDate(w.releaseDaysAgo || 0, 6), normWagonNumber);
     }
   }
 
@@ -2229,239 +2217,16 @@ export function seedDemoData(db?: DatabaseSync): void {
     }
   }
 
-  // 9. Seed Trackside OMRS Scans & Inventory Reservations
-  const checkOMRSStmt = database.prepare(`
-    SELECT id FROM omrs_scans WHERE wagon_number = ?
-  `);
-  const insertOMRSStmt = database.prepare(`
-    INSERT INTO omrs_scans (
-      id, wagon_number, scan_timestamp, location, train_speed_kmph,
-      wheel_impact_kn, acoustic_bearing_peak_db, temperature_celsius,
-      wheel_profile_deviation_mm, predicted_defects_json, triage_severity,
-      is_triaged, auto_reservation_triggered, created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  const checkResStmt = database.prepare(`
-    SELECT id FROM inventory_reservations WHERE wagon_number = ? AND part_code = ? AND source = ?
-  `);
-  const insertResStmt = database.prepare(`
-    INSERT INTO inventory_reservations (
-      id, wagon_number, part_code, quantity, source,
-      predicted_defect, confidence_score, status, allocated_at,
-      created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `);
-
-  const DEMO_OMRS_SCANS = [
-    {
-      id: 'omrs_scan_55303',
-      wagonNumber: 'SER/BOXNHL/55303',
-      scanTimestamp: getIsoDate(2, 4),
-      location: 'Trackside OMRS Array - Raipur Outer Yard (KM 828/14)',
-      trainSpeedKmph: 64.2,
-      wheelImpactKn: 142.5,
-      acousticBearingPeakDb: 86.8,
-      temperatureCelsius: 68.5,
-      wheelProfileDeviationMm: 4.6,
-      predictedDefects: [
-        {
-          component: 'WHEELSET_ASSEMBLY',
-          defectType: 'WHEEL_FLAT_IMPACT_HIGH',
-          severity: 'CRITICAL',
-          confidence: 0.96,
-          recommendedPartCode: 'PRT-WHL-BOXNHL',
-          quantity: 1
-        },
-        {
-          component: 'CTRB_BEARING',
-          defectType: 'CTRB_BEARING_ACOUSTIC_DEFECT',
-          severity: 'CRITICAL',
-          confidence: 0.94,
-          recommendedPartCode: 'PRT-BRG-CTRB',
-          quantity: 2
-        }
-      ],
-      triageSeverity: 'CRITICAL_TRIAGE',
-      isTriaged: 1,
-      autoReservationTriggered: 1,
-      reservations: [
-        {
-          id: 'res_omrs_55303_whl',
-          partCode: 'PRT-WHL-BOXNHL',
-          quantity: 1,
-          predictedDefect: 'WHEEL_FLAT_IMPACT_HIGH',
-          confidence: 0.96,
-          status: 'RESERVED'
-        },
-        {
-          id: 'res_omrs_55303_brg',
-          partCode: 'PRT-BRG-CTRB',
-          quantity: 2,
-          predictedDefect: 'CTRB_BEARING_ACOUSTIC_DEFECT',
-          confidence: 0.94,
-          status: 'RESERVED'
-        }
-      ]
-    },
-    {
-      id: 'omrs_scan_66313',
-      wagonNumber: 'ER/BOXNHL/66313',
-      scanTimestamp: getIsoDate(3, 1),
-      location: 'Trackside OMRS Array - Raipur Outer Yard (KM 828/14)',
-      trainSpeedKmph: 72.0,
-      wheelImpactKn: 135.0,
-      acousticBearingPeakDb: 74.2,
-      temperatureCelsius: 58.0,
-      wheelProfileDeviationMm: 5.2,
-      predictedDefects: [
-        {
-          component: 'WHEELSET_ASSEMBLY',
-          defectType: 'WHEEL_FLAT_IMPACT_HIGH',
-          severity: 'CRITICAL',
-          confidence: 0.93,
-          recommendedPartCode: 'PRT-WHL-BOXNHL',
-          quantity: 1
-        }
-      ],
-      triageSeverity: 'CRITICAL_TRIAGE',
-      isTriaged: 1,
-      autoReservationTriggered: 1,
-      reservations: [
-        {
-          id: 'res_omrs_66313_whl',
-          partCode: 'PRT-WHL-BOXNHL',
-          quantity: 1,
-          predictedDefect: 'WHEEL_FLAT_IMPACT_HIGH',
-          confidence: 0.93,
-          status: 'RESERVED'
-        }
-      ]
-    },
-    {
-      id: 'omrs_scan_11808',
-      wagonNumber: 'NCR/BOXNHL/11808',
-      scanTimestamp: getIsoDate(4, 2),
-      location: 'Trackside OMRS Array - Raipur Outer Yard (KM 828/14)',
-      trainSpeedKmph: 61.5,
-      wheelImpactKn: 88.0,
-      acousticBearingPeakDb: 62.0,
-      temperatureCelsius: 82.5,
-      wheelProfileDeviationMm: 2.1,
-      predictedDefects: [
-        {
-          component: 'BRAKE_BLOCK_AND_AXLE',
-          defectType: 'HOT_AXLE_BRAKE_BINDING',
-          severity: 'CRITICAL',
-          confidence: 0.92,
-          recommendedPartCode: 'PRT-BRK-COMP-BLK',
-          quantity: 4
-        }
-      ],
-      triageSeverity: 'CRITICAL_TRIAGE',
-      isTriaged: 1,
-      autoReservationTriggered: 1,
-      reservations: [
-        {
-          id: 'res_omrs_11808_brk',
-          partCode: 'PRT-BRK-COMP-BLK',
-          quantity: 4,
-          predictedDefect: 'HOT_AXLE_BRAKE_BINDING',
-          confidence: 0.92,
-          status: 'ALLOCATED'
-        }
-      ]
-    },
-    {
-      id: 'omrs_scan_33104',
-      wagonNumber: 'ECoR/BOXNHL/33104',
-      scanTimestamp: getIsoDate(1, 6),
-      location: 'Trackside OMRS Array - Raipur Outer Yard (KM 828/14)',
-      trainSpeedKmph: 65.0,
-      wheelImpactKn: 108.0,
-      acousticBearingPeakDb: 76.5,
-      temperatureCelsius: 54.0,
-      wheelProfileDeviationMm: 3.8,
-      predictedDefects: [
-        {
-          component: 'CTRB_BEARING',
-          defectType: 'BEARING_VIBRATION_ADVISORY',
-          severity: 'ADVISORY',
-          confidence: 0.79,
-          recommendedPartCode: 'PRT-BRG-CTRB',
-          quantity: 1
-        }
-      ],
-      triageSeverity: 'ADVISORY',
-      isTriaged: 1,
-      autoReservationTriggered: 1,
-      reservations: [
-        {
-          id: 'res_omrs_33104_brg',
-          partCode: 'PRT-BRG-CTRB',
-          quantity: 1,
-          predictedDefect: 'BEARING_VIBRATION_ADVISORY',
-          confidence: 0.79,
-          status: 'RESERVED'
-        }
-      ]
-    },
-    {
-      id: 'omrs_scan_77192',
-      wagonNumber: 'WR/BOXNHL/77192',
-      scanTimestamp: getIsoDate(0, 3),
-      location: 'Trackside OMRS Array - Raipur Outer Yard (KM 828/14)',
-      trainSpeedKmph: 70.0,
-      wheelImpactKn: 62.0,
-      acousticBearingPeakDb: 48.0,
-      temperatureCelsius: 42.0,
-      wheelProfileDeviationMm: 1.2,
-      predictedDefects: [],
-      triageSeverity: 'NORMAL',
-      isTriaged: 1,
-      autoReservationTriggered: 0,
-      reservations: []
-    }
-  ];
-
-  for (const scan of DEMO_OMRS_SCANS) {
-    if (!checkOMRSStmt.get(scan.wagonNumber)) {
-      insertOMRSStmt.run(
-        scan.id,
-        scan.wagonNumber,
-        scan.scanTimestamp,
-        scan.location,
-        scan.trainSpeedKmph,
-        scan.wheelImpactKn,
-        scan.acousticBearingPeakDb,
-        scan.temperatureCelsius,
-        scan.wheelProfileDeviationMm,
-        JSON.stringify(scan.predictedDefects),
-        scan.triageSeverity,
-        scan.isTriaged,
-        scan.autoReservationTriggered,
-        scan.scanTimestamp
-      );
-
-      for (const res of scan.reservations) {
-        if (!checkResStmt.get(scan.wagonNumber, res.partCode, 'OMRS_AI_TRIAGE')) {
-          insertResStmt.run(
-            res.id,
-            scan.wagonNumber,
-            res.partCode,
-            res.quantity,
-            'OMRS_AI_TRIAGE',
-            res.predictedDefect,
-            res.confidence,
-            res.status,
-            res.status === 'ALLOCATED' ? scan.scanTimestamp : null,
-            scan.scanTimestamp,
-            scan.scanTimestamp
-          );
-        }
-      }
-    }
-  }
+  /*
+   * No trackside "OMRS AI triage" is seeded any more.
+   *
+   * It used to put five scans and a set of parts reservations here, each with
+   * a "confidence" of 0.93–0.96 that nobody computed — typed into a seed file,
+   * for wagons that were not in the pipeline. The dashboard tiles of that kind
+   * were removed as fabricated; this was the same thing in the stores screen,
+   * and the first DRM to ask "where does 96% come from" would have been told
+   * the truth. There is no OMRS feed, so there is nothing to show.
+   */
 
   // -------------------------------------------------------------------------
   // 6. Seed Serialized Components & Passport Ledgers (Phase 3 - R4)
@@ -2542,6 +2307,8 @@ export function seedDemoData(db?: DatabaseSync): void {
   const componentCount = (database.prepare('SELECT COUNT(*) as c FROM components').get() as any).c;
 
   console.log('✅ [Demo Seed] Rich Demo Seeding successfully finished!');
+  seedShopFloor(database);
+
   console.log(`📊 Summary: ${wagonCount} Wagons across all 7 stages, ${springCount} Springs, ${checklistCount} Checklist Items, ${inventoryCount} Stores Inventory Parts, ${componentCount} Serialized Components.`);
 }
 
@@ -2559,5 +2326,13 @@ const isDirectRun = Boolean(
 if (isDirectRun) {
   const db = getDatabase();
   runMigrations(db);
+  // A database that already holds wagons is somebody's record, demo or not.
+  // The demo seed is written for an empty one and would fail half-way on a
+  // full one; refusing first is clearer than a constraint error.
+  const wagonsAlready = (db.prepare('SELECT COUNT(*) AS n FROM wagons').get() as { n: number }).n;
+  if (wagonsAlready > 0) {
+    console.error(`[seed] This database already holds ${wagonsAlready} wagon(s). The demo record is only written into an empty database — point DB_PATH at a new file, or delete this one on purpose.`);
+    process.exit(1);
+  }
   seedDemoData(db);
 }

@@ -187,7 +187,7 @@ export interface PocketDatasetReadiness {
   /** Frames where the first count and the blind recount differ — the ones to look at. */
   disagreements: number;
   model: typeof POCKET_MODEL;
-  gate: { allowed: boolean; why: string; thresholds: typeof POCKET_MODEL_GATE };
+  gate: { allowed: boolean; why: string; whyHi: string; thresholds: typeof POCKET_MODEL_GATE };
 }
 
 export function pocketDatasetReadiness(input: { labelledPhotos: number; coveredBogies: number; recounts: number; agreeing: number }): PocketDatasetReadiness {
@@ -197,14 +197,18 @@ export function pocketDatasetReadiness(input: { labelledPhotos: number; coveredB
   const agrees = agreementPct !== null && agreementPct >= POCKET_MODEL_GATE.minAgreementPct;
   const allowed = enoughBogies && enoughRecounts && agrees;
   let why: string;
+  let whyHi: string;
   if (allowed) {
     why = `${input.coveredBogies} covered bogies and ${input.recounts} blind recounts agreeing ${agreementPct}% of the time. A model may be attempted; it must beat the always-full baseline and be measured per bogie against these recounts, and it may only ever raise a question.`;
+    whyHi = `${input.coveredBogies} बोगी दोनों ओर से गिनी गईं और ${input.recounts} दोबारा गिनतियाँ ${agreementPct}% बार सहमत। मॉडल आज़माया जा सकता है; उसे "सब भरे हैं" बेसलाइन को हराना होगा, इन्हीं गिनतियों के विरुद्ध मापा जाएगा, और वह केवल प्रश्न उठा सकता है।`;
   } else {
     const missing: string[] = [];
-    if (!enoughBogies) missing.push(`${input.coveredBogies} of ${POCKET_MODEL_GATE.minCoveredBogies} covered bogies`);
-    if (!enoughRecounts) missing.push(`${input.recounts} of ${POCKET_MODEL_GATE.minRecounts} blind recounts`);
-    else if (!agrees) missing.push(`recounts agree ${agreementPct}% of the time; ${POCKET_MODEL_GATE.minAgreementPct}% is needed before a model has anything to be measured against`);
+    const missingHi: string[] = [];
+    if (!enoughBogies) { missing.push(`${input.coveredBogies} of ${POCKET_MODEL_GATE.minCoveredBogies} covered bogies`); missingHi.push(`${POCKET_MODEL_GATE.minCoveredBogies} में से ${input.coveredBogies} बोगी दोनों ओर से गिनी गईं`); }
+    if (!enoughRecounts) { missing.push(`${input.recounts} of ${POCKET_MODEL_GATE.minRecounts} blind recounts`); missingHi.push(`${POCKET_MODEL_GATE.minRecounts} में से ${input.recounts} दोबारा गिनतियाँ`); }
+    else if (!agrees) { missing.push(`recounts agree ${agreementPct}% of the time; ${POCKET_MODEL_GATE.minAgreementPct}% is needed before a model has anything to be measured against`); missingHi.push(`दोबारा गिनतियाँ ${agreementPct}% बार सहमत; मॉडल को मापने के लिए ${POCKET_MODEL_GATE.minAgreementPct}% चाहिए`); }
     why = `No model. ${missing.join('; ')}. Every count is a label; keep counting, and have a second person recount blind.`;
+    whyHi = `कोई मॉडल नहीं। ${missingHi.join('; ')}। हर गिनती एक लेबल है; गिनते रहें, और दूसरे व्यक्ति से बिना देखे दोबारा गिनवाएँ।`;
   }
   return {
     labelledPhotos: input.labelledPhotos,
@@ -214,6 +218,6 @@ export function pocketDatasetReadiness(input: { labelledPhotos: number; coveredB
     agreementPct,
     disagreements: input.recounts - input.agreeing,
     model: POCKET_MODEL,
-    gate: { allowed, why, thresholds: POCKET_MODEL_GATE }
+    gate: { allowed, why, whyHi, thresholds: POCKET_MODEL_GATE }
   };
 }

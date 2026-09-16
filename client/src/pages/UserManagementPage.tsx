@@ -78,6 +78,9 @@ const CAPABILITY_LABELS: Partial<Record<Capability, { en: string; hi: string }>>
   'analytics.read':      { en: 'Read the divisional dashboards', hi: 'मंडल डैशबोर्ड देखना' },
   'learning.view':       { en: 'Read what the system learned', hi: 'सिस्टम की सीख देखना' },
   'certificate.export':  { en: 'Export certificates',          hi: 'प्रमाणपत्र निर्यात' },
+  'shadow.view':         { en: 'Read the shadow-run log',      hi: 'छाया संचालन लॉग देखना' },
+  'shadow.record':       { en: 'Write a shadow-run entry',     hi: 'छाया संचालन में दर्ज करना' },
+  'records.ask':         { en: 'Ask the records a question',   hi: 'रिकॉर्ड से प्रश्न पूछना' },
   'users.manage':        { en: 'Manage people',                hi: 'लोगों का प्रबंधन' },
   'system.configure':    { en: 'Configure the system',         hi: 'सिस्टम कॉन्फ़िगर करना' }
 };

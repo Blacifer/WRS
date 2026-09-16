@@ -1208,7 +1208,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
               onClick={onBack}
               className="text-xs font-semibold text-accent-ink hover:text-accent-ink flex items-center gap-1 mb-2"
             >
-              ← Back to Wagons List
+              ← {isHi ? 'वैगन सूची पर वापस' : 'Back to Wagons List'}
             </button>
             <div className="flex items-center gap-3">
               <h2 className="text-2xl font-extrabold text-white">{wagon?.wagonNumber}</h2>
@@ -1277,7 +1277,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                 onClick={handleNextStage}
                 className="px-6 py-2.5 bg-accent hover:bg-accent-hover text-white rounded-control text-xs font-bold  transition flex items-center gap-2 min-h-[48px]"
               >
-                Advance to Next Stage →
+                {isHi ? 'अगले चरण पर बढ़ाएँ' : 'Advance to Next Stage'} →
               </button>
             )}
 
@@ -1318,7 +1318,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                       isCurrent ? 'text-accent-ink' : isPast ? 'text-ink-body' : 'text-ink-faint'
                     }`}
                   >
-                    {stg.replace(/_/g, ' ')}
+                    {(t(`lifecycle.stages.${stg}` as any) || stg).replace(/^\d+\.\s*/, '')}
                   </span>
                 </div>
               );
@@ -1328,38 +1328,43 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
       </div>
 
       {/* Tabs Navigation */}
-      <div className="flex border-b border-line gap-6">
+      {/*
+        * Ten tabs. Long titles wrapped into a three-line block that was
+        * unreadable in Hindi. The tab is a short name; the section heading
+        * inside it keeps the full title.
+        */}
+      <div className="flex border-b border-line gap-5 overflow-x-auto whitespace-nowrap" data-testid="wagon-tabs">
         <button
           onClick={() => setActiveTab('CHECKLIST')}
-          className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
+          className={`shrink-0 pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
             activeTab === 'CHECKLIST'
               ? 'border-accent-line text-accent-ink'
               : 'border-transparent text-ink-muted hover:text-ink-body'
           }`}
         >
-          <ClipboardIcon size={16} /> {t('checklist.title')}
+          <ClipboardIcon size={16} /> {isHi ? 'चेकलिस्ट' : 'Checklist'}
         </button>
 
         <button
           onClick={() => setActiveTab('REPORT')}
-          className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
+          className={`shrink-0 pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
             activeTab === 'REPORT'
               ? 'border-accent-line text-accent-ink'
               : 'border-transparent text-ink-muted hover:text-ink-body'
           }`}
         >
-          <ClipboardIcon size={16} />{isHi ? 'स्थिति रिपोर्ट' : 'Condition Report'}
+          <ClipboardIcon size={16} />{isHi ? 'स्थिति रिपोर्ट' : 'Condition report'}
         </button>
 
         <button
           onClick={() => setActiveTab('GATE')}
-          className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
+          className={`shrink-0 pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
             activeTab === 'GATE'
               ? 'border-accent-line text-accent-ink'
               : 'border-transparent text-ink-muted hover:text-ink-body'
           }`}
         >
-          <ShieldIcon size={16} /> {t('exitGate.title')}
+          <ShieldIcon size={16} /> {isHi ? 'रिलीज़ जाँच' : 'Release checks'}
           {gateStatus && !gateStatus.canRelease && (
             <span className="w-2 h-2 rounded-full bg-bad animate-pulse"></span>
           )}
@@ -1368,7 +1373,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
         <button
           onClick={() => setActiveTab('PASSPORT')}
           data-testid="tab-passport"
-          className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
+          className={`shrink-0 pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
             activeTab === 'PASSPORT'
               ? 'border-accent-line text-accent-ink'
               : 'border-transparent text-ink-muted hover:text-ink-body'
@@ -1380,7 +1385,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
         <button
           onClick={() => setActiveTab('PARTS')}
           data-testid="tab-parts"
-          className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
+          className={`shrink-0 pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
             activeTab === 'PARTS'
               ? 'border-accent-line text-accent-ink'
               : 'border-transparent text-ink-muted hover:text-ink-body'
@@ -1391,58 +1396,58 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
 
         <button
           onClick={() => setActiveTab('PHOTOS')}
-          className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
+          className={`shrink-0 pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
             activeTab === 'PHOTOS'
               ? 'border-accent-line text-accent-ink'
               : 'border-transparent text-ink-muted hover:text-ink-body'
           }`}
         >
-          <CameraIcon size={16} /> {t('photos.title')} ({photos.length})
+          <CameraIcon size={16} /> {isHi ? 'फ़ोटो' : 'Photos'} ({photos.length})
         </button>
 
         <button
           onClick={() => setActiveTab('TIMELINE')}
-          className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
+          className={`shrink-0 pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
             activeTab === 'TIMELINE'
               ? 'border-accent-line text-accent-ink'
               : 'border-transparent text-ink-muted hover:text-ink-body'
           }`}
         >
-          <ClockIcon size={16} />{isHi ? 'समयरेखा व ठहराव अवधि' : 'Timeline & Dwell Times'}</button>
+          <ClockIcon size={16} />{isHi ? 'समयरेखा' : 'Timeline'}</button>
 
 
 
         <button
           onClick={() => setActiveTab('SWT')}
-          className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
+          className={`shrink-0 pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
             activeTab === 'SWT'
               ? 'border-accent-line text-accent-ink'
               : 'border-transparent text-ink-muted hover:text-ink-body'
           }`}
         >
-          <WindIcon size={16} />{isHi ? 'एकल वैगन परीक्षण (वायु ब्रेक)' : 'Single Wagon Test (Air Brake)'}
+          <WindIcon size={16} />{isHi ? 'वायु ब्रेक परीक्षण' : 'Air-brake test'}
         </button>
 
         <button
           onClick={() => setActiveTab('ACOUSTIC')}
-          className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
+          className={`shrink-0 pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
             activeTab === 'ACOUSTIC'
               ? 'border-accent-line text-accent-ink'
               : 'border-transparent text-ink-muted hover:text-ink-body'
           }`}
         >
-          <HeadphonesIcon size={16} /> {t('acoustic.title', 'Acoustic Diagnostics')}
+          <HeadphonesIcon size={16} /> {isHi ? 'ध्वनि' : 'Sound'}
         </button>
 
         <button
           onClick={() => setActiveTab('COMPONENTS')}
-          className={`pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
+          className={`shrink-0 pb-3 text-sm font-bold transition border-b-2 flex items-center gap-2 ${
             activeTab === 'COMPONENTS'
               ? 'border-accent-line text-accent-ink'
               : 'border-transparent text-ink-muted hover:text-ink-body'
           }`}
         >
-          <IdCardIcon size={16} /> Serialized Passports ({wagonComponents.length})
+          <IdCardIcon size={16} /> {isHi ? 'सीरियल पुर्जे' : 'Serialized parts'} ({wagonComponents.length})
         </button>
       </div>
 
@@ -2316,7 +2321,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-white">
-                      {tr.fromStage} → {tr.toStage}
+                      {t(`lifecycle.stages.${tr.fromStage}` as any) || tr.fromStage} → {t(`lifecycle.stages.${tr.toStage}` as any) || tr.toStage}
                     </span>
                     {tr.isOverride && (
                       <span className="px-2 py-0.5 bg-warn-soft text-warn-ink border border-warn-line rounded text-[9px] font-bold">
@@ -3007,7 +3012,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                 >
                   {stageList.map((stg) => (
                     <option key={stg} value={stg}>
-                      {stg.replace(/_/g, ' ')}
+                      {t(`lifecycle.stages.${stg}` as any) || stg}
                     </option>
                   ))}
                 </select>

@@ -209,20 +209,22 @@ export function summariseAssemblyCoverage(
  * deliberately stated in whole bogies rather than photographs so that
  * photographing one side twice as fast cannot move them.
  */
-export function assemblyReadiness(completeBogies: number): string {
+export function assemblyReadiness(completeBogies: number, lang: 'en' | 'hi' = 'en'): string {
   if (completeBogies >= 300) {
-    return (
-      'Enough covered bogies to attempt an occupancy baseline. Publish the ' +
-      'always-full baseline first: any model has to beat it, not beat zero.'
-    );
+    return lang === 'hi'
+      ? 'ऑक्यूपेंसी बेसलाइन आज़माने लायक बोगियाँ हैं। पहले "सब भरे हैं" बेसलाइन प्रकाशित करें: किसी भी मॉडल को उसे हराना है, शून्य को नहीं।'
+      : 'Enough covered bogies to attempt an occupancy baseline. Publish the ' +
+        'always-full baseline first: any model has to beat it, not beat zero.';
   }
   if (completeBogies >= 50) {
-    return (
-      'Useful for evaluating capture protocol and lighting; far too few to ' +
-      'train against. Keep collecting.'
-    );
+    return lang === 'hi'
+      ? 'कैप्चर प्रोटोकॉल और रोशनी परखने के लिए उपयोगी; प्रशिक्षण के लिए बहुत कम। इकट्ठा करते रहें।'
+      : 'Useful for evaluating capture protocol and lighting; far too few to ' +
+        'train against. Keep collecting.';
   }
-  return 'Still accumulating. Both sides of a bogie are needed before it counts.';
+  return lang === 'hi'
+    ? 'अभी इकट्ठा हो रहा है। बोगी की दोनों ओर की फ़ोटो होने पर ही वह गिनी जाती है।'
+    : 'Still accumulating. Both sides of a bogie are needed before it counts.';
 }
 
 /**
@@ -237,3 +239,6 @@ export const ASSEMBLY_NEGATIVES_WARNING =
   'These counts say nothing about class balance. Occupancy needs staged empty ' +
   'pockets, deliberately photographed and labelled — waiting for genuine ' +
   'misassemblies means waiting for the failure this is meant to prevent.';
+
+export const ASSEMBLY_NEGATIVES_WARNING_HI =
+  'ये संख्याएँ वर्ग-संतुलन के बारे में कुछ नहीं कहतीं। ऑक्यूपेंसी के लिए जान-बूझकर खाली रखे पॉकेट की फ़ोटो और लेबल चाहिए — असली ग़लत असेंबली का इंतज़ार उसी विफलता का इंतज़ार है जिसे रोकना है।';

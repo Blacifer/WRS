@@ -55,14 +55,18 @@ export const WagonPassport: React.FC<Props> = ({ wagonNumber, released, lang }) 
   const role = api.getUser()?.role;
   const mayExport = can(role, 'certificate.export');
   const mayImport = can(role, 'wagon.release');
+  // Previous shops' passports are a wagon.view read. An inspector has no
+  // wagon.view, and asking anyway logged a 403 on every visit to the tab.
+  const mayReadPrevious = can(role, 'wagon.view');
   const [passports, setPassports] = useState<any[] | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [open, setOpen] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    if (!mayReadPrevious) { setPassports([]); return; }
     try { setPassports((await api.getWagonPassports(wagonNumber)).data); } catch { setPassports([]); }
-  }, [wagonNumber]);
+  }, [wagonNumber, mayReadPrevious]);
   useEffect(() => { void load(); }, [load]);
 
   const exportPassport = async () => {
@@ -117,7 +121,7 @@ export const WagonPassport: React.FC<Props> = ({ wagonNumber, released, lang }) 
         </div>
       )}
 
-      <div className="bg-card border border-line rounded-card p-5 space-y-3" data-testid="previous-shops">
+      {mayReadPrevious && <div className="bg-card border border-line rounded-card p-5 space-y-3" data-testid="previous-shops">
         <h3 className="text-base font-black text-white">{t('What previous shops recorded', 'पिछली दुकानों ने क्या दर्ज किया')}</h3>
         {passports === null ? null : passports.length === 0 ? (
           <p className="text-xs text-ink-muted">{t('No passport has been imported for this wagon.', 'इस वैगन के लिए कोई पासपोर्ट आयात नहीं हुआ।')}</p>
@@ -146,7 +150,7 @@ export const WagonPassport: React.FC<Props> = ({ wagonNumber, released, lang }) 
             )}
           </div>
         ))}
-      </div>
+      </div>}
     </section>
   );
 };

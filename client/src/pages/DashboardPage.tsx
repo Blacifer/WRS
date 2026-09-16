@@ -699,11 +699,13 @@ export const DashboardPage: React.FC = () => {
                     {b.currentStage}
                   </span>
                 </div>
-                <ul className="text-xs text-bad-ink/90 space-y-1 list-disc list-inside">
-                  {b.blockers.map((blk: string, idx: number) => (
-                    <li key={idx}>{blk}</li>
-                  ))}
-                </ul>
+                {/*
+                  * A wagon two stages in has forty uninspected mandatory items,
+                  * each its own line. Listing every one made this panel six
+                  * screens tall on a shop with thirteen wagons. The first few
+                  * say what kind of hold it is; the rest are one tap away.
+                  */}
+                <BlockerLines lines={b.blockers} isHi={isHi} />
               </div>
             ))}
           </div>
@@ -839,4 +841,21 @@ const ACTIVITY_LABEL: Record<string, string> = {
   PHOTO_UPLOADED: 'Photograph taken',
   OTP_VERIFIED: 'One-time code accepted',
   SECURITY_ALERT: 'Security alert'
+};
+
+const BlockerLines: React.FC<{ lines: string[]; isHi: boolean }> = ({ lines, isHi }) => {
+  const [open, setOpen] = useState(false);
+  const shown = open ? lines : lines.slice(0, 4);
+  return (
+    <>
+      <ul className="text-xs text-bad-ink/90 space-y-1 list-disc list-inside">
+        {shown.map((blk, idx) => <li key={idx}>{blk}</li>)}
+      </ul>
+      {lines.length > 4 && (
+        <button type="button" onClick={() => setOpen(!open)} className="text-[11px] font-semibold text-bad-ink underline-offset-2 hover:underline" data-testid="blockers-more">
+          {open ? (isHi ? 'कम दिखाएँ' : 'Show fewer') : (isHi ? `${lines.length - 4} और` : `${lines.length - 4} more`)}
+        </button>
+      )}
+    </>
+  );
 };

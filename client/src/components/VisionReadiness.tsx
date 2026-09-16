@@ -29,6 +29,7 @@
 
 import { useEffect, useState } from 'react';
 import { api } from '../services/api.ts';
+import { assemblyReadiness, ASSEMBLY_NEGATIVES_WARNING_HI } from '../../../shared/assembly/assemblyCapture.ts';
 
 interface VisionReadinessProps {
   lang: 'en' | 'hi';
@@ -170,8 +171,9 @@ export const VisionReadiness: React.FC<VisionReadinessProps> = ({ lang }) => {
           partialBogies: d.partialBogies || 0,
           totalPhotos: d.totalPhotos || 0,
           unusablePhotos: d.unusablePhotos || 0,
-          readiness: d.readiness || '',
-          negativesWarning: d.negativesWarning || '',
+          // The server's sentence in English; the same function gives the Hindi.
+          readiness: isHi ? assemblyReadiness(d.completeBogies || 0, 'hi') : (d.readiness || ''),
+          negativesWarning: isHi ? ASSEMBLY_NEGATIVES_WARNING_HI : (d.negativesWarning || ''),
           capped: (d.totalPhotos || 0) + (d.unusablePhotos || 0) >= ASSEMBLY_LIMIT
         });
       })
@@ -349,7 +351,7 @@ export const VisionReadiness: React.FC<VisionReadinessProps> = ({ lang }) => {
             <span className="text-xs font-bold text-ink-muted">{' · '}{pockets.coveredBogies}{isHi ? ' बोगी दोनों ओर से' : ' bogies both sides'}</span>
             <span className="text-xs font-bold text-ink-muted">{' · '}{pockets.recounts}{isHi ? ' दोबारा गिनती' : ' blind recounts'}{pockets.agreementPct !== null ? `, ${pockets.agreementPct}% ${isHi ? 'सहमत' : 'agree'}` : ''}</span>
           </p>
-          <p className="text-xs text-ink-body leading-relaxed">{isHi ? 'मॉडल' : 'Model'}: {pockets.model}. {pockets.gate?.why}</p>
+          <p className="text-xs text-ink-body leading-relaxed">{isHi ? 'मॉडल' : 'Model'}: {pockets.model}. {isHi ? (pockets.gate?.whyHi || pockets.gate?.why) : pockets.gate?.why}</p>
         </div>
       )}
     </section>
