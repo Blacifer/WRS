@@ -17,6 +17,7 @@ import { AppAccessQr } from '../components/AppAccessQr.tsx';
 import { TotpEnrolment } from '../components/TotpEnrolment.tsx';
 import { GaugeRegister } from '../components/GaugeRegister.tsx';
 import { ActionConfirm } from '../components/ActionConfirm.tsx';
+import { RosterImport } from '../components/RosterImport.tsx';
 import { RefreshCwIcon, UserIcon, CheckCircleIcon, PlusCircleIcon } from '../components/Icons.tsx';
 import { Button, Card, CardBody, CardHeader, Chip, Note } from '../components/ui/index.tsx';
 import { ROLE_CAPABILITIES } from '../../../shared/auth/permissions.ts';
@@ -440,6 +441,9 @@ export const UserManagementPage: React.FC<UserManagementPageProps> = ({ lang }) 
       </div>
 
       <CapabilityMatrix isHi={isHi} />
+
+      {/* The roster pasted from a spreadsheet — one confirmation, slips to print. */}
+      <RosterImport lang={lang} onImported={() => { void loadUsers(); }} />
 
       {/* Just-created credentials panel — shown once */}
       {justCreated && (

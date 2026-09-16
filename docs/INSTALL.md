@@ -203,6 +203,15 @@ photographed on the floor, with the blank dates its label carries — press
 
 ## 7. Backups
 
+**The server takes the backup itself.** Every night at 02:00 (`WRS_BACKUP_HOUR`
+to change it), and within minutes of starting if none is a day old, it runs
+the same encrypted, verified backup described below and writes the result
+where the readiness panel reads it. If no `WRS_BACKUP_KEY_FILE` is set, it
+generates a key once at `server\data\backup.key` and the readiness row keeps
+saying "copy this key to the office" until you set `WRS_BACKUP_KEY_FILE` to a
+copy kept off this PC. The scheduled task below is therefore optional —
+keep it if the office prefers a second, independent schedule.
+
 Create a key **once**, and keep it off the backup volume — a key stored beside
 the thing it encrypts protects against nothing.
 

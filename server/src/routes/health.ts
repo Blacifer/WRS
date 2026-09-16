@@ -12,6 +12,8 @@ import { authMiddleware } from '../middleware/auth.ts';
 import { requireCapability } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { config } from '../config/index.ts';
+import { lastRun } from '../backup/scheduler.ts';
+import { mirrorState } from '../middleware/readOnlyMirror.ts';
 import { photoStore } from '../db/photoStore.ts';
 import { verifyPassword } from '../auth/password.ts';
 import { verifyAuditChain } from '../db/auditLog.ts';
@@ -52,7 +54,9 @@ healthRouter.get('/health', (req: Request, res: Response): void => {
     memory: {
       rssMb: Math.round((memory.rss / (1024 * 1024)) * 10) / 10,
       heapUsedMb: Math.round((memory.heapUsed / (1024 * 1024)) * 10) / 10
-    }
+    },
+    // A mirror says so, and when its copy was taken, so the DRM's screen can too.
+    mirror: mirrorState()
   });
 });
 
@@ -365,20 +369,26 @@ healthRouter.get(
     } catch { /* no backup directory yet — the row below already says that */ }
 
     const backupAgeHours = newestBackupMs === null ? null : (Date.now() - newestBackupMs) / 3_600_000;
+    // What the server's own nightly backup last said, and where its key is.
+    const serverRun = lastRun(backupDir);
+    const keyBeside = serverRun?.keyBesideDatabase === true;
     checks.push({
       id: 'backup',
       label: 'A recent encrypted backup exists',
       state: backupAgeHours === null ? 'FAIL' : backupOnSameDisk ? 'WARN' : backupAgeHours <= 24 * 8 ? 'PASS' : 'WARN',
       detail: backupAgeHours === null
-        ? 'No backup has ever been taken. server/scripts/backup-db.mjs encrypts and verifies one, and nothing schedules it yet. ' +
-          'Schedule it weekly — Task Scheduler on Windows, cron on Linux; docs/INSTALL.md §7 has the exact command — ' +
-          `and point it at a different disk from the database (WRS_BACKUP_DIR is currently ${backupDir}).`
+        ? 'No backup has ever been taken. The server takes one itself every night at ' +
+          `${process.env.WRS_BACKUP_HOUR || '02'}:00, and within minutes of starting when none is a day old` +
+          (serverRun && !serverRun.ok ? ` — the last attempt FAILED: ${String(serverRun.output).split('\n').slice(-2).join(' ')}` : '') +
+          `. Point it at a different disk from the database (WRS_BACKUP_DIR is currently ${backupDir}).`
         : backupOnSameDisk
           ? `${backupCount} backup(s) retained, newest ${Math.floor(backupAgeHours)} hour(s) ago — but they are on the same disk as the database. ` +
             'If this machine is formatted or its disk fails, the records and every copy of them go together. ' +
             'Point the backup at another drive, a network share, or a USB disk kept elsewhere — ' +
             `set WRS_BACKUP_DIR in .env (currently ${backupDir}) and in the scheduled task.`
-          : `${backupCount} backup(s) retained on a separate disk, newest ${Math.floor(backupAgeHours)} hour(s) ago.`
+          : `${backupCount} backup(s) retained on a separate disk, newest ${Math.floor(backupAgeHours)} hour(s) ago.` +
+            (serverRun?.scheduledByServer ? ' Taken by the server itself; the next is tonight.' : '') +
+            (keyBeside ? ` The backup key was generated beside the database (${serverRun?.keyFile}); copy it to the office and set WRS_BACKUP_KEY_FILE — a key only on this PC is lost with it.` : '')
     });
 
     /*

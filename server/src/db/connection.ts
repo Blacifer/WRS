@@ -21,6 +21,10 @@ export interface IDatabase {
 }
 
 let dbInstance: DatabaseSync | null = null;
+let dbInstancePath: string | null = null;
+
+/** The file the open database was opened from, for anything that keeps state beside it. */
+export function currentDatabasePath(): string { return dbInstancePath || config.dbPath; }
 
 export function getDatabase(dbPath?: string): DatabaseSync {
   if (dbInstance && !dbPath) {
@@ -28,6 +32,7 @@ export function getDatabase(dbPath?: string): DatabaseSync {
   }
 
   const targetPath = dbPath || config.dbPath;
+  dbInstancePath = targetPath;
 
   // Create directory if not memory database
   if (targetPath !== ':memory:') {

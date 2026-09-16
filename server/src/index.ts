@@ -9,6 +9,7 @@ import { createApp } from './app.ts';
 import { config } from './config/index.ts';
 import { getDatabase, closeDatabase } from './db/connection.ts';
 import { STARTS_LOG } from './routes/health.ts';
+import { startBackupSchedule } from './backup/scheduler.ts';
 
 const app = createApp();
 
@@ -57,6 +58,39 @@ const server = useTls
     });
 
 /*
+ * The nightly backup, from inside the server.
+ *
+ * Off for a read-only mirror (it holds a restored copy, not the record) and
+ * for tests; on for everything else. The readiness panel reads what it wrote.
+ */
+const stopBackupSchedule = process.env.WRS_BACKUP_SCHEDULE === 'off' || process.env.WRS_READ_ONLY_MIRROR === 'true' || config.nodeEnv === 'test'
+  ? () => {}
+  : startBackupSchedule({
+      dbPath: config.dbPath, backupDir: config.backupDir, photoDir: config.photoDir,
+      hour: process.env.WRS_BACKUP_HOUR ? Number(process.env.WRS_BACKUP_HOUR) : 2,
+      log: (line) => console.log(line)
+    });
+
+/*
+ * A mirror reopens its database when the refresh script has swapped it.
+ *
+ * SQLite cannot have the file replaced underneath an open handle, so
+ * mirror-refresh.mjs writes the restored copy beside it and drops a flag;
+ * the server exits cleanly, and the start loop (START.cmd, or the mirror's
+ * systemd unit) brings it back on the new file within seconds.
+ */
+if (process.env.WRS_READ_ONLY_MIRROR === 'true') {
+  const flag = path.join(path.dirname(config.dbPath), 'mirror-restart.flag');
+  setInterval(() => {
+    if (fs.existsSync(flag)) {
+      try { fs.unlinkSync(flag); } catch { /* the restart is what matters */ }
+      console.log('[mirror] a fresh copy has been restored; restarting to open it');
+      process.kill(process.pid, 'SIGTERM');
+    }
+  }, 15_000).unref();
+}
+
+/*
  * Shutting down without leaving work half-written.
  *
  * This closed the HTTP server and never closed the database. In WAL mode that
@@ -72,6 +106,7 @@ let shuttingDown = false;
 function shutdown(signal: string, code = 0): void {
   if (shuttingDown) return;   // a second Ctrl+C must not race the first
   shuttingDown = true;
+  stopBackupSchedule();
 
   console.log(`${signal} received. Shutting down gracefully...`);
 

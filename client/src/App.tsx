@@ -9,6 +9,7 @@ import { isUserInspector, isUserSupervisorOrAdmin, canAccessTab } from '../../sh
 import type { LanguageCode } from './i18n/index.ts';
 import { api } from './services/api.ts';
 import { Header } from './components/Header.tsx';
+import { MirrorBanner } from './components/MirrorBanner.tsx';
 import { InspectionPage } from './pages/InspectionPage.tsx';
 import { SpringBatchPage } from './pages/SpringBatchPage.tsx';
 import { SpringSortingPage } from './pages/SpringSortingPage.tsx';
@@ -238,6 +239,7 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-transparent text-neutral-100 flex flex-col">
+      <MirrorBanner lang={currentLang} />
       <Header
         user={user}
         currentLang={currentLang}

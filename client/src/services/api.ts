@@ -225,7 +225,10 @@ export class ApiClient {
     }
 
     if (!res.ok) {
-      throw new ApiError(json.message || json.error || `HTTP error ${res.status}`, res.status, json.error ?? null, json.data ?? null);
+      const err = new ApiError(json.message || json.error || `HTTP error ${res.status}`, res.status, json.error ?? null, json.data ?? null);
+      // Row-level detail from a bulk refusal (the roster import), carried whole.
+      if (Array.isArray(json.problems)) (err as any).problems = json.problems;
+      throw err;
     }
 
     return json as T;
@@ -270,6 +273,16 @@ export class ApiClient {
 
   public async listUsers(): Promise<{ success: boolean; data: AdminUserRecord[] }> {
     return this.request('/auth/users');
+  }
+
+  /** Liveness, and whether this server is a read-only mirror and when its copy was taken. */
+  public async getHealth(): Promise<{ status: string; mirror?: { readOnly: boolean; restoredAt: string | null } }> {
+    return this.request('/health');
+  }
+
+  /** The roster in one go; passwords come back once. */
+  public async importRoster(rows: Array<{ fullName: string; employeeId: string; role: string; username?: string }>, otpToken: string): Promise<{ success: boolean; data: { created: Array<{ line: number; username: string; password: string; role: string; fullName: string; employeeId: string; id: string }> } }> {
+    return this.request('/auth/users/import', { method: 'POST', body: JSON.stringify({ rows, otpToken }) });
   }
 
   public async createUser(payload: {

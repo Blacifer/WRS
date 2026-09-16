@@ -6,6 +6,7 @@
 import { express, cors, ExpressApp } from './framework/index.ts';
 import type { Request, Response, NextFunction } from './framework/index.ts';
 import { apiRouter } from './routes/index.ts';
+import { readOnlyMirror } from './middleware/readOnlyMirror.ts';
 import { requestLogger } from './middleware/requestLogger.ts';
 import { requestContext } from './middleware/requestContext.ts';
 import { rateLimit } from './middleware/rateLimit.ts';
@@ -63,6 +64,9 @@ export function createApp(dbPath?: string): ExpressApp {
    * traffic, which would look exactly like the app being broken.
    */
   app.use('/api', rateLimit());
+
+  // A read-only mirror refuses every write but sign-in. See the middleware.
+  app.use('/api', readOnlyMirror());
 
   // Mount API Routes
   app.use('/api', apiRouter);

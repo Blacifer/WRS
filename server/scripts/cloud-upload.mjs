@@ -74,7 +74,7 @@ export function cloudSettings(env = process.env) {
   return { endpoint: endpoint.replace(/\/+$/, ''), bucket, accessKey, secretKey, region: env.WRS_CLOUD_REGION || 'ap-south-1', prefix: (env.WRS_CLOUD_PREFIX || '').replace(/^\/+/, '') };
 }
 
-async function signedFetch(settings, method, key, body, extraHeaders = {}) {
+export async function signedFetch(settings, method, key, body, extraHeaders = {}) {
   const url = new URL(`${settings.endpoint}/${settings.bucket}/${key.split('/').map((s) => uriEncode(s)).join('/')}`);
   const amzDate = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   const bodyHash = body ? sha256Hex(body) : sha256Hex('');
@@ -154,4 +154,32 @@ export async function syncBackupDirToCloud(settings, backupDir, log = () => {}) 
   manifest.failures = failures;
   writeManifest(backupDir, manifest);
   return { uploaded, skipped, failures, newestBackup: manifest.newestBackup };
+}
+
+/**
+ * The newest database backup in the bucket, by name — the names carry the
+ * timestamp (wrs_inspections_YYYYMMDD_HHMMSS.db.enc), so the greatest key is
+ * the newest. ListObjectsV2 is XML; the keys are the only thing needed from it.
+ */
+export async function newestBackupInCloud(settings) {
+  const url = new URL(`${settings.endpoint}/${settings.bucket}/`);
+  url.search = `list-type=2&prefix=${encodeURIComponent(settings.prefix)}&max-keys=1000`;
+  const amzDate = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const bodyHash = sha256Hex('');
+  const headers = { host: url.host, 'x-amz-content-sha256': bodyHash, 'x-amz-date': amzDate };
+  const query = `list-type=2&max-keys=1000&prefix=${uriEncode(settings.prefix)}`;
+  const { authorization } = signV4({ method: 'GET', host: url.host, pathName: url.pathname, query, headers, bodyHash, accessKey: settings.accessKey, secretKey: settings.secretKey, region: settings.region, amzDate });
+  const listUrl = `${settings.endpoint}/${settings.bucket}/?${query}`;
+  const res = await fetch(listUrl, { headers: { 'x-amz-content-sha256': bodyHash, 'x-amz-date': amzDate, authorization } });
+  if (!res.ok) throw new Error(`list ${settings.bucket}: ${res.status} ${(await res.text().catch(() => '')).slice(0, 200)}`);
+  const xml = await res.text();
+  const keys = [...xml.matchAll(/<Key>([^<]+)<\/Key>/g)].map((m) => m[1]).filter((k) => /\.db\.enc$/.test(k)).sort();
+  return keys.length ? keys[keys.length - 1] : null;
+}
+
+/** Download one object to a local file. */
+export async function download(settings, key, localPath) {
+  const res = await signedFetch(settings, 'GET', key, null);
+  if (!res.ok) throw new Error(`GET ${key}: ${res.status}`);
+  fs.writeFileSync(localPath, Buffer.from(await res.arrayBuffer()));
 }

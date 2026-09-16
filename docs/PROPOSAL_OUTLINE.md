@@ -33,7 +33,9 @@ the shop's numbers with the count behind every one.
 | Shadow-run log and verdict (for the go-live decision) | Delivered |
 | Offline-first tablet app, English and Hindi | Delivered |
 | Camera on the bench (learns this shop's springs; gated until proven) | Delivered, gated |
-| Encrypted backups, restart-on-failure, readiness panel, cloud copy | Delivered |
+| Encrypted backups (self-scheduled nightly), restart-on-failure, readiness panel, cloud copy | Delivered |
+| Read-only mirror for the DRM at division HQ, refreshed from the cloud copy | Delivered |
+| Roster import from a spreadsheet, passwords on printable slips | Delivered |
 | Security: capability-based roles, one-time codes / authenticator, audit chain | Delivered |
 | Installation bundle for a Windows PC (USB stick), tablet trust guide | Delivered |
 
@@ -46,6 +48,7 @@ the shop's numbers with the count behind every one.
 | Wi-Fi covering the bay, or a cable to the PC | LAN only; no internet needed to work | Shop |
 | One external/USB disk kept in another room | Off-site backup | Shop / quote |
 | Optional: cloud storage bucket (S3-compatible) | Off-site copy of encrypted backups; any Indian S3 provider or RailTel/NIC | Shop / quote |
+| Optional: a small VM or PC at division HQ | The DRM's read-only mirror | Shop / quote |
 | Optional: a lamp at the assembly photo position | For pocket counts | Shop |
 | Optional: digital wheel gauge with data output | Wheel readings without chalk | Quote |
 | Wagon Maintenance Manual PDF, IRCA Part III wheel page | For citations and to confirm wheel limits | Shop |

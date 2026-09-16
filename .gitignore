@@ -51,3 +51,4 @@ dist-shop/
 screen-walk/
 # Local demo database, logs and photographs (server/data/demo/) — never committed
 server/data/demo/
+server/data/backup.key

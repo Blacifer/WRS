@@ -5,6 +5,7 @@
 
 import { Router } from '../framework/index.ts';
 import type { Request, Response, NextFunction } from '../framework/index.ts';
+import crypto from 'node:crypto';
 import { verifyPassword, hashPassword } from '../auth/password.ts';
 import { signToken } from '../auth/jwt.ts';
 import { otpService } from '../auth/otpService.ts';
@@ -464,6 +465,70 @@ authRouter.post('/users', authMiddleware, requireCapability('users.manage'), (re
  * "change your password" flow that accepts the exact password being escaped
  * from would be theatre.
  */
+/**
+ * POST /api/auth/users/import — the roster, in one go.
+ *
+ * Twenty accounts one at a time is fine once; a list of forty names in a
+ * spreadsheet should be one confirmation. Rows are {fullName, employeeId,
+ * role, username?}; a username is made from the name when absent; every
+ * password is generated here, returned once, and never stored in the clear.
+ * The same one-time-code confirmation as a single account. Rows that fail
+ * are reported by line and do not stop the others — but nothing is written
+ * until every row has been checked, so a bad spreadsheet creates nobody.
+ */
+authRouter.post('/users/import', authMiddleware, requireCapability('users.manage'), (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
+  if (!requireUserMgmtToken(req, res)) return;
+  try {
+    const rows = Array.isArray(req.body?.rows) ? req.body.rows : null;
+    if (!rows || rows.length === 0 || rows.length > 500) {
+      res.status(400).json({ success: false, error: 'VALIDATION_ERROR', message: 'rows[] with 1 to 500 entries is required: {fullName, employeeId, role, username?}', statusCode: 400, timestamp: new Date().toISOString() });
+      return;
+    }
+    const validRoles = ['INSPECTOR', 'SUPERVISOR', 'ADMIN', 'DRM'];
+    const db = getDatabase();
+    const repo = new InspectionRepository(db);
+    const slug = (name: string) => String(name).toLowerCase().normalize('NFKD').replace(/[^\x00-\x7f]/g, '').replace(/[^a-z0-9]+/g, '.').replace(/^\.+|\.+$/g, '').slice(0, 32) || 'user';
+    const taken = new Set((db.prepare('SELECT username FROM users').all() as any[]).map((u) => String(u.username).toLowerCase()));
+    const takenEmp = new Set((db.prepare('SELECT employee_id FROM users').all() as any[]).map((u) => String(u.employee_id).toUpperCase()));
+    const problems: Array<{ line: number; message: string }> = [];
+    const planned: Array<{ line: number; username: string; password: string; role: string; fullName: string; employeeId: string }> = [];
+    rows.forEach((raw: any, i: number) => {
+      const line = i + 1;
+      const fullName = String(raw?.fullName || '').trim();
+      const employeeId = String(raw?.employeeId || '').trim().toUpperCase();
+      const role = String(raw?.role || '').trim().toUpperCase();
+      if (!fullName || !employeeId || !role) { problems.push({ line, message: 'fullName, employeeId and role are required' }); return; }
+      if (!validRoles.includes(role)) { problems.push({ line, message: `role must be one of ${validRoles.join(', ')}` }); return; }
+      if (takenEmp.has(employeeId)) { problems.push({ line, message: `employee ID ${employeeId} already has an account` }); return; }
+      let username = String(raw?.username || '').trim().toLowerCase() || slug(fullName);
+      let n = 2; const base = username;
+      while (taken.has(username)) username = `${base}${n++}`;
+      taken.add(username); takenEmp.add(employeeId);
+      // 14 characters from an alphabet with no look-alikes, for a slip of paper.
+      const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+      const password = Array.from(crypto.randomBytes(14), (b) => alphabet[b % alphabet.length]).join('');
+      planned.push({ line, username, password, role, fullName, employeeId });
+    });
+    if (problems.length > 0) {
+      res.status(422).json({ success: false, error: 'ROSTER_REJECTED', message: `${problems.length} row(s) cannot be created; nothing was written.`, problems, statusCode: 422, timestamp: new Date().toISOString() });
+      return;
+    }
+    const created: Array<{ line: number; username: string; password: string; role: string; fullName: string; employeeId: string; id: string }> = [];
+    db.exec('BEGIN');
+    try {
+      for (const p of planned) {
+        const user = repo.createUser({ username: p.username, passwordHash: hashPassword(p.password), role: p.role, fullName: p.fullName, employeeId: p.employeeId });
+        created.push({ ...p, id: user.id });
+      }
+      db.exec('COMMIT');
+    } catch (e) { db.exec('ROLLBACK'); throw e; }
+    logAuditEvent(db, { eventType: 'SECURITY_ALERT', userId: req.user!.id, userRole: req.user!.role, payload: { action: 'ROSTER_IMPORTED', count: created.length, usernames: created.map((c) => c.username) } });
+    res.status(201).json({ success: true, data: { created }, meta: { timestamp: new Date().toISOString(), note: 'Passwords are shown once. Print the slips; they are not stored in the clear.' } });
+  } catch (error) {
+    next(error);
+  }
+});
+
 const MIN_PASSWORD_LENGTH = 8;
 /*
  * Also read by the login handler above. Declared here rather than there

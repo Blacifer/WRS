@@ -59,7 +59,10 @@ The **WRS Raipur Quality Control Platform** is an enterprise-grade web applicati
 12. **Wheels — the chalk on the disc, kept and judged**
    - Tread diameter (and flange thickness, height, root radius, flat, hollow) typed once per wheel and judged as it is typed against the wagon's wheel family — BCN/BOXN on CASNUB: new 1000, last shop issue 919, condemn 906 mm (WD-97037 S-01); variation 0.5 / 13 / 25 mm within an axle, bogie and wagon — with the source on every figure. The checklist's wheel items follow the readings; a wheel below the issue limit or a set outside the variation rule holds the wagon at the gate by name. Three verdicts, because a wheel legal on the line may still not leave a POH.
 
-13. **Built for the shop floor**
+13. **Backups that schedule themselves, a copy in the cloud, and the DRM's mirror**
+   - The server takes its own encrypted backup every night (and within minutes of starting if none is a day old). With four settings it also pushes every file to any S3-compatible bucket — AWS Mumbai, an Indian provider, RailTel/NIC — verified by reading the bytes back; the key never leaves the shop. A second copy of the bundle at division HQ restores the newest backup on a schedule and serves it read-only, so the DRM reads the shop's dashboards from the office and cannot write a thing ([docs/MIRROR.md](docs/MIRROR.md)).
+
+14. **Built for the shop floor**
    - Offline-first PWA with an IndexedDB queue; work continues without a network and syncs without duplicating.
    - Bilingual throughout (English / Hindi).
    - Hands-free voice checklist entry, and acoustic bearing/leak diagnostics using real Web Audio FFT.
