@@ -1,6 +1,18 @@
 /**
  * RDSO Technical Pamphlet G-95 Revision-II Master Spring Tables (Tables 28-33)
  * Indian Railways Wagon Repair Shop (WRS) Raipur
+ *
+ * Source: the workshop's own printed copy of G-95 Revision-II (Wagon
+ * Directorate, file RDSO-MW0BD(LWLH)/2/2020, 135 pages, stamped 10.04.2026),
+ * §5.9.2 Tables 28–30 (in-service springs, six bands, Blue on top) and
+ * §5.9.3 Tables 31–33 (new springs, three bands), pages 107–108. Checked
+ * cell by cell against photographs of those pages on 18 Sep 2026: all 81
+ * figures match.
+ *
+ * DO NOT "CORRECT" THIS FILE FROM A COPY FOUND ONLINE. A 124-page draft of
+ * Revision-2 circulates with five bands, different table numbers (27–32)
+ * and an open top band ("Above 257"). It is not what the shop holds or
+ * paints by. The document on the shop's table governs.
  */
 
 import type {

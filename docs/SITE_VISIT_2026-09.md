@@ -133,3 +133,29 @@ sharp flange. One correction: the 25 t CASNUB 22NLC wheel is condemned at
 IRCA Part III cl. 2.8.14.2: deep flange 35, root radius 13, hollow tyre 5,
 and the 13 / 25 mm variation within a bogie / a wagon. On the next visit:
 photograph the wheel shop's IRCA page for those four.
+
+## Addendum, 18 Sep 2026 — the documents, read against the code
+
+Pratik found the RDSO documents online — IRCA Part III (2020 edition), G-95
+(1997 and a 124-page Revision-2 text), G-112, G-81, the air-brake handbook,
+02-ABR-02, WMM Vol-II — and photographed the shop's own printed copy of
+G-95 Revision-II (135 pages, received on the visit, stamped 10.04.2026).
+
+- **The band tables are exactly right, and the shop's printed copy is the
+  authority.** Its pages 107–108 print Tables 28–33 with six bands for an
+  in-service spring — Blue 263–260 on top — and three for a new one; every
+  one of the 81 cells matches `shared/classification/tables.ts`. The 124-page
+  Revision-2 text found online is a different draft (five bands, Tables
+  27–32, top band "Above 257"); for half a day the code was changed to
+  match it, and reverted when the shop's copy was photographed. **The
+  document the shop holds governs, not the one the internet holds.**
+- **IRCA Part III Rule 2.8.9.2** gives the diameter variation: 0.5 mm on an
+  axle, **13 mm within a bogie, 25 mm within a wagon** for four-wheeled
+  bogies — and **5 / 13 mm for BLC**, which the IRIMEE notes did not carry.
+  Note 4: the same-axle figure applies only at turning; in service the tyre
+  defect gauge governs. Corrected in the code.
+- **IRCA Plate 52** (the tyre defect gauge drawing, Rule 3.3.5 / S 4.19.1)
+  carries the last four figures: deep flange 35, thin flange 16, sharp flange
+  5 R, root radius 13 R, flat 60 for BG wagons (note 4). Every wheel figure
+  on the screen now has a rule number; only the hollow-tyre depth still rests
+  on the IRIMEE notes.

@@ -68,7 +68,7 @@ export const WheelReadings: React.FC<Props> = ({ wagonNumber, lang, canRecord, o
             {' '}{t(WHEEL_PROFILE_LIMITS.diameterMeasuredAt, 'व्यास रिम फ़ेस से 66.5 मिमी पर मापा जाता है।')}
           </p>
         </div>
-        <span className="text-[10px] text-ink-faint max-w-xs text-right">{t('Diameters, flat, thin and sharp flange: Wagon Maintenance Manual Ch.6 (RDSO WD-88089/S-1). Deep flange, root radius, hollow tyre and bogie/wagon variation: IRIMEE notes — the manual refers these to IRCA Part III cl. 2.8.14.2; confirm that page.', 'व्यास, फ़्लैट, पतला व नुकीला फ़्लैंज: वैगन रखरखाव मैनुअल अध्याय 6 (RDSO WD-88089/S-1)। गहरा फ़्लैंज, रूट त्रिज्या, खोखला टायर व बोगी/वैगन अंतर: IRIMEE नोट्स — मैनुअल इन्हें IRCA भाग III cl. 2.8.14.2 को सौंपता है; वह पृष्ठ मिलाएँ।')}</span>
+        <span className="text-[10px] text-ink-faint max-w-xs text-right">{t('Diameters: Wagon Maintenance Manual Ch.6 (RDSO WD-88089/S-1). Variation: IRCA Part III Rule 2.8.9.2. Flange and flat limits: IRCA Part III Plate 52 (tyre defect gauge). Hollow tyre: IRIMEE notes.', 'व्यास: वैगन रखरखाव मैनुअल अध्याय 6 (RDSO WD-88089/S-1)। अंतर: IRCA भाग III नियम 2.8.9.2। फ़्लैंज व फ़्लैट सीमाएँ: IRCA भाग III प्लेट 52 (टायर डिफ़ेक्ट गेज)। खोखला टायर: IRIMEE नोट्स।')}</span>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">

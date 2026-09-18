@@ -20,16 +20,19 @@
  *    variation after turning (0.5 mm), the permissible flat (60 mm, BG
  *    wagons), the minimum flange thickness (16 mm) and the sharp-flange
  *    radius (5 mm), and for the rest says "refer IRCA Part III".
- * 2. IRIMEE (rskr.irimee.in) supervisors' training notes "Wheel Set / Wheel
- *    Defects" and "Types of Bogies in Wagon Stock", which agree with the
- *    manual on every figure above, and add the ones the manual only points
- *    to: deep flange 35, root radius 13, hollow tyre 5, and the variation
- *    within a bogie (13) and a wagon (25), which the manual assigns to IRCA
- *    Part III clause 2.8.14.2.
+ * 2. IRCA Conference Rules Part III, 2020 edition (read 18 Sep 2026):
+ *    Rule 2.8.9.2 — variation in tread diameter at wheel change: four-wheeled
+ *    bogies 0.5 mm same axle / 13 mm same bogie / 25 mm same wagon; BLC
+ *    wagons 0.5 / 5 / 13. Note 4: the same-axle figure applies at turning
+ *    only; in service the tyre defect gauge governs. Plate 52 (Rule 3.3.5 and
+ *    S 4.19.1) is the tyre defect gauge itself, dimensioned: deep flange 35,
+ *    thin flange 16, sharp flange 5 R, root radius 13 R, flat 60 for BG
+ *    wagons (note 4). S 4.19.1(a) repeats the 60 mm flat.
+ * 3. IRIMEE (rskr.irimee.in) training notes, which agree with both, and are
+ *    the only source for the hollow-tyre depth (5 mm).
  *
- * Every figure below names which of the two it came from. The four IRIMEE-
- * only figures are marked on the screen as awaiting the shop's IRCA Part III
- * page; the diameters are not — they are the manual's own.
+ * Every figure below names its source; only the hollow-tyre figure is
+ * marked on the screen as resting on training notes.
  *
  * The 22NLC figure was 955 for both limits, from the IRIMEE bogie table,
  * which prints only a minimum. The manual's footnote gives both, and they
@@ -56,9 +59,9 @@ export interface WheelDiameterLimits {
   variation: { sameAxle: number; sameBogie: number; sameWagon: number };
 }
 
-export const SOURCE = 'Wagon Maintenance Manual Ch.6 §D (RDSO Drg. WD-88089/S-1) for diameters, flat, thin and sharp flange; IRIMEE training notes (rskr.irimee.in) for deep flange, root radius, hollow tyre and bogie/wagon variation, which the manual refers to IRCA Part III cl. 2.8.14.2';
-/** Which figures still rest on the IRIMEE notes alone, pending the shop's IRCA Part III page. */
-export const AWAITING_IRCA = ['deep flange 35 mm', 'root radius 13 mm', 'hollow tyre 5 mm', 'variation within a bogie 13 mm / a wagon 25 mm'] as const;
+export const SOURCE = 'Wagon Maintenance Manual Ch.6 §D (RDSO Drg. WD-88089/S-1) for diameters; IRCA Conference Rules Part III (2020) Rule 2.8.9.2 for diameter variation and Plate 52 (tyre defect gauge, Rule 3.3.5 / S 4.19.1) for flange and flat limits; hollow tyre from IRIMEE training notes';
+/** The one figure that still rests on the IRIMEE notes alone: IRCA Part III and the WMM do not print a hollow-tyre depth. */
+export const AWAITING_IRCA = ['hollow tyre 5 mm'] as const;
 
 export const WHEEL_DIAMETER_LIMITS: Record<WheelFamily, WheelDiameterLimits> = {
   CASNUB_BOXN: {
@@ -73,8 +76,9 @@ export const WHEEL_DIAMETER_LIMITS: Record<WheelFamily, WheelDiameterLimits> = {
     drawing: 'WD-88089/S-1 footnote (25 t, CASNUB 22NLC)', variation: { sameAxle: 0.5, sameBogie: 13, sameWagon: 25 }
   },
   LCCF_BLC: {
+    // IRCA Part III Rule 2.8.9.2: BLC wagons 0.5 / 5 / 13 — tighter than the 13 / 25 of a four-wheeled bogie.
     family: 'LCCF_BLC', label: 'BLC on LCCF 20(C)', newMm: 840, lastShopIssueMm: 793, condemnMm: 780,
-    drawing: 'CONTR-9404-S-13 (WMM Ch.6, WD-88089/S-1)', variation: { sameAxle: 0.5, sameBogie: 13, sameWagon: 25 }
+    drawing: 'CONTR-9404-S-13 (WMM Ch.6, WD-88089/S-1)', variation: { sameAxle: 0.5, sameBogie: 5, sameWagon: 13 }
   }
 };
 

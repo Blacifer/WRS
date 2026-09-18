@@ -56,6 +56,22 @@ describe('the limits', () => {
     assert.match(j.source, /IRIMEE/);
   });
 
+  it('TC-WHL-03b: BLC wagons are held to IRCA Part III Rule 2.8.9.2 — 5 mm within a bogie, 13 across the wagon', () => {
+    const limits = WHEEL_DIAMETER_LIMITS.LCCF_BLC.variation;
+    assert.deepEqual(limits, { sameAxle: 0.5, sameBogie: 5, sameWagon: 13 });
+    assert.deepEqual(WHEEL_DIAMETER_LIMITS.CASNUB_BOXN.variation, { sameAxle: 0.5, sameBogie: 13, sameWagon: 25 });
+    // 8 mm apart within one bogie: fine on a CASNUB bogie, a blocker on a BLC.
+    const readings = [
+      { axle: 1, side: 'L', treadDiameterMm: 830 }, { axle: 1, side: 'R', treadDiameterMm: 830 },
+      { axle: 2, side: 'L', treadDiameterMm: 822 }, { axle: 2, side: 'R', treadDiameterMm: 822 },
+      { axle: 3, side: 'L', treadDiameterMm: 830 }, { axle: 3, side: 'R', treadDiameterMm: 830 },
+      { axle: 4, side: 'L', treadDiameterMm: 830 }, { axle: 4, side: 'R', treadDiameterMm: 830 }
+    ] as any;
+    const blc = judgeWheelSet('LCCF_BLC', readings);
+    assert.equal(blc.ok, false);
+    assert.ok(blc.variations.some((v) => /bogie/i.test(v.scope) && v.spreadMm === 8 && v.limitMm === 5));
+  });
+
   it('TC-WHL-04: variation — 0.5 mm on an axle, 13 in a bogie, 25 across the wagon; a missing wheel is named, not assumed', () => {
     const r = (axle: 1 | 2 | 3 | 4, side: 'L' | 'R', d: number) => ({ axle, side, treadDiameterMm: d });
     const good = judgeWheelSet('CASNUB_BOXN', [r(1, 'L', 980), r(1, 'R', 980.4), r(2, 'L', 975), r(2, 'R', 975.2), r(3, 'L', 990), r(3, 'R', 990), r(4, 'L', 978), r(4, 'R', 978)]);
