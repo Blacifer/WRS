@@ -293,7 +293,18 @@ export const EXPECTED_MANUAL_SOURCES: ExpectedManualSource[] = [
     file: 'docs/shop-floor/wheel-limits-irimee.txt',
     required: false,
     supplementary: true
-  }
+  },
+  // The documents Pratik found online on 18 Sep 2026, converted to text in
+  // docs/manuals/ (not in git). Issued editions only: no drafts, and not the
+  // online G-95 texts — the shop's printed G-95 is transcribed as G95 above.
+  { label: 'IRCA_PART_III', name: 'IRCA Conference Rules Part III (2020)', file: 'docs/manuals/IRCA_PART_III-conference-rules-2020.txt', required: false, supplementary: true },
+  { label: 'WMM_VOL2', name: 'Wagon Maintenance Manual Vol-II (OEM documentation)', file: 'docs/manuals/WMM_VOL2-oem-documentation-2022.txt', required: false, supplementary: true },
+  { label: 'G112', name: 'RDSO G-112 (LCCF/LWLH bogies)', file: 'docs/manuals/G112-lccf-lwlh-bogies.txt', required: false, supplementary: true },
+  { label: 'G81', name: 'RDSO G-81 (Class E CTRB)', file: 'docs/manuals/G81-ctrb-class-e.txt', required: false, supplementary: true },
+  { label: 'G113', name: 'RDSO G-113 (Class K CTRB)', file: 'docs/manuals/G113-ctrb-class-k.txt', required: false, supplementary: true },
+  { label: 'AIR_BRAKE_HANDBOOK', name: 'CAMTECH air brake handbook (2012)', file: 'docs/manuals/AIR_BRAKE_HANDBOOK-camtech-2012.txt', required: false, supplementary: true },
+  { label: 'ABR_02', name: 'RDSO 02-ABR-02 air brake specification', file: 'docs/manuals/ABR_02-air-brake-specification.txt', required: false, supplementary: true },
+  { label: 'BLC_UNDERFRAME', name: 'RDSO BLC underframe repair procedure', file: 'docs/manuals/BLC_UNDERFRAME-rdso-repair-guidelines.txt', required: false, supplementary: true }
 ];
 
 /** What is actually in the index, per source. */
@@ -341,6 +352,26 @@ export function citationFor(
       );
     case 'WMM':
       return `RDSO Wagon Maintenance Manual, page ${page}${where}`;
+    case 'WMM_VOL2':
+      return `Wagon Maintenance Manual Volume-II (OEM Documentation), CAMTECH 2022, page ${page}${where}`;
+    case 'IRCA_PART_III':
+      return `IRCA Conference Rules Part III — Rules for Maintenance and Examination of BG Goods Stock, 2020 edition, page ${page}${where}`;
+    case 'G112':
+      return `RDSO Technical Pamphlet G-112 (LCCF/LWLH bogies), page ${page}${where}`;
+    case 'G81':
+      return `RDSO Technical Pamphlet G-81 (Class E CTRB), page ${page}${where}`;
+    case 'G113':
+      return `RDSO Technical Pamphlet G-113 (Class K CTRB, 25 t), Sept 2021, page ${page}${where}`;
+    case 'AIR_BRAKE_HANDBOOK':
+      return `CAMTECH Handbook on Air Brake System of Freight Stock, 2012, page ${page}${where}`;
+    case 'ABR_02':
+      return `RDSO Specification 02-ABR-02 (air brakes), Oct 2003 with amendments 1–3, page ${page}${where}`;
+    case 'BLC_UNDERFRAME':
+      return `RDSO technical procedure for BLC/BLCM/BLCS underframe inspection and repair (ROH/POH), page ${page}${where}`;
+    case 'CBC_WALL':
+      return `CBC section wall charts, transcribed on site (Sept 2026), page ${page}${where}`;
+    case 'WHEEL_LIMITS':
+      return `Wheel limits — IRIMEE notes, confirmed against WMM Ch.6 and IRCA Part III (Sept 2026)${where}`;
     default:
       /*
        * Named rather than guessed. An unknown label means somebody indexed a
@@ -522,14 +553,31 @@ export function searchManual(
     LIMIT ?
   `);
 
-  let rows: any[] = [];
+  /*
+   * Strictest tier first, then top up from the looser ones until the limit
+   * is reached, never repeating a passage. This used to stop at the first
+   * tier that returned anything: "wheel diameter variation same axle bogie
+   * wagon" matched exactly one passage on all six words — the IRIMEE note —
+   * and IRCA Part III Rule 2.8.9.2, the document that actually sets the
+   * figure, was never shown. The exact match still leads; the rule follows.
+   */
+  const rows: any[] = [];
+  const seen = new Set<string>();
+  const cap = Math.min(limit, 20);
   for (const q of queries) {
+    let tier: any[];
     try {
-      rows = stmt.all(q, Math.min(limit, 20)) as any[];
+      tier = stmt.all(q, cap) as any[];
     } catch {
       continue; // malformed for FTS5 syntax — fall through to the looser tier
     }
-    if (rows.length > 0) break;
+    for (const r of tier) {
+      const key = `${r.source}|${r.page}|${String(r.body).slice(0, 80)}`;
+      if (seen.has(key)) continue;
+      seen.add(key); rows.push(r);
+      if (rows.length >= cap) break;
+    }
+    if (rows.length >= cap) break;
   }
 
   return {

@@ -245,6 +245,12 @@ console.log('\nBetween walks: Ask the Manual cites the Wagon Maintenance Manual 
   const sources = status?.data?.sources || status?.data?.bySource || null;
   console.log(`    manual status: ${JSON.stringify(status?.data || status).slice(0, 200)}`);
   check(JSON.stringify(status || {}).includes('WMM'), 'the manual status names the WMM as indexed');
+  // The documents found on 18 Sep: a wheel question must reach IRCA Part III, cited by name.
+  await page.locator('form input').first().fill('wheel diameter variation same axle bogie wagon');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(3000);
+  await shot('ask-manual-irca');
+  check(/IRCA Conference Rules Part III/.test(await bodyText()), 'a wheel-variation question is answered from IRCA Part III, cited by name');
 }
 
 // ---------------------------------------------------------------------------

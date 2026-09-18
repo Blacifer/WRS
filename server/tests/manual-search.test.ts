@@ -169,6 +169,17 @@ describe('Maintenance Manual Search', () => {
     }
   });
 
+  it('TC-MAN-15: an exact match on every word does not hide the other documents that answer', () => {
+    // Two passages on the same rule: a short note that carries every query word, and the
+    // rule itself in a longer document that carries most of them. Both must come back.
+    indexManualText(db, 'WHEEL NOTE\nVariation in wheel tread diameter: same axle 0.5, same bogie 13, same wagon 25.\n', 'note.txt', 'WHEEL_LIMITS');
+    indexManualText(db, '2.8.9.2 At the time of wheel changing the variation in tread diameters should not exceed: on the same axle 0.5 mm, on the same trolley 13 mm, on the same wagon 25 mm.\n', 'irca.pdf', 'IRCA_PART_III');
+    const { hits } = searchManual(db, 'wheel diameter variation same axle bogie wagon', 5);
+    assert.ok(hits.some((h) => h.source === 'WHEEL_LIMITS'), 'the exact match leads');
+    assert.ok(hits.some((h) => h.source === 'IRCA_PART_III'), 'the rule that sets the figure follows');
+    assert.match(hits.find((h) => h.source === 'IRCA_PART_III')!.citation, /IRCA Conference Rules Part III/);
+  });
+
   it('TC-MAN-08: a question with no answer returns nothing rather than a guess', () => {
     const { hits } = searchManual(db, 'zzzqqq nonexistent terminology xyzzy', 5);
     assert.strictEqual(hits.length, 0, 'must not fabricate a match');
