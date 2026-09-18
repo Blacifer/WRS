@@ -41,8 +41,8 @@ the evening before, never in the room.
 | 1.1 | Open the address on the laptop | Sign-in page; the language toggle (हिंदी) top right; no console of errors, no blank page |
 | 1.2 | Tap हिंदी, then English | Every label on the sign-in page changes language, both ways |
 | 1.3 | Sign in with a wrong password | A plain refusal, in the chosen language; nothing else leaks |
-| 1.4 | Open the same address on the tablet | Same page; the browser offers "Add to home screen" (or the install icon) — accept it, so the app has its own icon |
-| 1.5 | On the tablet, turn Wi‑Fi off, reopen the app icon | The app still opens (it is installed); an "offline" indicator appears. Turn Wi‑Fi back on |
+| 1.4 | **First install the certificate on the tablet** (TABLET_TRUST.md) **and turn its mobile data off.** Then open the address | Same page with no warning; the browser offers "Add to home screen" (or the install icon) — accept it, so the app has its own icon. *Without the certificate the page opens but nothing below works offline and the camera stays shut.* |
+| 1.5 | On the tablet, turn Wi‑Fi off, reopen the app icon | The app still opens (it is installed); an "offline" indicator appears. Turn Wi‑Fi back on — it reconnects within seconds. *If it "stops loading" after Wi‑Fi returns, the tablet has switched to mobile data: see TABLET_TRUST.md.* |
 
 ## 2. Inspector — on the tablet
 
@@ -50,9 +50,9 @@ Sign in as **`inspector1` / `password123`**.
 
 | # | Do | Must see |
 |---|---|---|
-| 2.1 | Home | Three or four large choices: sort springs, a wagon, a single spring, photographs. Big enough to hit with a gloved thumb |
+| 2.1 | Home | Two large cards, both always visible: **Springs** (sort on the bench, or measure one) and **A wagon** (checklist, wheels, photographs, parts). Under Springs: *Your record today* — count, bands, and the day's list |
 | 2.2 | **Sorting** | Bogie type, condition (Used/New), position (Outer/Inner/Snubber) selectors; the band strip: **six coloured buttons for a used spring** (Blue, Green, Yellow, Orange, White, Red) each with its height range and Roman numeral; three for a new one |
-| 2.3 | Tap Green, Yellow, Blue | The session total rises by one each time; the last tap is shown; the pace readout moves |
+| 2.3 | Tap Green, Yellow, Blue | The session total rises by one each time; *Your record today* below the strip shows the three, newest first, with time, height and gauge |
 | 2.4 | Tap **Undo last** | Total goes down by one; the undone spring is named |
 | 2.5 | Gauge picker | The gauges named (OSG‑01, OSG‑02, ISG‑01, SSG‑02). Choose position *Snubber* → SSG‑02 → the amber note "no calibration date is recorded" |
 | 2.6 | **Off the strip** (condemn) | A reason must be chosen; a photograph is asked for; the spring is recorded CONDEMNED with the reason. Cancel and confirm both work |

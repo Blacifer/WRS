@@ -21,9 +21,10 @@ import type { User, LanguageCode, WagonRecord } from '../../../shared/types.ts';
 import { offlineDb } from '../services/offlineDb.ts';
 import { api } from '../services/api.ts';
 import {
-  CameraIcon, CoilIcon, CaliperIcon, CpuIcon, MicIcon, BookIcon, SearchIcon, RefreshCwIcon
+  CameraIcon, CoilIcon, CaliperIcon, CpuIcon, MicIcon, BookIcon, SearchIcon, RefreshCwIcon, TrainIcon
 } from './Icons.tsx';
 import { WagonNumberCamera } from './WagonNumberCamera.tsx';
+import { MyRecordToday } from './MyRecordToday.tsx';
 import { Button, Card, Chip, IconButton, Note, inputClass } from './ui/index.tsx';
 
 export interface InspectorLandingViewProps {
@@ -281,14 +282,22 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
             ? (isHi ? 'आज आप क्या कर रहे हैं?' : 'What are you working on today?')
             : (isHi ? 'आज का कार्य' : 'What you are working on')}
         </span>
+        {/*
+          Two large cards, not a segmented toggle. The toggle's two words were
+          small enough that a person on a phone, opened on "Springs" from last
+          time, reported "it is all springs, nothing about wagons" — the wagon
+          half was there, three centimetres wide. Each choice now says what it
+          is for, both stay visible whichever is chosen, and both are the size
+          of a thumb.
+        */}
         <div
           role="group"
           aria-label={isHi ? 'आज का कार्य' : 'What you are working on'}
-          className="grid grid-cols-2 gap-1.5 p-1.5 bg-card border border-line rounded-touch"
+          className="grid grid-cols-1 sm:grid-cols-2 gap-2"
         >
           {([
-            { mode: 'SPRINGS' as const, en: 'Springs', hi: 'स्प्रिंग', testId: 'choose-springs' },
-            { mode: 'WAGON' as const, en: 'A wagon', hi: 'वैगन', testId: 'choose-wagon' }
+            { mode: 'SPRINGS' as const, en: 'Springs', hi: 'स्प्रिंग', enDetail: 'Sort loose springs on the bench, or measure one', hiDetail: 'बेंच पर खुले स्प्रिंग छाँटें, या एक मापें', testId: 'choose-springs', icon: <CoilIcon size={26} /> },
+            { mode: 'WAGON' as const, en: 'A wagon', hi: 'वैगन', enDetail: 'Checklist, wheels, photographs, parts of one wagon', hiDetail: 'एक वैगन की चेकलिस्ट, पहिये, फ़ोटो, पुर्जे', testId: 'choose-wagon', icon: <TrainIcon size={26} /> }
           ]).map((choice) => {
             const current = workMode === choice.mode;
             return (
@@ -298,11 +307,15 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
                 aria-pressed={current}
                 onClick={() => chooseWorkMode(choice.mode)}
                 className={[
-                  'min-h-[52px] px-4 rounded-control text-[15px] font-bold transition-colors',
-                  current ? 'bg-selected text-ink' : 'text-ink-muted hover:text-ink hover:bg-raised'
+                  'min-h-[72px] px-4 py-3 rounded-card border-2 text-left flex items-center gap-3 transition-colors',
+                  current ? 'bg-selected border-accent-line text-ink' : 'bg-card border-line text-ink-muted hover:text-ink hover:bg-raised'
                 ].join(' ')}
               >
-                {isHi ? choice.hi : choice.en}
+                <span className={current ? 'text-accent-ink' : 'text-ink-faint'}>{choice.icon}</span>
+                <span className="min-w-0">
+                  <span className="block text-[16px] font-extrabold">{isHi ? choice.hi : choice.en}</span>
+                  <span className="block text-[12px] font-medium leading-snug">{isHi ? choice.hiDetail : choice.enDetail}</span>
+                </span>
               </button>
             );
           })}
@@ -328,6 +341,8 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
               : 'Tap the band against the strip — loose springs, no wagon number needed'}
             icon={<CoilIcon size={30} />}
           />
+          {/* What I have logged today — after the job, before the rest. Compact: the tallies and the last five. */}
+          <MyRecordToday lang={isHi ? 'hi' : 'en'} compact />
 
           {/* The shop's own count for today. */}
           <Card>
@@ -398,8 +413,8 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
                   </div>
                   <p className="mt-1.5 text-sm text-ink-body">
                     {isHi
-                      ? 'नीचे से एक वैगन चुनें, या QR स्कैन करें।'
-                      : 'Pick one of the wagons below, or scan its QR code.'}
+                      ? 'नीचे से एक वैगन चुनें, या उसका नंबर लिखें। (QR केवल उन वैगनों के लिए जिन पर इस शॉप का लेबल लगा है।)'
+                      : 'Pick one of the wagons below, or type its number. (QR is only for wagons this shop has already labelled.)'}
                   </p>
                   {/*
                     * The wagons actually in the shop, listed here rather than

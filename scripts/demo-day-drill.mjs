@@ -149,7 +149,7 @@ console.log('\nWalk 2: WR/BCNHL/40112 → Photos — four frames with pocket cou
   }
   await page.waitForTimeout(2000);
   await shot('inspector-wagon-selected');
-  await page.getByRole('button', { name: /Continue checklist|Open checklist|Checklist/i }).first().click().catch(() => {});
+  await page.getByRole('button', { name: /^(Continue checklist|Open checklist|Start checklist)/i }).first().click().catch(() => {});
   await page.waitForTimeout(1500);
   check(/WR\/BCNHL\/40112/.test(await bodyText()), 'the wagon WR/BCNHL/40112 is open');
   await page.locator('[data-testid="wagon-tabs"] button', { hasText: 'Photos' }).first().click();

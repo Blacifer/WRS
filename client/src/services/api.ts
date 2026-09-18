@@ -3,6 +3,12 @@
  * Indian Railways Wagon Repair Shop Raipur
  */
 
+export interface MySortingToday {
+  date: string; total: number; passed: number; condemned: number; byBand: Record<string, number>;
+  firstAt: string | null; lastAt: string | null;
+  records: Array<{ id: string; createdAt: string; bogieType: string; condition: string; springPosition: string; measuredFreeHeight: number; heightIsApproximate: boolean; classifiedBand: string | null; status: string; condemnationReason: string | null; gaugeCode: string | null; assignedWagonNumber: string | null }>;
+}
+
 import type { LearningSubsystem } from '../../../shared/learning/subsystems.ts';
 import type {
   User,
@@ -1493,6 +1499,12 @@ export class ApiClient {
 
   // Pocket counts on assembly frames. The expected number is never sent:
   // the server derives it from the designation on the frame's tags.
+  /** What I recorded today on the bench: my own springs, newest first, with tallies. */
+  public async getMySortingToday(date?: string): Promise<{ success: boolean; data: MySortingToday }> {
+    const d = date || new Date().toISOString().slice(0, 10);
+    return this.request(`/sorting/mine?date=${d}&limit=200`);
+  }
+
   public async getPocketCounts(photoId: string): Promise<{ success: boolean; data: any }> {
     return this.request(`/photos/${encodeURIComponent(photoId)}/pocket-counts`);
   }

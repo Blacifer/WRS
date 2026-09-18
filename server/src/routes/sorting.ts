@@ -617,6 +617,18 @@ sortingRouter.get('/allocation', authMiddleware, (req: AuthenticatedRequest, res
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/sorting/mine?date=YYYY-MM-DD — what the signed-in person recorded
+// today: their own springs, newest first, with the tallies. Own records only;
+// the day is the same UTC day the throughput figure uses.
+// ---------------------------------------------------------------------------
+sortingRouter.get('/mine', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+  const q = (req.query || {}) as Record<string, string>;
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(q.date || '')) ? String(q.date) : new Date().toISOString().slice(0, 10);
+  const limit = Math.min(Number(q.limit) || 200, 1000);
+  res.status(200).json({ success: true, data: repo().myRecords(req.user!.id, date, limit), timestamp: new Date().toISOString() });
+});
+
+// ---------------------------------------------------------------------------
 // GET /api/sorting/throughput?date=YYYY-MM-DD
 // ---------------------------------------------------------------------------
 sortingRouter.get('/throughput', authMiddleware, (req: AuthenticatedRequest, res: Response) => {

@@ -77,7 +77,7 @@ for (const role of ROLES) {
         await shot('wagon-list');
         await page.locator('text=/SECR\\//').first().click().catch(() => {});
         await page.waitForTimeout(2000);
-        await page.getByRole('button', { name: /Continue checklist|चेकलिस्ट/i }).first().click().catch(() => {});
+        await page.getByRole('button', { name: /^(Continue checklist|चेकलिस्ट जारी)/i }).first().click().catch(() => {});
       } else {
         await page.locator('[data-testid="nav-wagons"]').first().click();
         await page.waitForTimeout(2000);

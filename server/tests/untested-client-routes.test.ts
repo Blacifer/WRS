@@ -128,3 +128,33 @@ describe('routes the client calls that had no test', () => {
     assert.equal(after, before + 1, 'exactly one record exists after two sends');
   });
 });
+
+describe('my record today', () => {
+  it('TC-RTE-07: an inspector sees only their own springs for the day, newest first, with the tallies; an undone tap is not there', async () => {
+    const insp = await login('inspector1');
+    const other = await login('inspector2');
+    const rec = (t: string, band: string, h: number, batch: string) => call('POST', '/api/sorting/record', {
+      batchId: batch, bogieType: 'CASNUB_22_NLB', condition: 'USED', springPosition: 'OUTER', measuredFreeHeight: h, heightIsApproximate: true,
+      classifiedBand: band, bandRoman: 'Band II', status: 'PASS', tableReference: 'Table 28'
+    }, auth(t));
+    // The demo seed already has today's bench springs for inspector1, so the check is a delta.
+    const before = (await call('GET', '/api/sorting/mine', undefined, auth(insp))).body.data;
+    for (const [b, h] of [['GREEN', 258.5], ['YELLOW', 255.5], ['BLUE', 261.5]] as const) { const r = await rec(insp, b, h, 'mine-1'); assert.ok(r.status < 300, JSON.stringify(r.body)); }
+    const o = await rec(other, 'RED', 246.5, 'theirs-1'); assert.ok(o.status < 300);
+    const undo = await call('POST', '/api/sorting/batches/mine-1/undo', {}, auth(insp));
+    assert.ok(undo.status < 300, JSON.stringify(undo.body));
+    const mine = await call('GET', '/api/sorting/mine', undefined, auth(insp));
+    assert.equal(mine.status, 200, JSON.stringify(mine.body));
+    const d = mine.body.data;
+    assert.equal(d.total, before.total + 2, 'three taps, one undone');
+    assert.equal((d.byBand.GREEN || 0) - (before.byBand.GREEN || 0), 1);
+    assert.equal((d.byBand.YELLOW || 0) - (before.byBand.YELLOW || 0), 1);
+    assert.equal((d.byBand.BLUE || 0) - (before.byBand.BLUE || 0), 0, 'the undone tap is gone');
+    assert.equal(d.records.length, before.records.length + 2);
+    assert.equal(d.records[0].classifiedBand, 'YELLOW', 'newest first: the last surviving tap');
+    assert.equal(d.records[1].classifiedBand, 'GREEN');
+    assert.ok(!d.records.some((r: any) => r.measuredFreeHeight === 246.5 && r.classifiedBand === 'RED'), 'nobody else\'s springs');
+    const anon = await call('GET', '/api/sorting/mine');
+    assert.equal(anon.status, 401);
+  });
+});

@@ -61,6 +61,24 @@ Double-click `lan-cert.crt` → **Install Certificate** → **Local Machine** �
 **Place all certificates in the following store** → **Trusted Root
 Certification Authorities**.
 
+## Two Android habits that look like the app failing
+
+Found on the first phone that tried the rehearsal (18 Sep 2026):
+
+1. **"Proceed anyway" is not trust.** If the certificate is only clicked
+   past, the page loads but the browser refuses to keep the app for offline
+   use — no service worker, no camera, no queue. Turn Wi‑Fi off and the app
+   simply does not open. Installing the `.crt` as above is what makes the
+   offline copy and the camera possible; there is no shortcut.
+2. **A Wi‑Fi with no internet gets abandoned.** Android decides the shop's
+   Wi‑Fi is "no internet" and quietly routes everything over mobile data —
+   which cannot reach the shop PC. The page then "stops loading" even though
+   Wi‑Fi shows connected. Two fixes, either is enough: on the tablet, open
+   *Settings → Wi‑Fi → (the network) → Advanced* and turn on **"Connect even
+   when the network has no internet"** (wording varies by make), or simply
+   **turn mobile data off** on the shop tablets — they do not need it. Do this
+   the evening before, with the certificate.
+
 ## When it stops working
 
 - **The warning is back on every tablet.** The PC's address has changed

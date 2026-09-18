@@ -39,6 +39,7 @@ import { SpringEvidenceCamera } from '../components/SpringEvidenceCamera.tsx';
 import BlindSpringRead from '../components/BlindSpringRead.tsx';
 import TeachTheCamera from '../components/TeachTheCamera.tsx';
 import AutoSortBench from '../components/AutoSortBench.tsx';
+import { MyRecordToday } from '../components/MyRecordToday.tsx';
 import type { SpringEvidenceHandle } from '../components/SpringEvidenceCamera.tsx';
 import type { PendingSortedSpring } from '../services/offlineDb.ts';
 
@@ -1139,6 +1140,9 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           refusing to show when there is not yet enough to support it. The
           rules for that live in shared/sorting/throughput.ts, tested, rather
           than in this component. */}
+      {/* What I have logged today, from the server — the record, not the tablet's memory. */}
+      <MyRecordToday lang={isHi ? 'hi' : 'en'} compact refreshKey={totals.total} />
+
       {today && (() => {
         const pace = readThroughput(today);
         return (

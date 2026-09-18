@@ -703,6 +703,61 @@ export class SortingRepository {
    * It is given the raw ends rather than a computed rate precisely so that
    * judgement is made where the display rules live.
    */
+  /**
+   * What one inspector recorded today — their own springs, newest first,
+   * with the tallies. The bench showed a session total and the last band and
+   * nothing else, and the first person to sort fifty springs asked to see
+   * the fifty. A person who can see their own record trusts it; one who
+   * cannot is back to counting on paper beside the tablet.
+   */
+  public myRecords(inspectorId: string, date: string, limit = 200): {
+    date: string;
+    total: number;
+    passed: number;
+    condemned: number;
+    byBand: Record<string, number>;
+    firstAt: string | null;
+    lastAt: string | null;
+    records: Array<{
+      id: string; createdAt: string; bogieType: string; condition: string; springPosition: string;
+      measuredFreeHeight: number; heightIsApproximate: boolean; classifiedBand: string | null; status: string;
+      condemnationReason: string | null; gaugeCode: string | null; assignedWagonNumber: string | null;
+    }>;
+  } {
+    const rows = this.db.prepare(`
+      SELECT id, created_at, bogie_type, spring_condition, spring_position, measured_height, height_is_approximate,
+             classified_band, status, condemnation_reason, gauge_code, assigned_wagon_number
+      FROM spring_sorting_records
+      WHERE inspector_id = ? AND substr(created_at, 1, 10) = ? AND ${LIVE_RECORDS}
+      ORDER BY created_at DESC
+      LIMIT ?
+    `).all(inspectorId, date, Math.min(Math.max(limit, 1), 1000)) as any[];
+    const tally = this.db.prepare(`
+      SELECT COUNT(*) AS total,
+             SUM(CASE WHEN status = 'PASS' THEN 1 ELSE 0 END) AS passed,
+             SUM(CASE WHEN status = 'CONDEMNED' THEN 1 ELSE 0 END) AS condemned,
+             MIN(created_at) AS firstAt, MAX(created_at) AS lastAt
+      FROM spring_sorting_records
+      WHERE inspector_id = ? AND substr(created_at, 1, 10) = ? AND ${LIVE_RECORDS}
+    `).get(inspectorId, date) as any;
+    const byBand: Record<string, number> = {};
+    for (const r of this.db.prepare(`
+      SELECT classified_band AS band, COUNT(*) AS n FROM spring_sorting_records
+      WHERE inspector_id = ? AND substr(created_at, 1, 10) = ? AND ${LIVE_RECORDS} AND classified_band IS NOT NULL
+      GROUP BY classified_band
+    `).all(inspectorId, date) as any[]) byBand[r.band] = r.n;
+    return {
+      date,
+      total: tally?.total || 0, passed: tally?.passed || 0, condemned: tally?.condemned || 0,
+      byBand, firstAt: tally?.firstAt || null, lastAt: tally?.lastAt || null,
+      records: rows.map((r) => ({
+        id: r.id, createdAt: r.created_at, bogieType: r.bogie_type, condition: r.spring_condition, springPosition: r.spring_position,
+        measuredFreeHeight: r.measured_height, heightIsApproximate: r.height_is_approximate === 1, classifiedBand: r.classified_band,
+        status: r.status, condemnationReason: r.condemnation_reason, gaugeCode: r.gauge_code ?? null, assignedWagonNumber: r.assigned_wagon_number
+      }))
+    };
+  }
+
   public dailyThroughput(date: string): {
     date: string;
     total: number;
