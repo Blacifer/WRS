@@ -30,7 +30,9 @@ command or a click; nothing needs the internet.
    `SEED_DEMO_USERS=true` to `.env`, because a production build otherwise
    refuses the published demo password at sign-in — **delete that line, and
    the demo accounts, before the shop's real accounts are created.**
-4. **Open `https://localhost:3000`**, sign in as `drm1 / password123`, and look
+4. **Install the certificate on the laptop itself** (`server\certs\lan-cert.crt`
+   → Trusted Root, [TABLET_TRUST.md](TABLET_TRUST.md) *Windows*), so the
+   projector never shows "Not secure". Then **open `https://localhost:3000`**, sign in as `drm1 / password123`, and look
    at the DRM dashboard. The three tiles under *Shop Floor — Right Now* must
    show figures, not "Not yet known". If they do not, the seed did not run.
 5. **On the tablet you will hold up:** install `server\certs\lan-cert.crt`

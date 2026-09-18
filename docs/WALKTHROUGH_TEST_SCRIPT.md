@@ -55,20 +55,20 @@ Sign in as **`inspector1` / `password123`**.
 | 2.3 | Tap Green, Yellow, Blue | The session total rises by one each time; *Your record today* below the strip shows the three, newest first, with time, height and gauge |
 | 2.4 | Tap **Undo last** | Total goes down by one; the undone spring is named |
 | 2.5 | Gauge picker | The gauges named (OSG‑01, OSG‑02, ISG‑01, SSG‑02). Choose position *Snubber* → SSG‑02 → the amber note "no calibration date is recorded" |
-| 2.6 | **Off the strip** (condemn) | A reason must be chosen; a photograph is asked for; the spring is recorded CONDEMNED with the reason. Cancel and confirm both work |
-| 2.7 | Photograph springs while sorting (toggle) → camera | The camera opens on the tablet. Put your hand in front: the screen says a person is excluded. Point at the bench: "target region", **never** "spring 98%" |
+| 2.6 | The red bar under the strip: **Condemn this spring** | A reason must be chosen (crack, corrosion, deformation, under height…); a photograph is asked for if photographing is on; the spring is recorded CONDEMNED with the reason and appears red in *Your record today*. Cancel and confirm both work |
+| 2.7 | Tick **Photograph springs while sorting** | The live camera opens right under the tick box, large, with a green *Photographing* badge. Nothing else to choose: keep sorting by tapping bands and each tap saves a photo. Put your hand in front: the screen says a person is excluded; it never says "spring 98%". Everything under *Teach the camera (advanced)* is folded away and not part of the day's work |
 | 2.8 | Change bogie type to LWLH25 or LCCF20 | The strip disappears; a height is typed instead; the condemning height shown comes from WMM §309C / G‑112 |
 | 2.9 | Hindi toggle on this screen | Band names in Hindi with the same colours; numbers unchanged |
-| 2.10 | **Single Spring** | Type a height (e.g. 258.5, NLB outer used) → band Green, Table 28. Type 244 → CONDEMNED with the reason. Type 263.1 → over-height, condemned. Type "abc" → refused, no crash |
+| 2.10 | **Single Spring** — this is one spring *on a wagon*, so it first asks which wagon and bogie; scroll to **Free height** | Type 258.5 (NLB outer used) → band Green, Table 28. Type 244 → CONDEMNED with the reason. Type 263.1 → over-height, condemned. Type "abc" → refused, no crash |
 | 2.11 | **A wagon → All wagons** | The list of wagons in the shop with their stage. Type `WR/BCNHL/40112` → it opens |
 | 2.12 | Wagon → **Checklist** | Categories as tabs; items with Pass / Fail / Condemn; a condemned item asks for a note. The springs section links to the sorting records |
 | 2.13 | Wagon → **Photos** | Four assembly frames with pocket counts. Bogie 1·A: two counts agree. Bogie 2·B: "counted by Praveen Singh — a blind recount by someone else is needed" and **no figures**. Open the counter: tap pockets, the expected number is **not** shown. Close |
-| 2.14 | Wagon → **Parts** | The parts ledger: off / on / scrapped per position; adding a part asks position and source |
-| 2.15 | Wagon → **SWT** (air brake) | The 14-row proforma; each row judged against the WMM limit as you type |
+| 2.14 | Wagon → **Parts** — the wagon's parts ledger: what was taken **off** the wagon, what was fitted **on**, and what was **scrapped**, by position (Bogie 1 / 2, left / right) | The three lists; *Add a part* asks which position and where the part came from (new from Stores, reconditioned, or from another wagon) |
+| 2.15 | Wagon → **Air‑brake test** tab (the Single Wagon Test) | The 14-row proforma; each row judged against the WMM limit as you type |
 | 2.16 | Wagon → **Timeline** | The stage history with dates and who moved it |
-| 2.17 | Wagon → Checklist → **Wheels** (on a BOXN wagon, e.g. `SER/BOXNHL/30914`) | Eight wheels; type a diameter → judged live against 919 / 906 with the drawing number and the IRCA rule quoted beneath |
+| 2.17 | Wagon → Checklist → **Wheels** (on a BOXN wagon, e.g. `SER/BOXNHL/30914`). Tap a wheel | One large box: the tread diameter chalked on the disc. Type 917 → *below issue limit* against 919 / 906, with the drawing and rule beneath. The flange figures are folded under *optional* — only if the tyre defect gauge was used |
 | 2.18 | Read a wagon number with the camera (A wagon → camera icon) | Point at any printed number; it proposes the text; you confirm or correct — it never records unconfirmed |
-| 2.19 | **Manual** | Ask "brake block condemning limit" → the manual's words with page number. Ask "wheel diameter variation same axle bogie" → IRCA Part III, cited by name |
+| 2.19 | **Manual** | Ask "brake block condemning limit" → **Answer — in the document's own words**, large, with *Source:* the manual and page beneath; further passages under *Also in*. Ask "wheel diameter variation same axle bogie" → IRCA Part III appears, cited by name. It quotes; it never paraphrases — that is deliberate |
 | 2.20 | Wi‑Fi **off** on the tablet. Sort three springs. Wi‑Fi **on**. | The three sort while offline (a queued count shows); within a minute the queue empties and they appear on the laptop's records — exactly three, no duplicates |
 | 2.21 | Try to open the DRM dashboard or Audit chain URL by hand | Refused — an inspector does not have those screens |
 | 2.22 | Sign out | Back to the sign-in page; the back button does not reopen a signed-in screen |

@@ -236,6 +236,14 @@ export const ManualSearchPage: React.FC<ManualSearchPageProps> = ({ lang }) => {
               : 'Reproduced verbatim from the manual — always confirm against the cited page.'}
           </p>
 
+          {/*
+            The first hit is presented as the answer — larger, in plain type,
+            with the document it came from named directly beneath — and the
+            rest as "also in". The words are still the document's own: a
+            person asked for "a straightforward answer", and the honest form
+            of that is the manual's sentence, big, with its source, never a
+            paraphrase that could drift from the page it cites.
+          */}
           {hits.map((h, idx) => (
             <div
               key={idx}
@@ -244,11 +252,9 @@ export const ManualSearchPage: React.FC<ManualSearchPageProps> = ({ lang }) => {
               }`}
             >
               <div className="flex flex-wrap items-center gap-2">
-                {idx === 0 && (
-                  <span className="text-[9px] font-extrabold px-2 py-0.5 rounded bg-accent-soft text-accent-ink">
-                    {isHi ? 'सर्वश्रेष्ठ मिलान' : 'BEST MATCH'}
-                  </span>
-                )}
+                <span className={`text-[9px] font-extrabold px-2 py-0.5 rounded ${idx === 0 ? 'bg-accent-soft text-accent-ink' : 'bg-raised text-ink-muted'}`}>
+                  {idx === 0 ? (isHi ? 'उत्तर — दस्तावेज़ के अपने शब्दों में' : 'ANSWER — IN THE DOCUMENT\'S OWN WORDS') : (isHi ? 'यह भी देखें' : 'ALSO IN')}
+                </span>
                 <span className="text-[11px] font-mono text-ink-muted">
                   {isHi ? 'पृष्ठ' : 'Page'} {h.page}
                 </span>
@@ -257,9 +263,12 @@ export const ManualSearchPage: React.FC<ManualSearchPageProps> = ({ lang }) => {
                 )}
               </div>
 
-              <p className="text-sm text-ink-body leading-relaxed font-mono">
+              <p className={idx === 0 ? 'text-base text-white leading-relaxed' : 'text-sm text-ink-body leading-relaxed'}>
                 <Highlighted text={h.snippet} />
               </p>
+              {idx === 0 && (
+                <p className="text-[12px] text-accent-ink font-semibold">{isHi ? 'स्रोत: ' : 'Source: '}{h.citation}</p>
+              )}
 
               <button
                 onClick={() => setExpanded(expanded === idx ? null : idx)}
@@ -280,7 +289,7 @@ export const ManualSearchPage: React.FC<ManualSearchPageProps> = ({ lang }) => {
                 </pre>
               )}
 
-              <p className="text-[10px] text-ink-faint italic">{h.citation}</p>
+              {idx !== 0 && <p className="text-[10px] text-ink-faint italic">{h.citation}</p>}
             </div>
           ))}
         </div>

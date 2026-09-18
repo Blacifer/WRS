@@ -294,6 +294,8 @@ async function showSpring(page, TYPES, label) {
   );
 }
 
+// The learning panels are folded under 'Teach the camera (advanced)' on the bench; open them.
+await page.locator('[data-testid="camera-learning"] summary').click().catch(() => {});
 await page.click('[data-testid="teach-camera-toggle"]');
 
 /*

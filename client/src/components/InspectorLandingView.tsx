@@ -332,6 +332,8 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
       {/* ---------------------------------------------------------- SPRINGS */}
       {workMode === 'SPRINGS' && (
         <div className="space-y-3">
+          {/* What I have logged today, at the top — asked for by the first person to use the screen. Compact: the tallies and the last five. */}
+          <MyRecordToday lang={isHi ? 'hi' : 'en'} compact />
           <PrimaryAction
             onClick={onOpenSpringSorting}
             eyebrow={isHi ? 'आज का काम' : "Today's work"}
@@ -341,8 +343,6 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
               : 'Tap the band against the strip — loose springs, no wagon number needed'}
             icon={<CoilIcon size={30} />}
           />
-          {/* What I have logged today — after the job, before the rest. Compact: the tallies and the last five. */}
-          <MyRecordToday lang={isHi ? 'hi' : 'en'} compact />
 
           {/* The shop's own count for today. */}
           <Card>

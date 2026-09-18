@@ -15,7 +15,7 @@
 set -u
 cd "$(dirname "$0")/.."
 
-PORT=3200
+PORT="${DEMO_PORT:-3200}"
 OUT="${1:-demo-rehearsal}"
 BUNDLE="$PWD/dist-shop/wrs-raipur"
 LOG=/tmp/wrs_demo_day_server.log

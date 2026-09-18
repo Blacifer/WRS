@@ -55,11 +55,32 @@ that makes it trusted is the wrong page to trust for it.)
    full trust for "WRS Raipur workshop server".
 4. Open Safari at `https://<PC address>:3000`.
 
-## Windows (a second PC or laptop)
+## Windows (the demonstration laptop, the shop PC's own browser, a second PC)
 
-Double-click `lan-cert.crt` → **Install Certificate** → **Local Machine** →
-**Place all certificates in the following store** → **Trusted Root
-Certification Authorities**.
+The PC that runs the server shows "Not secure" in its own browser for the same
+reason a tablet does: the certificate is the shop's own, not from an
+authority the browser was born trusting. One install fixes it for good:
+
+Double-click `server\certs\lan-cert.crt` → **Install Certificate** →
+**Local Machine** → **Place all certificates in the following store** →
+**Browse → Trusted Root Certification Authorities** → Finish. Close every
+browser window and open the address again: the padlock is closed and the
+warning is gone. Do this on the demonstration laptop the evening before, so
+the projector never shows a red "Not secure".
+
+## macOS (rehearsing on a Mac)
+
+Double-click `server/certs/lan-cert.pem` → it opens in Keychain Access →
+find it under *login* or *System* → double-click → **Trust** → *When using
+this certificate:* **Always Trust** → close and enter your password. Restart
+the browser. Safari and Chrome then show the padlock; Firefox keeps its own
+store (*Settings → Privacy → Certificates → View → Import*).
+
+**A phone on its own internet cannot reach this address at all.**
+`192.168.1.x` is an address inside one Wi‑Fi; mobile data is a different
+network with no road to it. "This page isn't working" from a phone on mobile
+data is the network, not the app. Join the same Wi‑Fi as the PC (and turn
+mobile data off so Android does not drift back to it — next section).
 
 ## Two Android habits that look like the app failing
 

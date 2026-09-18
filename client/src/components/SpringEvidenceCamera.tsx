@@ -170,7 +170,7 @@ export const SpringEvidenceCamera = forwardRef<SpringEvidenceHandle, Props>(
             data-testid="spring-evidence-video"
             playsInline
             muted
-            className="w-full max-h-[220px] object-cover"
+            className="w-full max-h-[60vh] min-h-[260px] object-cover"
           />
           {ready && (
             <div className="absolute top-2 left-2 flex items-center gap-1.5 px-2 py-1 rounded-full bg-black/70 text-[11px] font-bold text-good-ink">

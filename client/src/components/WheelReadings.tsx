@@ -107,9 +107,15 @@ export const WheelReadings: React.FC<Props> = ({ wagonNumber, lang, canRecord, o
       {open && (
         <form onSubmit={(e) => { e.preventDefault(); void submit(); }} className="rounded-control border border-accent-line bg-accent-soft/40 p-3 space-y-2" data-testid="wheel-form">
           <div className="text-xs font-bold text-white">{t(`Axle ${open[0]}, ${open[1] === 'L' ? 'left' : 'right'} wheel`, `धुरी ${open[0]}, ${open[1] === 'L' ? 'बायाँ' : 'दायाँ'} पहिया`)}</div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          {/* The chalk on the disc is one number. It is asked for first and large; the tyre-defect-gauge figures are there when a person has them. */}
+          <label className="text-[11px] text-ink-muted flex flex-col gap-1">{t('Tread diameter (mm) — the figure chalked on the disc', 'ट्रेड व्यास (मिमी) — डिस्क पर चॉक से लिखा अंक')}
+            <input inputMode="decimal" required autoFocus value={form.treadDiameterMm || ''} onChange={(e) => setForm({ ...form, treadDiameterMm: e.target.value })} data-testid="wheel-treadDiameterMm"
+              className="min-h-[52px] px-3 bg-card border border-accent-line rounded-control text-2xl font-extrabold text-white tabular-nums" placeholder="e.g. 938" />
+          </label>
+          <details className="text-[11px] text-ink-muted">
+            <summary className="cursor-pointer select-none py-1 font-bold text-ink-body">{t('Flange and tread figures, if the tyre defect gauge was used (optional)', 'फ़्लैंज व ट्रेड के अंक, यदि टायर डिफ़ेक्ट गेज लगाया हो (वैकल्पिक)')}</summary>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2">
             {([
-              ['treadDiameterMm', t('Tread diameter (mm)', 'ट्रेड व्यास (मिमी)'), true],
               ['flangeThicknessMm', t('Flange thickness (mm)', 'फ़्लैंज मोटाई (मिमी)'), false],
               ['flangeHeightMm', t('Flange height (mm)', 'फ़्लैंज ऊँचाई (मिमी)'), false],
               ['rootRadiusMm', t('Root radius (mm)', 'रूट त्रिज्या (मिमी)'), false],
@@ -124,6 +130,7 @@ export const WheelReadings: React.FC<Props> = ({ wagonNumber, lang, canRecord, o
             <label className="text-[11px] text-ink-muted flex flex-col gap-1">{t('Instrument', 'उपकरण')}
               <input value={form.instrument || ''} onChange={(e) => setForm({ ...form, instrument: e.target.value })} placeholder={t('e.g. wheel dia gauge WDG-1', 'जैसे WDG-1')} className="min-h-[40px] px-2 bg-card border border-line rounded-control text-sm text-white" /></label>
           </div>
+          </details>
           {live && (
             <div className="text-[11px] space-y-0.5" data-testid="wheel-live">
               <div className={`font-bold ${verdictClass(live.verdict)}`}>{verdictLabel(live.verdict)}</div>

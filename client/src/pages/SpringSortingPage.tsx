@@ -1216,38 +1216,10 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           </span>
         </label>
         {/*
-          * The camera's go/no-go, answered by people before any model exists:
-          * can a second inspector read the band from the stored photograph?
-          * The server sends no label, and never this reader's own pictures.
+          * The live preview sits directly under its switch, large. It used to
+          * sit below three learning panels, small, and the first person to try
+          * the screen could not tell which of the "two camera things" to use.
           */}
-        <BlindSpringRead lang={lang} />
-        {/*
-          * The camera that learns, put where the springs actually are.
-          *
-          * Next to the blind read deliberately: that panel measures the
-          * ceiling for reading a BAND from a photograph, which is a question
-          * this camera does not attempt. The two sit together so nobody
-          * confuses what the camera claims with what it does not.
-          */}
-        {/*
-          * The bench with the taps taken out. Above the teaching panel because
-          * once the camera has earned it, this is where the shift happens; the
-          * teaching panel is how it earns it.
-          */}
-        <AutoSortBench
-          lang={lang}
-          batchId={batchId}
-          bogieType={bogieType}
-          condition={condition}
-          gaugeCode={gaugeCode || null}
-          expectedPosition={position}
-          onRecorded={(status) => {
-            if (status === 'CONDEMNED') playCondemnedBuzz();
-            else playPassChime();
-            void refresh();
-          }}
-        />
-        <TeachTheCamera lang={lang} domain="SPRING" />
         <SpringEvidenceCamera
           ref={cameraRef}
           lang={lang}
@@ -1255,6 +1227,37 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           gaugeCode={gaugeCode || undefined}
           onUnavailable={() => { /* sorting is unaffected; the component says so */ }}
         />
+        {/*
+          * Teaching the camera, reading photographs blind, and letting the
+          * camera decide are how the camera EARNS its place — the work of a
+          * supervisor or a keen inspector on a quiet afternoon, not the
+          * day's sorting. Folded away so the bench is: strip, tap, photograph.
+          */}
+        <details className="rounded-card border border-line bg-card" data-testid="camera-learning">
+          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-bold text-ink-body">
+            {isHi ? 'कैमरे को सिखाएँ (उन्नत) — फ़ोटो को बिना देखे पढ़ें, कैमरा सिखाएँ, कैमरे से छँटाई' : 'Teach the camera (advanced) — blind reads, teaching, sorting with the camera deciding'}
+            <span className="block text-[11px] font-normal text-ink-muted">
+              {isHi ? 'रोज़ की छँटाई के लिए ज़रूरी नहीं। कैमरा तभी कुछ कहता है जब उसने इस शॉप के स्प्रिंगों पर खुद को साबित किया हो।' : 'Not needed for the day\'s sorting. The camera only speaks once it has proven itself on this shop\'s own springs.'}
+            </span>
+          </summary>
+          <div className="px-4 pb-4 space-y-4">
+            <BlindSpringRead lang={lang} />
+            <AutoSortBench
+              lang={lang}
+              batchId={batchId}
+              bogieType={bogieType}
+              condition={condition}
+              gaugeCode={gaugeCode || null}
+              expectedPosition={position}
+              onRecorded={(status) => {
+                if (status === 'CONDEMNED') playCondemnedBuzz();
+                else playPassChime();
+                void refresh();
+              }}
+            />
+            <TeachTheCamera lang={lang} domain="SPRING" />
+          </div>
+        </details>
         {dataset && dataset.total > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p data-testid="evidence-count" className="text-[11px] text-ink-muted">

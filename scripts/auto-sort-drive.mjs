@@ -100,6 +100,8 @@ async function openBench() {
   await page.evaluate(() => { const w = /spring|सॉर्ट|sorting/i; [...document.querySelectorAll('button,a')].find((x) => w.test(x.textContent || ''))?.click(); });
   await page.waitForTimeout(2000);
   await page.locator('[data-testid="auto-sort-bench"]').waitFor({ timeout: 15000 });
+  // The learning panels are folded under 'Teach the camera (advanced)' on the bench; open them.
+  await page.locator('[data-testid="camera-learning"] summary').click().catch(() => {});
   await page.click('[data-testid="auto-bench-toggle"]');
   await page.waitForFunction(() => { const i = document.querySelector('[data-testid="auto-bench-height"]'); return i && !i.disabled; }, { timeout: 30000 });
   // Our drawn spring becomes the camera.

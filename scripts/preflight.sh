@@ -249,7 +249,7 @@ else
   # the story, the certificate dated a three-week-old release today, and the
   # two-gauge drift answer accused each gauge in turn. The bundle is
   # packaged once, above, and reused here.
-  step "Demo day rehearsal (bundle)" env SKIP_PACKAGE=1 bash scripts/demo-day.sh demo-rehearsal
+  step "Demo day rehearsal (bundle)" env SKIP_PACKAGE=1 DEMO_PORT=3210 bash scripts/demo-day.sh demo-rehearsal
 fi
 
 echo
