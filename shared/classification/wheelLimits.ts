@@ -8,15 +8,32 @@
  * number. A number without the limit it is judged against is a number
  * nobody can act on, so the limits came first. They are here.
  *
- * Source: Indian Railways' own training material — IRIMEE (rskr.irimee.in),
- * "Wheel Set / Wheel Defects" (STC/NBQ) and "Types of Bogies in Wagon Stock",
- * which give the tread-diameter table by wheel type with the drawing it
- * comes from (WD-97037 S-01 for BCN/BOXN on CASNUB), the permitted variation
- * within an axle, a bogie and a wagon, and the condemning limits for flange
- * and tread defects. Every figure below names that source; nothing is
- * inferred. The workshop should confirm them against IRCA Part III / the WMM
- * before relying on them for a release, and the readiness of that check is
- * stated on the screen.
+ * Sources, in order of authority:
+ *
+ * 1. The Wagon Maintenance Manual, Chapter 6 (Bogie), section D "Wheels":
+ *    "The last shop issue size and the condemning dia of different wheels
+ *    shall be as per RDSO Drg. No. WD-88089/S-1" — the table gives, per
+ *    wheel drawing, new / condemning (D) / last-shop-issue (E) diameters:
+ *    22.9 t WD-97037-S-01: 1000 / 906 / 919; BLC CONTR-9404-S-13: 840 / 780
+ *    / 793; and the footnote for 25 t CASNUB 22NLC (BOXNEL, BOYEL): minimum
+ *    service 950, last shop issue 963. The same chapter gives the same-axle
+ *    variation after turning (0.5 mm), the permissible flat (60 mm, BG
+ *    wagons), the minimum flange thickness (16 mm) and the sharp-flange
+ *    radius (5 mm), and for the rest says "refer IRCA Part III".
+ * 2. IRIMEE (rskr.irimee.in) supervisors' training notes "Wheel Set / Wheel
+ *    Defects" and "Types of Bogies in Wagon Stock", which agree with the
+ *    manual on every figure above, and add the ones the manual only points
+ *    to: deep flange 35, root radius 13, hollow tyre 5, and the variation
+ *    within a bogie (13) and a wagon (25), which the manual assigns to IRCA
+ *    Part III clause 2.8.14.2.
+ *
+ * Every figure below names which of the two it came from. The four IRIMEE-
+ * only figures are marked on the screen as awaiting the shop's IRCA Part III
+ * page; the diameters are not — they are the manual's own.
+ *
+ * The 22NLC figure was 955 for both limits, from the IRIMEE bogie table,
+ * which prints only a minimum. The manual's footnote gives both, and they
+ * differ from it: 950 to condemn, 963 to leave a shop. The manual governs.
  *
  * Three verdicts, not two. "Last shop issue" is the diameter below which a
  * workshop must not send a wheel out (919 mm for BOXN), and it sits above
@@ -39,21 +56,25 @@ export interface WheelDiameterLimits {
   variation: { sameAxle: number; sameBogie: number; sameWagon: number };
 }
 
-export const SOURCE = 'IRIMEE STC training notes "Wheel Set / Wheel Defects" and "Types of Bogies in Wagon Stock" (rskr.irimee.in)';
+export const SOURCE = 'Wagon Maintenance Manual Ch.6 §D (RDSO Drg. WD-88089/S-1) for diameters, flat, thin and sharp flange; IRIMEE training notes (rskr.irimee.in) for deep flange, root radius, hollow tyre and bogie/wagon variation, which the manual refers to IRCA Part III cl. 2.8.14.2';
+/** Which figures still rest on the IRIMEE notes alone, pending the shop's IRCA Part III page. */
+export const AWAITING_IRCA = ['deep flange 35 mm', 'root radius 13 mm', 'hollow tyre 5 mm', 'variation within a bogie 13 mm / a wagon 25 mm'] as const;
 
 export const WHEEL_DIAMETER_LIMITS: Record<WheelFamily, WheelDiameterLimits> = {
   CASNUB_BOXN: {
     family: 'CASNUB_BOXN', label: 'BCN / BOXN on CASNUB', newMm: 1000, lastShopIssueMm: 919, condemnMm: 906,
-    drawing: 'WD-97037 S-01', variation: { sameAxle: 0.5, sameBogie: 13, sameWagon: 25 }
+    drawing: 'WD-97037-S-01 (WMM Ch.6, WD-88089/S-1)', variation: { sameAxle: 0.5, sameBogie: 13, sameWagon: 25 }
   },
   CASNUB_22NLC: {
-    // The bogie table gives only a minimum for 22NLC; the last-shop-issue figure is not published there.
-    family: 'CASNUB_22NLC', label: 'CASNUB 22NLC (25 t)', newMm: 1000, lastShopIssueMm: 955, condemnMm: 955,
-    drawing: 'WD-97037 S-01 (minimum 955 mm for 22NLC)', variation: { sameAxle: 0.5, sameBogie: 13, sameWagon: 25 }
+    // WMM Ch.6 §D, footnote to the WD-88089/S-1 table: "Minimum service diameter of wheel disc
+    // in 25 T axle load having CASNUB 22 NLC bogie like BOXNEL, BOYEL etc. is 950 mm. Last shop
+    // issue size of such wheels is 963 mm." (IRIMEE's bogie table prints 955 as a bare minimum.)
+    family: 'CASNUB_22NLC', label: 'CASNUB 22NLC (25 t)', newMm: 1000, lastShopIssueMm: 963, condemnMm: 950,
+    drawing: 'WD-88089/S-1 footnote (25 t, CASNUB 22NLC)', variation: { sameAxle: 0.5, sameBogie: 13, sameWagon: 25 }
   },
   LCCF_BLC: {
     family: 'LCCF_BLC', label: 'BLC on LCCF 20(C)', newMm: 840, lastShopIssueMm: 793, condemnMm: 780,
-    drawing: 'CONTR-9404-S/13', variation: { sameAxle: 0.5, sameBogie: 13, sameWagon: 25 }
+    drawing: 'CONTR-9404-S-13 (WMM Ch.6, WD-88089/S-1)', variation: { sameAxle: 0.5, sameBogie: 13, sameWagon: 25 }
   }
 };
 

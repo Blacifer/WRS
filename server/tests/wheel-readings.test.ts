@@ -38,7 +38,11 @@ describe('the limits', () => {
     assert.equal(wheelFamilyFor('LWLH25'), null);
     const j = judgeWheel(null, { treadDiameterMm: 850 });
     assert.equal(j.verdict, 'PASS'); assert.match(j.findings[0].limit, /no diameter table/);
-    assert.equal(judgeWheel('CASNUB_22NLC', { treadDiameterMm: 954 }).verdict, 'CONDEMN');
+    // WMM Ch.6 footnote for the 25 t 22NLC wheel: 950 condemns, 963 is the last shop issue —
+    // so 954 is in service on the line but may not leave a POH; 949 is condemned.
+    assert.equal(judgeWheel('CASNUB_22NLC', { treadDiameterMm: 954 }).verdict, 'BELOW_SHOP_ISSUE');
+    assert.equal(judgeWheel('CASNUB_22NLC', { treadDiameterMm: 949 }).verdict, 'CONDEMN');
+    assert.equal(judgeWheel('CASNUB_22NLC', { treadDiameterMm: 963 }).verdict, 'PASS');
     assert.equal(judgeWheel('LCCF_BLC', { treadDiameterMm: 790 }).verdict, 'BELOW_SHOP_ISSUE');
   });
 

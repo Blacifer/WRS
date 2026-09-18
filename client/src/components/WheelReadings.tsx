@@ -68,7 +68,7 @@ export const WheelReadings: React.FC<Props> = ({ wagonNumber, lang, canRecord, o
             {' '}{t(WHEEL_PROFILE_LIMITS.diameterMeasuredAt, 'व्यास रिम फ़ेस से 66.5 मिमी पर मापा जाता है।')}
           </p>
         </div>
-        <span className="text-[10px] text-ink-faint max-w-xs text-right">{t('Limits from IRIMEE training notes (rskr.irimee.in); confirm against IRCA Part III before relying on them for a release.', 'सीमाएँ IRIMEE प्रशिक्षण नोट्स से; रिलीज़ से पहले IRCA भाग III से मिलाएँ।')}</span>
+        <span className="text-[10px] text-ink-faint max-w-xs text-right">{t('Diameters, flat, thin and sharp flange: Wagon Maintenance Manual Ch.6 (RDSO WD-88089/S-1). Deep flange, root radius, hollow tyre and bogie/wagon variation: IRIMEE notes — the manual refers these to IRCA Part III cl. 2.8.14.2; confirm that page.', 'व्यास, फ़्लैट, पतला व नुकीला फ़्लैंज: वैगन रखरखाव मैनुअल अध्याय 6 (RDSO WD-88089/S-1)। गहरा फ़्लैंज, रूट त्रिज्या, खोखला टायर व बोगी/वैगन अंतर: IRIMEE नोट्स — मैनुअल इन्हें IRCA भाग III cl. 2.8.14.2 को सौंपता है; वह पृष्ठ मिलाएँ।')}</span>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">

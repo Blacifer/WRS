@@ -80,7 +80,7 @@ the shop's numbers with the count behind every one.
 - It does not decide. Every verdict is a person's; the system computes, records, proves and asks.
 - The camera does not judge springs until it has proven itself on this shop's own photographs; the dashboard shows the score.
 - No trackside "AI triage", no predicted failures, no confidence number nobody computed. Every rate on screen carries its count.
-- Wheel limits are reproduced from IRIMEE training material and are marked "confirm against IRCA Part III" on the screen until the shop does so.
+- Wheel diameters and the flat/thin/sharp-flange limits are the Wagon Maintenance Manual's own (Ch.6, RDSO WD-88089/S-1). Four figures the manual refers to IRCA Part III (deep flange, root radius, hollow tyre, bogie/wagon variation) come from IRIMEE notes and say so on the screen until the shop's IRCA page is read.
 
 ## 7. Data, ownership and security (one paragraph for the file)
 

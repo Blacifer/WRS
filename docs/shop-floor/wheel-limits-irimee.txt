@@ -2,9 +2,15 @@ WHEEL SET LIMITS FOR C&W STOCK — FROM INDIAN RAILWAYS' OWN TRAINING NOTES
 Source: IRIMEE (Indian Railways Institute of Mechanical and Electrical Engineering) supervisors'
 training centre notes, "Wheel Set / Wheel Defects" (STC/NBQ) and "Types of Bogies in Wagon
 Stock" (rskr.irimee.in), read September 2026. Source label in this index: WHEEL_LIMITS.
-The workshop should confirm these against IRCA Part III / the Wagon Maintenance Manual before
-relying on them for a release; they are reproduced here so that every wheel reading can cite
-the figure it was judged against.
+Confirmed against the Wagon Maintenance Manual, Chapter 6 (Bogie) §D "Wheels", on 18 Sep 2026:
+the manual's table (RDSO Drg. WD-88089/S-1) gives the same new / condemning / last-shop-issue
+diameters — 1000 / 906 / 919 for the 22.9 t CASNUB wheel (WD-97037-S-01), 840 / 780 / 793 for
+BLC (CONTR-9404-S-13) — and the same 0.5 mm same-axle variation, 60 mm flat, 16 mm thin flange
+and 5 mm sharp-flange radius. ONE DIFFERENCE: for the 25 t CASNUB 22NLC wheel these notes print
+only "955 mm minimum"; the manual's footnote gives minimum service 950 mm and last shop issue
+963 mm, and the manual governs. For deep flange, root radius, hollow tyre and the variation
+within a bogie and a wagon, the manual says "refer IRCA Part III" (clause 2.8.14.2 for the
+variation); those four figures rest on these notes until the shop's copy of that page is read.
 
 WHEEL TREAD DIAMETER (all dimensions in mm)
 Type of wheel — initial diameter — last shop issue diameter — condemning limit — drawing no.

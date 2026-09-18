@@ -121,3 +121,15 @@ shadow-run forms. Nothing seen contradicts them. The four things still
 unproven (camera on real springs, pocket model, bearing detector, shadow-run
 verdict) are unchanged: they need the floor's data, and the visit produced
 photographs of the floor, not of springs under the sorting camera.
+
+## Addendum, 18 Sep 2026 — the wheel limits against the manual
+
+The Wagon Maintenance Manual, Chapter 6 §D, carries the wheel table (RDSO
+Drg. WD-88089/S-1) and agrees with the IRIMEE figures on every diameter,
+the same-axle variation, the 60 mm flat, the 16 mm thin flange and the 5 mm
+sharp flange. One correction: the 25 t CASNUB 22NLC wheel is condemned at
+950 mm and last-shop-issued at 963 mm (the IRIMEE bogie table printed only
+"955 minimum"). Still resting on IRIMEE, because the manual sends them to
+IRCA Part III cl. 2.8.14.2: deep flange 35, root radius 13, hollow tyre 5,
+and the 13 / 25 mm variation within a bogie / a wagon. On the next visit:
+photograph the wheel shop's IRCA page for those four.
