@@ -240,6 +240,8 @@ export function buildSpringTablePassages(): ManualPassage[] {
  * left to discover the index is empty.
  */
 export interface ExpectedManualSource {
+  /** Shop-floor transcriptions: named when present, not a warning when absent. */
+  supplementary?: boolean;
   label: string;
   name: string;
   /** Where the document lives in this repository, when it is shipped with it. */
@@ -273,6 +275,24 @@ export const EXPECTED_MANUAL_SOURCES: ExpectedManualSource[] = [
     name: 'RDSO quality audit check-sheet (depot ROH)',
     file: 'docs/Quality_Audit_check-sheet_for_Wagon_Depot.pdf',
     required: false
+  },
+  // The two shop-floor transcriptions from the site visit. The demo seed
+  // indexes them; on a real install INSTALL §5 does. Listed here so the
+  // readiness row names everything the index holds, not only the three
+  // documents it knew about first.
+  {
+    label: 'CBC_WALL',
+    name: 'CBC section wall charts (draft gear gauges), transcribed on site',
+    file: 'docs/shop-floor/cbc-draft-gear-wall-charts.txt',
+    required: false,
+    supplementary: true
+  },
+  {
+    label: 'WHEEL_LIMITS',
+    name: 'Wheel diameter and profile limits (IRIMEE training notes)',
+    file: 'docs/shop-floor/wheel-limits-irimee.txt',
+    required: false,
+    supplementary: true
   }
 ];
 

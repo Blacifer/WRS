@@ -169,8 +169,15 @@ is refused outright rather than weakened.
 
 ## 5. Index the manual
 
-Two documents. The first is the one everything cites; the second ships with the
-repository:
+**On the shop PC (the bundle):** the manuals travel as text in `docs\manuals\`
+because a Windows PC has no `pdftotext`. Double-click `INDEX-MANUALS.cmd`
+once; it indexes every `.txt` there, labelled by the part of the file name
+before the first hyphen. The texts are made on the build machine before the
+stick is written — [docs/manuals/README.md](manuals/README.md) has the two
+commands. `DEMO-DATA.cmd` runs the same step.
+
+**On a development machine**, two documents. The first is the one everything
+cites; the second ships with the repository:
 
 ```bash
 npm run index-manual -- "/path/to/Vol-I (System Documentation).pdf"

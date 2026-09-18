@@ -541,7 +541,7 @@ healthRouter.get(
      */
     const present = indexedSources(db);
     const manualPassages = Object.values(present).reduce((n, c) => n + c, 0);
-    const notIndexed = EXPECTED_MANUAL_SOURCES.filter((src) => !present[src.label]);
+    const notIndexed = EXPECTED_MANUAL_SOURCES.filter((src) => !present[src.label] && !src.supplementary);
     const notIndexedRequired = notIndexed.filter((src) => src.required);
 
     const held = EXPECTED_MANUAL_SOURCES

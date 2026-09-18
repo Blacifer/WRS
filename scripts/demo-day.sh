@@ -50,6 +50,16 @@ node server/scripts/make-lan-cert.mjs server/certs >/dev/null 2>&1
 echo "DEMO-DATA.cmd: seeding the demonstration record"
 ( cd server && SEED_DEMO_USERS=true node --experimental-strip-types src/db/seed.ts >/tmp/wrs_demo_day_seed.log 2>&1 ) || { tail -20 /tmp/wrs_demo_day_seed.log; exit 1; }
 grep -q '^SEED_DEMO_USERS=true' .env || echo 'SEED_DEMO_USERS=true' >> .env
+# … and what DEMO-DATA.cmd does next: INDEX-MANUALS.cmd, every .txt in docs/manuals.
+if ls docs/manuals/*.txt >/dev/null 2>&1; then
+  echo "INDEX-MANUALS.cmd: indexing docs/manuals"
+  for f in docs/manuals/*.txt; do
+    label="$(basename "$f" .txt | cut -d- -f1)"
+    ( cd server && node --experimental-strip-types scripts/index-manual.ts "../$f" "$label" >>/tmp/wrs_demo_day_seed.log 2>&1 ) || { echo "  indexing $f failed:"; tail -5 /tmp/wrs_demo_day_seed.log; exit 1; }
+  done
+else
+  echo "  (no docs/manuals/*.txt — Ask the Manual will cite nothing; see docs/manuals/README.md)"
+fi
 
 # START.cmd, second run.
 echo "START.cmd: starting on :$PORT"

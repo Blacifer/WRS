@@ -231,6 +231,23 @@ console.log('\nWalk 4: Ask the Records — two questions, "How this was computed
 }
 
 // ---------------------------------------------------------------------------
+console.log('\nBetween walks: Ask the Manual cites the Wagon Maintenance Manual by page');
+{
+  await page.locator('[data-testid="nav-manual-sup"]').first().click();
+  await page.waitForTimeout(1500);
+  await page.locator('form input').first().fill('free height of outer spring casnub 22 nlb');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(3000);
+  await shot('ask-manual');
+  const t = await bodyText();
+  check(/WMM|Wagon Maintenance Manual/.test(t) && /p\.\s?\d+|page \d+/i.test(t), 'a WMM passage comes back with its page number');
+  const status = await (await fetch(`${BASE}/api/manual/status`, { headers: { authorization: `Bearer ${sup}` } })).json().catch(() => null);
+  const sources = status?.data?.sources || status?.data?.bySource || null;
+  console.log(`    manual status: ${JSON.stringify(status?.data || status).slice(0, 200)}`);
+  check(JSON.stringify(status || {}).includes('WMM'), 'the manual status names the WMM as indexed');
+}
+
+// ---------------------------------------------------------------------------
 console.log('\nWalk 5: drm1 — the four dashboard questions with n, then Spring Analytics against the standard');
 await signIn('drm1');
 {
@@ -316,6 +333,8 @@ await signIn('admin1');
   // design; the row must FAIL and say why they can nevertheless sign in.
   const demoRow = list.find((r) => r.id === 'demo-passwords');
   check(demoRow?.state === 'FAIL' && /SEED_DEMO_USERS=true is set/.test(demoRow.detail), `demo-passwords FAILS and says SEED_DEMO_USERS is what lets them sign in: "${(demoRow?.detail || '').slice(0, 100)}"`);
+  const manualRow = list.find((r) => r.id === 'manual');
+  check(manualRow?.state === 'PASS', `the manual readiness row is green: "${(manualRow?.detail || '').slice(0, 100)}"`);
   const fails = list.filter((r) => r.state === 'FAIL' && r.id !== 'demo-passwords');
   console.log(`  readiness: ${list.map((r) => `${r.id}=${r.state}`).join(', ')}`);
   for (const r of list.filter((x) => x.state !== 'PASS')) console.log(`    ${r.state} ${r.id}: ${r.detail}`);

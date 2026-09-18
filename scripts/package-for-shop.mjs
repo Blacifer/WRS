@@ -319,6 +319,7 @@ set SEED_DEMO_USERS=true
 "%NODE%" --experimental-strip-types src\db\seed.ts
 if errorlevel 1 ( cd .. & echo. & echo   Nothing written. & pause & exit /b 1 )
 cd ..
+if exist "docs\manuals\*.txt" call INDEX-MANUALS.cmd quiet
 rem A production build refuses the published demo password at sign-in unless
 rem this switch is set for the server too. It goes into .env here, on purpose,
 rem and must come out again before the shop's real accounts are created.
@@ -329,6 +330,45 @@ echo.
 echo   SEED_DEMO_USERS=true was added to .env so the demo accounts can sign in.
 echo   DELETE THAT LINE, and the demo accounts, before real use.
 pause
+`
+);
+
+/*
+ * INDEX-MANUALS.cmd — the documents Ask the Manual can cite.
+ *
+ * A Windows PC has no pdftotext, so the manuals travel as text: every .txt
+ * in docs\manuals\ is indexed, labelled by the part of its name before the
+ * first hyphen (WMM-Vol-I.txt → WMM, ROH_AUDIT-check-sheet.txt → ROH_AUDIT).
+ * The texts are made on the build machine (pdftotext -layout) and are not in
+ * git — docs/manuals/README.md says how. Run once at install, and again
+ * whenever a document is added; re-indexing a label replaces that label only.
+ * DEMO-DATA.cmd calls this, because a demonstration on which Ask the Manual
+ * cites nothing is a demonstration of an empty box.
+ */
+fs.writeFileSync(
+  path.join(BUNDLE, 'INDEX-MANUALS.cmd'),
+  String.raw`@echo off
+setlocal enabledelayedexpansion
+title WRS Raipur — index the manuals
+cd /d "%~dp0"
+set "NODE=node"
+if exist "%ProgramFiles%\nodejs\node.exe" set "NODE=%ProgramFiles%\nodejs\node.exe"
+if not exist "docs\manuals\*.txt" (
+  echo   No text files in docs\manuals. See docs\manuals\README.md.
+  pause
+  exit /b 1
+)
+cd server
+for %%f in (..\docs\manuals\*.txt) do (
+  set "LABEL=%%~nf"
+  for /f "tokens=1 delims=-" %%l in ("!LABEL!") do set "LABEL=%%l"
+  echo   Indexing %%~nxf as !LABEL! ...
+  "%NODE%" --experimental-strip-types scripts\index-manual.ts "%%f" !LABEL!
+)
+cd ..
+echo.
+echo   Done. Ask the Manual can now cite these documents.
+if not "%1"=="quiet" pause
 `
 );
 
@@ -358,6 +398,9 @@ On the PC:
   9. On each tablet, install server\\certs\\lan-cert.crt once, so the browser
      trusts this PC and the camera works — docs\\TABLET_TRUST.md.
 
+  10. Double-click INDEX-MANUALS.cmd once, so Ask the Manual can cite the
+     Wagon Maintenance Manual (the text is in docs\\manuals).
+
 Then read docs\\INSTALL.md — sections 5 (the manual), 6 (the gauges),
 7 (backups: the scheduled task), 8 (check your work), 9 (starting at boot).
 
@@ -376,7 +419,8 @@ step('Read the start scripts back the way cmd.exe will');
  */
 for (const [file, needles] of [
   ['START.cmd', ['server\\certs\\lan-cert.pem', 'src\\index.ts', '%ProgramFiles%\\nodejs\\node.exe', 'logs\\wrs-']],
-  ['DEMO-DATA.cmd', ['src\\db\\seed.ts', '%ProgramFiles%\\nodejs\\node.exe']]
+  ['DEMO-DATA.cmd', ['src\\db\\seed.ts', '%ProgramFiles%\\nodejs\\node.exe', 'docs\\manuals\\*.txt']],
+  ['INDEX-MANUALS.cmd', ['scripts\\index-manual.ts', '..\\docs\\manuals\\*.txt', 'docs\\manuals\\README.md']]
 ]) {
   const text = fs.readFileSync(path.join(BUNDLE, file), 'utf8');
   for (const needle of needles) {

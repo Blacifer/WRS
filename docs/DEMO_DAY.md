@@ -23,7 +23,10 @@ command or a click; nothing needs the internet.
    thirteen wagons across all seven stages, a month of the sorting bench, one
    wagon's parts ledger, air-brake tests, assembly photographs with pocket
    counts, and a week of the shadow run. It refuses if the database already
-   holds wagons, so it cannot land on a real record by accident. It also adds
+   holds wagons, so it cannot land on a real record by accident. It then
+   indexes the Wagon Maintenance Manual from `docs\manuals\` so *Ask the
+   Manual* cites pages (the text must be in that folder when the bundle is
+   built — `docs/manuals/README.md`). It also adds
    `SEED_DEMO_USERS=true` to `.env`, because a production build otherwise
    refuses the published demo password at sign-in — **delete that line, and
    the demo accounts, before the shop's real accounts are created.**

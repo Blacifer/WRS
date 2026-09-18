@@ -53,3 +53,4 @@ screen-walk/
 server/data/demo/
 server/data/backup.key
 demo-rehearsal/
+docs/manuals/*.txt
