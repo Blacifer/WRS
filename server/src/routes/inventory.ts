@@ -292,8 +292,10 @@ inventoryRouter.post('/restock', authMiddleware, requireCapability('stores.manag
       return;
     }
 
+    // "Must be a positive integer" — and it was checked only as positive: 1.5 springs were
+    // being added to stock, and 'ten' came through as NaN but '1e1' as 10.
     const qty = Number(quantity);
-    if (isNaN(qty) || qty <= 0) {
+    if (!Number.isInteger(qty) || qty <= 0) {
       res.status(400).json({
         success: false,
         error: 'INVALID_QUANTITY',

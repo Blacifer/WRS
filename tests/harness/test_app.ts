@@ -2,7 +2,7 @@
  * Test Application / Dispatcher exposing full REST API Endpoints
  * Indian Railways WRS Raipur (Phase 1 Spring System + Phase 2 Wagon QC)
  *
- * Implements standard REST endpoints matching PROJECT.md interface contracts.
+ * Implements the REST endpoints the client calls (see client/src/services/api.ts).
  */
 
 import { AuditDatabase } from './audit_db.ts';
