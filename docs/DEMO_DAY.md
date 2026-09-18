@@ -42,6 +42,10 @@ command or a click; nothing needs the internet.
 6. **Take a backup** (`server\scripts\backup-db.mjs`, or the scheduled task)
    so the morning starts from a known file.
 
+Before the day, walk every screen by hand once with
+[WALKTHROUGH_TEST_SCRIPT.md](WALKTHROUGH_TEST_SCRIPT.md) — laptop and tablet,
+all four roles, the failure drills — and keep the ticked copy with the stick.
+
 ## The accounts
 
 | Sign in as | Password | Shows |
