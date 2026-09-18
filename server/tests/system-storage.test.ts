@@ -12,9 +12,12 @@
  * noticed at exactly the moment the file is needed and not before.
  */
 
-import { test, describe, before } from 'node:test';
+import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import os from 'node:os';
+import path from 'node:path';
 import { createApp } from '../src/app.ts';
+import { config } from '../src/config/index.ts';
 import { generateToken } from '../src/auth/jwt.ts';
 import type { ExpressApp } from '../src/framework/index.ts';
 
@@ -25,7 +28,16 @@ describe('Storage and backup visibility', () => {
 
   const auth = (t: string) => ({ authorization: `Bearer ${t}`, 'content-type': 'application/json' });
 
+  /*
+   * "No backup" must mean the directory this test points at, not whatever
+   * the developer's server/data/backups happens to hold. The server now
+   * takes its own nightly backup (backup/scheduler.ts), so the first time a
+   * dev server ran for a few minutes the real directory acquired a file and
+   * these tests reported RECENT on a "fresh" deployment.
+   */
+  const realBackupDir = config.backupDir;
   before(() => {
+    config.backupDir = path.join(os.tmpdir(), `wrs-no-backups-${process.pid}-${Date.now()}`); // never created
     app = createApp(':memory:');
     adminToken = generateToken({
       id: 'usr_admin_001', username: 'admin1', role: 'ADMIN',
@@ -36,6 +48,7 @@ describe('Storage and backup visibility', () => {
       name: 'S. K. Verma', employeeId: 'WRS-SUP-2019'
     });
   });
+  after(() => { config.backupDir = realBackupDir; });
 
   test('TC-SYS-01: a deployment with no backup says NEVER, not nothing', async () => {
     const res = await app.dispatch({

@@ -99,6 +99,19 @@ describe('gauge drift', () => {
     assert.match(thin[0].note, new RegExp(`${MIN_READINGS_EACH_SIDE} needed`));
   });
 
+  it('TC-GD-05: two gauges on a kind — both flagged, and the note says the record cannot tell which is off', () => {
+    // Each is the other's "other gauges": one comes out high, one low, and
+    // the old notes accused each in turn. The truth is that they disagree.
+    const lines = gaugeDrift([...readings('OSG-01', 40, 257), ...readings('OSG-02', 40, 258.5)]);
+    assert.strictEqual(lines.length, 2);
+    for (const l of lines) {
+      assert.strictEqual(l.flagged, true);
+      assert.match(l.note, /Disagrees with OSG-0[12], the only other gauge/);
+      assert.match(l.note, /cannot say which one is off — put both against the master/);
+      assert.doesNotMatch(l.note, /higher than|lower than/);
+    }
+  });
+
   it('TC-GD-03: kinds are not mixed — an inner-spring gauge is not compared with outer springs', () => {
     const lines = gaugeDrift([...readings('SG-1', 40, 258), ...Array.from({ length: 40 }, (_, i) => ({ gaugeCode: 'SG-I', kind: 'CASNUB_22_NLB|USED|INNER', heightMm: 240 + (i % 3) }))]);
     for (const l of lines) assert.strictEqual(l.shiftMm, null);

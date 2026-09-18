@@ -51,7 +51,8 @@ cd "$OLDPWD"
 APP_URL="https://localhost:$PORT" ADMIN_PASSWORD="$BOOT_PASSWORD" BUNDLE_DIR="$BUNDLE" node scripts/first-day-drill.mjs
 RESULT=$?
 
-kill $SERVER_PID 2>/dev/null
+# The subshell's node child too — killing the subshell alone left a server on the port.
+pkill -P $SERVER_PID 2>/dev/null; kill $SERVER_PID 2>/dev/null
 # The bundle keeps no trace of the drill: a fresh .env.example is what ships.
 rm -f "$BUNDLE/.env"
 rm -rf "$BUNDLE/backups-elsewhere" "$BUNDLE/key-elsewhere" "$BUNDLE/server/data" "$BUNDLE/server/certs"

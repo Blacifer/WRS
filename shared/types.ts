@@ -371,6 +371,8 @@ export interface InspectionStats {
   uniqueWagonsCount?: number;
   activeInspectorsCount?: number;
   bandDistribution: Record<BandColor, number>;
+  /** Where the banded springs came from: single-spring inspections on the wagon line, and the sorting bench. */
+  bandedSprings?: { inspections: number; bench: number; total: number };
   bogieTypeDistribution: Record<BogieType, number>;
   conditionDistribution: Record<SpringCondition, number>;
   damageTypeDistribution: Record<DamageType, number>;

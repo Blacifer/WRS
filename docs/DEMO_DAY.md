@@ -7,9 +7,14 @@ command or a click; nothing needs the internet.
 
 1. **Build the bundle on your own machine and check it.**
    ```
-   bash scripts/preflight.sh        # 13 steps, all PASS
+   bash scripts/preflight.sh        # 16 steps, all PASS — the last one is this walk, rehearsed
    npm run package:shop             # dist-shop/wrs-raipur
    ```
+   `bash scripts/demo-day.sh` on its own packages the bundle, seeds it the way
+   `DEMO-DATA.cmd` does, starts it the way `START.cmd` does, and walks every
+   step below in a browser, checking each claim and photographing each screen
+   into `demo-rehearsal/`. Look at the pictures. `KEEP=1` leaves the seeded
+   bundle running on `https://localhost:3200` to click through yourself.
 2. **Copy `dist-shop/wrs-raipur` to the demo PC** (or a USB stick beside the
    Node 22 installer, per `READ-ME-FIRST.txt` in the bundle).
 3. **On the demo PC:** run the Node installer, double-click `START.cmd` twice
@@ -51,21 +56,28 @@ Order matters: the shop floor first, the dashboards second, the proofs last.
    band on the strip. Undo one. Point out the gauge named on every record and
    the amber note that SSG-02 carries no calibration date — that note is
    transcribed from the real instrument's label.
-2. **A wagon** (`inspector1`). Open `WR/BCNHL/40112` → *Photos*. The four
-   assembly frames are there with their pocket counts; *Bogie 2 · Side B* is
-   short one outer spring. Open the counter: the expected number is not on
-   the screen — the person counts what is in the photograph.
-3. **Release checks** (`supervisor1`). Same wagon, *Release checks*: the short
-   count is waiting there as an advisory, by name. Then `SER/BOXNHL/30914` at
-   the final gate — blocked by a condemned spring and by the axle-3 wheel pair
-   at 917.5 mm, below the 919 mm last-shop-issue diameter; open its
+2. **A wagon** (`inspector1`). *A wagon → All wagons*, type `WR/BCNHL/40112`
+   (it is at reassembly, so it is not among the eight "in the shop now") →
+   *Photos*. The four assembly frames are there. *Bogie 1 · Side A* shows two
+   counts that agree; *Bogie 2 · Side B* shows only "counted by Praveen Singh
+   — a blind recount by someone else is needed": the inspector is not shown
+   the figures, on purpose. Open the counter: the expected number is not on
+   the screen either — the person counts what is in the photograph.
+3. **Release checks** (`supervisor1`). Same wagon, *Photos*: the supervisor
+   sees what the inspector did not — *Bogie 2 · Side B: 6 of 7 outer counted*.
+   *Release checks*: the short count is waiting there as an advisory, by name.
+   Then `SER/BOXNHL/30914` at the final gate — blocked by a condemned spring,
+   by the axle-3 wheel pair at 917.5 mm, below the 919 mm last-shop-issue
+   diameter, and by one bearing rotation check not yet done; open its
    *Checklist* tab and show *Wheels — what the gauge read*: the chalk figures
    from the disc, the limit and the drawing number beside them.
 4. **Ask the Records** (`supervisor1`). Type *which wagon type condemns the
    most snubbers this quarter* and *is any gauge reading high*. Open *How this
-   was computed* — the query, its parameters, the rows. OSG-02 reads about a
-   millimetre high; that is in the seed on purpose and the drift check finds
-   it.
+   was computed* — the query, its parameters, the rows. The two outer gauges
+   disagree by 1.5 mm, and the answer says what the record can and cannot
+   tell: with only two gauges it cannot say which one is off, so both go
+   against the master. (OSG-02 is the one biased in the seed, on purpose.)
+   That refusal to guess is the point of the screen.
 5. **DRM dashboard** (`drm1`). *When does today's pile finish*, *how many
    bogies can we build*, *where wagons wait*, *what keeps coming back*. Every
    figure carries its `n`. Then *Spring Analytics → What this shop's springs

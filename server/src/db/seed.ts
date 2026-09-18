@@ -1463,6 +1463,17 @@ function bootstrapFirstAdmin(database: DatabaseSync): void {
     console.error('[seed] BOOTSTRAP_ADMIN_PASSWORD must be at least 12 characters. No account created.');
     return;
   }
+  if (/^CHANGE-ME/i.test(password)) {
+    /*
+     * The bundle's .env.example ships BOOTSTRAP_ADMIN_PASSWORD=CHANGE-ME-at-
+     * least-12-characters — thirty-two characters, so it passed the length
+     * check above, and an installer who closed Notepad without editing it
+     * got an administrator whose password is printed in every copy of the
+     * bundle. The placeholder is refused by name; the message says what to do.
+     */
+    console.error('[seed] BOOTSTRAP_ADMIN_PASSWORD is still the placeholder from .env.example. Open .env, set a real password of at least 12 characters, and start again. No account created.');
+    return;
+  }
 
   database.prepare(`
     INSERT OR IGNORE INTO users (id, username, password_hash, role, full_name, employee_id, is_active)
@@ -1841,7 +1852,10 @@ export function seedDemoData(db?: DatabaseSync): void {
 
       // Special active blockers for Wagon 3 at FINAL_QC_GATE
       if (w.isBlockerWagon) {
-        if (it.category === 'BEARINGS' && it.partName.includes('CTRB')) {
+        // One bearing check, not every CTRB item: the rotation test is the one
+        // done at the gate. Five "not inspected" lines drowned the story the
+        // demo tells (a condemned spring and a wheel pair below issue size).
+        if (it.category === 'BEARINGS' && /Rotation/i.test(it.partName)) {
           status = 'PENDING';
           conditionNotes = 'Awaiting rotational torque & temperature inspection';
         } else if (it.category === 'SPRINGS' && it.partName.includes('Outer Spring (Bogie 1)')) {
@@ -2013,6 +2027,9 @@ export function seedDemoData(db?: DatabaseSync): void {
         otpTokenRef: `demo-seed-${w.id}`,
         acknowledgedAdvisoryIds: (evaluation.advisoryDetails || []).map((x: any) => x.id),
         signoffNotes: 'All 8 CASNUB component categories and coil springs inspected, repaired, and certified zero-defect. Approved for line service.',
+        // The day the seed says it left, so the certificate's release date and
+        // turnaround agree with the wagon row and the dashboard.
+        signedAt: getIsoDate(w.releaseDaysAgo || 0, 6),
         checksSummary: {
           wagonType: w.wagonType,
           owningRailway: w.owningRailway,
@@ -2020,8 +2037,7 @@ export function seedDemoData(db?: DatabaseSync): void {
           turnaroundDays: (w.entryDaysAgo - (w.releaseDaysAgo || 0)).toFixed(1)
         }
       });
-      // The gate stamps the release "now". The demo wagon left when the seed
-      // says it did; the signed certificate keeps its own (seed-time) date.
+      // The gate stamps the wagon row "now" as well; the demo wagon left when the seed says it did.
       database.prepare('UPDATE wagons SET actual_release_date = ? WHERE wagon_number = ?')
         .run(getIsoDate(w.releaseDaysAgo || 0, 6), normWagonNumber);
     }

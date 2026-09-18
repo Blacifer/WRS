@@ -93,6 +93,18 @@ describe('Seeding across environments', () => {
     assert.ok(!has(db, 'wrs.admin'), 'a five-character password was accepted for an administrator');
   });
 
+  it('refuses the placeholder password the bundle ships in .env.example', () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.SEED_DEMO_USERS;
+    process.env.BOOTSTRAP_ADMIN_USERNAME = 'wrs.admin';
+    // Thirty-two characters: it passes the length check, and it is printed in every copy of the bundle.
+    process.env.BOOTSTRAP_ADMIN_PASSWORD = 'CHANGE-ME-at-least-12-characters';
+
+    const db = freshDb();
+    seedUsers(db);
+    assert.ok(!has(db, 'wrs.admin'), 'an administrator was created with the password from .env.example');
+  });
+
   it('does not bootstrap over a deployment that already has real accounts', () => {
     process.env.NODE_ENV = 'production';
     process.env.BOOTSTRAP_ADMIN_USERNAME = 'wrs.admin';

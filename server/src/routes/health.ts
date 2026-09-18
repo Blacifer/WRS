@@ -266,14 +266,27 @@ healthRouter.get(
     }
     const unchecked = Math.max(0, accounts.length - checkedAccounts);
 
+    /*
+     * The same switch the login route reads. With SEED_DEMO_USERS=true on a
+     * production build (DEMO-DATA.cmd sets it for a demonstration) the demo
+     * password DOES sign in, and this row used to say the opposite on the
+     * very PC where a room full of people had just watched it work. The
+     * state stays FAIL — the switch and the accounts must come out before
+     * real use — but the detail says what is actually true.
+     */
+    const demoSwitchOn = process.env.SEED_DEMO_USERS === 'true';
     checks.push({
       id: 'demo-passwords',
       label: 'No account is still on the demonstration password',
       state: onDemoPassword.length ? (isProd ? 'FAIL' : 'WARN') : 'PASS',
       detail: onDemoPassword.length
         ? `${onDemoPassword.length} account(s) still use it: ${onDemoPassword.slice(0, 6).join(', ')}` +
-          `${onDemoPassword.length > 6 ? '…' : ''}. Production logins refuse this password, so these accounts cannot sign in there. ` +
-          'Set a password for each from the User Accounts screen.' +
+          `${onDemoPassword.length > 6 ? '…' : ''}. ` +
+          (demoSwitchOn
+            ? 'SEED_DEMO_USERS=true is set in .env, so they can sign in — this is the demonstration record. Before real use, delete that line from .env and deactivate these accounts from the User Accounts screen.'
+            : (isProd
+              ? 'Production logins refuse this password, so these accounts cannot sign in there. Set a password for each from the User Accounts screen.'
+              : 'Set a password for each from the User Accounts screen before this goes to the shop.')) +
           (unchecked ? ` ${unchecked} further account(s) were not checked.` : '')
         : `Checked ${checkedAccounts} active account(s).` +
           (unchecked ? ` ${unchecked} further account(s) were not checked.` : '')

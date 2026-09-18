@@ -1715,7 +1715,9 @@ export class WagonRepository {
       const wheels = new WheelRepository(this.db).summary(normalizedWagonNumber);
       for (const w of wheels.wheels) {
         if (w.verdict === 'PASS') continue;
-        const bad = w.findings.filter((f) => f.verdict !== 'PASS').map((f) => `${f.dimension.replace(/Mm$/, '')} ${f.value} mm (${f.limit})`).join('; ');
+        // "treadDiameter" is a field name; the person reads "tread diameter".
+        const words = (d: string) => d.replace(/Mm$/, '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+        const bad = w.findings.filter((f) => f.verdict !== 'PASS').map((f) => `${words(f.dimension)} ${f.value} mm (${f.limit})`).join('; ');
         const message = w.verdict === 'CONDEMN'
           ? `Wheel axle ${w.axle} ${w.side === 'L' ? 'left' : 'right'} is condemned: ${bad}.`
           : `Wheel axle ${w.axle} ${w.side === 'L' ? 'left' : 'right'} is below the last-shop-issue diameter: ${bad}. It may not leave a POH at this size.`;
@@ -1988,6 +1990,13 @@ export class WagonRepository {
     acknowledgedAdvisoryIds?: string[];
     signoffNotes?: string;
     checksSummary: Record<string, unknown>;
+    /**
+     * The demo seed only. A wagon the seed says left three weeks ago was
+     * being signed "now", so its certificate read today's date and a
+     * turnaround four times the dashboard's. The route never passes this —
+     * it builds the object field by field — so a request cannot backdate.
+     */
+    signedAt?: string;
   }): any {
     const normalizedWagonNumber = data.wagonNumber.trim().toUpperCase();
     const wagon = this.getWagonByNumber(normalizedWagonNumber);
@@ -2024,8 +2033,9 @@ export class WagonRepository {
     }
 
     const id = `signoff_${crypto.randomUUID()}`;
-    const year = new Date().getFullYear();
-    const month = String(new Date().getMonth() + 1).padStart(2, '0');
+    const stampedOn = data.signedAt ? new Date(data.signedAt) : new Date();
+    const year = stampedOn.getFullYear();
+    const month = String(stampedOn.getMonth() + 1).padStart(2, '0');
     const randomSuffix = crypto.randomBytes(2).toString('hex').toUpperCase();
     const certificateNumber = `WRS/QC-REL/${year}/${month}/${randomSuffix}`;
 
@@ -2034,7 +2044,7 @@ export class WagonRepository {
     // summary and a separate one for the row, so the hash covered a moment
     // that was never recorded — nobody could ever recompute it to check the
     // certificate. A hash that cannot be re-derived attests to nothing.
-    const signedAt = new Date().toISOString();
+    const signedAt = data.signedAt || new Date().toISOString();
 
     // The acknowledgement is folded into the checks summary rather than kept
     // as a signature-only field, because the summary is what gets stored.

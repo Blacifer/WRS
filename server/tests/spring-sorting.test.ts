@@ -18,6 +18,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { runMigrations } from '../src/db/migrations.ts';
 import { seedUsers } from '../src/db/seed.ts';
 import { SortingRepository } from '../src/db/sortingRepository.ts';
+import { InspectionRepository } from '../src/db/repository.ts';
 import { verifyAuditChain } from '../src/db/auditLog.ts';
 import { getWagonSpringConfig } from '../../shared/classification/wagonTypes.ts';
 
@@ -492,6 +493,22 @@ describe('Spring Sorting', () => {
     const red = summary.byLabel.find((r) => r.band === 'RED' && r.springPosition === 'OUTER');
     assert.strictEqual(green?.count, 3);
     assert.strictEqual(red?.count, 1, 'the thin band is visible rather than averaged away');
+  });
+
+  it('TC-SRT-17: the dashboard\'s band pie counts the bench, and not the spring that was undone', () => {
+    /*
+     * The DRM dashboard's band distribution read only `inspections` and
+     * showed "40 inspected" under a bench that had sorted thousands. The
+     * bench's live rows are counted; a withdrawn one is not, and the
+     * withdrawal row is not counted as a spring either.
+     */
+    sort('OUTER', 'GREEN', 258, 5);
+    sort('OUTER', 'YELLOW', 255, 2);
+    repo.correctLast('batch_1', null, 'usr_insp_001'); // one yellow taken back
+    const stats = new InspectionRepository(db).getInspectionStats();
+    assert.equal(stats.bandDistribution.GREEN, 5);
+    assert.equal(stats.bandDistribution.YELLOW, 1);
+    assert.deepEqual(stats.bandedSprings, { inspections: 0, bench: 6, total: 6 });
   });
 
   it('TC-SRT-16: a correction can be undone in its turn', () => {

@@ -68,7 +68,8 @@ export function gaugeDrift(readings: Reading[]): GaugeDriftLine[] {
     for (const [gaugeCode, hs] of gauges) {
       if (hs.length < MIN_READINGS_EACH_SIDE) continue;
       const others: number[] = [];
-      for (const [other, ohs] of gauges) if (other !== gaugeCode) others.push(...ohs);
+      const otherCodes: string[] = [];
+      for (const [other, ohs] of gauges) if (other !== gaugeCode) { others.push(...ohs); otherCodes.push(other); }
       const med = median(hs);
       if (others.length < MIN_READINGS_EACH_SIDE) {
         out.push({ gaugeCode, kind, n: hs.length, medianMm: r1(med), othersN: others.length, othersMedianMm: null, shiftMm: null, flagged: false,
@@ -79,12 +80,24 @@ export function gaugeDrift(readings: Reading[]): GaugeDriftLine[] {
       const omed = median(others);
       const shift = r1(med - omed);
       const flagged = Math.abs(shift) >= DRIFT_THRESHOLD_MM;
+      /*
+       * Two gauges on a kind: each is the other's "other gauges", so both
+       * come out flagged, one high and one low, and the two notes contradict
+       * each other on the screen. The record genuinely cannot say which of
+       * the two is off — only that they disagree — so the note says that,
+       * and names both, rather than accusing each in turn.
+       */
+      const pair = otherCodes.length === 1;
       out.push({ gaugeCode, kind, n: hs.length, medianMm: r1(med), othersN: others.length, othersMedianMm: r1(omed), shiftMm: shift, flagged,
         note: flagged
-          ? `Reads ${Math.abs(shift)} mm ${shift > 0 ? 'higher' : 'lower'} than the shop's other gauges on this kind (median ${r1(med)} vs ${r1(omed)}, ${hs.length} vs ${others.length} readings). Put it against the master.`
+          ? (pair
+            ? `Disagrees with ${otherCodes[0]}, the only other gauge on this kind, by ${Math.abs(shift)} mm (median ${r1(med)} vs ${r1(omed)}, ${hs.length} vs ${others.length} readings). With two gauges the record cannot say which one is off — put both against the master.`
+            : `Reads ${Math.abs(shift)} mm ${shift > 0 ? 'higher' : 'lower'} than the shop's other gauges on this kind (median ${r1(med)} vs ${r1(omed)}, ${hs.length} vs ${others.length} readings). Put it against the master.`)
           : `Within ${DRIFT_THRESHOLD_MM} mm of the shop's other gauges (${shift >= 0 ? '+' : ''}${shift} mm over ${hs.length} readings).`,
         noteHi: flagged
-          ? `इस प्रकार पर शॉप के दूसरे गेजों से ${Math.abs(shift)} मिमी ${shift > 0 ? 'ऊँचा' : 'नीचा'} पढ़ता है (मध्यमान ${r1(med)} बनाम ${r1(omed)}, ${hs.length} बनाम ${others.length} रीडिंग)। इसे मास्टर गेज से मिलाएँ।`
+          ? (pair
+            ? `इस प्रकार पर एकमात्र दूसरे गेज ${otherCodes[0]} से ${Math.abs(shift)} मिमी का अंतर (मध्यमान ${r1(med)} बनाम ${r1(omed)}, ${hs.length} बनाम ${others.length} रीडिंग)। दो गेजों में रिकॉर्ड यह नहीं बता सकता कि कौन-सा गलत है — दोनों को मास्टर गेज से मिलाएँ।`
+            : `इस प्रकार पर शॉप के दूसरे गेजों से ${Math.abs(shift)} मिमी ${shift > 0 ? 'ऊँचा' : 'नीचा'} पढ़ता है (मध्यमान ${r1(med)} बनाम ${r1(omed)}, ${hs.length} बनाम ${others.length} रीडिंग)। इसे मास्टर गेज से मिलाएँ।`)
           : `शॉप के दूसरे गेजों के ${DRIFT_THRESHOLD_MM} मिमी के भीतर (${hs.length} रीडिंग पर ${shift >= 0 ? '+' : ''}${shift} मिमी)।` });
     }
   }

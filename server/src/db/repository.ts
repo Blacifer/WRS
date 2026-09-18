@@ -506,6 +506,34 @@ export class InspectionRepository {
       }
     }
 
+    /*
+     * The bench too. The DRM dashboard's band pie read only `inspections`
+     * — single springs measured on the wagon line — and said "40 inspected"
+     * two scrolls below a tile that said the bench had sorted 120 that day.
+     * The sorting bench is where nine springs in ten get their band, so its
+     * live rows (not voided, not superseded by an undo) are counted here
+     * under the same date filter; a wagon filter applies to the wagon the
+     * batch was assigned to. The two sources are reported separately as well,
+     * so the tile can say where its number came from.
+     */
+    const benchWhere: string[] = ['voided = 0', 'NOT EXISTS (SELECT 1 FROM spring_sorting_records l WHERE l.supersedes = r.id)', 'classified_band IS NOT NULL'];
+    const benchParams: any[] = [];
+    if (startDate) { benchWhere.push('r.created_at >= ?'); benchParams.push(startDate); }
+    if (endDate) { benchWhere.push('r.created_at <= ?'); benchParams.push(endDate); }
+    if (wagonNumber) { benchWhere.push('r.assigned_wagon_number LIKE ?'); benchParams.push(`%${wagonNumber.trim()}%`); }
+    let benchBanded = 0;
+    for (const r of this.db.prepare(`
+      SELECT classified_band, COUNT(*) as count FROM spring_sorting_records r
+      WHERE ${benchWhere.join(' AND ')} GROUP BY classified_band
+    `).all(...benchParams) as Array<{ classified_band: string; count: number }>) {
+      if (r.classified_band in bandDistribution) {
+        bandDistribution[r.classified_band as BandColor] += r.count;
+        benchBanded += r.count;
+      }
+    }
+    const inspectionsBanded = bandRows.reduce((n, r) => n + (r.classified_band in bandDistribution ? r.count : 0), 0);
+    const bandedSprings = { inspections: inspectionsBanded, bench: benchBanded, total: inspectionsBanded + benchBanded };
+
     // Bogie distribution
     const bogieRows = this.db.prepare(`
       SELECT bogie_type, COUNT(*) as count
@@ -622,6 +650,7 @@ export class InspectionRepository {
       uniqueWagonsCount: summaryRow?.unique_wagons || 0,
       activeInspectorsCount: summaryRow?.unique_inspectors || 0,
       bandDistribution,
+      bandedSprings,
       bogieTypeDistribution,
       conditionDistribution,
       damageTypeDistribution,

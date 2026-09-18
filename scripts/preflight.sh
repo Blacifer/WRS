@@ -239,6 +239,17 @@ else
   # shown in the wrong branch of the confirmation modal, and a button offered
   # to a role the server refuses.
   step "Production first day (bundle)" bash scripts/first-day.sh
+
+  # Demo day, rehearsed: the same bundle, seeded the way DEMO-DATA.cmd seeds
+  # it, walked the way docs/DEMO_DAY.md says to walk it, every claim in that
+  # document checked against the screen. Found on its first run: the inspector
+  # cannot reach the demo wagon from "in the shop now", the readiness panel
+  # said the demo accounts could not sign in on the PC where they just had,
+  # the dashboard's band pie ignored the bench, five bearing blockers drowned
+  # the story, the certificate dated a three-week-old release today, and the
+  # two-gauge drift answer accused each gauge in turn. The bundle is
+  # packaged once, above, and reused here.
+  step "Demo day rehearsal (bundle)" env SKIP_PACKAGE=1 bash scripts/demo-day.sh demo-rehearsal
 fi
 
 echo

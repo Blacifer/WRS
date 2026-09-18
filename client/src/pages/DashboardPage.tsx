@@ -522,8 +522,8 @@ export const DashboardPage: React.FC = () => {
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <CoilIcon size={17} className="text-accent-ink" /> {t('charts.springBands')}
             </h3>
-            <span className="text-xs font-semibold text-ink-muted bg-raised px-2.5 py-1 rounded-control">
-              {springStats?.totalInspections || 0} {t('charts.totalInspected')}
+            <span className="text-xs font-semibold text-ink-muted bg-raised px-2.5 py-1 rounded-control" title={springStats?.bandedSprings ? `${springStats.bandedSprings.bench} on the sorting bench, ${springStats.bandedSprings.inspections} single-spring inspections` : undefined}>
+              {springStats?.bandedSprings?.total ?? springStats?.totalInspections ?? 0} {t('charts.totalInspected')}
             </span>
           </div>
 
