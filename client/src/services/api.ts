@@ -182,7 +182,10 @@ export class ApiClient {
     });
 
     const contentType = res.headers.get('content-type') || '';
-    if (contentType.includes('text/csv') || contentType.includes('text/html')) {
+    // Text bodies come back as text. The passport is NDJSON — one JSON object per
+    // line — which res.json() cannot parse, so the export handed the screen an
+    // empty object and 'g.split is not a function' where the event count should be.
+    if (contentType.includes('text/csv') || contentType.includes('text/html') || contentType.includes('text/plain') || contentType.includes('x-ndjson')) {
       if (!res.ok) {
         const text = await res.text();
         throw new Error(text || `Request failed with status ${res.status}`);

@@ -86,13 +86,18 @@ export function AuditVerificationPage({ lang }: Props) {
   const [result, setResult] = useState<Verification | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // When the last check ran and how long it took — so a second click visibly
+  // does something. "I clicked and could not tell if it did anything."
+  const [ran, setRan] = useState<{ at: Date; ms: number; n: number } | null>(null);
 
   const verify = useCallback(async () => {
     setBusy(true);
     setError(null);
+    const started = performance.now();
     try {
       const res = await api.verifyAuditChain();
       setResult(res.data);
+      setRan((r) => ({ at: new Date(), ms: Math.round(performance.now() - started), n: (r?.n || 0) + 1 }));
     } catch (e: any) {
       // A failed check is not a passed check. Say so plainly rather than
       // leaving the last good result on screen looking current.
@@ -144,8 +149,10 @@ export function AuditVerificationPage({ lang }: Props) {
       {/* The verdict, read from across a room. */}
       {result && (
         <div
+          key={ran?.n ?? 0}
+          data-testid="audit-verdict"
           className={[
-            'flex flex-wrap items-center gap-5 px-7 py-6 rounded-card border',
+            'flex flex-wrap items-center gap-5 px-7 py-6 rounded-card border motion-safe:animate-[pulse_0.9s_ease-in-out_1]',
             broken ? 'bg-bad-soft border-bad-line' : 'bg-good-soft border-good-line'
           ].join(' ')}
         >
@@ -164,6 +171,13 @@ export function AuditVerificationPage({ lang }: Props) {
                 ? (isHi ? 'श्रृंखला टूटी हुई है' : 'The chain is broken')
                 : (isHi ? 'श्रृंखला अटूट है' : 'Chain intact')}
             </p>
+            {ran && (
+              <p className="text-[12px] font-mono text-ink-muted" data-testid="audit-ran-at">
+                {isHi
+                  ? `अभी-अभी दोबारा निकाला गया — ${ran.at.toLocaleTimeString('en-IN')} पर, ${ran.ms} ms में${ran.n > 1 ? ` (इस सत्र में ${ran.n}वीं बार)` : ''}`
+                  : `Re-derived just now — at ${ran.at.toLocaleTimeString('en-IN')}, in ${ran.ms} ms${ran.n > 1 ? ` (check ${ran.n} this session)` : ''}`}
+              </p>
+            )}
             <p className="mt-1 text-sm font-medium text-ink-body">
               {isHi
                 ? `${result.entriesChecked} प्रविष्टियाँ जाँची गईं${broken ? ` — ${result.breaksFound} में गड़बड़ी` : ''}`

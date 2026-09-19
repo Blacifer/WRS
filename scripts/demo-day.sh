@@ -31,7 +31,9 @@ fi
 cd "$BUNDLE"
 mkdir -p server/data
 rm -f .env server/data/wrs_inspections.db server/data/wrs_inspections.db-wal server/data/wrs_inspections.db-shm
-rm -rf server/data/photos server/data/backups server/certs backups-elsewhere logs
+# The certificate is kept between runs (like START.cmd keeps it): trust it once on
+# this machine and it stays trusted. Everything else starts fresh.
+rm -rf server/data/photos server/data/backups backups-elsewhere logs
 
 # START.cmd, first run: .env from the example, a generated secret. The demo
 # leaves BOOTSTRAP_ADMIN_PASSWORD at the placeholder — that is what a person
@@ -44,7 +46,7 @@ sed -i.bak \
   -e "s#^CORS_ORIGIN=.*#CORS_ORIGIN=https://localhost:$PORT#" \
   -e "s#^WRS_BACKUP_DIR=.*#WRS_BACKUP_DIR=$BUNDLE/backups-elsewhere#" .env
 rm -f .env.bak
-node server/scripts/make-lan-cert.mjs server/certs >/dev/null 2>&1
+[ -f server/certs/lan-cert.pem ] || node server/scripts/make-lan-cert.mjs server/certs >/dev/null 2>&1
 
 # DEMO-DATA.cmd: the demonstration record, SEED_DEMO_USERS=true into .env.
 echo "DEMO-DATA.cmd: seeding the demonstration record"
@@ -101,6 +103,6 @@ echo "server log: $LOG"
 grep -iE "error|warn" "$LOG" | grep -v "SEED_DEMO_USERS\|demo" | head -5
 # The bundle keeps no trace of the rehearsal: a fresh folder is what ships.
 rm -f "$BUNDLE/.env"
-rm -rf "$BUNDLE/backups-elsewhere" "$BUNDLE/key-elsewhere" "$BUNDLE/server/data" "$BUNDLE/server/certs" "$BUNDLE/logs"
+rm -rf "$BUNDLE/backups-elsewhere" "$BUNDLE/key-elsewhere" "$BUNDLE/server/data" "$BUNDLE/logs"
 mkdir -p "$BUNDLE/server/data"
 exit $RESULT

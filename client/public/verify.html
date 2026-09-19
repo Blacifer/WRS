@@ -227,6 +227,17 @@
   if (location.hash.startsWith('#c=')) {
     try { const text = new TextDecoder().decode(b64(decodeURIComponent(location.hash.slice(3)))); $('input').value = text; run(text); } catch {}
   }
+  // The QR on a printed certificate: /verify.html?n=<certificate number>.
+  // The signed certificate is fetched from the shop's server and verified
+  // here, in the browser, exactly as a pasted one is. The number is shown as
+  // text only; nothing from the URL is put into the page as markup.
+  const n = new URLSearchParams(location.search).get('n');
+  if (n) {
+    fetch('/api/audit/certificates/' + encodeURIComponent(n))
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('This server holds no certificate with that number.'))))
+      .then((j) => { const text = JSON.stringify(j); $('input').value = text; run(text); })
+      .catch((e) => { const v = document.querySelector('.verdict') || $('input'); const p = document.createElement('p'); p.className = 'verdict bad'; p.textContent = 'NOT VERIFIED — ' + (e && e.message ? e.message : 'could not fetch the certificate'); v.parentNode.insertBefore(p, v.nextSibling); });
+  }
 })();
 </script>
 </body>

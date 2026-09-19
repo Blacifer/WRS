@@ -178,7 +178,9 @@ export function seedShopFloor(db: DatabaseSync): void {
     const imageData = `data:image/jpeg;base64,${jpeg.toString('base64')}`;
     const counts = new PocketCountRepository(db);
     const frames: Array<[('BOGIE_1' | 'BOGIE_2'), ('SIDE_A' | 'SIDE_B'), number, number, number]> = [
-      ['BOGIE_1', 'SIDE_A', 7, 6, 2], ['BOGIE_1', 'SIDE_B', 7, 6, 2], ['BOGIE_2', 'SIDE_A', 7, 6, 2], ['BOGIE_2', 'SIDE_B', 6, 6, 2]
+      // BCNHL carries 14 outer, 14 inner, 4 snubber per bogie pair: 7 / 7 / 2 a side.
+      // Three complete frames; Bogie 2 · Side B one outer short — the one the demo shows.
+      ['BOGIE_1', 'SIDE_A', 7, 7, 2], ['BOGIE_1', 'SIDE_B', 7, 7, 2], ['BOGIE_2', 'SIDE_A', 7, 7, 2], ['BOGIE_2', 'SIDE_B', 6, 7, 2]
     ];
     for (const [bogie, side, outer, inner, snubber] of frames) {
       const photo = wagons.insertPhoto({

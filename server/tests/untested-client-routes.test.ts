@@ -158,3 +158,23 @@ describe('my record today', () => {
     assert.equal(anon.status, 401);
   });
 });
+
+describe('the certificate QR', () => {
+  it('TC-RTE-08: the QR on a certificate is a link to /verify.html with the number; the number fetches the signed certificate to anyone; an unknown number is a 404', async () => {
+    const sup = await login('supervisor1');
+    const js = await app.dispatch({ method: 'GET', url: '/api/wagons/' + encodeURIComponent('SECR/BOXNHL/10492') + '/certificate?format=json', headers: { ...auth(sup), host: 'shop-pc:3000' } });
+    assert.equal(js.status, 200);
+    const qr = String(js.body.data.qrData || '');
+    assert.match(qr, /^https?:\/\/shop-pc:3000\/verify\.html\?n=/, `the QR payload is a link to this server's verify page (https when TLS is configured): ${qr}`);
+    const number = decodeURIComponent(qr.split('?n=')[1]);
+    assert.match(number, /^WRS\/QC-REL\//);
+    const pub = await call('GET', '/api/audit/certificates/' + encodeURIComponent(number));
+    assert.equal(pub.status, 200, 'no account needed');
+    assert.equal(pub.body.data.certificateNumber, number);
+    assert.ok(pub.body.data.verification?.signature, 'the signed certificate, ready for the verify page');
+    const none = await call('GET', '/api/audit/certificates/' + encodeURIComponent('WRS/QC-REL/2026/09/ZZZZ'));
+    assert.equal(none.status, 404);
+    const junk = await call('GET', '/api/audit/certificates/' + encodeURIComponent('<script>'));
+    assert.equal(junk.status, 404);
+  });
+});

@@ -661,8 +661,11 @@ wagonsRouter.get('/:wagonNumber/certificate', authMiddleware, async (req: Authen
   }
 
   try {
+    // The QR on the printed certificate links back to this server's verify page.
+    const host = String(req.headers?.['x-forwarded-host'] || req.headers?.host || '');
+    const proto = String(req.headers?.['x-forwarded-proto'] || (process.env.TLS_KEY_PATH ? 'https' : 'http'));
     const cert = CertificateGenerator.generate(
-      wagonNumber, wagonRepo, inspectionRepo, undefined, format, { provisional }
+      wagonNumber, wagonRepo, inspectionRepo, undefined, format, { provisional, verifyBaseUrl: host ? `${proto}://${host}` : undefined }
     );
 
     // Uses the existing CERTIFICATE_GENERATED event type rather than adding new

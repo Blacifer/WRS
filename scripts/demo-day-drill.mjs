@@ -180,6 +180,10 @@ const sup = await signIn('supervisor1');
   await shot('40112-photos-supervisor');
   const sb2b = (await page.locator('[data-testid="pocket-frame-BOGIE_2-SIDE_B"]').innerText().catch(() => '')).replace(/\s+/g, ' ');
   check(/6 of 7 outer/i.test(sb2b) && /pocket may be empty/i.test(sb2b), `to the supervisor, Bogie 2 · Side B is short one outer spring: "${sb2b.slice(0, 120)}"`);
+  for (const f of ['BOGIE_1-SIDE_A', 'BOGIE_1-SIDE_B', 'BOGIE_2-SIDE_A']) {
+    const txt = (await page.locator(`[data-testid="pocket-frame-${f}"]`).innerText().catch(() => '')).replace(/\s+/g, ' ');
+    check(!/pocket may be empty|of 7/i.test(txt), `${f.replace(/_/g, ' ')} is complete, not flagged`);
+  }
   await page.locator('[data-testid="wagon-tabs"] button', { hasText: 'Release checks' }).first().click();
   await page.waitForTimeout(2000);
   await shot('40112-release-checks');

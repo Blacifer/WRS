@@ -122,6 +122,10 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
   // Certificate Modal State
   const [showAssemblyCapture, setShowAssemblyCapture] = useState<boolean>(false);
   const [showCertificateModal, setShowCertificateModal] = useState<boolean>(false);
+  // Moving the due-out date: picked date waits for a reason, then is saved and confirmed.
+  const [pendingDueOut, setPendingDueOut] = useState<string | null>(null);
+  const [dueOutReason, setDueOutReason] = useState('');
+  const [dueOutNote, setDueOutNote] = useState<string | null>(null);
 
   // Voice UI Highlighting & Undo Stack
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null);
@@ -1231,21 +1235,43 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                   <input
                     type="date"
                     aria-label={isHi ? 'रिलीज़ तिथि बदलें' : 'Change due-out date'}
-                    defaultValue={wagon?.targetReleaseDate ? String(wagon.targetReleaseDate).slice(0, 10) : ''}
-                    onChange={async (e) => {
-                      const v = e.target.value || null;
-                      try {
-                        await api.setTargetReleaseDate(wagonNumber, v);
-                        loadWagonData();
-                      } catch (err: any) {
-                        alert(err?.message || 'Could not change the date.');
-                      }
-                    }}
+                    value={pendingDueOut ?? (wagon?.targetReleaseDate ? String(wagon.targetReleaseDate).slice(0, 10) : '')}
+                    onChange={(e) => { setPendingDueOut(e.target.value || ''); setDueOutNote(null); }}
+                    data-testid="due-out-input"
                     className="bg-page border border-line rounded px-1.5 py-0.5 text-[11px] text-white"
                   />
                 )}
               </span>
             </div>
+            {/*
+              A moved date used to save on the spot with no reason and no word
+              back — the supervisor who tried it thought nothing had happened.
+              The move is on the audit trail, so it asks why, and says what it
+              did.
+            */}
+            {pendingDueOut !== null && pendingDueOut !== (wagon?.targetReleaseDate ? String(wagon.targetReleaseDate).slice(0, 10) : '') && (
+              <div className="mt-2 flex flex-wrap items-end gap-2 rounded-control border border-accent-line bg-accent-soft/40 p-3" data-testid="due-out-reason">
+                <label className="text-[11px] text-ink-muted flex flex-col gap-1 flex-1 min-w-[16rem]">
+                  {isHi
+                    ? `रिलीज़ तिथि ${wagon?.targetReleaseDate ? String(wagon.targetReleaseDate).slice(0, 10) : 'तय नहीं'} से ${pendingDueOut || 'हटाएँ'} — कारण (ऑडिट में दर्ज होगा)`
+                    : `Move due-out from ${wagon?.targetReleaseDate ? String(wagon.targetReleaseDate).slice(0, 10) : 'not set'} to ${pendingDueOut || 'no date'} — why? (goes on the audit trail)`}
+                  <input value={dueOutReason} onChange={(e) => setDueOutReason(e.target.value)} placeholder={isHi ? 'जैसे: RWF से पहिया सेट की प्रतीक्षा' : 'e.g. wheel set awaited from RWF'} className="min-h-[40px] px-2 bg-card border border-line rounded-control text-sm text-white" data-testid="due-out-reason-input" />
+                </label>
+                <button type="button" disabled={dueOutReason.trim().length < 3}
+                  onClick={async () => {
+                    try {
+                      const before = wagon?.targetReleaseDate ? String(wagon.targetReleaseDate).slice(0, 10) : null;
+                      await api.setTargetReleaseDate(wagonNumber, pendingDueOut || null, dueOutReason.trim());
+                      setDueOutNote(isHi ? `रिलीज़ तिथि ${before || 'तय नहीं'} → ${pendingDueOut || 'हटाई'} — कारण सहित ऑडिट में दर्ज।` : `Due-out moved ${before || 'not set'} → ${pendingDueOut || 'cleared'}, with the reason, on the audit trail.`);
+                      setPendingDueOut(null); setDueOutReason('');
+                      loadWagonData();
+                    } catch (err: any) { setDueOutNote(err?.message || 'Could not change the date.'); }
+                  }}
+                  className="min-h-[40px] px-4 rounded-control bg-accent text-white text-xs font-bold disabled:opacity-50" data-testid="due-out-save">{isHi ? 'तिथि बदलें' : 'Move the date'}</button>
+                <button type="button" onClick={() => { setPendingDueOut(null); setDueOutReason(''); }} className="min-h-[40px] px-3 rounded-control border border-line text-xs font-bold text-ink-body">{isHi ? 'रद्द' : 'Cancel'}</button>
+              </div>
+            )}
+            {dueOutNote && <p className="mt-2 text-xs font-bold text-good-ink" data-testid="due-out-note">{dueOutNote}</p>}
           </div>
 
           {/* Action Buttons */}

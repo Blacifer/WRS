@@ -259,6 +259,7 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
   // classification, so it is asked for by name — an administrator no longer
   // qualifies simply by outranking a supervisor.
   const canOverride = can(user?.role, 'wagon.override');
+  const isHi = lang === 'hi';
 
   const handleVoiceCommand = (result: VoiceParseResult) => {
     if (result.actionType === 'CLASSIFY_SPRING' && result.springParams) {
@@ -617,10 +618,11 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
           <button
             type="button"
             onClick={() => setIsOverrideModalOpen(true)}
-            className="px-6 py-3 bg-transparent text-neutral-400 font-medium text-sm rounded-full border border-white/10 hover:text-white transition-colors flex items-center gap-2"
+            data-testid="open-override"
+            className="min-h-[48px] px-5 py-3 bg-warn-soft text-warn-ink font-bold text-sm rounded-control border border-warn-line hover:brightness-110 transition-colors flex items-center gap-2"
           >
             <ShieldIcon size={16} />
-            <span>{dict.actions.override}</span>
+            <span>{isHi ? 'पर्यवेक्षक ओवरराइड — बैंड बदलें' : 'Supervisor override — change the band'}</span>
           </button>
         )}
 

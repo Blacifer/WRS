@@ -81,24 +81,24 @@ Sign in as **`supervisor1` / `password123`**.
 |---|---|---|
 | 3.1 | **Wagons Pipeline** | Thirteen wagons across the seven stages; each card with its stage, days in shop and target date |
 | 3.2 | Register a wagon | Number, type, railway; a duplicate number is refused; a nonsense type is refused |
-| 3.3 | Open `WR/BCNHL/40112` → **Photos** | Now the supervisor sees "6 of 7 outer counted" on Bogie 2·B — what the inspector could not |
+| 3.3 | Open `WR/BCNHL/40112` → **Photos** → *Pocket counts* | This is the same screen the inspector saw in 2.13, seen as a supervisor: three frames complete, and on **Bogie 2 · Side B** the figures the inspector was not shown — *6 of 7 outer counted* — because a supervisor may see a first count before the blind recount |
 | 3.4 | → **Release checks** | The short count listed as an advisory, by name. Cannot release: the advisory must be acknowledged |
 | 3.5 | Open `SER/BOXNHL/30914` → **Release checks** | Blockers: a condemned spring; wheel axle 3 left and right at 917.5 mm below the 919 last-shop-issue diameter; one bearing rotation check pending. The Authorise button is disabled |
 | 3.6 | → **Checklist → Wheels** | The eight chalk figures with the limit and drawing number beside each; axle 3 flagged |
 | 3.7 | → **Condition report** | A printable one-page report of the wagon's state |
-| 3.8 | Open `SECR/BOXNHL/10492` (released) → **Release Certificate** | The certificate with its number, date (weeks ago, not today), TAT, QR code, and the eight component categories. *Print* gives a clean page |
-| 3.9 | → **Passport** → Export | A file downloads; the note says where to verify it |
-| 3.10 | Move a target date (a wagon in progress) | A reason is required; the new date shows on the card; the Audit chain later shows the change with the reason |
-| 3.11 | **Stores & Inventory** | Parts with stock; restock 10 of a part → stock rises by 10; restock 1.5 → refused; an inspector account cannot restock |
-| 3.12 | **Component Passports** | Serialised wheelsets and bearings; scan/paste `WRS-PASSPORT\|WHL-RWF-2023-8841\|WHEELSET\|RWF_YELAHANKA` → its history |
-| 3.13 | **History** | Filter by wagon, band, status, date; export CSV (asks for the one-time code) |
-| 3.14 | **Spring Analytics** | Bench totals today/week, band shares, the standard report ("against the standard") with **n** on every figure, gauge drift with OSG‑02 named |
+| 3.8 | Open `SECR/BOXNHL/10492` (released) → **Release Certificate** | The certificate with its number, date (weeks ago, not today), TAT, the eight component categories, and a QR. **Scan the QR with a phone on the same Wi‑Fi**: it opens `/verify.html` on this server and shows **VERIFIED** — the signature checked in the phone's browser. *Print* gives a clean page |
+| 3.9 | → **Passport** → *Export the passport* | A `.jsonl` file downloads — that file is for the **next workshop's software**, not for reading. Under the button: *What the passport holds* — how many stage moves, spring readings, checklist verdicts, parts, tests, photographs, and the sign‑off, with the dates and who sealed it |
+| 3.10 | Pick a new date in the *Due out* box on a wagon in progress | A box opens asking **why** (it goes on the audit trail); *Move the date* is disabled until a reason is typed; afterwards a green line says *Due‑out moved 19 → 22, with the reason, on the audit trail*. Cancel discards |
+| 3.11 | *(moved to Admin 5.9 — the pilot keeps Stores off the supervisor's menu on purpose, `pilotScope.ts`)* | — |
+| 3.12 | *(moved to Admin 5.10 — same reason)* | — |
+| 3.13 | *(moved to Admin 5.11 — same reason)* | — |
+| 3.14 | *(moved to DRM 4.3 — the supervisor's pilot menu is the shop floor only)* | — |
 | 3.15 | **Ask the Manual** | As 2.19 |
-| 3.16 | **System Learning** | Each subsystem with its measured agreement and count; the camera says it has been taught nothing yet and auto-commit is off |
+| 3.16 | *(moved to DRM 4.4)* | — |
 | 3.17 | **Shadow Run** | A week of the log; the verdict panel; the line "the snubber on NR/BOXN/60334 — the register would have passed it". Record a new discrepancy and a shift summary; both appear |
 | 3.18 | **Ask the Records** | "which wagon type condemns the most snubbers this quarter" → an answer with the count → *How this was computed* shows the SQL and rows. "is any gauge reading high" → OSG‑02, 1.1 mm, with the reading counts. A question it cannot answer → it says so, no guess |
-| 3.19 | **Audit Chain** → Verify chain again | "Chain intact", the count of events, the time taken |
-| 3.20 | Supervisor override on a spring (Single Spring → override) | Asks a reason and the one-time code; the record shows original and overridden band, both |
+| 3.19 | **Audit Chain** → *Verify chain again* | The green card pulses once and gains a line *Re‑derived just now — at HH:MM:SS, in N ms (check 2 this session)*; the count of entries checked |
+| 3.20 | **Single Spring** → fill wagon, bogie, height → at the bottom next to *Save*, the amber button **Supervisor override — change the band** | Asks the new band, a reason and the one‑time code; the record shows both the original and the overridden band |
 | 3.21 | Hindi toggle on the pipeline and release checks | Everything translated; wagon numbers and figures unchanged |
 
 ## 4. DRM — on the laptop
@@ -109,8 +109,8 @@ Sign in as **`drm1` / `password123`**.
 |---|---|---|
 | 4.1 | **DRM Dashboard** — *Shop Floor — Right Now* | When does today's pile finish; how many bogies can we build; what Stores will need — each a figure with its basis, none "Not yet known" |
 | 4.2 | Scroll: turnaround, where wagons wait, what keeps coming back, inspector quality, gauge exposure | Every rate carries its count; the band pie shows **six** colours with the bench included in its total |
-| 4.3 | **Spring Analytics** | As 3.14 |
-| 4.4 | **System Learning** | As 3.16 — read-only for the DRM |
+| 4.3 | **Spring Analytics** | Bench totals today/week, band shares, the standard report ("against the standard") with **n** on every figure, gauge drift with OSG‑02 named |
+| 4.4 | **System Learning** | Each subsystem with its measured agreement and count; the camera says it has been taught nothing yet and auto‑commit is off. Read‑only for the DRM |
 | 4.5 | **Shadow Run** | Visible, read-only (no record buttons) |
 | 4.6 | **Ask the Records** | As 3.18 |
 | 4.7 | **Audit Chain** → Verify | As 3.19 |
@@ -131,6 +131,9 @@ Sign in as **`admin1` / `password123`**.
 | 5.6 | **Deployment readiness** and **Storage** panels (bottom of the **DRM Dashboard**, admin only) | Every row with a plain sentence: backup (where, how old), cloud copy (not configured), manual indexed (green, naming each document), demo passwords (red on the demo record — and it says why they can still sign in), restarts, audit chain, storage |
 | 5.7 | Change own password (key icon) | Old password stops working; new one works |
 | 5.8 | Authenticator enrolment (shield icon top right, or the panel on User Accounts) | A QR to scan; a wrong code refused; a right code enrols; the account then needs the code at sign-in |
+| 5.9 | **Stores & Inventory** | Parts with stock; restock 10 of a part → stock rises by 10; restock 1.5 → refused |
+| 5.10 | **Component Passports** | Serialised wheelsets and bearings; paste `WRS-PASSPORT\|WHL-RWF-2023-8841\|WHEELSET\|RWF_YELAHANKA` → its history |
+| 5.11 | **History** | Filter by wagon, band, status, date; export CSV asks for the one‑time code |
 
 ## 6. Failure drills — do these once, on the laptop
 

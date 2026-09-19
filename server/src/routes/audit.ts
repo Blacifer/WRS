@@ -13,6 +13,9 @@ import { Router } from '../framework/index.ts';
 import type { Response } from '../framework/index.ts';
 import { getDatabase } from '../db/connection.ts';
 import { verifyAuditChain, verifyAuditChainTail } from '../db/auditLog.ts';
+import { WagonRepository } from '../db/wagonRepository.ts';
+import { InspectionRepository } from '../db/repository.ts';
+import { CertificateGenerator } from '../reports/certificate.ts';
 import {
   certificatePublicKeyPem,
   certificateKeyFingerprint,
@@ -262,6 +265,30 @@ function safeParse(json: string): any {
 //
 // Publishing this key allows verification and nothing else. It cannot sign.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// GET /api/audit/certificates/:number — one signed release certificate, by
+// its number, to anyone.
+//
+// The QR on a printed certificate is a link to /verify.html?n=<number>. The
+// verify page fetches this and checks the signature in the browser. No
+// account: a certificate is meant to be checked by another railway that has
+// none. It gives only what is on the printed certificate already; it cannot
+// issue, alter or list, and an unknown number is a 404 with no hint.
+// ---------------------------------------------------------------------------
+auditRouter.get('/certificates/:number', (req: AuthenticatedRequest, res: Response) => {
+  const number = String((req.params as Record<string, string>).number || '').trim();
+  if (!/^[A-Z0-9/-]{6,60}$/i.test(number)) { res.status(404).json({ success: false, error: 'NOT_FOUND', message: 'No such certificate.', statusCode: 404, timestamp: new Date().toISOString() }); return; }
+  try {
+    const db = getDatabase();
+    const row = db.prepare('SELECT wagon_number FROM gate_signoffs WHERE certificate_number = ? ORDER BY signed_at DESC LIMIT 1').get(number) as { wagon_number: string } | undefined;
+    if (!row) { res.status(404).json({ success: false, error: 'NOT_FOUND', message: 'No such certificate.', statusCode: 404, timestamp: new Date().toISOString() }); return; }
+    const cert = CertificateGenerator.generate(row.wagon_number, new WagonRepository(db), new InspectionRepository(db), undefined, 'json');
+    res.status(200).json({ success: true, data: cert.json, timestamp: new Date().toISOString() });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: 'CERTIFICATE_READ_FAILED', message: error?.message || 'Could not read the certificate.', statusCode: 500, timestamp: new Date().toISOString() });
+  }
+});
+
 auditRouter.get('/certificate-key', (_req: AuthenticatedRequest, res: Response) => {
   try {
     res.status(200).json({

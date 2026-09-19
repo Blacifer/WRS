@@ -63,7 +63,7 @@ export class CertificateGenerator {
     // Options object rather than a positional boolean: parameter 4 is
     // overloaded (repo OR format string), which makes positional args past it
     // genuinely easy to misalign.
-    options: { provisional?: boolean } = {}
+    options: { provisional?: boolean; verifyBaseUrl?: string } = {}
   ): { html?: string; json?: Record<string, unknown> } {
     const provisional = options.provisional === true;
     const normalizedWagonNumber = wagonNumber.trim().toUpperCase();
@@ -238,7 +238,19 @@ export class CertificateGenerator {
 
     const categoriesCleared = categoryStats.filter(c => c.verdict === 'CLEARED').length;
 
-    const qrData = `INDIAN_RAILWAYS|WRS_RAIPUR|QC_CERT|${certNumber}|${normalizedWagonNumber}|${wagon.wagonType}|${signedAt}|${certHash.slice(0, 16)}`;
+    /*
+     * The QR is a link, so any phone camera opens it. It used to be a bare
+     * text payload ('INDIAN_RAILWAYS|WRS_RAIPUR|QC_CERT|…'), which a phone
+     * showed as text and could do nothing with — the first person to scan
+     * one said "it does not read or work at all". The link opens /verify.html
+     * on this server with the certificate number; the page fetches the
+     * signed certificate and verifies the signature in the browser against
+     * the shop's published key. A certificate handed over as a file still
+     * verifies with no server at all, on the same page.
+     */
+    const qrData = options.verifyBaseUrl
+      ? `${options.verifyBaseUrl.replace(/\/+$/, '')}/verify.html?n=${encodeURIComponent(certNumber)}`
+      : `INDIAN_RAILWAYS|WRS_RAIPUR|QC_CERT|${certNumber}|${normalizedWagonNumber}|${wagon.wagonType}|${signedAt}|${certHash.slice(0, 16)}`;
 
     const jsonPayload = {
       certificateNumber: certNumber,

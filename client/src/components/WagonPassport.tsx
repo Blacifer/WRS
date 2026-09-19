@@ -69,13 +69,36 @@ export const WagonPassport: React.FC<Props> = ({ wagonNumber, released, lang }) 
   }, [wagonNumber, mayReadPrevious]);
   useEffect(() => { void load(); }, [load]);
 
+  /*
+   * What is in the file, in words. The file itself is one JSON object per
+   * line for the next shop's software to read — the first supervisor to
+   * export one said, rightly, that no person could understand it. So the
+   * screen says what it holds: how many of each kind of event, first and
+   * last dates, and who sealed it.
+   */
+  const [contents, setContents] = useState<{ counts: Record<string, number>; first: string | null; last: string | null; issuer: string; events: number } | null>(null);
+  const KIND_WORDS: Record<string, [string, string]> = {
+    REGISTERED: ['registered into the shop', 'शॉप में पंजीकृत'], STAGE_TRANSITION: ['stage moves', 'चरण परिवर्तन'], SPRING_INSPECTION: ['spring readings', 'स्प्रिंग रीडिंग'],
+    CHECKLIST_VERDICT: ['checklist verdicts', 'चेकलिस्ट निर्णय'], PART_EVENT: ['parts off / on / scrapped', 'पुर्जे उतारे / लगाए / रद्द'], SINGLE_WAGON_TEST: ['air-brake tests', 'एयर-ब्रेक परीक्षण'],
+    PHOTO: ['photographs (by hash)', 'फ़ोटो (हैश से)'], GATE_SIGNOFF: ['release sign-off', 'रिलीज़ हस्ताक्षर'], WHEEL_READING: ['wheel readings', 'पहिया रीडिंग']
+  };
+  const describeFile = (jsonl: string) => {
+    const lines = jsonl.split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean) as any[];
+    const head = lines.find((l) => l.type === 'PASSPORT');
+    const events = lines.filter((l) => l.type === 'EVENT');
+    const counts: Record<string, number> = {};
+    for (const e of events) counts[e.kind] = (counts[e.kind] || 0) + 1;
+    const ats = events.map((e) => String(e.at)).sort();
+    setContents({ counts, first: ats[0] || null, last: ats[ats.length - 1] || null, issuer: head?.issuer?.name || head?.issuer?.workshop || 'this shop', events: events.length });
+  };
   const exportPassport = async () => {
     try {
       const jsonl = await api.exportWagonPassport(wagonNumber);
       const url = URL.createObjectURL(new Blob([jsonl], { type: 'application/x-ndjson' }));
       const a = document.createElement('a'); a.href = url; a.download = `${wagonNumber.replace(/[^A-Za-z0-9]+/g, '_')}.passport.jsonl`; a.click();
       URL.revokeObjectURL(url);
-      setNote(t(`Passport exported: ${jsonl.split('\n').filter(Boolean).length - 2} events, sealed by this shop's key. Verify it anywhere at /verify.html.`, `पासपोर्ट निर्यात हुआ। /verify.html पर कहीं भी सत्यापित करें।`));
+      describeFile(jsonl);
+      setNote(t('Passport file saved. It is for the next workshop\'s software, not for reading — what it contains is listed below. Anyone can check it at /verify.html.', 'पासपोर्ट फ़ाइल सहेजी गई। यह अगली वर्कशॉप के सॉफ़्टवेयर के लिए है, पढ़ने के लिए नहीं — इसमें क्या है, नीचे लिखा है। /verify.html पर कोई भी जाँच सकता है।'));
     } catch (e: any) { setNote(e?.message || 'Could not export.'); }
   };
 
@@ -107,6 +130,17 @@ export const WagonPassport: React.FC<Props> = ({ wagonNumber, released, lang }) 
           </button>
         )}
         {note && <p className="text-xs font-bold text-ink-body" data-testid="passport-note">{note}</p>}
+        {contents && (
+          <div className="rounded-control border border-line bg-raised p-3 text-xs space-y-1" data-testid="passport-contents">
+            <div className="font-bold text-white">{t(`What the passport holds — ${contents.events} events, sealed by ${contents.issuer}`, `पासपोर्ट में क्या है — ${contents.events} घटनाएँ, ${contents.issuer} द्वारा मुहरबंद`)}</div>
+            {contents.first && <div className="text-ink-muted">{t('From', 'से')} {new Date(contents.first).toLocaleDateString('en-IN')} {t('to', 'तक')} {contents.last ? new Date(contents.last).toLocaleDateString('en-IN') : ''}</div>}
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+              {Object.entries(contents.counts).map(([k, n]) => (
+                <li key={k} className="text-ink-body"><b className="tabular-nums">{n}</b> {isHi ? (KIND_WORDS[k]?.[1] || k) : (KIND_WORDS[k]?.[0] || k.toLowerCase().replace(/_/g, ' '))}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </div>
 
       {mayImport && (
