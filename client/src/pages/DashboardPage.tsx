@@ -215,6 +215,16 @@ export const DashboardPage: React.FC = () => {
         * each needs interpreting; this states the decision each one implies,
         * which is what a divisional officer opens the screen for.
         */}
+      {/*
+        * For the administrator, the machine's own health comes first: is the
+        * backup running, is the manual indexed, is the chain intact. It sat
+        * five panels down, and the first administrator to look did not find
+        * it. Silent for every other role, so the DRM's dashboard opens on
+        * the shop floor as before.
+        */}
+      <DeploymentReadiness lang={lang} />
+      <SystemStorage lang={lang} />
+
       <ShopFloorNow lang={lang} />
 
       {/*
@@ -232,18 +242,6 @@ export const DashboardPage: React.FC = () => {
       <WhereWagonsWait lang={lang} />
 
       <RecurringFindings lang={lang} />
-
-      {/*
-        * Administrator only, and silent for everyone else. A backup job that
-        * stops running produces no error — only an absence.
-        */}
-      {/*
-        * Beside the installation panel, because both answer questions about
-        * this machine rather than about the workshop's work.
-        */}
-      <DeploymentReadiness lang={lang} />
-
-      <SystemStorage lang={lang} />
 
       {/* Top Banner & Export Actions */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-card p-6 rounded-card border border-line">

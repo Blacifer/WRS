@@ -249,6 +249,12 @@ export const ChecklistConfigPage: React.FC<ChecklistConfigPageProps> = ({ lang }
             'पंजीकरण के समय इस प्रकार के हर वैगन की जाँच इसी सूची से होती है। जब शॉप का काम बदले, तब इसे यहीं बदलें।'
           )}
         </p>
+        {/* The first administrator to open this asked what it was and what could be done. Three sentences. */}
+        <div className="rounded-control border border-accent-line bg-accent-soft/40 p-3 text-xs text-ink-body space-y-1 max-w-3xl" data-testid="checklist-rules-what">
+          <p><b>{t('What it is:', 'यह क्या है:')}</b> {t('the list of parts an inspector must pass, fail or condemn on every wagon of this type — the 41 CASNUB items from the Wagon Maintenance Manual, plus anything this shop adds. A wagon cannot be released until every mandatory line has a verdict.', 'हर वैगन पर निरीक्षक जिन पुर्ज़ों को पास/फ़ेल/कंडम करता है, उनकी सूची — WMM के 41 CASNUB बिंदु, और जो यह शॉप जोड़े। हर अनिवार्य बिंदु पर निर्णय बिना वैगन रिलीज़ नहीं होता।')}</p>
+          <p><b>{t('What you can do here:', 'यहाँ क्या कर सकते हैं:')}</b> {t('pick a wagon type above; add a line the shop checks that the manual does not list (with the reason and the source, e.g. a Railway Board letter); withdraw a line the shop no longer checks. Every change is recorded with your name. You cannot remove a manual item — only mark it withdrawn, with a reason.', 'ऊपर वैगन प्रकार चुनें; कोई बिंदु जोड़ें जो शॉप जाँचती है पर मैनुअल में नहीं (कारण और स्रोत सहित); जो अब नहीं जाँचा जाता उसे हटाएँ। हर बदलाव आपके नाम से दर्ज होता है।')}</p>
+          <p><b>{t('When:', 'कब:')}</b> {t('rarely — when a component stops being overhauled here, or a new gauge or instruction arrives. Day to day, nobody touches this screen.', 'कभी-कभार — जब कोई पुर्ज़ा यहाँ ओवरहॉल होना बंद हो, या नया गेज/निर्देश आए। रोज़ कोई इसे नहीं छूता।')}</p>
+        </div>
 
         <div className="flex flex-wrap items-center gap-2 pt-1">
           {WAGON_TYPES.map((wt) => (

@@ -309,6 +309,33 @@ export class InventoryRepository {
   /**
    * Restock part inventory (increments stock_quantity)
    */
+  /**
+   * A new line in the catalogue. The store had twelve seeded parts and no way
+   * to add a thirteenth; the first administrator to open it asked. Codes are
+   * the shop's own, upper-cased; the category must be one of the eight the
+   * checklist uses, so a part can be tied to the item it serves.
+   */
+  public addPart(input: { partCode: string; partName: string; category: string; unitOfMeasure?: string; stockQuantity?: number; reorderThreshold?: number; unitCostInr?: number; binLocation: string; supplierName?: string }): StoresPart {
+    const code = String(input.partCode || '').trim().toUpperCase();
+    if (!/^[A-Z0-9][A-Z0-9-]{2,29}$/.test(code)) throw new Error('A part code is 3 to 30 letters, digits or hyphens, e.g. PRT-SPR-OUT-02.');
+    const name = String(input.partName || '').trim();
+    if (name.length < 3) throw new Error('A part needs a name.');
+    const category = String(input.category || '').trim().toUpperCase();
+    const allowed = ['SPRINGS', 'WHEELS_AXLES', 'BEARINGS', 'BRAKE_SYSTEM', 'COUPLERS_DRAFT_GEAR', 'BOGIE_FRAME_BOLSTER', 'FRICTION_WEDGES', 'BODY_UNDERFRAME'];
+    if (!allowed.includes(category)) throw new Error(`Category must be one of: ${allowed.join(', ')}.`);
+    const bin = String(input.binLocation || '').trim();
+    if (!bin) throw new Error('Say where the part is kept (bin location), e.g. BAY-2-RACK-B1.');
+    const qty = Math.floor(Number(input.stockQuantity ?? 0)); const reorder = Math.floor(Number(input.reorderThreshold ?? 10)); const cost = Number(input.unitCostInr ?? 0);
+    if (!Number.isFinite(qty) || qty < 0 || !Number.isFinite(reorder) || reorder < 0 || !Number.isFinite(cost) || cost < 0) throw new Error('Quantity, reorder level and unit cost must be zero or more.');
+    if (this.getPartByCode(code)) throw new Error(`Part '${code}' is already in the catalogue.`);
+    const id = `prt_${crypto.randomUUID()}`;
+    this.db.prepare(`
+      INSERT INTO stores_inventory (id, part_code, part_name, category, unit_of_measure, stock_quantity, reserved_quantity, reorder_threshold, unit_cost_inr, bin_location, supplier_name, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
+    `).run(id, code, name, category, String(input.unitOfMeasure || 'NOS').trim().toUpperCase() || 'NOS', qty, reorder, cost, bin, String(input.supplierName || '').trim() || 'RWF Yelahanka / Secunderabad Stores', new Date().toISOString());
+    return this.getPartByCode(code)!;
+  }
+
   public restockPart(partCode: string, quantity: number): StoresPart {
     if (!partCode) {
       throw new Error('Part code is required.');

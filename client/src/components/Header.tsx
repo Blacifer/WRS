@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { User, NavigationTab } from '../../../shared/types.ts';
 import type { SyncConflict } from '../services/offlineDb.ts';
 import { getDictionary } from '../i18n/index.ts';
@@ -344,62 +345,80 @@ export const Header: React.FC<HeaderProps> = ({
                 * of all a supervisor, who is the one signing wagons onto the
                 * line and the whole reason a second factor matters here.
                 */}
-              <IconButton
-                variant="quiet"
+              {/* Icons alone read as decoration; three roles' first walk missed both. A word beside each on anything wider than a phone. */}
+              <button
+                type="button"
                 onClick={() => setIsTotpOpen(true)}
-                label={enrolled ? 'Authenticator app — enrolled' : 'Set up an authenticator app'}
+                aria-label={enrolled ? 'Authenticator app — enrolled' : 'Set up an authenticator app'}
+                title={enrolled ? 'Authenticator app — enrolled' : 'Set up an authenticator app'}
                 data-testid="header-totp"
-                className={enrolled ? '!text-good-ink' : ''}
+                className={`inline-flex items-center gap-1.5 min-h-[40px] px-2 rounded-control text-xs font-semibold transition-colors hover:bg-raised ${enrolled ? 'text-good-ink' : 'text-ink-muted hover:text-ink'}`}
               >
                 <ShieldIcon size={18} />
-              </IconButton>
+                <span className="hidden md:inline">{currentLang === 'hi' ? 'ऑथेंटिकेटर' : 'Authenticator'}</span>
+              </button>
               {/*
                 * Beside the authenticator, and for the same reason it was moved
                 * here: a password belongs to a person, and an inspector cannot
                 * open the screen where account settings otherwise live. Left on
                 * the admin screen, only administrators could change their own.
                 */}
-              <IconButton
-                variant="quiet"
+              <button
+                type="button"
                 onClick={() => setIsPasswordOpen(true)}
-                label={currentLang === 'hi' ? 'अपना पासवर्ड बदलें' : 'Change your password'}
+                aria-label={currentLang === 'hi' ? 'अपना पासवर्ड बदलें' : 'Change your password'}
+                title={currentLang === 'hi' ? 'अपना पासवर्ड बदलें' : 'Change your password'}
                 data-testid="header-password"
+                className="inline-flex items-center gap-1.5 min-h-[40px] px-2 rounded-control text-xs font-semibold text-ink-muted hover:text-ink hover:bg-raised transition-colors"
               >
                 <KeyIcon size={18} />
-              </IconButton>
-              <IconButton
-                variant="quiet"
+                <span className="hidden md:inline">{currentLang === 'hi' ? 'पासवर्ड' : 'Password'}</span>
+              </button>
+              <button
+                type="button"
                 onClick={onLogout}
-                label={dict.nav.logout}
-                className="hover:!text-bad-ink"
+                aria-label={dict.nav.logout}
+                title={dict.nav.logout}
+                data-testid="header-logout"
+                className="inline-flex items-center gap-1.5 min-h-[40px] px-2 rounded-control text-xs font-semibold text-ink-muted hover:text-bad-ink hover:bg-raised transition-colors"
               >
                 <LogOutIcon size={18} />
-              </IconButton>
+                <span className="hidden md:inline">{dict.nav.logout}</span>
+              </button>
             </div>
           )}
         </div>
       </div>
 
-      {isTotpOpen && (
+      {/*
+        Rendered into document.body, not inside this header. The header's
+        backdrop blur makes it the containing block for anything position:fixed
+        inside it, so these two panels were clipped to the header's own height
+        — the administrator saw "Change your password" cut off after its first
+        field, and the authenticator panel likewise.
+      */}
+      {isTotpOpen && createPortal(
         <div
-          className="fixed inset-0 z-50 bg-black/70 flex items-start justify-center p-4 overflow-y-auto"
+          className="fixed inset-0 z-[100] bg-black/70 flex items-start justify-center p-4 overflow-y-auto"
           onClick={() => setIsTotpOpen(false)}
         >
           <div className="mt-16 w-full max-w-lg" onClick={e => e.stopPropagation()}>
             <TotpEnrolment lang={currentLang} onClose={() => setIsTotpOpen(false)} />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {isPasswordOpen && (
+      {isPasswordOpen && createPortal(
         <div
-          className="fixed inset-0 z-50 bg-black/70 flex items-start justify-center p-4 overflow-y-auto"
+          className="fixed inset-0 z-[100] bg-black/70 flex items-start justify-center p-4 overflow-y-auto"
           onClick={() => setIsPasswordOpen(false)}
         >
           <div className="mt-16 w-full max-w-md" onClick={e => e.stopPropagation()}>
             <ChangeOwnPassword lang={currentLang} onClose={() => setIsPasswordOpen(false)} />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Navigation Tabs Bar */}

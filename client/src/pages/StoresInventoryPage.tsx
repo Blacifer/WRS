@@ -42,6 +42,21 @@ export const StoresInventoryPage: React.FC = () => {
 
   // Tabs & Filters
   const [activeTab, setActiveTab] = useState<'catalog' | 'reservations'>('catalog');
+  // A new catalogue line. The store had twelve seeded parts and no way to add one.
+  const [addOpen, setAddOpen] = useState(false);
+  const [addForm, setAddForm] = useState({ partCode: '', partName: '', category: 'SPRINGS', unitOfMeasure: 'NOS', stockQuantity: '0', reorderThreshold: '10', unitCostInr: '0', binLocation: '', supplierName: '' });
+  const [addNote, setAddNote] = useState<string | null>(null);
+  const [addBusy, setAddBusy] = useState(false);
+  const addPart = async () => {
+    setAddBusy(true); setAddNote(null);
+    try {
+      const r = await api.addStoresPart({ ...addForm, stockQuantity: Number(addForm.stockQuantity), reorderThreshold: Number(addForm.reorderThreshold), unitCostInr: Number(addForm.unitCostInr) });
+      setAddNote(r.message || `${r.data.partCode} added.`);
+      setAddForm({ partCode: '', partName: '', category: 'SPRINGS', unitOfMeasure: 'NOS', stockQuantity: '0', reorderThreshold: '10', unitCostInr: '0', binLocation: '', supplierName: '' });
+      await loadData(false);
+    } catch (e: any) { setAddNote(e?.message || 'Could not add the part.'); }
+    finally { setAddBusy(false); }
+  };
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [reservationStatusFilter, setReservationStatusFilter] = useState<string>('ALL');
@@ -267,15 +282,44 @@ export const StoresInventoryPage: React.FC = () => {
           </div>
         </div>
 
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="min-h-[44px] px-4 py-2 bg-raised hover:bg-selected active:bg-selected text-ink-body font-bold text-xs rounded-control flex items-center gap-2 border border-line shadow transition-all self-end sm:self-auto"
-        >
-          <RefreshCwIcon size={16} className={refreshing ? 'animate-spin text-accent-ink' : 'text-ink-muted'} />
-          <span>{refreshing ? t('app.syncing', 'Syncing...') : 'Refresh Stock'}</span>
-        </button>
+        <div className="flex gap-2 self-end sm:self-auto">
+          <button
+            type="button"
+            onClick={() => { setAddOpen(!addOpen); setAddNote(null); }}
+            data-testid="stores-add-toggle"
+            className="min-h-[44px] px-4 py-2 bg-accent hover:bg-accent-hover text-white font-bold text-xs rounded-control flex items-center gap-2 border border-accent-line shadow transition-all"
+          >
+            {addOpen ? (isHi ? 'बंद करें' : 'Close') : (isHi ? '+ नया पुर्ज़ा जोड़ें' : '+ Add a part')}
+          </button>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="min-h-[44px] px-4 py-2 bg-raised hover:bg-selected active:bg-selected text-ink-body font-bold text-xs rounded-control flex items-center gap-2 border border-line shadow transition-all"
+          >
+            <RefreshCwIcon size={16} className={refreshing ? 'animate-spin text-accent-ink' : 'text-ink-muted'} />
+            <span>{refreshing ? t('app.syncing', 'Syncing...') : 'Refresh Stock'}</span>
+          </button>
+        </div>
       </div>
+
+      {addOpen && (
+        <form onSubmit={(e) => { e.preventDefault(); void addPart(); }} className="bg-card border border-accent-line rounded-card p-4 space-y-3" data-testid="stores-add-form">
+          <h3 className="text-sm font-extrabold text-white">{isHi ? 'सूची में नया पुर्ज़ा' : 'A new line in the catalogue'}</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-[11px] text-ink-muted">
+            <label className="flex flex-col gap-1">{isHi ? 'पुर्ज़ा कोड' : 'Part code'}<input required value={addForm.partCode} onChange={(e) => setAddForm({ ...addForm, partCode: e.target.value })} placeholder="PRT-SPR-OUT-02" data-testid="stores-add-code" className="min-h-[40px] px-2 bg-page border border-line rounded-control text-sm text-white font-mono uppercase" /></label>
+            <label className="flex flex-col gap-1 sm:col-span-2">{isHi ? 'नाम' : 'Name'}<input required value={addForm.partName} onChange={(e) => setAddForm({ ...addForm, partName: e.target.value })} placeholder={isHi ? 'जैसे CASNUB 22HS बाहरी स्प्रिंग' : 'e.g. CASNUB 22HS Outer Coil Spring'} data-testid="stores-add-name" className="min-h-[40px] px-2 bg-page border border-line rounded-control text-sm text-white" /></label>
+            <label className="flex flex-col gap-1">{isHi ? 'श्रेणी' : 'Category'}<select value={addForm.category} onChange={(e) => setAddForm({ ...addForm, category: e.target.value })} className="min-h-[40px] px-2 bg-page border border-line rounded-control text-sm text-white">{CASNUB_CATEGORIES.map((c) => <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>)}</select></label>
+            <label className="flex flex-col gap-1">{isHi ? 'इकाई' : 'Unit'}<input value={addForm.unitOfMeasure} onChange={(e) => setAddForm({ ...addForm, unitOfMeasure: e.target.value })} placeholder="NOS / SET / PAIR" className="min-h-[40px] px-2 bg-page border border-line rounded-control text-sm text-white uppercase" /></label>
+            <label className="flex flex-col gap-1">{isHi ? 'अभी स्टॉक' : 'Stock now'}<input inputMode="numeric" value={addForm.stockQuantity} onChange={(e) => setAddForm({ ...addForm, stockQuantity: e.target.value })} className="min-h-[40px] px-2 bg-page border border-line rounded-control text-sm text-white tabular-nums" /></label>
+            <label className="flex flex-col gap-1">{isHi ? 'पुनः-ऑर्डर स्तर' : 'Reorder when below'}<input inputMode="numeric" value={addForm.reorderThreshold} onChange={(e) => setAddForm({ ...addForm, reorderThreshold: e.target.value })} className="min-h-[40px] px-2 bg-page border border-line rounded-control text-sm text-white tabular-nums" /></label>
+            <label className="flex flex-col gap-1">{isHi ? 'इकाई मूल्य (₹)' : 'Unit cost (₹)'}<input inputMode="decimal" value={addForm.unitCostInr} onChange={(e) => setAddForm({ ...addForm, unitCostInr: e.target.value })} className="min-h-[40px] px-2 bg-page border border-line rounded-control text-sm text-white tabular-nums" /></label>
+            <label className="flex flex-col gap-1 sm:col-span-2">{isHi ? 'रखने की जगह (बिन)' : 'Where it is kept (bin)'}<input required value={addForm.binLocation} onChange={(e) => setAddForm({ ...addForm, binLocation: e.target.value })} placeholder="BAY-2-RACK-B1" data-testid="stores-add-bin" className="min-h-[40px] px-2 bg-page border border-line rounded-control text-sm text-white font-mono uppercase" /></label>
+            <label className="flex flex-col gap-1 sm:col-span-2">{isHi ? 'आपूर्तिकर्ता (वैकल्पिक)' : 'Supplier (optional)'}<input value={addForm.supplierName} onChange={(e) => setAddForm({ ...addForm, supplierName: e.target.value })} className="min-h-[40px] px-2 bg-page border border-line rounded-control text-sm text-white" /></label>
+          </div>
+          {addNote && <p className="text-xs font-bold text-ink-body" data-testid="stores-add-note">{addNote}</p>}
+          <button type="submit" disabled={addBusy} className="min-h-[44px] px-5 rounded-control bg-accent text-white text-xs font-bold disabled:opacity-50" data-testid="stores-add-save">{isHi ? 'सूची में जोड़ें' : 'Add to the catalogue'}</button>
+        </form>
+      )}
 
       {/* KPI Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

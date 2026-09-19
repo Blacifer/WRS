@@ -68,16 +68,41 @@ gaugesRouter.get('/drift', authMiddleware, (req: AuthenticatedRequest, res: Resp
         AND NOT EXISTS (SELECT 1 FROM spring_sorting_records l WHERE l.supersedes = r.id)
     `).all(since) as any[];
     const lines = gaugeDrift(rows);
+    /*
+     * One line per finding, not two. With exactly two gauges on a kind, each
+     * is flagged against the other and the same disagreement appeared twice
+     * (OSG-02 vs OSG-01, then OSG-01 vs OSG-02) — four lines for two facts on
+     * the register the first administrator opened. A pair is reported once,
+     * named as a pair, with both gauges' figures.
+     */
+    const seenPair = new Set<string>();
+    const flagged = lines.filter((l) => l.flagged).filter((l) => {
+      const m = /Disagrees with ([A-Z0-9-]+), the only other gauge/.exec(l.note);
+      if (!m) return true;
+      const key = `${l.kind}|${[l.gaugeCode, m[1]].sort().join('+')}`;
+      if (seenPair.has(key)) return false;
+      seenPair.add(key); return true;
+    }).map((l) => {
+      const m = /Disagrees with ([A-Z0-9-]+), the only other gauge on this kind, by ([\d.]+) mm \(median ([\d.]+) vs ([\d.]+), (\d+) vs (\d+) readings\)/.exec(l.note);
+      if (!m) return l;
+      const [, other, by, med, omed, n, on] = m;
+      return {
+        ...l,
+        gaugeCode: `${l.gaugeCode} & ${other}`,
+        note: `The two gauges on this kind disagree by ${by} mm (${l.gaugeCode} median ${med} over ${n} readings; ${other} median ${omed} over ${on}). The record cannot say which is off — put both against the master.`,
+        noteHi: `इस प्रकार के दो गेज ${by} मिमी अलग पढ़ते हैं (${l.gaugeCode} मध्यमान ${med}, ${n} रीडिंग; ${other} मध्यमान ${omed}, ${on})। रिकॉर्ड नहीं बता सकता कौन-सा गलत है — दोनों को मास्टर गेज से मिलाएँ।`
+      };
+    });
     ok(res, {
       days, thresholdMm: DRIFT_THRESHOLD_MM, minReadingsEachSide: MIN_READINGS_EACH_SIDE,
       readings: rows.length, lines,
-      flagged: lines.filter((l) => l.flagged),
+      flagged,
       summary: lines.filter((l) => l.flagged).length === 0
         ? (lines.some((l) => l.shiftMm !== null) ? 'No gauge reads more than a millimetre from the others on the same kind of spring.' : 'Not enough readings on more than one gauge per kind to compare yet.')
-        : `${lines.filter((l) => l.flagged).length} gauge/kind pair(s) read a millimetre or more from the shop's other gauges. Put them against the master.`,
+        : `${flagged.length} finding${flagged.length === 1 ? '' : 's'}: a gauge reads a millimetre or more from the shop's other gauges on the same kind of spring. Put them against the master.`,
       summaryHi: lines.filter((l) => l.flagged).length === 0
         ? (lines.some((l) => l.shiftMm !== null) ? 'एक ही प्रकार की स्प्रिंग पर कोई गेज दूसरों से एक मिलीमीटर से अधिक नहीं पढ़ता।' : 'तुलना के लिए अभी प्रति प्रकार एक से अधिक गेज पर पर्याप्त रीडिंग नहीं।')
-        : `${lines.filter((l) => l.flagged).length} गेज/प्रकार जोड़ी शॉप के दूसरे गेजों से एक मिलीमीटर या अधिक पढ़ती है। उन्हें मास्टर गेज से मिलाएँ।`
+        : `${flagged.length} निष्कर्ष: एक ही प्रकार की स्प्रिंग पर कोई गेज दूसरों से एक मिलीमीटर या अधिक पढ़ता है। उन्हें मास्टर गेज से मिलाएँ।`
     });
   } catch (error: any) {
     res.status(500).json({ success: false, error: 'GAUGE_DRIFT_FAILED', message: error?.message || 'Gauge drift could not be computed', statusCode: 500, timestamp: new Date().toISOString() });

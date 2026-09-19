@@ -219,3 +219,26 @@ describe('registering a wagon', () => {
     assert.ok(JSON.stringify(audit.body).includes('WAGON_REGISTERED_IN_ERROR'), 'on the audit trail');
   });
 });
+
+describe('the stores catalogue', () => {
+  it('TC-RTE-10: a new part can be added by stores.manage; a bad code, a wrong category or a duplicate is refused; an inspector cannot', async () => {
+    const sup = await login('supervisor1'); const insp = await login('inspector1');
+    const good = { partCode: 'prt-spr-out-02', partName: 'CASNUB 22HS Outer Coil Spring', category: 'SPRINGS', unitOfMeasure: 'nos', stockQuantity: 24, reorderThreshold: 8, unitCostInr: 1850, binLocation: 'BAY-2-RACK-C3' };
+    const denied = await call('POST', '/api/inventory/parts', good, auth(insp));
+    assert.equal(denied.status, 403);
+    const ok = await call('POST', '/api/inventory/parts', good, auth(sup));
+    assert.equal(ok.status, 201, JSON.stringify(ok.body));
+    assert.equal(ok.body.data.partCode, 'PRT-SPR-OUT-02');
+    assert.equal(Number(ok.body.data.stockQuantity), 24);
+    const dup = await call('POST', '/api/inventory/parts', good, auth(sup));
+    assert.equal(dup.status, 400); assert.match(dup.body.message, /already/);
+    for (const bad of [{ ...good, partCode: 'x' }, { ...good, partCode: 'PRT-NEW-1', category: 'PAINT' }, { ...good, partCode: 'PRT-NEW-2', binLocation: '' }, { ...good, partCode: 'PRT-NEW-3', stockQuantity: -1 }]) {
+      const r = await call('POST', '/api/inventory/parts', bad, auth(sup));
+      assert.equal(r.status, 400, JSON.stringify(bad));
+    }
+    const look = await call('GET', '/api/inventory/part/PRT-SPR-OUT-02', undefined, auth(insp));
+    assert.equal(look.status, 200);
+    const audit = await call('GET', '/api/audit/activity?limit=50', undefined, auth(sup));
+    assert.ok(JSON.stringify(audit.body).includes('PART_ADDED'));
+  });
+});

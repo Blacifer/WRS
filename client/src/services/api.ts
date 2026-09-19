@@ -1034,6 +1034,10 @@ export class ApiClient {
     });
   }
 
+  /** A new line in the stores catalogue. */
+  public async addStoresPart(payload: { partCode: string; partName: string; category: string; unitOfMeasure?: string; stockQuantity?: number; reorderThreshold?: number; unitCostInr?: number; binLocation: string; supplierName?: string }): Promise<{ success: boolean; data: StoresPart; message?: string }> {
+    return this.request('/inventory/parts', { method: 'POST', body: JSON.stringify(payload) });
+  }
   public async restockPart(payload: {
     partCode: string;
     quantity: number;

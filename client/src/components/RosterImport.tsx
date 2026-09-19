@@ -103,12 +103,18 @@ export const RosterImport: React.FC<{ lang: 'en' | 'hi'; onImported: () => void 
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-extrabold text-white">{t('Import a roster', 'सूची से खाते बनाएँ')}</h3>
-          <p className="text-[11px] text-ink-muted">{t('Paste from a spreadsheet: name, employee ID, role, and optionally a username — one person per line. Roles: inspector, supervisor, DRM, admin.', 'स्प्रेडशीट से चिपकाएँ: नाम, कर्मचारी आईडी, भूमिका, और चाहें तो उपयोगकर्ता नाम — एक व्यक्ति प्रति पंक्ति।')}</p>
+          <p className="text-[11px] text-ink-muted">{t('Three ways to create accounts: one at a time with the form above; paste the roster from a spreadsheet here (name, employee ID, role, optional username — one person per line); or open the CSV file the office keeps. Roles: inspector, supervisor, DRM, admin.', 'खाते बनाने के तीन तरीके: ऊपर के फ़ॉर्म से एक-एक; स्प्रेडशीट से सूची यहाँ चिपकाएँ (नाम, कर्मचारी आईडी, भूमिका, चाहें तो उपयोगकर्ता नाम — एक व्यक्ति प्रति पंक्ति); या दफ़्तर की CSV फ़ाइल खोलें।')}</p>
         </div>
         <button type="button" onClick={() => setOpen(!open)} className="min-h-[40px] px-4 rounded-control border border-accent-line bg-accent-soft text-accent-ink text-xs font-bold" data-testid="roster-toggle">{open ? t('Close', 'बंद करें') : t('Paste roster', 'सूची चिपकाएँ')}</button>
       </div>
       {open && (
         <>
+          {/* Two ways in: paste from the spreadsheet, or open the CSV/TSV the office already keeps. One account at a time is the form above this panel. */}
+          <label className="text-[11px] text-ink-muted flex flex-wrap items-center gap-2">
+            {t('Or open a CSV / TSV / text file exported from Excel:', 'या Excel से निर्यात की गई CSV / TSV फ़ाइल खोलें:')}
+            <input type="file" accept=".csv,.tsv,.txt" data-testid="roster-file" className="text-xs text-ink-body"
+              onChange={async (e) => { const f = e.target.files?.[0]; if (f) { setText(await f.text()); setOpen(true); } }} />
+          </label>
           <textarea value={text} onChange={(e) => setText(e.target.value)} rows={6} data-testid="roster-text"
             placeholder={'Ramesh Kumar\tWRS-INSP-1042\tinspector\nS. K. Verma\tWRS-SUP-2019\tsupervisor'}
             className="w-full bg-raised border border-line rounded-control px-3 py-2 text-xs font-mono text-white" />

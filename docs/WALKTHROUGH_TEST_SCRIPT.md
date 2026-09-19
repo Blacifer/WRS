@@ -124,26 +124,39 @@ Sign in as **`admin1` / `password123`**.
 | # | Do | Must see |
 |---|---|---|
 | 5.1 | **User Accounts** | The roster; create an account (one-time code asked); deactivate it → it cannot sign in; reactivate → it can |
-| 5.2 | **Roster import** | Paste three lines (name, ID, role) → preview → confirm → three slips with passwords, printable |
-| 5.3 | Capability matrix | Which role may do what; the admin **cannot** release a wagon |
-| 5.4 | **Checklist Rules** | The 41 CASNUB items; add a shop item with a reason; withdraw it |
-| 5.5 | Gauge Register (bottom of **User Accounts**) | The four gauges; SSG‑02 with its certificate number and blank dates; add a gauge; enter a calibration date → the amber note goes |
-| 5.6 | **Deployment readiness** and **Storage** panels (bottom of the **DRM Dashboard**, admin only) | Every row with a plain sentence: backup (where, how old), cloud copy (not configured), manual indexed (green, naming each document), demo passwords (red on the demo record — and it says why they can still sign in), restarts, audit chain, storage |
-| 5.7 | Change own password (key icon) | Old password stops working; new one works |
-| 5.8 | Authenticator enrolment (shield icon top right, or the panel on User Accounts) | A QR to scan; a wrong code refused; a right code enrols; the account then needs the code at sign-in |
-| 5.9 | **Stores & Inventory** | Parts with stock; restock 10 of a part → stock rises by 10; restock 1.5 → refused |
+| 5.2 | **Roster import** — three ways to make accounts: one at a time (the form at the top), paste from a spreadsheet, or **open the office's CSV file** | Paste or open three lines (name, ID, role) → preview → confirm → three printable slips with passwords |
+| 5.3 | *What each role holds* table | Read‑only by design (the note above it says why): who may do what, fixed in the system; the admin **cannot** release a wagon. To change a person's access, change their role on their row |
+| 5.4 | **Checklist Rules** | The blue box says what it is (the list every wagon of that type is checked against), what you can do (add a shop line with reason and source; withdraw one), and when (rarely). Pick a wagon type; add a line; withdraw it — each recorded under your name |
+| 5.5 | Gauge Register (bottom of **User Accounts**) — the instruments on the bench and their calibration papers | Four gauges; SSG‑02 shows its certificate number and *NOT RECORDED* because its label has no dates; *Record calibration* → the dates from certificate 1251122‑04‑125 → amber note goes. The drift box above lists **one line per finding** ("the two gauges on this kind disagree by 1.5 mm — put both against the master") |
+| 5.6 | **DRM Dashboard** as admin — *Deployment readiness* and *Storage* are now the **first two panels** | Every row a plain sentence: backup (where, how old), cloud copy (not configured), manual (green, each document named), demo passwords (red on the demo record, saying why they still sign in), restarts, audit chain, storage |
+| 5.7 | Top right: **Password** (key icon, now labelled) | The panel opens in full over the page (it used to be cut off under the header). Old password stops working; new one works. Same for every role |
+| 5.8 | Top right: **Authenticator** (shield icon, now labelled) | The panel opens in full; a QR to scan; a wrong code refused; a right code enrols; the account then needs the code at sign‑in |
+| 5.9 | **Stores & Inventory** | Parts with stock; **+ Add a part** → code, name, category, bin → it appears in the list; restock 10 → stock rises by 10; restock 1.5 → refused |
 | 5.10 | **Component Passports** | Serialised wheelsets and bearings; paste `WRS-PASSPORT\|WHL-RWF-2023-8841\|WHEELSET\|RWF_YELAHANKA` → its history |
-| 5.11 | **History** | Filter by wagon, band, status, date; export CSV asks for the one‑time code |
+| 5.11 | **History & Logs** | Pick a band or status → the list narrows at once; type part of a wagon number → narrows as you type; the count line says *N records matching …* with *Clear filters*. Export CSV asks for the one‑time code |
 
-## 6. Failure drills — do these once, on the laptop
+## 6. Failure drills — once, on the machine you are rehearsing on
+
+Every one of these is one command on the Mac, and one action on the laptop.
+Open a terminal in the project folder (`cd ~/Desktop/WRS_Raipur`).
+
+| Mac (rehearsal) | Demo laptop (Windows) |
+|---|---|
+| `bash scripts/rehearsal.sh start` — package, seed, start on :3200, keep running | double‑click `START.cmd` |
+| `bash scripts/rehearsal.sh stop` | close the `START.cmd` window |
+| `bash scripts/rehearsal.sh status` — the two addresses | the addresses `START.cmd` prints |
+| `bash scripts/rehearsal.sh log` | open `logs\wrs-<today>.log` in Notepad |
+| `bash scripts/rehearsal.sh backup` | wait for 02:00, or run `server\scripts\backup-db.mjs` per INSTALL §7 |
+| `bash scripts/rehearsal.sh restore` | RESTORE_DRILL.md |
 
 | # | Do | Must see |
 |---|---|---|
-| 6.1 | Close the `START.cmd` window while a tablet is mid-checklist | The tablet shows offline and keeps working. Double-click `START.cmd` → within ten seconds the tablet reconnects and syncs |
-| 6.2 | Pull the laptop's network cable / turn Wi‑Fi off | The laptop's own screens keep working (localhost). The tablet goes offline and queues |
-| 6.3 | `logs\wrs-<today>.log` | Every start and stop is written with a reason |
-| 6.4 | Run the backup (`server\scripts\backup-db.mjs` or wait for 02:00) | A `.db.enc` and `.hmac` appear in the backup folder; the readiness row updates |
-| 6.5 | Restore that backup onto a second folder (RESTORE_DRILL.md) | The restored copy opens and shows the same wagons |
+| 6.1 | On the phone, sign in as `inspector1`, open **Sorting**. On the Mac: `bash scripts/rehearsal.sh stop`. On the phone, tap two bands. | The phone shows *offline* / *waiting to send*; the taps are accepted and counted. Then `bash scripts/rehearsal.sh start` (a minute or two). The phone reconnects on its own; the queue empties; *Your record today* shows the two taps once each |
+| 6.2 | On the Mac, turn Wi‑Fi off. Use the laptop's own screen; look at the phone. | The Mac's own `https://localhost:3200` keeps working; the phone goes offline and queues. Wi‑Fi back on → the phone reconnects |
+| 6.3 | `bash scripts/rehearsal.sh log` | Lines for every start; every request with its status; the stop from 6.1 written with its reason |
+| 6.4 | `bash scripts/rehearsal.sh backup` | A `…db.enc` and its `.hmac` listed in `backups-elsewhere/`, with the time. As admin, the *Deployment readiness* row for the backup shows *newest 0 hours ago* |
+| 6.5 | `bash scripts/rehearsal.sh restore` | The newest backup restored into a second folder, and a table: wagons, inspections, sorting records, audit entries — **live and restored counts equal** |
+| 6.6 | *(Plan B, only if a phone must join on its own internet)* `bash scripts/rehearsal.sh tunnel` | A public `https://…trycloudflare.com` address that opens on any phone with no certificate warning. Demonstration only: the data crosses Cloudflare, so never for the shop's live record |
 
 ## 7. What must NOT happen, anywhere
 

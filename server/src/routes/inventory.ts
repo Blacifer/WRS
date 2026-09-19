@@ -10,6 +10,7 @@ import type { AuthenticatedRequest } from '../middleware/auth.ts';
 import { requireCapability } from '../middleware/rbac.ts';
 import { getDatabase } from '../db/connection.ts';
 import { InventoryRepository } from '../db/inventoryRepository.ts';
+import { logAuditEvent } from '../db/auditLog.ts';
 
 export const inventoryRouter = Router();
 
@@ -276,6 +277,17 @@ inventoryRouter.post('/issue', authMiddleware, async (req: Request, res: Respons
 // -------------------------------------------------------------------------
 // 7. Restock Part Inventory
 // -------------------------------------------------------------------------
+// POST /api/inventory/parts — a new line in the stores catalogue.
+inventoryRouter.post('/parts', authMiddleware, requireCapability('stores.manage'), (req: Request, res: Response) => {
+  try {
+    const part = new InventoryRepository(getDatabase()).addPart(req.body || {});
+    logAuditEvent(getDatabase(), { eventType: 'INVENTORY_RESTOCKED', userId: (req as AuthenticatedRequest).user!.id, userRole: (req as AuthenticatedRequest).user?.role ?? undefined, payload: { kind: 'PART_ADDED', partCode: part.partCode, partName: part.partName, category: part.category, stockQuantity: part.stockQuantity } });
+    res.status(201).json({ success: true, data: part, message: `${part.partCode} added to the catalogue.`, timestamp: new Date().toISOString() });
+  } catch (err: any) {
+    res.status(400).json({ success: false, error: 'INVALID_PART', message: err?.message || 'Could not add the part.', statusCode: 400, timestamp: new Date().toISOString() });
+  }
+});
+
 inventoryRouter.post('/restock', authMiddleware, requireCapability('stores.manage'), async (req: Request, res: Response) => {
   try {
     const repo = getRepo();

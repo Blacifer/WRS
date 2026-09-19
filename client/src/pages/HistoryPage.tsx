@@ -78,9 +78,14 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
     }
   };
 
+  // The selects filter on change; the wagon box filters as you type, a
+  // moment after the last keystroke. It used to wait for Enter or the
+  // button, and the first administrator to try it concluded the filter did
+  // nothing.
   useEffect(() => {
-    loadRecords();
-  }, [filterBand, filterStatus, filterBogie]);
+    const t = setTimeout(() => { void loadRecords(); }, filterWagon ? 350 : 0);
+    return () => clearTimeout(t);
+  }, [filterBand, filterStatus, filterBogie, filterWagon]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,7 +142,7 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
       {view === 'ACTIVITY' ? <ActivityLog /> : (
       <>
       {/* Multi-Criteria Filters (Glove-Friendly Touch Inputs) */}
-      <form onSubmit={handleSearchSubmit} className="bg-card border border-line rounded-control p-4 space-y-3">
+      <form onSubmit={handleSearchSubmit} className="bg-card border border-line rounded-control p-4 space-y-3" data-testid="history-filters">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Wagon Search */}
           <div>
@@ -230,7 +235,17 @@ export const HistoryPage: React.FC<HistoryPageProps> = ({ lang }) => {
       {/* Record Cards List */}
       <div className="space-y-3">
         <div className="flex items-center justify-between text-xs text-ink-muted font-semibold px-1">
-          <span>{lang === 'hi' ? `कुल रिकॉर्ड: ${totalCount}` : `Total Logs: ${totalCount}`}</span>
+          <span data-testid="history-count">
+            {(() => {
+              const active = [filterWagon && `wagon "${filterWagon}"`, filterBand && `band ${filterBand}`, filterStatus && `status ${filterStatus}`, filterBogie && `bogie ${filterBogie.replace('CASNUB_22_', '')}`].filter(Boolean);
+              return lang === 'hi'
+                ? `${active.length ? 'फ़िल्टर के साथ' : 'कुल'} रिकॉर्ड: ${totalCount}${active.length ? ` (${active.join(', ')})` : ''}`
+                : active.length ? `${totalCount} record${totalCount === 1 ? '' : 's'} matching ${active.join(', ')}` : `Total Logs: ${totalCount}`;
+            })()}
+          </span>
+          {(filterWagon || filterBand || filterStatus || filterBogie) && (
+            <button type="button" onClick={() => { setFilterWagon(''); setFilterBand(''); setFilterStatus(''); setFilterBogie(''); }} className="text-accent-ink underline underline-offset-2">{lang === 'hi' ? 'फ़िल्टर हटाएँ' : 'Clear filters'}</button>
+          )}
         </div>
 
         {records.length === 0 ? (

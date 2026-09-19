@@ -109,6 +109,12 @@ const CapabilityMatrix: React.FC<{ isHi: boolean }> = ({ isHi }) => {
         title={isHi ? 'कौन क्या कर सकता है' : 'What each role holds'}
         meta={isHi ? 'सीधे अनुमति तालिका से' : 'Read from the permission table itself'}
       />
+      {/* Read-only on purpose; the first administrator tried to click it. */}
+      <p className="px-5 pt-3 text-[11px] text-ink-muted max-w-3xl">
+        {isHi
+          ? 'यह तालिका पढ़ने के लिए है — इसमें कुछ बदला नहीं जाता। भूमिकाएँ प्रणाली में तय हैं (पर्यवेक्षक रिलीज़ कर सकता है, व्यवस्थापक नहीं)। किसी व्यक्ति की पहुँच बदलनी हो तो ऊपर उसकी पंक्ति में भूमिका बदलें।'
+          : 'This table is for reading, not clicking. What each role may do is fixed in the system — a supervisor can release a wagon, an administrator cannot — so that nobody can quietly grant themselves more. To change what a person can reach, change their role on their row above.'}
+      </p>
       <div className="overflow-x-auto">
         <table className="w-full text-sm min-w-[34rem]">
           <thead>
