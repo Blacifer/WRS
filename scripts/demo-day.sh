@@ -23,9 +23,19 @@ LOG=/tmp/wrs_demo_day_server.log
 if ! node -e "import('playwright')" >/dev/null 2>&1; then echo "playwright is not installed"; exit 2; fi
 if lsof -nP -iTCP:$PORT -sTCP:LISTEN >/dev/null 2>&1; then echo "something is already listening on :$PORT"; exit 2; fi
 
+# The rehearsal's certificate lives beside the bundle, not in it: packaging
+# wipes the folder, and a browser that had trusted the old certificate then
+# loads the cached app and gets 'Failed to fetch' on every call against the
+# new one. Trust it once on this machine and it is the certificate served by
+# every rehearsal after.
+CERT_KEEP="$PWD/dist-shop/.rehearsal-certs"
 if [ "${SKIP_PACKAGE:-}" != "1" ]; then
+  [ -d "$BUNDLE/server/certs" ] && mkdir -p "$CERT_KEEP" && cp "$BUNDLE"/server/certs/lan-*.* "$CERT_KEEP"/ 2>/dev/null
   echo "packaging the bundle..."
   if ! npm run package:shop >/tmp/wrs_demo_day_package.log 2>&1; then tail -20 /tmp/wrs_demo_day_package.log; exit 1; fi
+fi
+if [ -f "$CERT_KEEP/lan-cert.pem" ] && [ ! -f "$BUNDLE/server/certs/lan-cert.pem" ]; then
+  mkdir -p "$BUNDLE/server/certs" && cp "$CERT_KEEP"/lan-*.* "$BUNDLE/server/certs/"
 fi
 
 cd "$BUNDLE"
@@ -88,6 +98,7 @@ else
 fi
 
 cd "$OLDPWD"
+mkdir -p "$CERT_KEEP" && cp "$BUNDLE"/server/certs/lan-*.* "$CERT_KEEP"/ 2>/dev/null
 APP_URL="https://localhost:$PORT" node scripts/demo-day-drill.mjs "$OUT"
 RESULT=$?
 [ "${BACKUP_FAILED:-}" = "1" ] && RESULT=1

@@ -55,3 +55,4 @@ server/data/backup.key
 demo-rehearsal/
 docs/manuals/*.txt
 docs/artifacts/
+dist-shop/.rehearsal-certs/
