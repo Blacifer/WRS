@@ -28,7 +28,7 @@ if lsof -nP -iTCP:$PORT -sTCP:LISTEN >/dev/null 2>&1; then echo "something is al
 # loads the cached app and gets 'Failed to fetch' on every call against the
 # new one. Trust it once on this machine and it is the certificate served by
 # every rehearsal after.
-CERT_KEEP="$PWD/dist-shop/.rehearsal-certs"
+CERT_KEEP="$PWD/.rehearsal-certs"   # outside dist-shop, which packaging wipes
 if [ "${SKIP_PACKAGE:-}" != "1" ]; then
   [ -d "$BUNDLE/server/certs" ] && mkdir -p "$CERT_KEEP" && cp "$BUNDLE"/server/certs/lan-*.* "$CERT_KEEP"/ 2>/dev/null
   echo "packaging the bundle..."
