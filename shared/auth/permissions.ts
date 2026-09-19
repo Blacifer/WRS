@@ -39,6 +39,7 @@ export type Capability =
   // Shop floor
   | 'spring.record'          // measure and classify springs
   | 'spring.correct'         // withdraw a mistapped spring
+  | 'wagon.register'         // enter a wagon into the shop — the shop floor's job, not oversight's
   | 'wagon.inspect'          // record checklist verdicts
   | 'wagon.photograph'       // attach photographic evidence
   | 'wagon.view'             // look at wagons and their history without touching them
@@ -63,6 +64,7 @@ export type Capability =
 const INSPECTOR: Capability[] = [
   'spring.record',
   'spring.correct',
+  'wagon.register',
   'wagon.inspect',
   'wagon.photograph'
   /*

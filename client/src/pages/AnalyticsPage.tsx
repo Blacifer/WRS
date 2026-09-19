@@ -82,6 +82,9 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
   const [days, setDays] = useState<Day[]>([]);
   const [sortingStock, setSortingStock] = useState<any[]>([]);
   const [gaugeExposure, setGaugeExposure] = useState<{ total: number; summary: string; summaryHi?: string } | null>(null);
+  const [pickedDay, setPickedDay] = useState<string | null>(null);
+  // Which gauge reads differently from the others — read here by whoever reads analytics, not only on the admin's register.
+  const [drift, setDrift] = useState<{ flagged: any[]; lines: any[]; summary: string; summaryHi?: string; readings: number } | null>(null);
   /*
    * What Stores should expect to issue. Held as whatever the server returned,
    * including its refusal to quote — a spring type without enough
@@ -122,6 +125,7 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
       setSortingStock(stock.data.stock || []);
       setGaugeExposure(exposure.data);
       setForecast(demand);
+      api.getGaugeDrift().then((r) => setDrift(r.data)).catch(() => setDrift(null));
     } catch {
       // A quiet failure here must not take the rest of the page with it.
     }
@@ -256,24 +260,38 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
               {/* Seven days at a glance. Bars rather than a chart library:
                   the shape is the whole message and it has to read on a tablet. */}
               {days.length > 0 && (
-                <div className="flex items-end gap-1.5 h-16" data-testid="sorting-trend">
-                  {days.map(d => {
-                    const max = Math.max(1, ...days.map(x => x.total));
-                    const h = Math.round((d.total / max) * 100);
-                    const isToday = d === today;
-                    return (
-                      <div key={d.date} className="flex-1 flex flex-col items-center justify-end h-full gap-1">
-                        <span className="text-[10px] text-ink-faint tabular-nums">{d.total || ''}</span>
-                        <div
-                          className={`w-full rounded-t ${isToday ? 'bg-accent' : 'bg-selected'}`}
-                          style={{ height: `${Math.max(d.total > 0 ? 6 : 2, h)}%` }}
-                          title={`${d.date}: ${d.total} sorted, ${d.condemned} condemned`}
-                        />
-                        <span className="text-[9px] text-ink-faint">{d.date.slice(8)}</span>
-                      </div>
-                    );
-                  })}
-                </div>
+                <>
+                  <div className="flex items-end gap-1.5 h-16" data-testid="sorting-trend">
+                    {days.map(d => {
+                      const max = Math.max(1, ...days.map(x => x.total));
+                      const h = Math.round((d.total / max) * 100);
+                      const isToday = d === today;
+                      const isPicked = pickedDay === d.date;
+                      return (
+                        <button type="button" key={d.date} onClick={() => setPickedDay(isPicked ? null : d.date)}
+                          aria-pressed={isPicked} aria-label={`${d.date}: ${d.total} sorted, ${d.condemned} condemned`}
+                          className="flex-1 flex flex-col items-center justify-end h-full gap-1 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent">
+                          <span className="text-[10px] text-ink-faint tabular-nums">{d.total || ''}</span>
+                          <div
+                            className={`w-full rounded-t ${isPicked ? 'bg-white' : isToday ? 'bg-accent' : 'bg-selected hover:bg-accent/60'}`}
+                            style={{ height: `${Math.max(d.total > 0 ? 6 : 2, h)}%` }}
+                          />
+                          <span className={`text-[9px] ${isPicked ? 'text-white font-bold' : 'text-ink-faint'}`}>{d.date.slice(8)}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {/* Tap a day to read it. The bars used to answer only to a mouse hover — no use on a tablet. */}
+                  <p className="text-[11px] text-ink-muted" data-testid="sorting-day-detail">
+                    {(() => {
+                      const d = days.find((x) => x.date === pickedDay);
+                      if (!d) return isHi ? 'किसी दिन की पट्टी पर टैप करें — उस दिन के आँकड़े यहाँ दिखेंगे।' : 'Tap a day\'s bar to read it here.';
+                      return isHi
+                        ? `${d.date}: ${d.total} छाँटे गए, ${d.condemned} कंडम${d.total ? ` (${Math.round((d.condemned / d.total) * 1000) / 10}%)` : ''}।`
+                        : `${d.date}: ${d.total} sorted, ${d.condemned} condemned${d.total ? ` (${Math.round((d.condemned / d.total) * 1000) / 10}%)` : ''}.`;
+                    })()}
+                  </p>
+                </>
               )}
             </>
           );
@@ -390,6 +408,25 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ lang, user }) => {
           <p className="text-[11px] text-warn-ink/90 bg-warn-soft border border-warn-line rounded-control px-3 py-2 font-semibold">
             {isHi ? (gaugeExposure.summaryHi || gaugeExposure.summary) : gaugeExposure.summary}
           </p>
+        )}
+
+        {/*
+          * Which gauge reads differently. Lived only on the admin's gauge
+          * register; the DRM, whose question this answers, could not reach it.
+          */}
+        {drift && drift.readings > 0 && (
+          <div data-testid="analytics-gauge-drift" className={`rounded-control border px-3 py-2.5 ${drift.flagged.length > 0 ? 'bg-warn-soft border-warn-line' : 'bg-raised border-line'}`}>
+            <h3 className="text-xs font-bold uppercase tracking-wide text-ink-muted mb-1">{isHi ? 'गेज की तुलना — कौन-सा गेज अलग पढ़ता है' : 'Gauge drift — does any gauge read differently from the others?'}</h3>
+            <p className={`text-[12px] font-semibold ${drift.flagged.length > 0 ? 'text-warn-ink' : 'text-ink-body'}`}>{isHi ? (drift.summaryHi || drift.summary) : drift.summary}</p>
+            {drift.flagged.map((l: any) => (
+              <p key={`${l.gaugeCode}-${l.kind}`} className="mt-1 text-[12px] text-warn-ink">
+                <span className="font-bold">{l.gaugeCode}</span> · {String(l.kind).replace(/CASNUB_22_/, '').replace(/\|/g, ' ').toLowerCase()} — {isHi ? (l.noteHi || l.note) : l.note}
+              </p>
+            ))}
+            {drift.flagged.length === 0 && drift.lines.length > 0 && (
+              <p className="mt-1 text-[11px] text-ink-muted">{drift.lines.map((l: any) => `${l.gaugeCode}: ${l.note}`).join(' · ')}</p>
+            )}
+          </div>
         )}
       </div>
 

@@ -178,3 +178,44 @@ describe('the certificate QR', () => {
     assert.equal(junk.status, 404);
   });
 });
+
+describe('registering a wagon', () => {
+  it('TC-RTE-09: only the shop floor registers; a junk number is refused; a wrong registration is marked, not deleted, and only while nothing is recorded', async () => {
+    const insp = await login('inspector1'); const sup = await login('supervisor1'); const drm = await login('drm1'); const admin = await login('admin1');
+    for (const [who, t] of [['drm1', drm], ['admin1', admin]] as const) {
+      const r = await call('POST', '/api/wagons/register', { wagonNumber: 'SECR/BOXNHL/70707', wagonType: 'BOXNHL', owningRailway: 'SECR' }, auth(t));
+      assert.equal(r.status, 403, `${who} may not register a wagon`);
+    }
+    for (const junk of ['ADSFADS', 'wagon', '12345', 'SECR/BOXNHL', 'SECR//10492', 'SECR/BOXNHL/10492/EXTRA']) {
+      const r = await call('POST', '/api/wagons/register', { wagonNumber: junk, wagonType: 'BOXNHL', owningRailway: 'SECR' }, auth(insp));
+      assert.equal(r.status, 400, `${junk} is not a wagon number`);
+      assert.match(r.body.message, /not a wagon number/);
+    }
+    for (const good of ['secr/boxnhl/70707', '31088123456', 'NR/BOXNHL/PHOTO-BND']) {
+      const r = await call('POST', '/api/wagons/register', { wagonNumber: good, wagonType: 'BOXNHL', owningRailway: 'SECR' }, auth(insp));
+      assert.equal(r.status, 201, `${good}: ${JSON.stringify(r.body).slice(0, 120)}`);
+    }
+    // Registered in error: the supervisor marks it with a reason and the code; it leaves the pipeline; the row stays.
+    const noReason = await call('POST', '/api/wagons/' + encodeURIComponent('SECR/BOXNHL/70707') + '/void', { otpToken: 'test_token_override' }, auth(sup));
+    assert.equal(noReason.status, 400);
+    const byInsp = await call('POST', '/api/wagons/' + encodeURIComponent('SECR/BOXNHL/70707') + '/void', { reason: 'mistyped number', otpToken: 'test_token_override' }, auth(insp));
+    assert.equal(byInsp.status, 403, 'an inspector cannot void');
+    const noCode = await call('POST', '/api/wagons/' + encodeURIComponent('SECR/BOXNHL/70707') + '/void', { reason: 'mistyped number' }, auth(sup));
+    assert.equal(noCode.status, 401);
+    const ok = await call('POST', '/api/wagons/' + encodeURIComponent('SECR/BOXNHL/70707') + '/void', { reason: 'mistyped number; the real wagon is SECR/BOXNHL/70701', otpToken: 'test_token_override' }, auth(sup));
+    assert.equal(ok.status, 200, JSON.stringify(ok.body));
+    assert.ok(ok.body.data.voidedAt, 'marked, with when');
+    const list = await call('GET', '/api/wagons?limit=200', undefined, auth(sup));
+    assert.ok(!(list.body.data as any[]).some((w) => w.wagonNumber === 'SECR/BOXNHL/70707'), 'gone from the pipeline');
+    const still = await call('GET', '/api/wagons/' + encodeURIComponent('SECR/BOXNHL/70707'), undefined, auth(sup));
+    assert.equal(still.status, 200, 'the record itself remains');
+    const twice = await call('POST', '/api/wagons/' + encodeURIComponent('SECR/BOXNHL/70707') + '/void', { reason: 'again', otpToken: 'test_token_override' }, auth(sup));
+    assert.equal(twice.status, 409);
+    // A wagon with work recorded, or past entry, is not a mistake.
+    const moved = await call('POST', '/api/wagons/' + encodeURIComponent('SER/BOXNHL/30914') + '/void', { reason: 'trying to remove a real wagon', otpToken: 'test_token_override' }, auth(sup));
+    assert.equal(moved.status, 409);
+    assert.match(moved.body.message, /record now|has moved|recorded against/i);
+    const audit = await call('GET', '/api/audit/activity?limit=50', undefined, auth(sup));
+    assert.ok(JSON.stringify(audit.body).includes('WAGON_REGISTERED_IN_ERROR'), 'on the audit trail');
+  });
+});

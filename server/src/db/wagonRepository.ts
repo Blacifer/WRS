@@ -213,6 +213,29 @@ export class WagonRepository {
     return this.getWagonByNumber(wagonNumber);
   }
 
+  /**
+   * Mark a wagon as registered in error. Refused unless the wagon is still at
+   * entry registration with nothing recorded against it — a wagon that has
+   * been inspected, photographed or moved is history, not a typo.
+   */
+  public voidWagon(wagonNumber: string, by: { id: string; name: string }, reason: string): { ok: true } | { ok: false; reason: string } {
+    const w = this.getWagonByNumber(wagonNumber);
+    if (!w) return { ok: false, reason: 'No such wagon.' };
+    if (w.voidedAt) return { ok: false, reason: 'This wagon is already marked as registered in error.' };
+    if (w.currentStage !== 'ENTRY_REGISTRATION') return { ok: false, reason: `This wagon has moved to ${String(w.currentStage).replace(/_/g, ' ').toLowerCase()}; it is a record now, not a mistake. Move it back with an override if the stage is wrong.` };
+    const n = w.wagonNumber;
+    const counts = {
+      inspections: (this.db.prepare('SELECT COUNT(*) AS c FROM inspections WHERE wagon_number = ?').get(n) as any).c,
+      verdicts: (this.db.prepare("SELECT COUNT(*) AS c FROM checklist_items WHERE wagon_number = ? AND status NOT IN ('PENDING')").get(n) as any).c,
+      photos: (this.db.prepare('SELECT COUNT(*) AS c FROM wagon_photos WHERE wagon_number = ?').get(n) as any).c
+    };
+    const recorded = Object.entries(counts).filter(([, c]) => c > 0).map(([k, c]) => `${c} ${k}`);
+    if (recorded.length) return { ok: false, reason: `Work has been recorded against this wagon (${recorded.join(', ')}); it cannot be marked as a mistake.` };
+    this.db.prepare('UPDATE wagons SET voided_at = ?, voided_by = ?, void_reason = ?, status = ?, updated_at = ? WHERE wagon_number = ?')
+      .run(new Date().toISOString(), `${by.name} (${by.id})`, reason, 'HELD', new Date().toISOString(), n);
+    return { ok: true };
+  }
+
   public getWagonByNumber(wagonNumber: string): any {
     const row = this.db.prepare(`
       SELECT * FROM wagons WHERE wagon_number = ?
@@ -232,6 +255,7 @@ export class WagonRepository {
   }
 
   public queryWagons(params: {
+    includeVoided?: boolean;
     stage?: string;
     wagonType?: string;
     owningRailway?: string;
@@ -244,6 +268,9 @@ export class WagonRepository {
   } = {}): { records: any[]; totalCount: number; page: number; limit: number; totalPages: number } {
     const whereClauses: string[] = ['1=1'];
     const bindParams: any[] = [];
+
+    // A wagon registered in error is marked, not deleted; the pipeline does not show it.
+    if (!params.includeVoided) whereClauses.push('voided_at IS NULL');
 
     if (params.stage) {
       whereClauses.push('current_stage = ?');
@@ -2535,6 +2562,9 @@ export class WagonRepository {
       conditionNotes: row.condition_notes || row.entry_notes,
       createdBy: row.created_by,
       isReleased: row.current_stage === 'RELEASE',
+      voidedAt: row.voided_at ?? null,
+      voidedBy: row.voided_by ?? null,
+      voidReason: row.void_reason ?? null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       totalElapsedHours

@@ -13,6 +13,7 @@ import { parseWagonNumber } from '../../../shared/wagons/wagonNumber.ts';
 import { TrainIcon, CameraIcon, PlusCircleIcon } from '../components/Icons.tsx';
 import { Button, Chip, inputClass } from '../components/ui/index.tsx';
 import type { WagonRecord, LifecycleStage } from '../../../shared/types.ts';
+import { can } from '../../../shared/auth/permissions.ts';
 
 interface WagonsListPageProps {
   onSelectWagon: (wagonNumber: string) => void;
@@ -220,10 +221,13 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
           </div>
         </div>
 
-        <Button variant="primary" size="md" onClick={() => setShowRegisterModal(true)}>
-          <PlusCircleIcon size={18} />
-          {t('actions.registerWagon')}
-        </Button>
+        {/* Entering a wagon is the shop floor's job. The DRM and the admin read this list; they are not offered the button, and the server refuses them anyway. */}
+        {can(api.getUser()?.role, 'wagon.register') && (
+          <Button variant="primary" size="md" onClick={() => setShowRegisterModal(true)}>
+            <PlusCircleIcon size={18} />
+            {t('actions.registerWagon')}
+          </Button>
+        )}
       </div>
 
       {/* 7-Stage Pipeline Visualizer Pills */}

@@ -21,6 +21,7 @@ import { WagonConditionReport } from '../components/WagonConditionReport.tsx';
 import { PartsLedger } from '../components/PartsLedger.tsx';
 import { WagonPassport } from '../components/WagonPassport.tsx';
 import { ReleaseCertificateModal } from '../components/ReleaseCertificateModal.tsx';
+import { ActionConfirm } from '../components/ActionConfirm.tsx';
 import { SoundDiagnosticTool } from '../components/SoundDiagnosticTool.tsx';
 import { VoiceInspectionToolbar } from '../components/VoiceInspectionToolbar.tsx';
 import { CaliperCamera } from '../components/CaliperCamera.tsx';
@@ -122,6 +123,11 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
   // Certificate Modal State
   const [showAssemblyCapture, setShowAssemblyCapture] = useState<boolean>(false);
   const [showCertificateModal, setShowCertificateModal] = useState<boolean>(false);
+  // Registered in error: a supervisor, a reason, the one-time code; only at entry with nothing recorded.
+  const [voidOpen, setVoidOpen] = useState(false);
+  const [voidReason, setVoidReason] = useState('');
+  const [voidConfirming, setVoidConfirming] = useState(false);
+  const [voidNote, setVoidNote] = useState<string | null>(null);
   // Moving the due-out date: picked date waits for a reason, then is saved and confirmed.
   const [pendingDueOut, setPendingDueOut] = useState<string | null>(null);
   const [dueOutReason, setDueOutReason] = useState('');
@@ -1316,8 +1322,48 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                 <GearIcon size={16} /> {t('actions.overrideStage')}
               </button>
             )}
+            {isSupervisor && !isReleased && wagon?.currentStage === 'ENTRY_REGISTRATION' && (
+              <button
+                onClick={() => { setVoidOpen(!voidOpen); setVoidNote(null); }}
+                data-testid="void-open"
+                className="px-4 py-2.5 bg-transparent hover:bg-raised text-ink-muted border border-line rounded-control text-xs font-bold transition min-h-[48px]"
+              >
+                {isHi ? 'ग़लती से पंजीकृत?' : 'Registered in error?'}
+              </button>
+            )}
           </div>
         </div>
+        {/*
+          A wrong registration is marked, never deleted. Offered only while the
+          wagon is still at entry with nothing recorded against it; the server
+          refuses otherwise and says why. Supervisor, reason, one-time code —
+          the same weight as any other override, because that is what it is.
+        */}
+        {voidOpen && (
+          <div className="mt-3 rounded-control border border-line bg-raised p-3 flex flex-wrap items-end gap-2" data-testid="void-panel">
+            <label className="text-[11px] text-ink-muted flex flex-col gap-1 flex-1 min-w-[18rem]">
+              {isHi ? 'यह वैगन ग़लती से पंजीकृत हुआ — क्यों? (हटाया नहीं जाता; चिह्नित होकर ऑडिट में दर्ज होता है)' : 'This wagon was registered in error — why? (It is not deleted: it is marked, kept, and written to the audit trail. Only possible while nothing has been recorded against it.)'}
+              <input value={voidReason} onChange={(e) => setVoidReason(e.target.value)} placeholder={isHi ? 'जैसे: नंबर ग़लत टाइप हुआ; सही वैगन SECR/BOXNHL/40101' : 'e.g. number mistyped; the real wagon is SECR/BOXNHL/40101'} className="min-h-[40px] px-2 bg-card border border-line rounded-control text-sm text-white" data-testid="void-reason" />
+            </label>
+            <button type="button" disabled={voidReason.trim().length < 5} onClick={() => setVoidConfirming(true)} className="min-h-[40px] px-4 rounded-control bg-bad text-white text-xs font-bold disabled:opacity-50" data-testid="void-confirm">{isHi ? 'ग़लती से पंजीकृत — चिह्नित करें' : 'Mark as registered in error'}</button>
+            <button type="button" onClick={() => { setVoidOpen(false); setVoidReason(''); }} className="min-h-[40px] px-3 rounded-control border border-line text-xs font-bold text-ink-body">{isHi ? 'रद्द' : 'Cancel'}</button>
+          </div>
+        )}
+        {voidNote && <p className="mt-2 text-xs font-bold text-warn-ink" data-testid="void-note">{voidNote}</p>}
+        {voidConfirming && (
+          <ActionConfirm action="OVERRIDE" lang={(lang || 'en') as 'en' | 'hi'}
+            title={isHi ? `${wagonNumber} को ग़लती से पंजीकृत चिह्नित करें` : `Mark ${wagonNumber} as registered in error`}
+            description={isHi ? 'यह पाइपलाइन से हट जाएगा; रिकॉर्ड और ऑडिट प्रविष्टि बनी रहेगी।' : 'It leaves the pipeline; the record and the audit entry stay. This needs the supervisor\'s one-time code, like any override.'}
+            onConfirmed={async (otpToken) => {
+              setVoidConfirming(false);
+              try {
+                await api.voidWagon(wagonNumber, voidReason.trim(), otpToken);
+                setVoidNote(isHi ? 'चिह्नित हो गया — पाइपलाइन में अब नहीं दिखेगा।' : 'Marked as registered in error — it no longer appears in the pipeline.');
+                setTimeout(() => onBack(), 1200);
+              } catch (err: any) { setVoidNote(err?.message || 'Could not mark it.'); }
+            }}
+            onCancel={() => setVoidConfirming(false)} />
+        )}
 
         {/* 7-Stage Horizontal Stepper */}
         <div className="pt-4 border-t border-line">

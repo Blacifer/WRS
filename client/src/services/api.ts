@@ -517,6 +517,10 @@ export class ApiClient {
     });
   }
 
+  /** Mark a wagon as registered in error — a supervisor, a reason, the one-time code. Nothing is deleted. */
+  public async voidWagon(wagonNumber: string, reason: string, otpToken: string): Promise<{ success: boolean; data: WagonRecord }> {
+    return this.request(`/wagons/${encodeURIComponent(wagonNumber)}/void`, { method: 'POST', body: JSON.stringify({ reason, otpToken }) });
+  }
   public async setTargetReleaseDate(wagonNumber: string, targetReleaseDate: string | null, reason?: string): Promise<{ success: boolean; data: WagonRecord }> {
     return this.request(`/wagons/${encodeURIComponent(wagonNumber)}/target-release-date`, { method: 'PUT', body: JSON.stringify({ targetReleaseDate, reason }) });
   }

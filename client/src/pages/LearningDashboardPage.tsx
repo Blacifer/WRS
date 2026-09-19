@@ -52,11 +52,20 @@ export const LearningDashboardPage: React.FC<LearningDashboardPageProps> = ({ la
     load();
   }, [load]);
 
+  const [analysed, setAnalysed] = useState<string | null>(null);
   const runAnalysis = async () => {
     setBusyKey('__analyze__');
     try {
-      await api.runLearningAnalysis();
+      const r = await api.runLearningAnalysis();
       await load();
+      // Say what happened. It used to reload quietly, and with nothing new to
+      // propose the button looked dead.
+      const n = Array.isArray(r?.data?.insights) ? r.data.insights.length : 0;
+      const p = Number(r?.data?.proposalsRaised || 0);
+      const at = new Date().toLocaleTimeString('en-IN');
+      setAnalysed(isHi
+        ? `${at} पर विश्लेषण हुआ — ${n} अवलोकन, ${p} नए प्रस्ताव${p === 0 ? ' (अभी बदलने लायक कुछ नहीं)' : ''}।`
+        : `Analysed at ${at} — ${n} observation${n === 1 ? '' : 's'}, ${p} new proposal${p === 1 ? '' : 's'}${p === 0 ? ' (nothing worth changing yet)' : ''}.`);
     } catch (e: any) {
       setError(e?.message || 'Analysis failed');
     } finally {
@@ -115,6 +124,7 @@ export const LearningDashboardPage: React.FC<LearningDashboardPageProps> = ({ la
             : isHi ? 'अभी विश्लेषण करें' : 'Run Analysis'}
         </button>
       </div>
+      {analysed && <p className="text-xs font-bold text-good-ink -mt-2" data-testid="analysis-ran">{analysed}</p>}
 
       {/* The direct answer to the question in the title, placed first because
           it is what somebody senior actually asks: how much has it seen, and

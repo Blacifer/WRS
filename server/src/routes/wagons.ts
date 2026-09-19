@@ -76,6 +76,36 @@ function parseTargetDate(raw: unknown): string | null | false {
 // inspector's; on the audit trail, because moving a date is how a late wagon
 // stops looking late.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// POST /api/wagons/:wagonNumber/void — registered in error.
+//
+// Nothing is deleted. A supervisor, under a one-time code, with a reason,
+// marks a wagon that is still at entry with nothing recorded against it.
+// The pipeline stops showing it; the row and the audit entry remain. Filed
+// as a supervisor override because that is what it is.
+// ---------------------------------------------------------------------------
+wagonsRouter.post('/:wagonNumber/void', authMiddleware, requireCapability('wagon.override'), (req: Request, res: Response) => {
+  const { wagonRepo } = getRepos();
+  const wagonNumber = decodeURIComponent(String(req.params.wagonNumber || '')).trim().toUpperCase();
+  const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : '';
+  const user = (req as AuthenticatedRequest).user!;
+  if (reason.length < 5) { res.status(400).json({ success: false, error: 'REASON_REQUIRED', message: 'Say why this wagon was registered in error (at least five characters).', statusCode: 400, timestamp: new Date().toISOString() }); return; }
+  const token = req.body?.otpToken || req.body?.otp;
+  if (!token || !otpService.consumeActionToken(String(token), 'OVERRIDE', user.id)) {
+    res.status(401).json({ success: false, error: 'INVALID_OTP_TOKEN', message: 'Marking a wagon as registered in error needs the supervisor\'s one-time code.', statusCode: 401, timestamp: new Date().toISOString() });
+    return;
+  }
+  const r = wagonRepo.voidWagon(wagonNumber, { id: user.id, name: user.name || user.username || user.id }, reason.slice(0, 500));
+  if (!r.ok) { res.status(409).json({ success: false, error: 'CANNOT_VOID', message: r.reason, statusCode: 409, timestamp: new Date().toISOString() }); return; }
+  logAuditEvent(getDatabase(), {
+    eventType: 'SUPERVISOR_OVERRIDE_RECORDED',
+    userId: user.id,
+    userRole: user.role ?? undefined,
+    payload: { kind: 'WAGON_REGISTERED_IN_ERROR', wagonNumber, reason: reason.slice(0, 500) }
+  });
+  res.status(200).json({ success: true, data: wagonRepo.getWagonByNumber(wagonNumber), meta: { timestamp: new Date().toISOString() } });
+});
+
 wagonsRouter.put('/:wagonNumber/target-release-date', authMiddleware, requireCapability('wagon.release'), async (req: Request, res: Response) => {
   const { wagonRepo } = getRepos();
   const wagonNumber = String(req.params?.wagonNumber || '').trim().toUpperCase();
@@ -191,7 +221,21 @@ wagonsRouter.get('/:wagonNumber/passports', authMiddleware, requireCapability('w
   });
 });
 
-wagonsRouter.post('/register', authMiddleware, async (req: Request, res: Response) => {
+/**
+ * What a wagon number looks like: the shop's own form RAILWAY/TYPE/NUMBER
+ * (SECR/BOXNHL/10492 — the type and number segments may carry letters and
+ * hyphens), or the eleven-digit number painted on the wagon. The DRM's first
+ * walk registered a wagon called ADSFADS and it was accepted; a record that
+ * can never be matched to a wagon is worse than no record.
+ */
+export const WAGON_NUMBER_SHAPE = /^(?:[A-Z]{2,6}\/[A-Z0-9]{2,10}\/[A-Z0-9-]{1,12}|\d{11})$/;
+export function normaliseWagonNumber(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const n = raw.trim().toUpperCase().replace(/\s+/g, '').replace(/[\\]+/g, '/');
+  return WAGON_NUMBER_SHAPE.test(n) ? n : null;
+}
+
+wagonsRouter.post('/register', authMiddleware, requireCapability('wagon.register'), async (req: Request, res: Response) => {
   const { wagonRepo } = getRepos();
   const { wagonNumber, wagonType, owningRailway, entryNotes, conditionNotes, entryDate } = req.body;
 
@@ -220,6 +264,16 @@ wagonsRouter.post('/register', authMiddleware, async (req: Request, res: Respons
       success: false,
       error: 'INVALID_WAGON_NUMBER',
       message: 'Wagon number is required and cannot be empty (e.g. NR/BOXNHL/12345).',
+      statusCode: 400,
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
+  if (!normaliseWagonNumber(wagonNumber)) {
+    res.status(400).json({
+      success: false,
+      error: 'INVALID_WAGON_NUMBER',
+      message: `"${String(wagonNumber).trim()}" is not a wagon number. Use RAILWAY/TYPE/NUMBER as painted on the wagon, e.g. SECR/BOXNHL/10492, or the 11-digit number.`,
       statusCode: 400,
       timestamp: new Date().toISOString()
     });

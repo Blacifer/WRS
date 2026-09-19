@@ -1770,4 +1770,21 @@ export function runMigrations(db: DatabaseSync): void {
       SELECT RAISE(ABORT, 'A sync receipt records a delivery and cannot be deleted.');
     END;
   `);
+
+  /*
+   * A wagon registered in error.
+   *
+   * Nothing in this record is deleted, and a wagon is no exception: the DRM's
+   * first walk registered "ADSFADS" and then found there was no way to take
+   * it back. A void is a mark, not a removal — who, when, why — placed only
+   * while the wagon is still at entry with nothing recorded against it, by a
+   * supervisor under a one-time code, and written to the audit trail. The
+   * pipeline stops showing it; the row and its audit entries stay.
+   */
+  const wagonCols = db.prepare("PRAGMA table_info(wagons)").all() as any[];
+  if (wagonCols.length > 0 && !wagonCols.some((c) => c.name === 'voided_at')) {
+    db.exec("ALTER TABLE wagons ADD COLUMN voided_at TEXT DEFAULT NULL;");
+    db.exec("ALTER TABLE wagons ADD COLUMN voided_by TEXT DEFAULT NULL;");
+    db.exec("ALTER TABLE wagons ADD COLUMN void_reason TEXT DEFAULT NULL;");
+  }
 }

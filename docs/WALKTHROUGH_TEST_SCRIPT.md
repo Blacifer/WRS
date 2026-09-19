@@ -109,13 +109,13 @@ Sign in as **`drm1` / `password123`**.
 |---|---|---|
 | 4.1 | **DRM Dashboard** — *Shop Floor — Right Now* | When does today's pile finish; how many bogies can we build; what Stores will need — each a figure with its basis, none "Not yet known" |
 | 4.2 | Scroll: turnaround, where wagons wait, what keeps coming back, inspector quality, gauge exposure | Every rate carries its count; the band pie shows **six** colours with the bench included in its total |
-| 4.3 | **Spring Analytics** | Bench totals today/week, band shares, the standard report ("against the standard") with **n** on every figure, gauge drift with OSG‑02 named |
-| 4.4 | **System Learning** | Each subsystem with its measured agreement and count; the camera says it has been taught nothing yet and auto‑commit is off. Read‑only for the DRM |
+| 4.3 | **Spring Analytics** | Bench totals today/week; **tap a day's bar** → that day's figures read out beneath; stock by band; the standard report ("against the standard") with **n** on every figure; **Gauge drift** panel naming OSG‑02 |
+| 4.4 | **System Learning** → *Run Analysis* | Each subsystem with its measured agreement and count; the camera says it has been taught nothing yet and auto‑commit is off. After *Run Analysis* a green line: *Analysed at HH:MM — N observations, 0 new proposals (nothing worth changing yet)* |
 | 4.5 | **Shadow Run** | Visible, read-only (no record buttons) |
 | 4.6 | **Ask the Records** | As 3.18 |
 | 4.7 | **Audit Chain** → Verify | As 3.19 |
-| 4.8 | Try the Wagons → register, or Stores → restock | Not offered; if reached by URL, refused. The DRM reads; he does not write |
-| 4.9 | A released wagon's certificate → scan the QR with a phone, or open `/verify.html` and paste the certificate JSON | **VERIFIED** — with the laptop's Wi‑Fi off. Change one character → NOT VERIFIED |
+| 4.8 | Wagons Pipeline | **No *Register New Wagon* button** for the DRM; the server refuses the DRM too. (A supervisor typing a junk number like `ADSFADS` is refused: "not a wagon number". A supervisor who registers a wagon by mistake opens it → *Registered in error?* → reason → one‑time code → it leaves the pipeline; the record stays) |
+| 4.9 | Open `SECR/BOXNHL/10492` → *Release Certificate* → **scan the QR with the phone** (same Wi‑Fi) | The phone opens the verify page and shows **VERIFIED** — the certificate's signature checked against the shop's key, in the phone's browser. (The same page also accepts a certificate *file* handed over on paper/USB, with no server at all — that is what another railway would do) |
 
 ## 5. Admin — on the laptop
 
