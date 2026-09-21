@@ -39,6 +39,7 @@ case "${1:-}" in
     if curl -sk -o /dev/null --max-time 2 "https://localhost:$PORT/api/health"; then
       echo "running:  https://localhost:$PORT   (laptop)"
       echo "          https://${ip:-THIS-MACHINE-WIFI-ADDRESS}:$PORT   (phone or tablet on the same Wi-Fi)"
+      echo "          https://$(hostname -s | tr 'A-Z' 'a-z').local:$PORT   (iPad: use THIS one for the home-screen icon — it stays the same on every Wi-Fi and hotspot)"
     else echo "NOT running on :$PORT — run: bash scripts/rehearsal.sh start"; fi ;;
   log)
     echo "== $LOG (newest last)"; tail -40 "$LOG" 2>/dev/null | cut -c1-220 || echo "no log yet" ;;
