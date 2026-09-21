@@ -46,7 +46,7 @@ the evening before, never in the room.
 
 ## 2. Inspector — on the tablet
 
-Every step of this section, performed by the machine on the packaged bundle and photographed on a phone-sized screen, with the exact taps and what to suspect when a screen is not there: `node scripts/inspector-walk.mjs` then `node scripts/inspector-guide.mjs` (the page is published as the *Inspector walk* artifact).
+Every step of this section, performed by the machine on the packaged bundle and photographed on a phone-sized screen, with the exact taps and what to suspect when a screen is not there: `node scripts/inspector-walk.mjs` then `node scripts/walk-guide.mjs inspector` (the page is published as the *Inspector walk* artifact).
 
 Sign in as **`inspector1` / `password123`**.
 
@@ -63,7 +63,7 @@ Sign in as **`inspector1` / `password123`**.
 | 2.9 | Hindi toggle on this screen | Band names in Hindi with the same colours; numbers unchanged |
 | 2.10 | **Single Spring** — this is one spring *on a wagon*, so it first asks which wagon and bogie; scroll to **Free height** | Type 258.5 (NLB outer used) → band Green, Table 28. Type 244 → CONDEMNED with the reason. Type 263.1 → over-height, condemned. Type "abc" → refused, no crash |
 | 2.11 | **A wagon → All wagons** | The list of wagons in the shop with their stage. Type `WR/BCNHL/40112` → it opens |
-| 2.12 | Wagon → **Checklist** | Categories as tabs; items with Pass / Fail / Condemn; a condemned item asks for a note. The springs section links to the sorting records |
+| 2.12 | Wagon → **Checklist** | Categories as chips; items with **Pass · Fail · Condemned · Repaired · Replaced**; a condemned item asks for a note. The springs section links to the sorting records |
 | 2.13 | Wagon → **Photos** | Four assembly frames with pocket counts. Bogie 1·A: two counts agree. Bogie 2·B: "counted by Praveen Singh — a blind recount by someone else is needed" and **no figures**. Open the counter: tap pockets, the expected number is **not** shown. Close |
 | 2.14 | Wagon → **Parts** — *Parts in, parts out*: what came **off**, what went back **on**, what was **scrapped**, by position | A balance line (*40 off · 40 back on …*); in the list one outer spring **Replaced with new — crack at the second coil**; the form offers **Came off · Went back on · Replaced with new · Scrapped · Not being refitted**, then Category, Position, Part, How many |
 | 2.15 | Wagon → **Air‑brake test** tab (the Single Wagon Test) | The 14-row proforma; each row judged against the WMM limit as you type |
@@ -135,7 +135,7 @@ Sign in as **`admin1` / `password123`**.
 | 5.8 | Top right: **Authenticator** (shield icon, now labelled) | The panel opens in full; a QR to scan; a wrong code refused; a right code enrols; the account then needs the code at sign‑in |
 | 5.9 | **Stores & Inventory** | Parts with stock; **+ Add a part** → code, name, category, bin → it appears in the list; restock 10 → stock rises by 10; restock 1.5 → refused |
 | 5.10 | **Component Passports** | Serialised wheelsets and bearings; paste `WRS-PASSPORT\|WHL-RWF-2023-8841\|WHEELSET\|RWF_YELAHANKA` → its history |
-| 5.11 | **History & Logs** | Pick a band or status → the list narrows at once; type part of a wagon number → narrows as you type; the count line says *N records matching …* with *Clear filters*. Export CSV asks for the one‑time code |
+| 5.11 | **History & Logs** | Pick a band or status → the list narrows at once; type part of a wagon number → narrows as you type; the count line says *N records matching …* with *Clear filters*. **Export Audit Trail** (top bar) asks for the one‑time code |
 
 ## 6. Failure drills — once, on the machine you are rehearsing on
 

@@ -1,26 +1,32 @@
 #!/usr/bin/env node
 /**
- * The inspector's walkthrough as a page: every step of section 2 with the
- * phone screenshot the machine took, the exact taps, what must be on the
- * screen, what the machine saw (from scripts/inspector-walk.mjs's
- * result.json) and what to do when it is not there.
+ * A role's walkthrough as a page: every step of its section with the
+ * screenshot the machine took, the exact taps, what must be on the screen,
+ * what the machine saw (the walk's result.json) and what to do when it is
+ * not there.
  *
- *   node scripts/inspector-walk.mjs            # the walk, → docs/artifacts/inspector-walk/
- *   node scripts/inspector-guide.mjs           # this page, → docs/artifacts/inspector-guide/index.html
+ *   node scripts/inspector-walk.mjs                 # section 2, → docs/artifacts/inspector-walk/
+ *   node scripts/role-walks.mjs supervisor|drm|admin # sections 3–5, → docs/artifacts/<role>-walk/
+ *   node scripts/walk-guide.mjs <role>               # this page, → docs/artifacts/<role>-guide/index.html
+ *   HANDOUT=1 node scripts/walk-guide.mjs <role>     # the same for the shop, → docs/handouts/<role>-walk.html
  *
- * The words a person reads here are written by hand below; the evidence is
- * the machine's and is never edited.
+ * The words a person reads are in scripts/walk-guides/<role>.mjs; the
+ * evidence is the machine's and is never edited.
  */
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 
+const ROLE = (process.argv[2] || 'inspector').toLowerCase();
+const G = await import(`./walk-guides/${ROLE}.mjs`);
+const { GUIDE, GROUPS, DEVICE, TITLE, EYEBROW, H1, ACCOUNT, WALK_CMD } = G;
 // HANDOUT=1: the same page for the shop and the DRM's office — images embedded,
 // the evidence worded as "verified on the build", no tick controls, no
 // commands, nothing about how the page was produced. Written to docs/handouts/.
 const HANDOUT = process.env.HANDOUT === '1';
-const WALK = 'docs/artifacts/inspector-walk';
-const OUT = HANDOUT ? 'docs/handouts' : 'docs/artifacts/inspector-guide';
-const SHOTS = 'docs/artifacts/inspector-guide/shots';
+const WALK = `docs/artifacts/${ROLE}-walk`;
+const OUT = HANDOUT ? 'docs/handouts' : `docs/artifacts/${ROLE}-guide`;
+const SHOTS = `docs/artifacts/${ROLE}-guide/shots`;
+const WIDE = DEVICE !== 'phone';
 mkdirSync(SHOTS, { recursive: true });
 mkdirSync(OUT, { recursive: true });
 const result = JSON.parse(readFileSync(`${WALK}/result.json`, 'utf8'));
@@ -42,129 +48,6 @@ const day = new Date(result.startedAt).toLocaleDateString('en-IN', { day: '2-dig
  * screen; `why` is what the step proves to the room; `ifNot` is the fault to
  * suspect. Keep every button name exactly as the screen prints it.
  */
-const GUIDE = {
-  '2.1': { title: 'The inspector\'s home screen', group: 'bench',
-    do: ['Sign in as <b>inspector1</b> / password123.', 'Stay on the first screen — do not tap anything yet.'],
-    see: ['Two large cards under <em>What are you working on today?</em>: <b>Springs</b> and <b>A wagon</b>.', 'Under them, <b>Your record today</b>: how many springs, how many passed, the band tallies and the newest few with a time each.', 'A green <b>Online</b> dot and <em>Nothing waiting to send</em>.'],
-    why: 'The first person to use this screen asked for two things: to see at once whether they are on springs or a wagon, and to see what they have logged. Both are here before a single tap.',
-    ifNot: ['No <b>Your record today</b> box: the phone is not reaching the server — check the address and that the certificate was installed (section 1.4).', 'A red <b>Offline</b> dot: Wi‑Fi is off, or the phone has switched to mobile data — turn mobile data off.'] },
-  '2.2': { title: 'The sorting bench', group: 'bench',
-    do: ['Tap <b>Sorting</b> in the bar (or the <b>Springs</b> card, then <b>Sort springs</b>).'],
-    see: ['<b>Bogie type</b> CASNUB 22 NLB, <b>Condition</b> Used (6 bands), <b>Spring position</b> Outer.', 'The strip: six coloured buttons — <span class="band blue">Blue I 263–260</span> <span class="band green">Green II 260–257</span> <span class="band yellow">Yellow III 257–254</span> <span class="band orange">Orange IV 254–251</span> <span class="band white">White V 251–248</span> <span class="band red">Red VI 248–245</span> mm.', 'Below the strip a red <b>Condemn this spring</b> bar and the <b>Gauge</b> picker.'],
-    why: 'These are the six bands of the shop\'s own G‑95 Rev‑II (Tables 28–33), not a five-band draft from the internet. The Roman numerals and heights should match the strip on the bench exactly.',
-    ifNot: ['Three buttons, not six: <b>Condition</b> is on New — set it to Used.', 'No strip at all, a height box instead: <b>Bogie type</b> is on LWLH25 or LCCF20 (see 2.8).'] },
-  '2.3': { title: 'Three springs by the band', group: 'bench',
-    do: ['Tap <b>Green</b>, then <b>Yellow</b>, then <b>Blue</b>, a second apart.'],
-    see: ['<em>This session:</em> rises 1 → 2 → 3, <em>Passed: 3</em>, and <em>Last:</em> names the band just tapped.', 'A short chime on each tap.', 'In <b>Your record today</b> under the strip: the three new lines at the top, newest first — Blue, then Yellow, then Green — each with the time, ≈height, position, bogie and gauge.'],
-    why: 'One tap per spring is the whole bench workflow. At 700 springs a shift nothing else is fast enough, and the record under the strip is how an inspector proves their own count at the end of the day.',
-    ifNot: ['The count rises but the record does not change: the record box is fetched from the server after each tap — if the phone is offline it says so and fills in when the network returns (see 2.20).'] },
-  '2.4': { title: 'Undo the last tap', group: 'bench',
-    do: ['Tap <b>↩ Undo last spring</b> (right, under the strip).'],
-    see: ['<em>This session</em> drops by one.', 'A line names what was taken back: <em>Took back BLUE · Band I · 261.5 mm. 2 left in this session.</em>', 'The line disappears from <b>Your record today</b>.'],
-    why: 'A wrong tap is a certainty at bench speed, so the undo is one tap and says exactly what it undid. The record keeps a "taken back" mark internally — nothing is silently deleted.',
-    ifNot: ['<b>Undo last spring</b> greyed out: the session is empty, or the last tap is still sending — wait a second.'] },
-  '2.5': { title: 'Which gauge — and one with no calibration date', group: 'bench',
-    do: ['Open the <b>Gauge</b> picker and read the list.', 'Set <b>Spring position</b> to Snubber.', 'Pick <b>SSG‑02</b> in the gauge picker.'],
-    see: ['The gauges are named: <b>ISG‑01</b>, <b>OSG‑01</b>, <b>OSG‑02</b>, <b>SSG‑02</b>, each with what it measures.', 'On SSG‑02 an amber note: <em>No calibration date is recorded for this gauge. Readings will be marked accordingly.</em>'],
-    why: 'Every reading carries the gauge it was made with, so a drifting gauge can be found later (the admin sees this on the gauge register). An uncalibrated gauge does not stop work — it marks the readings.',
-    ifNot: ['No amber note on SSG‑02: the gauge register has a date for it — the admin can check under Gauges; the demo seed leaves it blank on purpose.', 'Set <b>Spring position</b> back to <b>Outer</b> before the next step.'] },
-  '2.6': { title: 'Condemn a spring on sight', group: 'bench',
-    do: ['Tap the red <b>Condemn this spring</b> bar.', 'Read the panel, tap <b>Back</b> — nothing is recorded.', 'Tap <b>Condemn this spring</b> again, then tap <b>Crack</b>.'],
-    see: ['The panel asks <em>What did you see?</em> with <b>Off the strip (height)</b>, <b>Crack</b>, <b>Corrosion</b>, <b>Deformation</b>, <b>Something else</b> and <b>Back</b>.', 'An amber note says that for a crack, corrosion or deformation the photograph is the evidence — switch on photographing (2.7).', 'The tap on <b>Crack</b> records it: <em>Condemned: 1</em>, a low buzz, and in <b>Your record today</b> a red line — <b>Condemned Crack · outer · 22 NLB · OSG‑01</b>.', 'No question about re‑measuring — nothing was measured.'],
-    why: 'The reason is the record. A spring condemned for a crack must never be filed as "200 mm" — the record shows the word, not an invented height.',
-    ifNot: ['The record line shows a height instead of the reason, or a yellow <em>Worth a second look</em> panel appears asking you to re-measure: the phone is showing an old build — pull down to reload the page once.'] },
-  '2.7': { title: 'Photographing while sorting', group: 'bench',
-    do: ['Tick <b>Photograph springs while sorting</b>.', 'Put a spring in front of the camera and tap its band.', 'Put your hand in front of the lens and watch the badge.'],
-    see: ['The live camera opens directly under the tick box, large (not a thumbnail), with a green <b>Photographing</b> badge.', 'Each band tap saves a frame against the spring — no extra taps.', 'A hand in front → <em>person excluded</em>. It never says "spring 98 %".', '<b>Teach the camera (advanced)</b> stays folded — it is not part of the day\'s work.'],
-    why: 'The camera records evidence; it does not decide. The photograph is what a supervisor opens months later to see the crack that condemned the spring.',
-    ifNot: ['No camera, a grey box: the browser has no camera permission or the page is on plain http — the address must start with <b>https://</b> and the certificate must be installed (section 1.4).', 'The camera opens somewhere else on the page: reload once.'],
-    byHandNote: 'The machine ran this with a fake camera: it proved the camera opens where it should, large, with the badge. The spring and the hand are yours.' },
-  '2.8': { title: 'A bogie with no band table', group: 'bench',
-    do: ['Untick photographing.', 'Set <b>Bogie type</b> to <b>LWLH25 (BOXNS)</b>.', 'Then set it back to <b>CASNUB 22 NLB</b>.'],
-    see: ['The six-button strip disappears; a single <em>Free height — how many mm?</em> box appears.', 'A note: <em>No band table is published for this bogie — serviceable / condemn only. WMM 2.0 §309C</em>.', 'The snubber position splits into Snubber outer / inner (G‑112 Table 26).'],
-    why: 'Where the standard publishes no bands, the app refuses to invent them. LWLH25 springs are judged serviceable or condemned against §309C, by a typed height.',
-    ifNot: ['A six-button strip on LWLH25: that would be an invented table — report it at once.'] },
-  '2.9': { title: 'The bench in Hindi', group: 'bench',
-    do: ['Tap <b>हिंदी</b> top right.', 'Look at the strip, then tap <b>EN</b> to come back.'],
-    see: ['<b>स्प्रिंग छँटाई</b> as the title; the bands read <b>नीला · हरा · पीला · नारंगी · सफ़ेद · लाल</b> in the same colours, with BAND I–VI and the same millimetres.', 'The gauge names (OSG‑01 …) stay as printed on the gauges.'],
-    why: 'Numbers and colours are the shared language of the bench; the words follow whoever is holding the phone.',
-    ifNot: ['A line still in English inside a Hindi screen: note which one — it is a missing translation, not a fault in the record.'] },
-  '2.10': { title: 'One spring, on a wagon — Single Spring', group: 'single',
-    do: ['Tap <b>Single Spring</b> in the bar.', 'Note it first asks which wagon and bogie.', 'Scroll to the height box and type <b>258.5</b>, then <b>244</b>, then <b>263.1</b>, then try to type <b>abc</b>.'],
-    see: ['258.5 → <b>Green</b>, Band II, <em>Table 28</em> cited.', '244 → <b>CONDEMNED</b> with the reason (below the condemning limit).', '263.1 → over height, condemned.', '"abc" cannot be typed at all — the box only takes a number; nothing crashes.'],
-    why: 'The same tables as the bench, but tied to one wagon and bogie so the spring can be traced. Every verdict quotes its table.',
-    ifNot: ['A verdict without a table reference: report it — a verdict must always say where it came from.'] },
-  '2.11': { title: 'Choosing a wagon', group: 'wagon',
-    do: ['Tap <b>Tasks / Home</b>, then the <b>A wagon</b> card.', 'Tap <b>All wagons</b>.', 'Type <b>WR/BCNHL/40112</b> in <em>Or enter the number</em> and tap <b>Select</b> (or pick it from the list).', 'Tap <b>Continue checklist</b>.'],
-    see: ['The picker lists the wagons in the shop with their stage; WR/BCNHL/40112 is at <b>Reassembly</b> (stage 5 of 7 on the stage bar).', 'The wagon opens with its tabs: Checklist · Condition report · Release checks · Passport · Parts · Photos (4) · Timeline · Air‑brake test · Sound.'],
-    why: 'One wagon is "active" on the phone until you switch; every photograph, reading and part event lands on it.',
-    ifNot: ['"No such wagon": check the slashes — WR/BCNHL/40112, capital letters.', 'The picker shows a different set of wagons: the demo data was not seeded — run DEMO‑DATA.cmd (laptop) or <code>bash scripts/rehearsal.sh start</code> (Mac).'] },
-  '2.12': { title: 'The checklist', group: 'wagon',
-    do: ['Tap the <b>Checklist</b> tab.', 'Pick a category chip (Springs, Wheels & Axles, Bearings …).'],
-    see: ['Each item has <b>Pass</b> / <b>Fail</b> / <b>Condemn</b>.', 'Condemning an item asks for a note; a mandatory item cannot be skipped.'],
-    why: 'The eight CASNUB categories from the WMM, item by item, with the standard each item cites.',
-    ifNot: ['Buttons greyed out: the wagon is already released, or you are signed in as a role that cannot inspect.'] },
-  '2.13': { title: 'Photographs and the blind pocket count', group: 'wagon',
-    do: ['Tap the <b>Photos (4)</b> tab.', 'Read the four <b>Pocket counts</b> lines.', 'Tap <b>Recount</b> on Bogie 2 · Side B and look at the counter, then close it.'],
-    see: ['Four frames: Bogie 1 · Side A/B, Bogie 2 · Side A/B.', 'Bogie 1 · Side A: <b>7⁄7⁄2 and 7⁄7⁄2 — agree</b>.', 'Bogie 2 · Side B: <em>Counted by Praveen Singh — a blind recount by someone else is needed</em>, and <b>no figures</b>.', 'The counter never shows the expected number — you count what is in the photograph.'],
-    why: 'A second person counts without seeing the first count. Only a supervisor sees "6 of 7 outer — one pocket may be empty". This is how a short bogie is caught before the exit gate, without anyone being led.',
-    ifNot: ['The inspector\'s screen shows "6 of 7" or "short": that is a leak of the supervisor\'s view — report it.', 'The counter shows "expected 7": same — report it.'] },
-  '2.14': { title: 'Parts in, parts out', group: 'wagon',
-    do: ['Tap the <b>Parts</b> tab.', 'Read the balance line and open <b>Show every entry</b>.', 'Look at the form: <b>Came off · Went back on · Replaced with new · Scrapped · Not being refitted</b>, then Category, Position, Part, How many.'],
-    see: ['The heading <b>Parts in, parts out</b> and a balance such as <em>40 off · 40 back on · 20 % of 41 expected positions covered</em>.', 'In the list: the springs off at Dismantling, one outer spring <b>Replaced with new — crack at the second coil, new from Stores</b>, the rest back on at Reassembly. No warning box about a position with more back on than came off.', 'Recording a part asks which position; Scrapped and Not being refitted ask for a reason.'],
-    why: 'Months after the wagon has gone, this list answers "was anything missing" — with the person and the time against each entry.',
-    ifNot: ['A red box saying the wagon has no parts record at all: the demo data on this server predates this build — re-seed (DEMO‑DATA.cmd / rehearsal.sh start).'] },
-  '2.15': { title: 'The air-brake test proforma', group: 'wagon',
-    do: ['Tap the <b>Air‑brake test</b> tab.', 'Type <b>3.2</b> in row 1 <em>Pressure in BP</em>, watch the box, then clear it.'],
-    see: ['<b>Single Wagon Test (air brake)</b> — WMM 2.0 §720‑C — 14 rows: 12 readings with the specified range beside each, 2 yes/no rows (<b>As specified</b> / <b>Not</b>).', '3.2 against 4.9–5.1 turns the box red as you type.', 'The foot says how many rows are still blank; <b>Record test</b> refuses until every row is answered.'],
-    why: 'The proforma the WMM requires after POH, with each limit beside the box so the person testing does not have to remember it.',
-    ifNot: ['The <b>Not</b> button cut off at the right edge: an old build on the phone — reload once.'] },
-  '2.16': { title: 'The wagon\'s timeline', group: 'wagon',
-    do: ['Tap the <b>Timeline</b> tab.'],
-    see: ['Every stage the wagon has passed, with the date and who moved it: Entry registration → Dismantling → Component inspection → Repair → Reassembly.'],
-    why: 'Turnaround and "which stage is slow" on the DRM dashboard are computed from exactly these lines — nothing is estimated.',
-    ifNot: [] },
-  '2.17': { title: 'A wheel, from the chalk on the disc', group: 'wagon',
-    do: ['Home → <b>Switch wagon</b> → <b>All wagons</b> → <b>SER/BOXNHL/30914</b> → Continue checklist.', 'On the Checklist tab scroll to the wheels (Axle 1 · bogie 1 … Axle 4 · bogie 2).', 'Tap <b>Axle 1 · Left</b>. Type <b>917</b>.'],
-    see: ['One large box: <em>Tread diameter (mm) — the figure chalked on the disc</em>.', 'Under it, as you type: <b>below issue limit</b> — <em>Tread diameter 917 mm — last shop issue 919 mm, condemn 906 mm (WD‑97037‑S‑01 (WMM Ch.6, WD‑88089/S‑1))</em>.', 'Flange figures are folded under <em>Flange and tread figures, if the tyre defect gauge was used (optional)</em>.', 'Axle 3 already reads 917.5 / 917.8 in amber — this is the pair that blocks the wagon at the gate (section 3).'],
-    why: 'The one number every wheel has is the chalked diameter; the rest is optional and stays out of the way. The limit and its drawing are quoted, never remembered.',
-    ifNot: ['A row of six empty boxes with no verdict: an old build — reload.', 'Tap <b>Cancel</b> — do not record 917 on axle 1; the demo relies on axle 3 being the blocked pair.'] },
-  '2.18': { title: 'Reading a wagon number with the camera', group: 'camera',
-    do: ['Home → <b>Switch wagon</b> → <b>All wagons</b> → tap the camera icon <b>Read the number painted on the wagon</b>.', 'Point at any printed wagon number (a sheet of paper with <b>SER/BOXNHL/30914</b> in large letters is enough).'],
-    see: ['The camera opens with a frame guide.', 'It proposes the text it read; you <b>confirm</b> or correct it. Nothing is recorded until you confirm.'],
-    why: 'Eleven characters with gloves on, standing at the wagon, is exactly what a camera is for — but the person, not the camera, commits the number.',
-    ifNot: ['Reads nothing after ten seconds: more light, closer, hold still; typing the number is always there beneath.'],
-    byHandNote: 'The machine proved the camera opens and the confirm-or-correct wording is there; it had no painted number to read.' },
-  '2.19': { title: 'Ask the Manual', group: 'camera',
-    do: ['Tap <b>Manual</b> in the bar.', 'Search <b>brake block condemning limit</b>.', 'Then search <b>wheel diameter variation same axle bogie</b>.'],
-    see: ['The first hit is labelled <b>ANSWER — IN THE DOCUMENT\'S OWN WORDS</b>, large, with the page number, and a <em>Source:</em> line naming the manual and page.', 'More hits under <b>ALSO IN</b>.', 'The wheel question names <b>IRCA Part III</b> as its source.'],
-    why: 'It quotes; it never paraphrases. 8,200 passages from the shipped manuals, on the phone, with no internet. If a passage does not exist it says so rather than inventing one.',
-    ifNot: ['"Manual not indexed": run INDEX‑MANUALS.cmd on the laptop (the Mac does this in rehearsal.sh start).'] },
-  '2.20': { title: 'Working with no network', group: 'edge',
-    do: ['Turn the phone\'s Wi‑Fi off (mobile data is already off).', 'On <b>Sorting</b>, tap three bands.', 'Turn Wi‑Fi back on and wait up to a minute.'],
-    see: ['The three record with the usual chime; a banner: <em>3 springs are held on this tablet and will send themselves when the network is back. Nothing is lost.</em>', 'With Wi‑Fi back the banner clears and <b>Your record today</b> gains exactly three lines — no duplicates.'],
-    why: 'The shed has dead spots. Work continues; the record catches up; nothing doubles when the network flickers.',
-    ifNot: ['The page will not open with Wi‑Fi off: the app was never installed for offline use — that needs the certificate and one visit over https first (section 1.4).', 'Six lines instead of three: report it with the time — that would be a duplicate on resend, which the server is built to refuse.'] },
-  '2.21': { title: 'Screens an inspector does not have', group: 'edge',
-    do: ['In the address bar add <b>/dashboard</b> to the app address and open it.', 'Do the same with <b>/audit</b>.'],
-    see: ['Only the inspector\'s own screens appear — there is no DRM dashboard or audit page to reach by typing.', 'On the server the DRM\'s analytics and the audit data answer <b>403 refused</b> to an inspector\'s sign-in.'],
-    why: 'Roles are enforced on the server by capability, not by hiding buttons.',
-    ifNot: ['A dashboard with figures on an inspector\'s phone: report it — that is a permission fault.'] },
-  '2.22': { title: 'Sign out', group: 'edge',
-    do: ['Tap the red <b>Logout</b> in the bar.', 'Press the phone\'s back button.'],
-    see: ['The sign-in page.', 'Back does not reopen a signed-in screen.'],
-    why: 'A phone left on the bench must not carry a live session.',
-    ifNot: [] }
-};
-
-const GROUPS = [
-  ['bench', 'The bench — springs', '2.1 – 2.9', 'Sign in as inspector1. Everything here is one tap per spring.'],
-  ['single', 'One spring on a wagon', '2.10', 'The same tables, tied to a wagon and bogie.'],
-  ['wagon', 'A wagon — WR/BCNHL/40112 and SER/BOXNHL/30914', '2.11 – 2.17', 'Checklist, photographs, parts, the brake proforma, the timeline, a wheel.'],
-  ['camera', 'The camera and the manual', '2.18 – 2.19', 'Reading a painted number; asking the manual in its own words.'],
-  ['edge', 'No network, no permission, sign out', '2.20 – 2.22', 'What must keep working and what must be refused.']
-];
-
 const matched = result.steps.filter((s) => s.ok).length;
 const byHand = result.steps.filter((s) => s.byHand).length;
 const total = result.steps.length;
@@ -216,8 +99,8 @@ const RUN_CARD = HANDOUT ? `
       <div class="big">${matched} / ${total} <small>steps verified</small></div>
       <dl>
         <dt>When</dt><dd>${esc(day)}</dd>
-        <dt>On</dt><dd>the packaged bundle, seeded with the demonstration record, on a phone-sized screen with the camera allowed</dd>
-        <dt>By hand</dt><dd>${byHand} steps need a real object in front of the camera (2.7, 2.18)</dd>
+        <dt>On</dt><dd>the packaged bundle, seeded with the demonstration record, ${DEVICE === 'phone' ? 'on a phone-sized screen with the camera allowed' : 'on a laptop screen'}</dd>
+        <dt>By hand</dt><dd>${byHand ? `${byHand} step${byHand === 1 ? '' : 's'} (${result.steps.filter((s) => s.byHand).map((s) => s.num).join(', ')}) need a person or a second device` : 'none'}</dd>
       </dl>
     </div>` : `
     <div class="card run">
@@ -226,10 +109,10 @@ const RUN_CARD = HANDOUT ? `
       <dl>
         <dt>When</dt><dd>${esc(day)}, ${when(result.startedAt)} – ${when(result.finishedAt)}</dd>
         <dt>Against</dt><dd>${esc(result.base)} (the packaged bundle, seeded by DEMO‑DATA's command)</dd>
-        <dt>As</dt><dd>a 412 × 915 phone, touch, camera allowed</dd>
-        <dt>By hand</dt><dd>${byHand} steps need a real object in front of the camera (2.7, 2.18) — the machine proved the screen, you supply the spring and the number</dd>
+        <dt>As</dt><dd>${DEVICE === 'phone' ? 'a 412 × 915 phone, touch, camera allowed' : 'a 1280 × 900 laptop screen'}</dd>
+        <dt>By hand</dt><dd>${byHand ? `${byHand} step${byHand === 1 ? '' : 's'} need${byHand === 1 ? 's' : ''} a person or a second device (${result.steps.filter((s) => s.byHand).map((s) => s.num).join(', ')}) — the machine proved the screen, you do the rest` : 'none — every step was done by the machine'}</dd>
         <dt>Page errors</dt><dd>${result.consoleErrors.length ? esc(result.consoleErrors.join('; ')) : 'none'}</dd>
-        <dt>Rerun</dt><dd>node scripts/inspector-walk.mjs · node scripts/inspector-guide.mjs</dd>
+        <dt>Rerun</dt><dd>${WALK_CMD} · node scripts/walk-guide.mjs ${ROLE}</dd>
       </dl>
     </div>`;
 const SETUP_CARD = HANDOUT ? `
@@ -240,7 +123,7 @@ const SETUP_CARD = HANDOUT ? `
         <li>On the tablet, turn <b>mobile data off</b> and join the shop Wi‑Fi.</li>
         <li>Install the certificate on the tablet once — <b>server\\certs\\lan‑cert.crt</b>, as in TABLET_TRUST.md — so the address opens with no warning and the camera and offline mode are allowed.</li>
         <li>Open the address START.cmd printed and accept <em>Add to home screen</em>.</li>
-        <li>Sign in with the inspector account you were given.</li>
+        <li>Sign in with ${ACCOUNT.handout}.</li>
       </ol>
       <p style="margin-top:10px">Then go step by step. Each step shows the screen as it should look, the taps in order, what must be on your screen, and what to suspect when it is not. Tick <b>Seen it</b> only when you saw it.</p>
     </div>` : `
@@ -251,11 +134,11 @@ const SETUP_CARD = HANDOUT ? `
         <li>On the phone, turn <b>mobile data off</b> and join the same Wi‑Fi as the server.</li>
         <li>Install the certificate on the phone once — <b>lan‑cert.crt</b>, as in TABLET_TRUST.md — so the address opens with no warning and the camera and offline mode are allowed. Without it the page opens but 2.7, 2.18 and 2.20 cannot pass.</li>
         <li>Open <b>https://&lt;the Wi‑Fi address&gt;:3200</b> and accept <em>Add to home screen</em>.</li>
-        <li>Sign in as <b>inspector1</b>, password <b>password123</b>.</li>
+        <li>Sign in as <b>${ACCOUNT.user}</b>, password <b>password123</b>.</li>
       </ol>
       <p style="margin-top:10px">Then go step by step. Each step shows the phone screenshot the machine took on this build, the taps in order, what must be on your screen, and what to suspect when it is not. Tick <b>Seen it</b> only when you saw it; <b>Didn't match</b> and a note is the bug report.</p>
     </div>`;
-const html = `<title>Inspector Walk</title>
+const html = `<title>${TITLE}</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
   :root{
@@ -320,6 +203,10 @@ const html = `<title>Inspector Walk</title>
   .note textarea{width:100%;box-sizing:border-box;font:inherit;font-size:13px;padding:6px 8px;border:1px solid var(--bad);background:var(--paper);color:var(--ink);min-height:48px;resize:vertical}
   .step-body{display:grid;grid-template-columns:230px 1fr;gap:18px;padding:14px 16px 16px}
   @media (max-width:640px){ .step-body{grid-template-columns:1fr} .shots{display:flex;gap:10px;overflow-x:auto} .shots figure{flex:0 0 200px} }
+  .wrap.wide .step-body{grid-template-columns:1fr}
+  .wrap.wide .shots{flex-direction:row;flex-wrap:wrap}
+  .wrap.wide .shots figure{flex:1 1 320px;max-width:640px}
+  .wrap.wide .shots img{max-height:420px;border-radius:8px;border-width:4px}
   .shots{display:flex;flex-direction:column;gap:10px}
   .shots figure{margin:0}
   .shots img{display:block;width:100%;max-width:100%;max-height:520px;object-fit:cover;object-position:top;background:var(--shot-frame);border:6px solid var(--shot-frame);border-radius:14px;box-sizing:border-box}
@@ -352,12 +239,12 @@ const html = `<title>Inspector Walk</title>
   @media (prefers-reduced-motion:reduce){ *{transition:none!important} }
 </style>
 
-<div class="wrap">
+<div class="wrap${WIDE ? ' wide' : ''}">
   <header class="top">
     <div class="top-row">
       <div>
-        <div class="eyebrow">WRS Raipur · Spring &amp; Wagon QC · the inspector, on the tablet</div>
-        <h1>${HANDOUT ? 'Inspector walk — every screen, step by step' : "Inspector walk — every screen, with the machine's own photographs"}</h1>
+        <div class="eyebrow">WRS Raipur · Spring &amp; Wagon QC · ${EYEBROW}</div>
+        <h1>${HANDOUT ? H1.handout : H1.rehearsal}</h1>
       </div>
       ${HANDOUT ? '' : `<div class="progress"><span id="count">0 / ${total}</span><div class="bar"><i id="fill"></i></div><span id="badcount"></span></div>`}
     </div>
@@ -380,7 +267,7 @@ const html = `<title>Inspector Walk</title>
 </div>
 
 ${HANDOUT ? '' : `<script>
-const KEY='wrs-inspector-walk-v1';
+const KEY='wrs-${ROLE}-walk-v1';
 let state={};
 try{ state=JSON.parse(localStorage.getItem(KEY)||'{}')||{}; }catch(e){ state={}; }
 function save(){ try{ localStorage.setItem(KEY,JSON.stringify(state)); }catch(e){} }
@@ -420,7 +307,7 @@ document.getElementById('reset').addEventListener('click',()=>{ document.getElem
 document.getElementById('reset-no').addEventListener('click',()=>{ document.getElementById('reset-confirm').hidden=true; });
 document.getElementById('reset-yes').addEventListener('click',()=>{ clearSteps(Object.keys(rows)); document.getElementById('reset-confirm').hidden=true; document.getElementById('summary').style.display='none'; window.scrollTo({top:0}); });
 document.getElementById('summarise').addEventListener('click',()=>{
-  const lines=['WRS Raipur — inspector walk (section 2) — '+new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})];
+  const lines=['WRS Raipur — ${ROLE} walk — '+new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})];
   let done=0,bad=[];
   for(const row of steps){ const n=row.dataset.num, st=state[n]; if(st&&st.done) done++; if(st&&st.bad) bad.push(n+' '+row.querySelector('h3').textContent+' — '+(st.note||'(no note)')); }
   lines.push(done+' of '+total+' steps seen; '+bad.length+' did not match.');
@@ -429,13 +316,17 @@ document.getElementById('summarise').addEventListener('click',()=>{
 });
 </script>`}
 `;
-const outFile = HANDOUT ? `${OUT}/inspector-walk.html` : `${OUT}/index.html`;
+const outFile = HANDOUT ? `${OUT}/${ROLE}-walk.html` : `${OUT}/index.html`;
 // The handout goes to the shop and the DRM's office: shop commands only, the shop's own accounts.
 const handoutText = (h) => h
   .replace(/run DEMO‑DATA\.cmd \(laptop\) or <code>bash scripts\/rehearsal\.sh start<\/code> \(Mac\)/g, 'run DEMO‑DATA.cmd on the PC')
   .replace(/re-seed \(DEMO‑DATA\.cmd \/ rehearsal\.sh start\)/g, 're-seed with DEMO‑DATA.cmd on the PC')
   .replace(/run INDEX‑MANUALS\.cmd on the laptop \(the Mac does this in rehearsal\.sh start\)/g, 'run INDEX‑MANUALS.cmd on the PC')
   .replace(/Sign in as <b>inspector1<\/b> \/ password123\./g, 'Sign in with the inspector account you were given.')
-  .replace(/Sign in as inspector1\./g, 'Sign in as an inspector.');
+  .replace(/https?:\/\/localhost:\d+/g, 'https://<the PC\'s address>')
+  .replace(/in rehearsal/g, 'in this check').replace(/the rehearsal record/g, 'the demonstration record')
+  .replace(/Sign in as inspector1\./g, 'Sign in as an inspector.')
+  .replace(/Sign in as supervisor1\./g, 'Sign in as a supervisor.').replace(/Sign in as drm1\./g, 'Sign in as the DRM.').replace(/Sign in as admin1\./g, 'Sign in as the administrator.')
+  .replace(/Sign in as <b>(supervisor1|drm1|admin1)<\/b> \/ password123\./g, 'Sign in with the account you were given.');
 writeFileSync(outFile, HANDOUT ? handoutText(html) : html);
 console.log(`${outFile} — ${matched}/${total} matched, ${byHand} by hand, ${result.steps.reduce((n, s) => n + s.shots.length, 0)} screenshots`);

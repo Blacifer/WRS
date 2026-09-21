@@ -289,7 +289,7 @@ begin('2.12', 'Wagon → Checklist');
   await wagonTab('Checklist');
   await shot('40112-checklist');
   const t = await bodyText();
-  saw(/Pass/i.test(t) && /Fail/i.test(t) && /Condemn/i.test(t), 'Pass / Fail / Condemn per item');
+  saw(/PASS/.test(t) && /FAIL/.test(t) && /CONDEMNED/.test(t) && /REPAIRED/.test(t) && /REPLACED/.test(t), 'Pass · Fail · Condemned · Repaired · Replaced per item');
   saw(/Spring|Bogie|Brake|Wheel/i.test(t), 'category tabs');
 }
 

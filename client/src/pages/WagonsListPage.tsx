@@ -344,7 +344,12 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
                 <div className="space-y-1">
                   <div className="flex justify-between text-[11px] text-ink-muted font-medium">
                     <span>{t(`lifecycle.stages.${wagon.currentStage}` as any) || wagon.currentStage}</span>
-                    <span>{wagon.totalElapsedHours ? `${wagon.totalElapsedHours}h ${isReleased ? (isHi ? 'टर्नअराउंड' : 'turnaround') : (isHi ? 'ठहराव' : 'dwell')}` : (isHi ? 'सक्रिय' : 'Active')}</span>
+                    {/* Days, not hours: "214.1h dwell" is arithmetic for the reader; "9 days in shop" is the figure the shop uses. */}
+                    <span>{wagon.totalElapsedHours
+                      ? (wagon.totalElapsedHours >= 48
+                        ? `${(wagon.totalElapsedHours / 24).toFixed(wagon.totalElapsedHours >= 240 ? 0 : 1)} ${isReleased ? (isHi ? 'दिन टर्नअराउंड' : 'days turnaround') : (isHi ? 'दिन शॉप में' : 'days in shop')}`
+                        : `${Math.round(wagon.totalElapsedHours)} h ${isReleased ? (isHi ? 'टर्नअराउंड' : 'turnaround') : (isHi ? 'शॉप में' : 'in shop')}`)
+                      : (isHi ? 'सक्रिय' : 'Active')}</span>
                   </div>
                   <div className="w-full h-2 bg-selected rounded-full overflow-hidden">
                     <div
@@ -375,7 +380,12 @@ export const WagonsListPage: React.FC<WagonsListPageProps> = ({ onSelectWagon })
 
                 {/* Footer Notes & Action */}
                 <div className="text-[11px] text-ink-faint flex justify-between items-center border-t border-line pt-3">
-                  <span>Intake: {new Date(wagon.entryDate).toLocaleDateString()}</span>
+                  <span>
+                    {isHi ? 'आया' : 'In'}: {new Date(wagon.entryDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                    {!isReleased && (wagon.targetReleaseDate
+                      ? ` · ${isHi ? 'निर्धारित' : 'Due'}: ${new Date(wagon.targetReleaseDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}`
+                      : ` · ${isHi ? 'तिथि तय नहीं' : 'no due date'}`)}
+                  </span>
                   <span className="text-accent-ink font-bold text-xs flex items-center gap-1 group-hover:translate-x-1 transition-transform">
                     {isHi ? 'खोलें →' : 'Open →'}
                   </span>

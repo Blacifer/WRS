@@ -51,6 +51,16 @@ export default defineConfig({
          */
         globIgnores: ['**/tensorflow-*.js', '**/tesseract/**'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        /*
+         * The certificate QR is a link to /verify.html?n=<number>. The page is
+         * precached, but a query string kept the precache from matching, and
+         * the navigation fallback then served the app shell — so a phone with
+         * the app installed scanned a certificate and got the sign-in screen.
+         * The number is ignored for matching (the page reads it itself), and
+         * verify.html and the API are never answered with the shell.
+         */
+        ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^n$/],
+        navigateFallbackDenylist: [/^\/verify\.html/, /^\/api\//],
         runtimeCaching: [
           /*
            * The vision weights, kept for the shed.

@@ -3,6 +3,7 @@
  * Indian Railways WRS Raipur (Phase 2)
  */
 
+import { getWagonSpringConfig } from '../../../shared/classification/wagonTypes.ts';
 import crypto from 'node:crypto';
 import { Router } from '../framework/index.ts';
 import type { Request, Response } from '../framework/index.ts';
@@ -253,6 +254,20 @@ wagonsRouter.post('/register', authMiddleware, requireCapability('wagon.register
       success: false,
       error: 'INVALID_TARGET_DATE',
       message: 'targetReleaseDate must be a date (YYYY-MM-DD or ISO 8601), or omitted.',
+      statusCode: 400,
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
+
+  // The type must be one the standard knows: the checklist template, the
+  // spring counts and the pocket counts are all looked up by it. "NOTATYPE"
+  // used to register and then carry a wagon with no checklist at all.
+  if (wagonType !== undefined && wagonType !== null && !getWagonSpringConfig(String(wagonType).trim().toUpperCase())) {
+    res.status(400).json({
+      success: false,
+      error: 'UNKNOWN_WAGON_TYPE',
+      message: `"${String(wagonType).slice(0, 20)}" is not a wagon type this shop's standard knows (BOXNHL, BOXN, BCNHL, BOBRN, …).`,
       statusCode: 400,
       timestamp: new Date().toISOString()
     });

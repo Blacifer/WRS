@@ -189,11 +189,16 @@ learningRouter.get(
 
 // ---------------------------------------------------------------------------
 // POST /api/learning/analyze — re-derive insights and raise proposals
+//
+// learning.view, not learning.approve: running the analysis decides nothing.
+// It re-derives the figures and raises proposals that a supervisor or
+// administrator must still accept. The DRM's screen carried the button and
+// the server refused it — "Run Analysis does nothing" on the first DRM walk.
 // ---------------------------------------------------------------------------
 learningRouter.post(
   '/analyze',
   authMiddleware,
-  requireCapability('learning.approve'),
+  requireCapability('learning.view'),
   (_req: AuthenticatedRequest, res: Response) => {
     const svc = service();
     svc.ensureParameters();
