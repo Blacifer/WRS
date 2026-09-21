@@ -14,16 +14,24 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 
+// HANDOUT=1: the same page for the shop and the DRM's office — images embedded,
+// the evidence worded as "verified on the build", no tick controls, no
+// commands, nothing about how the page was produced. Written to docs/handouts/.
+const HANDOUT = process.env.HANDOUT === '1';
 const WALK = 'docs/artifacts/inspector-walk';
-const OUT = 'docs/artifacts/inspector-guide';
-mkdirSync(`${OUT}/shots`, { recursive: true });
+const OUT = HANDOUT ? 'docs/handouts' : 'docs/artifacts/inspector-guide';
+const SHOTS = 'docs/artifacts/inspector-guide/shots';
+mkdirSync(SHOTS, { recursive: true });
+mkdirSync(OUT, { recursive: true });
 const result = JSON.parse(readFileSync(`${WALK}/result.json`, 'utf8'));
 
 // Lighter copies of the screenshots for the page (full-page PNGs run to 1 MB each).
 for (const s of result.steps) for (const f of s.shots) {
-  const jpg = `${OUT}/shots/${f.replace(/\.png$/, '.jpg')}`;
+  const jpg = `${SHOTS}/${f.replace(/\.png$/, '.jpg')}`;
   if (!existsSync(jpg)) execSync(`sips -Z 1600 --setProperty format jpeg --setProperty formatOptions 70 "${WALK}/${f}" --out "${jpg}"`, { stdio: 'ignore' });
 }
+// The published page references the files; the handout carries them inside itself.
+const src = (jpg) => HANDOUT ? `data:image/jpeg;base64,${readFileSync(`${SHOTS}/${jpg.replace(/^shots\//, '')}`).toString('base64')}` : jpg;
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const when = (iso) => new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -163,19 +171,19 @@ const total = result.steps.length;
 
 const stepHtml = (s) => {
   const g = GUIDE[s.num];
-  const shots = s.shots.map((f) => { const jpg = `shots/${f.replace(/\.png$/, '.jpg')}`; const cap = f.replace(/^\d+-/, '').replace(/\.png$/, '').replace(/-/g, ' '); return `<figure><a href="${jpg}" target="_blank" rel="noopener"><img src="${jpg}" alt="Step ${s.num} — ${esc(cap)}" loading="lazy"></a><figcaption>${esc(cap)} · tap to open in full</figcaption></figure>`; }).join('');
+  const shots = s.shots.map((f) => { const jpg = `shots/${f.replace(/\.png$/, '.jpg')}`; const cap = f.replace(/^\d+-/, '').replace(/\.png$/, '').replace(/-/g, ' '); return HANDOUT ? `<figure><img src="${src(jpg)}" alt="Step ${s.num} — ${esc(cap)}"><figcaption>${esc(cap)}</figcaption></figure>` : `<figure><a href="${jpg}" target="_blank" rel="noopener"><img src="${jpg}" alt="Step ${s.num} — ${esc(cap)}" loading="lazy"></a><figcaption>${esc(cap)} · tap to open in full</figcaption></figure>`; }).join('');
   const id = s.num.replace('.', '-');
   return `
 <article class="step" id="s-${id}" data-num="${s.num}">
   <header class="step-head">
     <div class="step-num">${s.num}</div>
     <h3>${esc(g.title)}</h3>
-    <div class="step-tick">
+    ${HANDOUT ? '<div class="step-tick"><span class="box" aria-hidden="true"></span><span>Seen it</span></div>' : `<div class="step-tick">
       <label><input type="checkbox" id="chk-${id}" aria-label="Step ${s.num} seen"> <span>Seen it</span></label>
       <button type="button" id="bad-${id}" aria-pressed="false">Didn't match</button>
-    </div>
+    </div>`}
   </header>
-  <div class="note" hidden><textarea id="note-${id}" placeholder="What you saw instead — and the screen you photographed"></textarea></div>
+  ${HANDOUT ? '' : `<div class="note" hidden><textarea id="note-${id}" placeholder="What you saw instead — and the screen you photographed"></textarea></div>`}
   <div class="step-body">
     <div class="shots">${shots}</div>
     <div class="text">
@@ -183,9 +191,9 @@ const stepHtml = (s) => {
       <section class="see"><h4>You must see</h4><ul>${g.see.map((d) => `<li>${d}</li>`).join('')}</ul></section>
       <section class="why"><h4>What it proves</h4><p>${g.why}</p></section>
       <section class="machine ${s.ok ? 'ok' : 'bad'}">
-        <h4>The machine saw <span class="stamp">${s.ok ? 'matched' : 'did not match'} · ${when(s.startedAt)}</span></h4>
+        <h4>${HANDOUT ? 'Checked on the build' : 'The machine saw'} <span class="stamp">${s.ok ? (HANDOUT ? 'verified' : 'matched') : 'did not match'} · ${when(s.startedAt)}</span></h4>
         <ul>${s.saw.map((x) => `<li class="${x.ok ? 'ok' : 'bad'}">${esc(x.text)}</li>`).join('')}</ul>
-        ${s.byHand ? `<p class="byhand"><b>By hand:</b> ${esc(g.byHandNote || s.byHand)}</p>` : ''}
+        ${s.byHand ? `<p class="byhand"><b>By hand:</b> ${esc(HANDOUT ? (g.byHandNote || s.byHand).replace(/The machine[^.]*\./g, '').replace(/it had no painted number to read\.?/i, '').replace(/\s+/g, ' ').trim() : (g.byHandNote || s.byHand))}</p>` : ''}
       </section>
       ${g.ifNot.length ? `<section class="ifnot"><h4>If it is not there</h4><ul>${g.ifNot.map((d) => `<li>${d}</li>`).join('')}</ul></section>` : ''}
     </div>
@@ -196,12 +204,57 @@ const stepHtml = (s) => {
 const groupHtml = ([key, title, range, who]) => {
   const steps = result.steps.filter((s) => GUIDE[s.num].group === key);
   return `<section class="group" id="g-${key}">
-  <div class="group-head"><h2>${esc(title)}</h2><span class="range">${esc(range)}</span><button type="button" class="sec-clear" data-sec="${key}">Clear these ticks</button></div>
+  <div class="group-head"><h2>${esc(title)}</h2><span class="range">${esc(range)}</span>${HANDOUT ? '' : `<button type="button" class="sec-clear" data-sec="${key}">Clear these ticks</button>`}</div>
   <p class="who">${esc(who)}</p>
   ${steps.map(stepHtml).join('')}
 </section>`;
 };
 
+const RUN_CARD = HANDOUT ? `
+    <div class="card run">
+      <h2>Verified on the packaged build</h2>
+      <div class="big">${matched} / ${total} <small>steps verified</small></div>
+      <dl>
+        <dt>When</dt><dd>${esc(day)}</dd>
+        <dt>On</dt><dd>the packaged bundle, seeded with the demonstration record, on a phone-sized screen with the camera allowed</dd>
+        <dt>By hand</dt><dd>${byHand} steps need a real object in front of the camera (2.7, 2.18)</dd>
+      </dl>
+    </div>` : `
+    <div class="card run">
+      <h2>The machine's run of these 22 steps</h2>
+      <div class="big">${matched} / ${total} <small>matched</small></div>
+      <dl>
+        <dt>When</dt><dd>${esc(day)}, ${when(result.startedAt)} – ${when(result.finishedAt)}</dd>
+        <dt>Against</dt><dd>${esc(result.base)} (the packaged bundle, seeded by DEMO‑DATA's command)</dd>
+        <dt>As</dt><dd>a 412 × 915 phone, touch, camera allowed</dd>
+        <dt>By hand</dt><dd>${byHand} steps need a real object in front of the camera (2.7, 2.18) — the machine proved the screen, you supply the spring and the number</dd>
+        <dt>Page errors</dt><dd>${result.consoleErrors.length ? esc(result.consoleErrors.join('; ')) : 'none'}</dd>
+        <dt>Rerun</dt><dd>node scripts/inspector-walk.mjs · node scripts/inspector-guide.mjs</dd>
+      </dl>
+    </div>`;
+const SETUP_CARD = HANDOUT ? `
+    <div class="card">
+      <h2>Before you start — five minutes, once</h2>
+      <ol>
+        <li>On the shop PC, double‑click <b>START.cmd</b>; it prints the address for the tablet.</li>
+        <li>On the tablet, turn <b>mobile data off</b> and join the shop Wi‑Fi.</li>
+        <li>Install the certificate on the tablet once — <b>server\\certs\\lan‑cert.crt</b>, as in TABLET_TRUST.md — so the address opens with no warning and the camera and offline mode are allowed.</li>
+        <li>Open the address START.cmd printed and accept <em>Add to home screen</em>.</li>
+        <li>Sign in with the inspector account you were given.</li>
+      </ol>
+      <p style="margin-top:10px">Then go step by step. Each step shows the screen as it should look, the taps in order, what must be on your screen, and what to suspect when it is not. Tick <b>Seen it</b> only when you saw it.</p>
+    </div>` : `
+    <div class="card">
+      <h2>Before you start — five minutes, once</h2>
+      <ol>
+        <li>On the Mac: <code>bash scripts/rehearsal.sh start</code>, then <code>bash scripts/rehearsal.sh status</code> for the two addresses. On the demo laptop: double‑click <b>START.cmd</b>; it prints the address.</li>
+        <li>On the phone, turn <b>mobile data off</b> and join the same Wi‑Fi as the server.</li>
+        <li>Install the certificate on the phone once — <b>lan‑cert.crt</b>, as in TABLET_TRUST.md — so the address opens with no warning and the camera and offline mode are allowed. Without it the page opens but 2.7, 2.18 and 2.20 cannot pass.</li>
+        <li>Open <b>https://&lt;the Wi‑Fi address&gt;:3200</b> and accept <em>Add to home screen</em>.</li>
+        <li>Sign in as <b>inspector1</b>, password <b>password123</b>.</li>
+      </ol>
+      <p style="margin-top:10px">Then go step by step. Each step shows the phone screenshot the machine took on this build, the taps in order, what must be on your screen, and what to suspect when it is not. Tick <b>Seen it</b> only when you saw it; <b>Didn't match</b> and a note is the bug report.</p>
+    </div>`;
 const html = `<title>Inspector Walk</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
@@ -260,6 +313,7 @@ const html = `<title>Inspector Walk</title>
   .step-tick{display:flex;align-items:center;gap:10px;font-size:13px}
   .step-tick label{display:flex;align-items:center;gap:6px;cursor:pointer}
   .step-tick input{width:20px;height:20px;accent-color:var(--ok);margin:0}
+  .step-tick .box{display:inline-block;width:16px;height:16px;border:1.5px solid var(--ink-2);border-radius:3px;margin-right:6px;vertical-align:-3px}
   .step-tick button{font:inherit;font-size:12px;border:1px solid var(--line);background:transparent;color:var(--ink-2);padding:4px 8px;cursor:pointer}
   .step-tick button[aria-pressed=true]{background:var(--bad);color:#fff;border-color:var(--bad)}
   .note{padding:10px 16px 0}
@@ -294,7 +348,7 @@ const html = `<title>Inspector Walk</title>
   .foot button{font:inherit;font-size:13px;border:1px solid var(--line);background:var(--paper);color:var(--ink);padding:6px 10px;cursor:pointer;margin-right:8px}
   .summary{font-family:"IBM Plex Mono",monospace;font-size:13px;white-space:pre-wrap;background:var(--paper);border:1px solid var(--line);padding:12px;margin-top:10px;display:none}
   :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  @media print{ header.top{position:static} .step-tick,.foot,.sec-clear{display:none} .step{break-inside:avoid} .shots img{max-height:none} }
+  @media print{ header.top{position:static} .foot,.sec-clear,.step-tick button{display:none} .step{break-inside:avoid} .step-body{grid-template-columns:190px 1fr} .shots img{max-height:120mm;border-width:3px} .machine li{font-size:10.5px} body{font-size:12.5px} }
   @media (prefers-reduced-motion:reduce){ *{transition:none!important} }
 </style>
 
@@ -302,53 +356,30 @@ const html = `<title>Inspector Walk</title>
   <header class="top">
     <div class="top-row">
       <div>
-        <div class="eyebrow">WRS Raipur · Walkthrough section 2 · the inspector, on a phone</div>
-        <h1>Inspector walk — every screen, with the machine's own photographs</h1>
+        <div class="eyebrow">WRS Raipur · Spring &amp; Wagon QC · the inspector, on the tablet</div>
+        <h1>${HANDOUT ? 'Inspector walk — every screen, step by step' : "Inspector walk — every screen, with the machine's own photographs"}</h1>
       </div>
-      <div class="progress"><span id="count">0 / ${total}</span><div class="bar"><i id="fill"></i></div><span id="badcount"></span></div>
+      ${HANDOUT ? '' : `<div class="progress"><span id="count">0 / ${total}</span><div class="bar"><i id="fill"></i></div><span id="badcount"></span></div>`}
     </div>
   </header>
 
-  <div class="intro">
-    <div class="card">
-      <h2>Before you start — five minutes, once</h2>
-      <ol>
-        <li>On the Mac: <code>bash scripts/rehearsal.sh start</code>, then <code>bash scripts/rehearsal.sh status</code> for the two addresses. On the demo laptop: double‑click <b>START.cmd</b>; it prints the address.</li>
-        <li>On the phone, turn <b>mobile data off</b> and join the same Wi‑Fi as the server.</li>
-        <li>Install the certificate on the phone once — <b>lan‑cert.crt</b>, as in TABLET_TRUST.md — so the address opens with no warning and the camera and offline mode are allowed. Without it the page opens but 2.7, 2.18 and 2.20 cannot pass.</li>
-        <li>Open <b>https://&lt;the Wi‑Fi address&gt;:3200</b> and accept <em>Add to home screen</em>.</li>
-        <li>Sign in as <b>inspector1</b>, password <b>password123</b>.</li>
-      </ol>
-      <p style="margin-top:10px">Then go step by step. Each step shows the phone screenshot the machine took on this build, the taps in order, what must be on your screen, and what to suspect when it is not. Tick <b>Seen it</b> only when you saw it; <b>Didn't match</b> and a note is the bug report.</p>
-    </div>
-    <div class="card run">
-      <h2>The machine's run of these 22 steps</h2>
-      <div class="big">${matched} / ${total} <small>matched</small></div>
-      <dl>
-        <dt>When</dt><dd>${esc(day)}, ${when(result.startedAt)} – ${when(result.finishedAt)}</dd>
-        <dt>Against</dt><dd>${esc(result.base)} (the packaged bundle, seeded by DEMO‑DATA's command)</dd>
-        <dt>As</dt><dd>a 412 × 915 phone, touch, camera allowed</dd>
-        <dt>By hand</dt><dd>${byHand} steps need a real object in front of the camera (2.7, 2.18) — the machine proved the screen, you supply the spring and the number</dd>
-        <dt>Page errors</dt><dd>${result.consoleErrors.length ? esc(result.consoleErrors.join('; ')) : 'none'}</dd>
-        <dt>Rerun</dt><dd>node scripts/inspector-walk.mjs · node scripts/inspector-guide.mjs</dd>
-      </dl>
-    </div>
+  <div class="intro">${SETUP_CARD}${RUN_CARD}
   </div>
 
   <nav class="toc">${GROUPS.map(([k, t, r]) => `<a href="#g-${k}">${esc(r)} · ${esc(t)}</a>`).join('')}</nav>
 
   <div id="sections">${GROUPS.map(groupHtml).join('')}</div>
 
-  <div class="foot">
+  ${HANDOUT ? '' : `<div class="foot">
     <p>When you finish, press <b>Show summary</b> and send the text to Pratik's chat — the "did not match" lines with their notes are what gets fixed. Ticks live only in this browser.</p>
     <button type="button" id="summarise">Show summary</button>
     <button type="button" id="reset">Clear all ticks</button>
     <span id="reset-confirm" hidden>Clear every tick and note on this page? <button type="button" id="reset-yes" class="danger">Yes, clear all</button> <button type="button" id="reset-no">Keep them</button></span>
     <div class="summary" id="summary"></div>
-  </div>
+  </div>`}
 </div>
 
-<script>
+${HANDOUT ? '' : `<script>
 const KEY='wrs-inspector-walk-v1';
 let state={};
 try{ state=JSON.parse(localStorage.getItem(KEY)||'{}')||{}; }catch(e){ state={}; }
@@ -396,7 +427,15 @@ document.getElementById('summarise').addEventListener('click',()=>{
   if(bad.length){ lines.push(''); lines.push('Did not match:'); lines.push(...bad.map((b)=>'  - '+b)); }
   const el=document.getElementById('summary'); el.textContent=lines.join('\\n'); el.style.display='block';
 });
-</script>
+</script>`}
 `;
-writeFileSync(`${OUT}/index.html`, html);
-console.log(`${OUT}/index.html — ${matched}/${total} matched, ${byHand} by hand, ${result.steps.reduce((n, s) => n + s.shots.length, 0)} screenshots`);
+const outFile = HANDOUT ? `${OUT}/inspector-walk.html` : `${OUT}/index.html`;
+// The handout goes to the shop and the DRM's office: shop commands only, the shop's own accounts.
+const handoutText = (h) => h
+  .replace(/run DEMO‑DATA\.cmd \(laptop\) or <code>bash scripts\/rehearsal\.sh start<\/code> \(Mac\)/g, 'run DEMO‑DATA.cmd on the PC')
+  .replace(/re-seed \(DEMO‑DATA\.cmd \/ rehearsal\.sh start\)/g, 're-seed with DEMO‑DATA.cmd on the PC')
+  .replace(/run INDEX‑MANUALS\.cmd on the laptop \(the Mac does this in rehearsal\.sh start\)/g, 'run INDEX‑MANUALS.cmd on the PC')
+  .replace(/Sign in as <b>inspector1<\/b> \/ password123\./g, 'Sign in with the inspector account you were given.')
+  .replace(/Sign in as inspector1\./g, 'Sign in as an inspector.');
+writeFileSync(outFile, HANDOUT ? handoutText(html) : html);
+console.log(`${outFile} — ${matched}/${total} matched, ${byHand} by hand, ${result.steps.reduce((n, s) => n + s.shots.length, 0)} screenshots`);
