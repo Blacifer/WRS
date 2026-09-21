@@ -13,6 +13,7 @@
 #   bash scripts/rehearsal.sh log       # the server's log, newest lines
 #   bash scripts/rehearsal.sh backup    # take a backup now — what 02:00 does on its own
 #   bash scripts/rehearsal.sh restore   # restore the newest backup into a second folder and count its wagons
+#   bash scripts/rehearsal.sh cert      # the certificate file to install on the iPad / phone, copied to the Desktop, with the steps
 #   bash scripts/rehearsal.sh tunnel    # Plan B: a public https address through Cloudflare, for a phone on its own internet
 set -u
 cd "$(dirname "$0")/.."
@@ -53,6 +54,23 @@ case "${1:-}" in
     ( cd "$BUNDLE" && WRS_BACKUP_KEY_FILE="$BUNDLE/key-elsewhere/backup.key" node --experimental-strip-types server/scripts/backup-db.mjs --restore "$newest" /tmp/wrs-restored/wrs.db ) | grep -E "Restored|restored|ERROR|verified" | head -4
     node scripts/count-tables.mjs "$BUNDLE/server/data/wrs_inspections.db" /tmp/wrs-restored/wrs.db
     echo "   restored copy: /tmp/wrs-restored/wrs.db" ;;
+  cert)
+    # The one file a tablet, phone or laptop installs: the workshop CA. Copied
+    # to the Desktop under a name a person recognises, because .rehearsal-certs
+    # is a dot-folder Finder hides, and the AirDrop target is the Desktop.
+    [ -f .rehearsal-certs/lan-cert.crt ] || node server/scripts/make-lan-cert.mjs .rehearsal-certs >/dev/null
+    cp .rehearsal-certs/lan-cert.crt "$HOME/Desktop/WRS-Raipur-workshop-CA.crt"
+    echo "the certificate to install is on your Desktop:  ~/Desktop/WRS-Raipur-workshop-CA.crt"
+    echo "fingerprint (SHA-256): $(openssl x509 -inform der -in .rehearsal-certs/lan-cert.crt -noout -fingerprint -sha256 2>/dev/null | cut -d= -f2)"
+    echo
+    echo "iPad:   AirDrop the file from the Desktop -> tap it -> Settings shows 'Profile Downloaded' at the top -> Install -> passcode -> Install -> Done."
+    echo "        THEN Settings -> General -> About -> (bottom) Certificate Trust Settings -> switch ON 'WRS Raipur workshop CA' -> Continue."
+    echo "        Without that switch Safari still warns. Install once; it covers every address this Mac will ever have."
+    echo "Android: get the file onto the phone (Gmail/Drive/cable) -> Settings -> Security & privacy -> More security settings ->"
+    echo "        Encryption & credentials -> Install a certificate -> CA certificate -> Install anyway -> pick the file."
+    echo "Windows: double-click -> Install Certificate -> Local Machine -> Trusted Root Certification Authorities."
+    echo "This Mac: already trusted (login keychain)."
+    open "$HOME/Desktop" 2>/dev/null || true ;;
   tunnel)
     # A plain tunnel to the server that is already running — nothing else.
     # (scripts/pilot-tunnel.sh is a different thing: it frees the port, builds
@@ -78,5 +96,5 @@ case "${1:-}" in
     echo
     wait $TPID ;;
   *)
-    sed -n 2,17p "$0" | cut -c3- ;;
+    sed -n 2,18p "$0" | cut -c3- ;;
 esac

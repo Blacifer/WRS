@@ -64,7 +64,7 @@
 <h3>Where automation is used today — and where it is not</h3>
 <ul>
   <li><b>Used now:</b> reading a painted wagon number from the camera (the person confirms it); searching the shipped manuals in their own words with the page cited; a check that flags a reading unlike its neighbours (a question, never a block); a spoken entry read back for confirmation; counting springs in a bogie photograph as an aid to the person counting.</li>
-  <li><b>Not used for any decision:</b> no camera classifies a spring; no model produces a figure on any screen. Where a model is allowed to help, it may only pick <em>which</em> question to run — the arithmetic is fixed and the rows are shown.</li>
+  <li><b>Not used for any decision:</b> no camera classifies a spring; no model produces a figure on any screen. Where a model is allowed to help (Zapheit, our own service, when the shop switches it on), it may only find the clause somebody meant, turn a spoken sentence into fields, or pick <em>which</em> question to run — the arithmetic is fixed and the rows are shown.</li>
   <li><b>Later, only once earned:</b> the camera may propose a band on its own after blind reads on this shop's own springs have shown it is right often enough. Until then the server refuses it, and the screen says how far it is from earning it.</li>
 </ul>
 
@@ -89,7 +89,8 @@
   <div>
     <h3>Nothing leaves the shop</h3>
     <ul>
-      <li>One PC in the spring section runs everything: the application, the database, the photographs, the manuals index. No cloud, no external service, no internet connection required at any point.</li>
+      <li>One PC in the spring section runs everything: the application, the database, the photographs, the manuals index. No cloud, no internet connection required at any point.</li>
+      <li>One optional connection, switched on by the shop: <b>Zapheit</b>, our own service, which receives manual questions and spoken sentences so a model can find the right clause or field. It never produces a figure or a verdict; with it off, the application does everything with keyword search and its own parser.</li>
       <li>Tablets reach the PC over the shop Wi‑Fi (or one access point in the bay). Each tablet trusts the PC's certificate once; after that the address opens with no warning and the camera and offline mode are allowed.</li>
       <li>Backups are encrypted to a second disk nightly; a restore onto another machine has been drilled and recorded.</li>
     </ul>

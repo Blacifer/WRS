@@ -57,12 +57,12 @@ sed -i.bak \
   -e "s#^CORS_ORIGIN=.*#CORS_ORIGIN=https://localhost:$PORT#" \
   -e "s#^WRS_BACKUP_DIR=.*#WRS_BACKUP_DIR=$BUNDLE/backups-elsewhere#" .env
 rm -f .env.bak
-# The model's key stays out of the rehearsal unless asked for: with it set,
-# manual queries and voice transcripts leave the machine, and the "nothing
-# leaves the shop" sentence in the room stops being true. WITH_ZAPHEIT=1
-# carries the ZAPHEIT_* lines from the project's own .env into this one.
-if [ "${WITH_ZAPHEIT:-}" = "1" ] && [ -f "$ROOT_DIR/.env" ]; then
-  grep -E '^ZAPHEIT_' "$ROOT_DIR/.env" >> .env && echo "WITH_ZAPHEIT=1: the model's key is set for this rehearsal — manual queries and voice transcripts leave this machine"
+# Zapheit is the shop's own service, so its key rides into the rehearsal from
+# the project's .env (the bundle's .env is rebuilt on every start and would
+# otherwise lose it). WITHOUT_ZAPHEIT=1 leaves it out — the app then does
+# everything it did before, with keyword search and the built-in parser.
+if [ "${WITHOUT_ZAPHEIT:-}" != "1" ] && [ -f "$ROOT_DIR/.env" ] && grep -q '^ZAPHEIT_API_KEY=.\+' "$ROOT_DIR/.env"; then
+  grep -E '^ZAPHEIT_' "$ROOT_DIR/.env" >> .env && echo "Zapheit: key carried from the project .env (WITHOUT_ZAPHEIT=1 to leave it out)"
 fi
 # Every start: the CA is made once and kept; the server certificate is reissued
 # only when this machine's addresses have changed (a new Wi-Fi, a phone hotspot).
