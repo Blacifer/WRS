@@ -9,15 +9,17 @@ the camera, the microphone and offline reload all work.
 A browser hands a web page the camera only from a *secure context* — `https`,
 or `localhost`. The tablets reach the PC over the shop wifi, not as localhost,
 so the PC must serve `https`. It does: the first time `START.cmd` runs it
-makes a certificate for this PC's own address, with Node alone, and serves
-with it from then on.
+makes, with Node alone, the **workshop's own certificate authority** (a CA)
+and a server certificate signed by it for this PC's addresses. Every later
+start reissues the server certificate if the PC's address has changed — a
+new DHCP lease, a different Wi‑Fi, a phone hotspot — without touching the CA.
 
-That certificate is *self-signed*: nobody outside the workshop vouches for it.
-A browser meeting it for the first time therefore warns — "Your connection is
-not private" — and will let you proceed, but it will warn again, and a warning
-people learn to click through is worse than none. Installing the certificate
-on the tablet as a trusted one is what removes the warning for good. It says,
-in effect, "this tablet trusts this PC", which is exactly the truth.
+Nobody outside the workshop vouches for that CA, so a browser meeting it for
+the first time warns — "Your connection is not private" — and will let you
+proceed, but it will warn again, and a warning people learn to click through
+is worse than none. Installing the CA on the tablet as a trusted one removes
+the warning for good, **for every address the PC will ever have**. It says,
+in effect, "this tablet trusts this workshop", which is exactly the truth.
 
 ## What to copy
 
@@ -25,9 +27,10 @@ On the PC, in the folder you installed to:
 
     server\certs\lan-cert.crt
 
-That is the certificate in the form tablets install from a tap. (`lan-cert.pem`
-is the same certificate for the server; `lan-key.pem` is the private key and
-**never leaves the PC**.)
+That is the workshop CA in the form tablets install from a tap. It is the
+only file that ever leaves the PC. (`lan-cert.pem` and `lan-key.pem` are the
+server's own certificate and key; `lan-ca-key.pem` is the CA's key; **none of
+those leave the PC**.)
 
 Get `lan-cert.crt` onto the tablet however is easiest: a USB cable, or an
 email to an account the tablet reads. (The app deliberately does not offer
@@ -52,8 +55,9 @@ that makes it trusted is the wrong page to trust for it.)
    downloaded.
 2. **Settings → Profile Downloaded → Install**, and enter the passcode.
 3. **Settings → General → About → Certificate Trust Settings**, and switch on
-   full trust for "WRS Raipur workshop server".
-4. Open Safari at `https://<PC address>:3000`.
+   full trust for **"WRS Raipur workshop CA"**. Without this switch iOS keeps
+   the profile but does not trust it, and Safari still warns.
+4. Open Safari at `https://<PC address>:3000`. Share → **Add to Home Screen**.
 
 ## Windows (the demonstration laptop, the shop PC's own browser, a second PC)
 
@@ -70,11 +74,16 @@ the projector never shows a red "Not secure".
 
 ## macOS (rehearsing on a Mac)
 
-Double-click `server/certs/lan-cert.pem` → it opens in Keychain Access →
-find it under *login* or *System* → double-click → **Trust** → *When using
-this certificate:* **Always Trust** → close and enter your password. Restart
-the browser. Safari and Chrome then show the padlock; Firefox keeps its own
-store (*Settings → Privacy → Certificates → View → Import*).
+One command, once (the rehearsal keeps its certificates in `.rehearsal-certs/`;
+the bundle keeps them in `server/certs/`):
+
+    security add-trusted-cert -r trustRoot -k ~/Library/Keychains/login.keychain-db .rehearsal-certs/lan-ca.pem
+
+Or by hand: double-click `lan-ca.pem` → Keychain Access → *login* →
+double-click "WRS Raipur workshop CA" → **Trust** → *When using this
+certificate:* **Always Trust** → close and enter your password. Restart the
+browser. Safari and Chrome then show the padlock; Firefox keeps its own store
+(*Settings → Privacy → Certificates → View → Import*).
 
 **A phone on its own internet cannot reach this address at all.**
 `192.168.1.x` is an address inside one Wi‑Fi; mobile data is a different
@@ -102,15 +111,19 @@ Found on the first phone that tried the rehearsal (18 Sep 2026):
 
 ## When it stops working
 
-- **The warning is back on every tablet.** The PC's address has changed
-  (a new router, a new DHCP lease). The certificate names the address it was
-  made for. Give the PC a fixed address on the router, then on the PC delete
-  `server\certs\` and run `START.cmd` again — it makes a new certificate —
-  and install the new `lan-cert.crt` on each tablet.
+- **The PC's address has changed** (a new router, a new DHCP lease, a
+  hotspot). Close the `START.cmd` window and open it again: it reissues the
+  server certificate for the new address by itself, signed by the same CA.
+  Nothing to install on any tablet. (On the Mac: `bash scripts/rehearsal.sh
+  stop`, then `start`.)
 - **The warning is back on one tablet.** That tablet was reset, or its
-  certificate was removed. Install it again.
-- **It says the certificate expired.** They last 825 days. Same fix as a
-  changed address: delete `server\certs\`, restart, reinstall.
+  certificate was removed, or on an iPad the *Certificate Trust Settings*
+  switch was never turned on. Install it again.
+- **It says the certificate expired.** The server certificate lasts 825 days
+  and is reissued on the next start once it is within thirty days of expiry;
+  the CA lasts ten years. Nothing to reinstall.
+- **Tablets that trusted the old, single certificate** (before 21 Sep 2026)
+  must install the new `lan-cert.crt` once — it is a different thing, the CA.
 
 ## What this does not do
 

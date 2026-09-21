@@ -32,7 +32,7 @@ import http from 'node:http';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
-import { makeSelfSigned, localIPv4s } from '../server/scripts/make-lan-cert.mjs';
+import { ensureCerts, localIPv4s } from '../server/scripts/make-lan-cert.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'wrs-lan-cert-'));
@@ -41,12 +41,14 @@ const PORT_HTTP = 3080;
 
 const ips = localIPv4s();
 const lan = ips.find((ip) => ip !== '127.0.0.1') || '127.0.0.1';
-const made = makeSelfSigned({ commonName: 'WRS Raipur workshop server', organization: 'Indian Railways WRS Raipur', ips, dnsNames: ['localhost'] });
-const keyPath = path.join(work, 'lan-key.pem');
-const certPath = path.join(work, 'lan-cert.pem');
-fs.writeFileSync(keyPath, made.keyPem);
-fs.writeFileSync(certPath, made.certPem);
-console.log(`certificate names ${ips.join(', ')}; testing against ${lan}`);
+// The CA and a server certificate for this machine's addresses, exactly as
+// START.cmd makes them; the strict client below trusts only the CA — the
+// one file a tablet installs.
+const certs = ensureCerts(work);
+const keyPath = certs.files.keyPath;
+const certPath = certs.files.certPath;
+const made = { certPem: fs.readFileSync(certs.files.caCertPath, 'utf8') };
+console.log(`certificate names ${certs.ips.join(', ')} (signed by the workshop CA); testing against ${lan}`);
 
 function startServer(env, port) {
   const child = spawn(process.execPath, ['--experimental-strip-types', 'src/index.ts'], {
@@ -90,7 +92,7 @@ try {
       let body = ''; r.on('data', (d) => { body += d; }); r.on('end', () => res({ ok: r.statusCode === 200 && /healthy/.test(body) }));
     }).on('error', (e) => res({ ok: false, err: e.message }));
   });
-  check(`a strict client trusting only lan-cert.pem reaches https://${lan}:${PORT_TLS}`, strict.ok, strict.err || '');
+  check(`a strict client trusting only the CA (lan-cert.crt) reaches https://${lan}:${PORT_TLS}`, strict.ok, strict.err || '');
 
   // And the same client refuses an address the certificate does not name.
   const wrongName = await new Promise((res) => {

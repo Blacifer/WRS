@@ -24,20 +24,31 @@
  *
  * WHAT IT MAKES
  * -------------
- *   lan-key.pem    RSA-2048 private key. Stays on the PC.
- *   lan-cert.pem   Self-signed X.509 v3, CA:TRUE, for the server to present.
- *   lan-cert.crt   The same certificate in DER, which Android and Windows
- *                  install from a tap. Copied to a tablet ONCE and installed
- *                  as a trusted certificate, it stops the browser warning
- *                  for good. See docs/TABLET_TRUST.md.
+ *   lan-ca-key.pem  The shop's own certificate authority: its private key.
+ *   lan-ca.pem      The CA certificate (self-signed, CA:TRUE, ten years).
+ *   lan-cert.crt    The SAME CA certificate in DER — the one file a tablet,
+ *                   phone or laptop installs, ONCE. See docs/TABLET_TRUST.md.
+ *   lan-key.pem     The server's private key. Stays on the PC.
+ *   lan-cert.pem    The server's certificate, signed by the CA, naming every
+ *                   IPv4 address this machine has right now (plus localhost,
+ *                   its hostname and anything extra on the command line),
+ *                   followed by the CA certificate, as the chain the server
+ *                   presents.
  *
- * The certificate names every IPv4 address this machine has, plus localhost
- * and any extra names given on the command line. A certificate that does not
- * name the address the tablet typed is warned about even once installed, so
- * if the PC's address changes, run this again.
+ * WHY TWO
+ * -------
+ * The first version was one self-signed certificate naming the PC's
+ * addresses. Every time the address changed — a new DHCP lease, a phone
+ * hotspot, a rehearsal on a different Wi-Fi — the certificate had to be made
+ * again AND installed again on every tablet, and until it was, the browser
+ * warned and kept the camera shut. That happened three times in one week of
+ * rehearsal. With a CA the devices trust one thing that never changes, and
+ * the server's certificate is reissued for whatever addresses it has: this
+ * script does that on every start, and only rewrites the server certificate
+ * when the addresses actually differ. The CA key is never overwritten.
  *
- * It is valid for 825 days — the longest Apple and Chrome accept without
- * complaint — and refuses to overwrite a key that already exists.
+ * The server certificate is valid for 825 days — the longest Apple and
+ * Chrome accept — and carries the serverAuth purpose Apple requires.
  */
 
 import fs from 'node:fs';
@@ -98,8 +109,19 @@ const OID = {
   basicConstraints: '2.5.29.19',
   keyUsage: '2.5.29.15',
   subjectAltName: '2.5.29.17',
-  subjectKeyId: '2.5.29.14'
+  subjectKeyId: '2.5.29.14',
+  authorityKeyId: '2.5.29.35',
+  extKeyUsage: '2.5.29.37',
+  serverAuth: '1.3.6.1.5.5.7.3.1'
 };
+
+const pem = (label, der) =>
+  `-----BEGIN ${label}-----\n${der.toString('base64').replace(/(.{64})/g, '$1\n').trim()}\n-----END ${label}-----\n`;
+const derFromPem = (text) => Buffer.from(text.replace(/-----[^-]+-----/g, '').replace(/\s+/g, ''), 'base64');
+const nameOf = (organization, commonName) => seq(
+  set(seq(oid(OID.organization), utf8(organization))),
+  set(seq(oid(OID.commonName), utf8(commonName)))
+);
 
 // ---------------------------------------------------------------------------
 // The certificate
@@ -109,10 +131,7 @@ export function makeSelfSigned({ commonName, organization, ips, dnsNames, days =
   const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
   const spki = publicKey.export({ type: 'spki', format: 'der' });
 
-  const name = seq(
-    set(seq(oid(OID.organization), utf8(organization))),
-    set(seq(oid(OID.commonName), utf8(commonName)))
-  );
+  const name = nameOf(organization, commonName);
   const notBefore = new Date(Date.now() - 60_000);
   const notAfter = new Date(notBefore.getTime() + days * 86400_000);
 
@@ -127,10 +146,12 @@ export function makeSelfSigned({ commonName, organization, ips, dnsNames, days =
   const keyUsage = bits(Buffer.from([0xa4]), 2);
   const skid = crypto.createHash('sha1').update(spki).digest();
 
+  // No SAN at all when there are no names (the CA): an empty SAN is malformed,
+  // and macOS refused the CA with "unknown critical cert extension".
   const extensions = ctx(3, seq(
     seq(oid(OID.basicConstraints), bool(true), octets(seq(bool(true)))),
     seq(oid(OID.keyUsage), bool(true), octets(keyUsage)),
-    seq(oid(OID.subjectAltName), octets(san)),
+    ...(ips.length + dnsNames.length ? [seq(oid(OID.subjectAltName), octets(san))] : []),
     seq(oid(OID.subjectKeyId), octets(octets(skid)))
   ));
 
@@ -148,9 +169,6 @@ export function makeSelfSigned({ commonName, organization, ips, dnsNames, days =
   const signature = crypto.sign('sha256', tbs, privateKey);
   const cert = seq(tbs, sigAlg, bits(signature));
 
-  const pem = (label, der) =>
-    `-----BEGIN ${label}-----\n${der.toString('base64').replace(/(.{64})/g, '$1\n').trim()}\n-----END ${label}-----\n`;
-
   return {
     keyPem: privateKey.export({ type: 'pkcs8', format: 'pem' }),
     certPem: pem('CERTIFICATE', cert),
@@ -159,6 +177,132 @@ export function makeSelfSigned({ commonName, organization, ips, dnsNames, days =
     ips,
     dnsNames
   };
+}
+
+/**
+ * The server's certificate, signed by the CA. CA:FALSE, digitalSignature +
+ * keyEncipherment, serverAuth, the addresses in the SAN, 825 days.
+ */
+export function makeLeaf({ caKeyPem, caCertDer, commonName, organization, ips, dnsNames, days = 825 }) {
+  const caKey = crypto.createPrivateKey(caKeyPem);
+  const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
+  const spki = publicKey.export({ type: 'spki', format: 'der' });
+  const caSpki = new crypto.X509Certificate(caCertDer).publicKey.export({ type: 'spki', format: 'der' });
+  const issuer = derIssuerName(caCertDer);
+
+  const notBefore = new Date(Date.now() - 60_000);
+  const notAfter = new Date(notBefore.getTime() + days * 86400_000);
+  const san = seq(
+    ...dnsNames.map((d) => tlv(0x82, Buffer.from(d, 'ascii'))),
+    ...ips.map((ip) => tlv(0x87, Buffer.from(ip.split('.').map(Number))))
+  );
+  // digitalSignature (bit 0) + keyEncipherment (bit 2): 10100000 = 0xa0, 5 unused bits.
+  const keyUsage = bits(Buffer.from([0xa0]), 5);
+  const extensions = ctx(3, seq(
+    seq(oid(OID.basicConstraints), bool(true), octets(seq())),
+    seq(oid(OID.keyUsage), bool(true), octets(keyUsage)),
+    seq(oid(OID.extKeyUsage), octets(seq(oid(OID.serverAuth)))),
+    seq(oid(OID.subjectAltName), octets(san)),
+    seq(oid(OID.subjectKeyId), octets(octets(crypto.createHash('sha1').update(spki).digest()))),
+    seq(oid(OID.authorityKeyId), octets(seq(tlv(0x80, crypto.createHash('sha1').update(caSpki).digest()))))
+  ));
+  const sigAlg = seq(oid(OID.sha256WithRSA), nul());
+  const tbs = seq(
+    ctx(0, integer(Buffer.from([2]))),
+    integer(crypto.randomBytes(16)),
+    sigAlg,
+    issuer,
+    seq(utcTime(notBefore), utcTime(notAfter)),
+    nameOf(organization, commonName),
+    spki,
+    extensions
+  );
+  const cert = seq(tbs, sigAlg, bits(crypto.sign('sha256', tbs, caKey)));
+  return {
+    keyPem: privateKey.export({ type: 'pkcs8', format: 'pem' }),
+    certPem: pem('CERTIFICATE', cert) + pem('CERTIFICATE', caCertDer),   // the chain the server presents
+    certDer: cert,
+    notAfter, ips, dnsNames
+  };
+}
+
+/** The CA certificate's subject, byte for byte, to be the leaf's issuer. */
+function derIssuerName(caCertDer) {
+  // Certificate ::= SEQUENCE { tbsCertificate SEQUENCE { [0] version, serial, sigAlg, issuer, validity, subject, ... } }
+  const readTlv = (buf, at) => {
+    let i = at + 1; let l = buf[i++];
+    if (l & 0x80) { const n = l & 0x7f; l = 0; for (let k = 0; k < n; k++) l = (l << 8) | buf[i++]; }
+    return { start: at, headerEnd: i, end: i + l };
+  };
+  const outer = readTlv(caCertDer, 0);
+  const tbs = readTlv(caCertDer, outer.headerEnd);
+  let at = tbs.headerEnd;
+  const fields = [];
+  while (at < tbs.end && fields.length < 6) { const f = readTlv(caCertDer, at); fields.push(f); at = f.end; }
+  // fields: [0]version, serial, sigAlg, issuer, validity, subject — subject is the CA's own name.
+  const subject = fields[5];
+  return caCertDer.subarray(subject.start, subject.end);
+}
+
+/** The addresses an existing server certificate names. */
+export function namesInCert(certPem) {
+  try {
+    const x = new crypto.X509Certificate(derFromPem(certPem.split('-----END CERTIFICATE-----')[0] + '-----END CERTIFICATE-----'));
+    const san = String(x.subjectAltName || '');
+    return {
+      ips: [...san.matchAll(/IP Address:([\d.]+)/g)].map((m) => m[1]),
+      dnsNames: [...san.matchAll(/DNS:([^,\s]+)/g)].map((m) => m[1]),
+      notAfter: new Date(x.validTo),
+      issuerIsSelf: x.issuer === x.subject
+    };
+  } catch { return null; }
+}
+
+/**
+ * Make or refresh the certificates in outDir. The CA is made once and never
+ * rewritten; the server certificate is reissued when it is missing, was the
+ * old self-signed kind, or does not name every address this machine has.
+ * Returns what happened, for the caller to print.
+ */
+export function ensureCerts(outDir, extras = []) {
+  const caKeyPath = path.join(outDir, 'lan-ca-key.pem');
+  const caCertPath = path.join(outDir, 'lan-ca.pem');
+  const installPath = path.join(outDir, 'lan-cert.crt');
+  const keyPath = path.join(outDir, 'lan-key.pem');
+  const certPath = path.join(outDir, 'lan-cert.pem');
+  fs.mkdirSync(outDir, { recursive: true });
+
+  const result = { caMade: false, leafMade: false, ips: [], dnsNames: [], notAfter: null, files: { caKeyPath, caCertPath, installPath, keyPath, certPath } };
+
+  if (!fs.existsSync(caKeyPath) || !fs.existsSync(caCertPath)) {
+    const ca = makeSelfSigned({ commonName: 'WRS Raipur workshop CA', organization: 'Indian Railways WRS Raipur', ips: [], dnsNames: [], days: 3650 });
+    fs.writeFileSync(caKeyPath, ca.keyPem, { mode: 0o600 });
+    fs.writeFileSync(caCertPath, ca.certPem, { mode: 0o644 });
+    fs.writeFileSync(installPath, ca.certDer, { mode: 0o644 });
+    result.caMade = true;
+  } else if (!fs.existsSync(installPath) || !fs.readFileSync(caCertPath, 'utf8').includes(fs.readFileSync(installPath).toString('base64').slice(0, 40))) {
+    // The install file must always be the CA — an old self-signed lan-cert.crt would be the wrong thing to hand out.
+    fs.writeFileSync(installPath, derFromPem(fs.readFileSync(caCertPath, 'utf8')), { mode: 0o644 });
+  }
+
+  const ips = [...new Set([...localIPv4s(), ...extras.filter((e) => /^\d+\.\d+\.\d+\.\d+$/.test(e))])];
+  const dnsNames = [...new Set(['localhost', os.hostname().toLowerCase(), ...extras.filter((e) => !/^\d+\.\d+\.\d+\.\d+$/.test(e))])];
+  result.ips = ips; result.dnsNames = dnsNames;
+
+  const existing = fs.existsSync(certPath) && fs.existsSync(keyPath) ? namesInCert(fs.readFileSync(certPath, 'utf8')) : null;
+  const covers = existing && !existing.issuerIsSelf && ips.every((ip) => existing.ips.includes(ip)) && dnsNames.every((d) => existing.dnsNames.includes(d)) && existing.notAfter > new Date(Date.now() + 30 * 86400_000);
+  if (!covers) {
+    const leaf = makeLeaf({
+      caKeyPem: fs.readFileSync(caKeyPath, 'utf8'), caCertDer: derFromPem(fs.readFileSync(caCertPath, 'utf8')),
+      commonName: 'WRS Raipur workshop server', organization: 'Indian Railways WRS Raipur', ips, dnsNames
+    });
+    fs.writeFileSync(keyPath, leaf.keyPem, { mode: 0o600 });
+    fs.writeFileSync(certPath, leaf.certPem, { mode: 0o644 });
+    result.leafMade = true; result.notAfter = leaf.notAfter;
+  } else {
+    result.notAfter = existing.notAfter;
+  }
+  return result;
 }
 
 /** Every IPv4 address this machine answers on, loopback included. */
@@ -179,26 +323,9 @@ if (invokedDirectly) {
   const [outDirArg, ...extras] = process.argv.slice(2);
   const here = path.dirname(new URL(import.meta.url).pathname);
   const outDir = outDirArg || path.join(here, '..', 'certs');
-  const keyPath = path.join(outDir, 'lan-key.pem');
-  const certPath = path.join(outDir, 'lan-cert.pem');
-  const derPath = path.join(outDir, 'lan-cert.crt');
-
-  if (fs.existsSync(keyPath)) {
-    console.error(`[make-lan-cert] ${keyPath} already exists. A tablet that trusts the old certificate would stop trusting a new one; delete it deliberately if the PC's address has changed.`);
-    process.exit(2);
-  }
-
-  const ips = [...new Set([...localIPv4s(), ...extras.filter((e) => /^\d+\.\d+\.\d+\.\d+$/.test(e))])];
-  const dnsNames = [...new Set(['localhost', os.hostname().toLowerCase(), ...extras.filter((e) => !/^\d+\.\d+\.\d+\.\d+$/.test(e))])];
-
-  const made = makeSelfSigned({ commonName: 'WRS Raipur workshop server', organization: 'Indian Railways WRS Raipur', ips, dnsNames });
-  fs.mkdirSync(outDir, { recursive: true });
-  fs.writeFileSync(keyPath, made.keyPem, { mode: 0o600 });
-  fs.writeFileSync(certPath, made.certPem, { mode: 0o644 });
-  fs.writeFileSync(derPath, made.certDer, { mode: 0o644 });
-
-  console.log(`[make-lan-cert] wrote ${certPath}`);
-  console.log(`[make-lan-cert]   for ${ips.join(', ')} and ${dnsNames.join(', ')}`);
-  console.log(`[make-lan-cert]   valid until ${made.notAfter.toISOString().slice(0, 10)}`);
-  console.log(`[make-lan-cert]   ${derPath} is the file to install on each tablet — see docs/TABLET_TRUST.md`);
+  const r = ensureCerts(outDir, extras);
+  if (r.caMade) console.log(`[make-lan-cert] made the workshop CA: ${r.files.caCertPath}`);
+  if (r.leafMade) console.log(`[make-lan-cert] issued the server certificate for ${r.ips.join(', ')} and ${r.dnsNames.join(', ')} — valid until ${r.notAfter.toISOString().slice(0, 10)}`);
+  else console.log(`[make-lan-cert] the server certificate already names ${r.ips.join(', ')} — kept`);
+  console.log(`[make-lan-cert] ${r.files.installPath} is the ONE file to install on each tablet, phone and laptop — see docs/TABLET_TRUST.md${r.caMade ? ' (new CA: install it on every device, even ones that trusted the old certificate)' : ''}`);
 }

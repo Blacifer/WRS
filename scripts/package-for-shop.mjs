@@ -243,12 +243,12 @@ rem A browser gives a page the camera, the microphone and offline reload only
 rem over https (or from localhost). The tablets reach this PC over the LAN, so
 rem without a certificate they get none of those — no photograph of a
 rem condemned spring, no QR, no voice. Made here with Node alone; the .crt
-rem beside it is installed on each tablet once. See docs\TABLET_TRUST.md.
+rem beside it (the workshop CA) is installed on each tablet once and never
+rem again, whatever address the PC gets. See docs\TABLET_TRUST.md.
 rem ---------------------------------------------------------------------------
-if not exist "server\certs\lan-cert.pem" (
-  echo   Making a certificate for this PC's address...
-  "%NODE%" server\scripts\make-lan-cert.mjs server\certs
-)
+rem The workshop CA is made once and kept; the server certificate is reissued
+rem only when this PC's address has changed, so a new DHCP lease needs nothing.
+"%NODE%" server\scripts\make-lan-cert.mjs server\certs
 set "TLS_KEY_PATH=%~dp0server\certs\lan-key.pem"
 set "TLS_CERT_PATH=%~dp0server\certs\lan-cert.pem"
 

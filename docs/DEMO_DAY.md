@@ -48,6 +48,21 @@ Before the day, walk every screen by hand once with
 [WALKTHROUGH_TEST_SCRIPT.md](WALKTHROUGH_TEST_SCRIPT.md) — laptop and tablet,
 all four roles, the failure drills — and keep the ticked copy with the stick.
 
+## If the laptop is a Mac (no START.cmd)
+
+`START.cmd` is the shop PC's Windows starter. On a Mac the same thing is
+`bash scripts/rehearsal.sh start` — it packages the bundle if needed, seeds
+the demonstration record, makes or refreshes the certificates and starts
+the server on `https://localhost:3200`; `status` prints the address for the
+tablet; `stop` is closing the START.cmd window. The certificates live in
+`.rehearsal-certs/`; `lan-cert.crt` there is the workshop CA to install on
+the iPad and the phone once.
+
+With a phone hotspot in the room: turn the hotspot on first, join the Mac
+and the tablet to it, *then* `start` — the server certificate is reissued
+for the address the hotspot gave the Mac. `status` shows it. The phone that
+runs the hotspot can open the same address itself.
+
 ## The accounts
 
 | Sign in as | Password | Shows |

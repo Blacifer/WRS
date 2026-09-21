@@ -56,7 +56,9 @@ sed -i.bak \
   -e "s#^CORS_ORIGIN=.*#CORS_ORIGIN=https://localhost:$PORT#" \
   -e "s#^WRS_BACKUP_DIR=.*#WRS_BACKUP_DIR=$BUNDLE/backups-elsewhere#" .env
 rm -f .env.bak
-[ -f server/certs/lan-cert.pem ] || node server/scripts/make-lan-cert.mjs server/certs >/dev/null 2>&1
+# Every start: the CA is made once and kept; the server certificate is reissued
+# only when this machine's addresses have changed (a new Wi-Fi, a phone hotspot).
+node server/scripts/make-lan-cert.mjs server/certs | grep -E "made the workshop CA|issued the server" || true
 
 # DEMO-DATA.cmd: the demonstration record, SEED_DEMO_USERS=true into .env.
 echo "DEMO-DATA.cmd: seeding the demonstration record"
