@@ -3,8 +3,10 @@
  * Indian Railways WRS Raipur
  */
 
+import https from 'node:https';
 import fs from 'node:fs';
 import path from 'node:path';
+import { ensureCerts } from '../scripts/make-lan-cert.mjs';
 import { createApp } from './app.ts';
 import { config } from './config/index.ts';
 import { getDatabase, closeDatabase } from './db/connection.ts';
@@ -58,6 +60,43 @@ const server = useTls
     });
 
 /*
+ * The certificate follows the address.
+ *
+ * The server's certificate names the addresses this machine had when it was
+ * issued. A laptop that joins a different Wi-Fi or a phone hotspot after
+ * starting — or a shop PC handed a new DHCP lease — then presents a
+ * certificate that does not name the address the tablet typed, and the
+ * tablet warns although it trusts the CA. The first rehearsal on a hotspot
+ * hit exactly this. Every thirty seconds the addresses are compared with the
+ * certificate; when they differ a new one is issued from the same CA and
+ * swapped into the running listener. No restart, nothing to reinstall.
+ */
+const stopCertWatch = (() => {
+  if (!useTls || process.env.WRS_CERT_WATCH === 'off') return () => {};
+  const certDir = path.dirname(tlsCertPath!);
+  if (!fs.existsSync(path.join(certDir, 'lan-ca-key.pem'))) return () => {};   // an operator's own certificate, not ours to reissue
+  const tick = async () => {
+    try {
+      // ensureCerts is idempotent and cheap (two file reads and a parse); it
+      // reissues only when the certificate on disk does not name every
+      // address this machine has now — so a changed network, and a replaced
+      // file, are both caught.
+      const r = ensureCerts(certDir);
+      if (r.leafMade) {
+        (server as https.Server).setSecureContext({ key: fs.readFileSync(tlsKeyPath!), cert: fs.readFileSync(tlsCertPath!) });
+        console.log(`🔐 address changed — certificate reissued for ${r.ips.join(', ')} and swapped in without a restart`);
+      }
+    } catch (e) {
+      console.error(`[cert-watch] ${(e as Error).message}`);
+    }
+  };
+  void tick();
+  const timer = setInterval(() => { void tick(); }, 30_000);
+  timer.unref();
+  return () => clearInterval(timer);
+})();
+
+/*
  * The nightly backup, from inside the server.
  *
  * Off for a read-only mirror (it holds a restored copy, not the record) and
@@ -107,6 +146,7 @@ function shutdown(signal: string, code = 0): void {
   if (shuttingDown) return;   // a second Ctrl+C must not race the first
   shuttingDown = true;
   stopBackupSchedule();
+  stopCertWatch();
 
   console.log(`${signal} received. Shutting down gracefully...`);
 
