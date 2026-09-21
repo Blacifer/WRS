@@ -1,91 +1,81 @@
 # WRS Raipur QC App — Quick Start
 
-One page per role. The app has an English/Hindi toggle (top of screen) — use whichever is easier.
+One page per role. Every screen has an **English / हिंदी** toggle at the top right — use whichever is easier. The words below are the words on the buttons.
 
 ---
 
-## Inspector — Springs
+## Inspector — the home screen
 
-1. **Log in** with your username and password. Tap **Spring Batch**.
-2. Enter the **wagon number** once, then pick the **bogie type**, whether the springs are **used or new**, and the **axle load**. The app tells you how many springs that configuration has — for a 20.32t NLB bogie it is 12 outer, 8 inner and 4 snubber, so 48 for the wagon.
-3. The app then walks you through them one at a time, showing which spring you are on (e.g. *Bogie 1 · Outer Spring 5 / 12*). For each one:
-   - Check the spring against the **strip**, exactly as you do now.
-   - **Tap the band the strip shows** — the six colours are on screen with their height ranges. That is the whole entry: one tap, no typing.
-   - The result and the band appear straight away, with a sound cue (chime = pass, buzz = condemned), and it tells you which colour to paint.
-   - If the spring is **off the strip** — below the lowest band or above the highest — tap **Off the strip — condemn**.
-   - If you need to record an exact measurement instead (a borderline spring, or a disputed reading), switch to the **Exact height** tab and type it. Both routes reach the same verdict.
-   - If you can see a crack, corrosion or deformation, tap **+ Flag a visible defect**. That condemns the spring whatever its height.
-   - Tap **Save & Next Spring**.
-4. A condemned spring asks for a **photo** before you can move on — that photograph is the evidence behind the condemnation. It also tells you what the replacement must be: not just "a good spring", but the band and millimetre range that keeps the nest matched.
-5. When the wagon is done you get a summary — how many passed, how many were condemned — and **Start Next Wagon**.
+Sign in. Two cards: **Springs** (sort on the bench, or measure one) and **A wagon** (checklist, wheels, photographs, parts). Under them, **Your record today** — how many springs you have logged, how many passed, the bands, and the newest few with the time. It is your own count for the day; a supervisor sees the same figures.
 
-**If you are interrupted:** close the app, lock the tablet, or lose the page — it comes back on the same spring with your counts intact.
+The bar at the top: **Tasks / Home · Sorting · Single Spring · Spring Batch · Manual · Logout**.
 
-**No signal:** keep working normally. Readings are held on the device and sync by themselves once you are back in range. Nothing is lost and nothing is recorded twice.
+## Inspector — Sorting (the loose-spring pile)
 
-**Note on the camera:** there is no photographing of springs or calipers. The strip already tells you the band, so the app just asks you to tap it. The camera is only for photographing a defect.
+This is the bulk job — roughly **700 springs a shift**. No wagon number: these are dismantled springs going back into stock.
 
-## Inspector — Spring Sorting (the loose-spring pile)
-
-This is the bulk job — roughly **700 springs a shift** — and it is different from Spring Batch above. There is no wagon number here. These are dismantled springs going back into stock, and they become a wagon's springs later, when an assembly draws on them.
-
-1. **Log in** and tap **Spring Sorting**.
-2. Set the three things at the top once, then leave them: **Bogie type**, **Condition** (used or new), and **Spring position** (outer, inner or snubber). Sort one position at a time — mixing them up as you go is what makes the tallies useless.
-3. Name the **gauge** you are using. If the gauge on the bench is not in the list, say so rather than picking the nearest name — a reading that names the wrong gauge is worse than one that names none.
-4. For each spring: check it against the strip and **tap the band the strip shows**. One tap per spring. The chime means serviceable, the buzz means condemned.
-   - Off the strip entirely? **Condemn this spring**, then say what you saw — crack, corrosion, deformation, or something else.
-   - Need an exact figure instead? Use **What is the free height? (mm)**.
-5. **Tapped the wrong band?** **Undo last spring** puts it right. Use it freely — at 700 a shift a wrong tap is certain, and undo does not delete anything, it records the correction.
-6. **Finish sorting session** when you stop. That writes one entry for the session.
+1. Tap **Sorting**. Set the three things at the top once, then leave them: **Bogie type**, **Condition** (Used / New) and **Spring position** (Outer / Inner / Snubber). Sort one position at a time.
+2. Pick the **Gauge** you are using from the list. If the gauge on the bench is not listed, say so rather than picking the nearest name. A gauge with no calibration date shows an amber note; work continues, the readings are marked.
+3. For each spring: check it against the strip and **tap the band the strip shows** — six coloured buttons for a used spring (Blue I … Red VI, each with its millimetres), three for a new one. One tap per spring. Chime = serviceable, buzz = condemned.
+   - Off the strip, or a crack, corrosion or deformation you can see → **Condemn this spring**, then tap what you saw. The reason is the record.
+   - **Bogie type LWLH25 or LCCF20** has no band table: type the **free height** instead and the screen says serviceable or condemn against WMM §309C.
+4. **Tapped the wrong band?** **Undo last spring**. Use it freely — it names what it took back and records the correction; nothing is deleted.
+5. **Photograph springs while sorting** — tick it once for the session. The camera opens under the tick box; each band tap saves a photograph against that spring. The camera keeps the evidence; it does not decide.
+6. **Finish sorting session** when you stop.
 
 ### "Worth a second look" — the amber box
 
-Sometimes after you record a spring an **amber box** appears. It means the reading does not look like the others of its kind — most often because a digit got typed in the wrong order, so 260.5 became 206.5.
-
-**Nothing has gone wrong, and nothing is blocked.** The spring is already recorded and the band above it stands. The box is a question, not a verdict.
-
-- Gauge it again. If the reading **changed**, tap **Re-measured — it was wrong**, then use **Undo last spring** to correct the record.
-- If the reading **was right all along**, tap **The reading stands**.
-
-**Please answer it either way, including when the app was wrong.** "The reading stands" is not a complaint — it is how the app learns it is asking too often, and it is the only way that ever gets fixed. A box nobody answers stays exactly as annoying as it is today.
-
-The box stays quiet until it has seen about a dozen springs of that kind, so it will say nothing at all early in a new batch.
+After a typed reading an amber box may say the figure does not look like the others of its kind — usually a digit in the wrong order (206.5 for 260.5). Nothing is blocked; the spring is recorded. Gauge it again: if the reading changed, tap **Re-measured — it was wrong** and use **Undo last spring**; if it was right, tap **The reading stands**. Answer it either way — that is how it learns to ask less.
 
 ### "Complete bogies from stock"
 
-The panel above the tallies says how many **whole bogies** the sorted pile can actually supply, and — more usefully — **which position is holding that number down**.
+The panel under the tallies says how many **whole bogies** the sorted pile can supply and **which position is holding that number down**. Set **Building for** to the wagon you are supplying. Springs "stranded" are sorted but too few of their band to fill a group.
 
-Set **Building for** to the wagon you are supplying. If it says the outer springs are the limit, sorting more outers raises the number and sorting more snubbers does not. It also tells you how many springs are **stranded** — sorted, but with too few of their band to fill a group, so they sit in the bin until more of that band turn up.
+## Inspector — Single Spring (one spring, on a wagon)
 
-## Inspector — Wagon Checklist
+Tap **Single Spring**. It first asks which wagon and bogie, then the **free height**. The verdict names its table (e.g. *Green, Table 28*). Physical damage condemns regardless of height.
 
-1. From the wagon list, open the wagon you're working on.
-2. The **Checklist** tab shows every part grouped by category (Springs, Wheels & Axles, Bearings, Brake System, Couplers, Bogie Frame, Friction Wedges, Body). Items marked **MANDATORY** must all be addressed before the wagon can leave.
-3. For each part: mark **PASS**, **FAIL**, **CONDEMNED**, **REPAIRED**, or **REPLACED**. Add a note if useful. Attach a photo with the camera icon if you want visual evidence on record.
-4. **Voice mode**: tap the microphone icon and just say what you're doing — e.g. *"Brake beam repaired and tested"* — hands-free for when you're mid-repair and your gloves are greasy. It'll read back what it understood; say "undo" if it got it wrong.
-5. You cannot mark the wagon ready for release until every mandatory item is addressed — this is enforced by the app, not just a reminder.
+## Inspector — A wagon
+
+Tap the **A wagon** card → the wagons in the shop with their stage → tap one, or **All wagons** and type the number (or the camera icon, **Read the number painted on the wagon** — it proposes the text; you confirm or correct it). Then **Continue checklist**. The wagon's tabs:
+
+- **Checklist** — every part by category (Springs, Wheels & Axles, Bearings, Brake System, Couplers & Draft Gear, Bogie Frame & Bolster, Friction Wedges, Body & Underframe). Each item: **Pass / Fail / Condemn**; condemning asks for a note; a mandatory item cannot be skipped. Under the list, **the wheels**: tap a wheel and type the **tread diameter** chalked on the disc — the limit and the drawing appear as you type. Flange figures are optional, folded away.
+- **Photos** — the four bogie assembly frames and the **pocket counts**. You count what is in the photograph; the expected number is never shown to you. A second person recounts blind.
+- **Parts** — *Parts in, parts out*: **Came off · Went back on · Replaced with new · Scrapped · Not being refitted**, by category and position. This is what answers "was anything missing" months later.
+- **Air-brake test** — the Single Wagon Test proforma (WMM §720-C), 14 rows, each judged against its limit as you type.
+- **Timeline** — every stage with the date and who moved it.
+- **Voice**: the microphone reads back what it understood; say "undo" if it got it wrong. Anything a model proposes is shown for you to confirm — it records nothing by itself.
+
+## Inspector — Manual
+
+Tap **Manual** and ask in plain words (*brake block condemning limit*). The answer is **in the document's own words**, with the page and the source beneath. It quotes; it never paraphrases. Works with no internet.
+
+## Everyone — no signal
+
+Keep working. Readings are held on the tablet — the screen says how many are waiting — and send themselves when the network is back. Nothing is lost and nothing is recorded twice. If the app "stops loading" when the Wi‑Fi returns, the tablet has switched to mobile data: turn mobile data off.
 
 ## Supervisor
 
-- Everything an inspector can do, plus:
-- **Override a spring's band**: opens an OTP-verification step — you'll need a one-time code before the override is recorded. Every override is logged with your name and reason.
-- **Gate & Release** tab on a wagon: shows exactly what's still blocking release (in plain language, e.g. *"Mandatory component X has not been inspected"*). Once the list is empty you can sign off, which needs a **one-time code**: tap **Send OTP**, enter the code, tap **Verify OTP**, then authorise. The certificate is issued in your name and carries a signature that can be checked later.
-- Some findings are **advisories** rather than blockers — most often a spring nest whose springs each pass but which are not matched as a set. These do not stop a release, but you have to **tick each one to accept it**, and your acceptance is recorded on the certificate. A wagon can leave with a mismatched nest only because a named person decided it should.
-- **Scan a component QR code** (wheelset, bearing, draft gear, etc.) to pull up its full service history across every wagon it's been fitted to.
+Everything an inspector can do, plus:
 
-## DRM / Administrator — Stores planning
+- **Wagons Pipeline** — every wagon by stage; **Advance to Next Stage** moves it; the **Due out** date can be changed, with a reason, and the change is on the record.
+- **Release checks** on a wagon — what still blocks release, in plain words (a condemned spring, a wheel below the last-shop-issue diameter, a pocket count that fell short, an item not yet inspected). **Advisories** do not block but must each be ticked to accept, and the acceptance is on the certificate. Sign-off needs a **one-time code**.
+- **Photos** — the supervisor sees the pocket-count figures the inspector was not shown (*6 of 7 outer — one pocket may be empty*).
+- **Supervisor override — change the band** on a single spring: OTP, name and reason, all recorded. **Registered in error?** on a wagon registered by mistake: OTP and a reason; the wagon is marked void, never deleted.
+- **Passport** — a wagon's signed, portable history; export it for the next shop. The **certificate** carries a QR that verifies on any phone with no server.
+- **Shadow Run** — the register and the app side by side; the disagreement log decides go-live.
+- **Ask the Records** — a question in plain words; the answer shows the query and the rows it came from.
 
-The **Analytics** screen carries a table headed *Expected spring replacements*. It is a shopping list for the next fortnight, and it is worth knowing exactly how it is built before ordering against it:
+## DRM
 
-- **Handled** comes from the shop's own out-turn return — 5,747 wagons last year, of which BOXNHL alone was 2,503 — multiplied by the spring counts RDSO publishes for each wagon.
-- **Condemned %** is measured here, from your own inspections. Nothing is assumed.
-- **Order** is those two multiplied, rounded up. A shortfall stops a wagon; a surplus sits on a shelf.
-- **From** is how many inspections the percentage rests on. Read this column before believing the row.
+**DRM Dashboard** — *Shop Floor — Right Now*: when today's pile finishes, how many bogies can be built, where wagons wait, what keeps coming back — every figure with its count. **Spring Analytics** — the shop's springs against the standard; *Expected spring replacements* for the fortnight, with the number of inspections each rate rests on (a type with too few condemnations is listed *not forecast yet* on purpose). **Audit** — *Verify chain*; the record proves nothing was altered after it was written. A DRM cannot register or inspect a wagon.
 
-A spring type with **fewer than 30 condemnations** on record is listed as *not forecast yet* rather than given a number. That is deliberate. An order quantity invented from four observations is worse than a blank, because somebody acts on it. Early in the pilot most types will sit in that list, and the table will fill in as the record builds.
+## Administrator
+
+**People, and what they can reach** — accounts, roles, the capability matrix (read-only), roster import from a CSV. **Checklist rules** — the items, which are mandatory, the expected quantities and where each figure comes from. **Gauges** — the register with calibration dates; a gauge reading systematically high shows up here from the record itself. **Stores** — parts and stock, **+ Add a part**. **History and logs** — filter as you type. **Deployment readiness** — the checks the PC must pass, at the top of the dashboard.
 
 ## Everyone
 
-- **Everything you do is logged permanently** — who, what, when — and cannot be edited or deleted afterward, including by an administrator. This is by design: it's what makes the record trustworthy. A supervisor can check the log is intact at any time from the audit verification view; it will say so if a single entry has been altered.
-- If something looks wrong (a reading, a checklist state), don't try to "fix" it by re-entering — flag it to your supervisor. The record should show what actually happened, corrections included, not be silently overwritten.
-- The app works offline. If you lose signal mid-shift, keep working normally — it'll catch up once you're connected again.
+- **Everything you do is logged permanently** — who, what, when — and cannot be edited or deleted afterwards, including by an administrator. Corrections are recorded as corrections.
+- If something looks wrong, don't "fix" it by re-entering — tell your supervisor. The record should show what happened.
+- A person decides. The camera photographs and counts; it may only sort on its own once blind reads on this shop's springs have earned it, and until then the server refuses it.

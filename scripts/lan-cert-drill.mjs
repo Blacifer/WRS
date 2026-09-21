@@ -3,7 +3,7 @@
  * The tablet gets a camera over the LAN, proven rather than promised
  * Indian Railways WRS Raipur
  *
- * The bundle used to serve plain http, and docs/RUNNING_ON_A_TABLET.md had
+ * The bundle used to serve plain http, and an earlier tablet note had
  * already measured what that means: from any address but localhost, no
  * getUserMedia, no service worker, no secure context. The quick-start told
  * inspectors a condemned spring needs a photograph. From a tablet, it could
