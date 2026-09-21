@@ -54,9 +54,29 @@ case "${1:-}" in
     node scripts/count-tables.mjs "$BUNDLE/server/data/wrs_inspections.db" /tmp/wrs-restored/wrs.db
     echo "   restored copy: /tmp/wrs-restored/wrs.db" ;;
   tunnel)
+    # A plain tunnel to the server that is already running — nothing else.
+    # (scripts/pilot-tunnel.sh is a different thing: it frees the port, builds
+    # and starts its own server. Handing off to it here killed the rehearsal.)
     echo "Plan B: a public https address for a phone on its own internet. Data passes through Cloudflare, encrypted."
-    echo "For a demonstration only, never for the live record. Needs internet on this machine. Ctrl-C ends it."
-    exec bash scripts/pilot-tunnel.sh ;;
+    echo "For a demonstration only, never for the live record. Needs internet on this machine. Ctrl-C ends the tunnel only."
+    for brewbin in /opt/homebrew/bin /usr/local/bin; do [ -d "$brewbin" ] && case ":$PATH:" in *":$brewbin:"*) ;; *) PATH="$PATH:$brewbin";; esac; done
+    command -v cloudflared >/dev/null 2>&1 || { echo "cloudflared is not installed (brew install cloudflared)"; exit 1; }
+    curl -sk -o /dev/null --max-time 2 "https://localhost:$PORT/api/health" || { echo "NOT running on :$PORT — run: bash scripts/rehearsal.sh start"; exit 1; }
+    TLOG=/tmp/wrs_rehearsal_tunnel.log; : > "$TLOG"
+    # --no-tls-verify: the origin is this machine's own self-signed certificate.
+    cloudflared tunnel --url "https://localhost:$PORT" --no-autoupdate --no-tls-verify >"$TLOG" 2>&1 &
+    TPID=$!
+    trap 'kill $TPID 2>/dev/null; echo; echo "tunnel closed — the server on :$PORT is still running"; exit 0' INT TERM
+    url=""
+    for _ in $(seq 1 40); do url=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' "$TLOG" | head -1); [ -n "$url" ] && break; sleep 1; done
+    if [ -z "$url" ]; then echo "no public address after 40 s — is this machine on the internet? ($TLOG)"; kill $TPID 2>/dev/null; exit 1; fi
+    for _ in $(seq 1 20); do curl -s -o /dev/null --max-time 5 "$url/api/health" && break; sleep 2; done
+    echo
+    echo "  phone (any network):  $url"
+    echo "  no certificate needed on the phone; the address changes every time this is started"
+    echo "  a new address takes up to a minute to spread — if the phone says it cannot find it, wait and retry"
+    echo
+    wait $TPID ;;
   *)
     sed -n 2,17p "$0" | cut -c3- ;;
 esac
