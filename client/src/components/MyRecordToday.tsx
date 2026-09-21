@@ -27,6 +27,15 @@ interface Props {
   refreshKey?: number;
 }
 
+const DAMAGE_WORDS: Record<string, [string, string]> = {
+  CRACK: ['Crack', 'दरार'], CORROSION: ['Corrosion', 'जंग'], DEFORMATION: ['Deformation', 'विकृति'], OTHER: ['Condemned on sight', 'देखकर कंडम']
+};
+/** "Physical damage detected: CRACK" (the engine) or "Physical damage recorded: CRACK." (the judge) → "Crack"; anything else → null (shown as stored). */
+const reasonWord = (reason: string | null | undefined, hi: boolean): string | null => {
+  const m = /^Physical damage (?:detected|recorded): ([A-Z_]+)\b/.exec(reason || '');
+  const w = m && DAMAGE_WORDS[m[1]];
+  return w ? w[hi ? 1 : 0] : null;
+};
 const time = (iso: string) => new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
 export const MyRecordToday: React.FC<Props> = ({ lang, compact = false, refreshKey = 0 }) => {
@@ -91,11 +100,14 @@ export const MyRecordToday: React.FC<Props> = ({ lang, compact = false, refreshK
               <span className="w-3 h-3 rounded-full shrink-0 border border-white/20" style={{ backgroundColor: r.classifiedBand ? COLOR_HEX_MAP[r.classifiedBand as keyof typeof COLOR_HEX_MAP] : '#dc2626' }} aria-hidden="true" />
               <span className="font-bold text-ink-body w-16 shrink-0">{r.status === 'CONDEMNED' ? t('Condemned', 'कंडम') : (isHi ? BAND_HI[r.classifiedBand || ''] || r.classifiedBand : r.classifiedBand)}</span>
               <span className="text-ink-muted flex-1 min-w-0 truncate">
-                {r.measuredFreeHeight ? <b className="text-ink-body tabular-nums">{r.heightIsApproximate ? '≈' : ''}{r.measuredFreeHeight} mm</b> : null}
-                {r.measuredFreeHeight ? ' · ' : ''}{isHi ? POS_HI[r.springPosition] || r.springPosition : r.springPosition.toLowerCase()} · {r.bogieType.replace(/^CASNUB_/, '').replace(/_/g, ' ')}
+                {/* A spring condemned by reason from the bench has no reading — the reason is the fact, so it leads and the placeholder height is not shown. */}
+                {r.status === 'CONDEMNED' && reasonWord(r.condemnationReason, isHi)
+                  ? <b className="text-ink-body">{reasonWord(r.condemnationReason, isHi)}</b>
+                  : r.measuredFreeHeight ? <b className="text-ink-body tabular-nums">{r.heightIsApproximate ? '≈' : ''}{r.measuredFreeHeight} mm</b> : null}
+                {' · '}{isHi ? POS_HI[r.springPosition] || r.springPosition : r.springPosition.toLowerCase()} · {r.bogieType.replace(/^CASNUB_/, '').replace(/_/g, ' ')}
                 {r.gaugeCode ? ` · ${r.gaugeCode}` : ''}
                 {r.assignedWagonNumber ? ` · ${r.assignedWagonNumber}` : ''}
-                {r.status === 'CONDEMNED' && r.condemnationReason ? ` — ${r.condemnationReason}` : ''}
+                {r.status === 'CONDEMNED' && r.condemnationReason && !reasonWord(r.condemnationReason, isHi) ? ` — ${r.condemnationReason}` : ''}
               </span>
             </li>
           ))}

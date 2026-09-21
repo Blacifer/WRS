@@ -93,7 +93,15 @@ sortingRouter.post('/record', authMiddleware, (req: AuthenticatedRequest, res: R
      */
     const r = repo();
     let anomaly = null;
+    /*
+     * A spring condemned from the bench by tapping a reason (crack, corrosion,
+     * off the strip) carries a placeholder height, not a reading. Asking the
+     * inspector to "re-measure" 200 mm they never measured is noise, so the
+     * unusual-height check is only run on a height someone actually read.
+     */
+    const placeholderHeight = verdict.status === 'CONDEMNED' && (Boolean(b.heightIsApproximate) || (b.damageType && b.damageType !== 'NONE'));
     try {
+      if (placeholderHeight) throw new Error('placeholder height');
       const population = r.recentHeights(bogieType as BogieType, condition, springPosition);
       const result = findMeasurementAnomaly(measuredFreeHeight, {
         bogieType: bogieType as BogieType,

@@ -53,6 +53,11 @@ export const WheelReadings: React.FC<Props> = ({ wagonNumber, lang, canRecord, o
   };
 
   const verdictClass = (v: string) => v === 'CONDEMN' ? 'text-bad-ink' : v === 'BELOW_SHOP_ISSUE' ? 'text-warn-ink' : 'text-good-ink';
+  // The judge names a dimension by its field key ("treadDiameterMm"); the person reads a word.
+  const dimensionWord = (d: string) => ({
+    treadDiameterMm: t('Tread diameter', 'ट्रेड व्यास'), flangeThicknessMm: t('Flange thickness', 'फ़्लैंज मोटाई'), flangeHeightMm: t('Flange height', 'फ़्लैंज ऊँचाई'),
+    rootRadiusMm: t('Root radius', 'रूट त्रिज्या'), flatMm: t('Flat', 'फ़्लैट'), hollowMm: t('Hollow', 'हॉलो')
+  } as Record<string, string>)[d] || d.replace(/Mm$/, '');
   const verdictLabel = (v: string) => v === 'CONDEMN' ? t('condemn', 'कंडम') : v === 'BELOW_SHOP_ISSUE' ? t('below issue limit', 'इश्यू सीमा से नीचे') : t('within limits', 'सीमा के भीतर');
 
   return (
@@ -134,7 +139,7 @@ export const WheelReadings: React.FC<Props> = ({ wagonNumber, lang, canRecord, o
           {live && (
             <div className="text-[11px] space-y-0.5" data-testid="wheel-live">
               <div className={`font-bold ${verdictClass(live.verdict)}`}>{verdictLabel(live.verdict)}</div>
-              {live.findings.map((f) => <div key={f.dimension} className={f.verdict === 'PASS' ? 'text-ink-muted' : verdictClass(f.verdict)}>{f.dimension.replace(/Mm$/, '')} {f.value} — {f.limit}</div>)}
+              {live.findings.map((f) => <div key={f.dimension} className={f.verdict === 'PASS' ? 'text-ink-muted' : verdictClass(f.verdict)}>{dimensionWord(f.dimension)} {f.value} mm — {f.limit}</div>)}
             </div>
           )}
           {error && <p className="text-xs text-bad-ink">{error}</p>}

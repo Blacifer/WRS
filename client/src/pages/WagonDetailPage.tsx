@@ -1221,7 +1221,8 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
             >
               ← {isHi ? 'वैगन सूची पर वापस' : 'Back to Wagons List'}
             </button>
-            <div className="flex items-center gap-3">
+            {/* Wraps on a phone — in one line the due-out badge hung off the right edge of the card. */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <h2 className="text-2xl font-extrabold text-white">{wagon?.wagonNumber}</h2>
               <span className="px-3 py-1 bg-raised border border-line rounded-control text-xs font-bold text-ink-body">
                 {wagon?.wagonType}
@@ -1235,7 +1236,7 @@ export const WagonDetailPage: React.FC<WagonDetailPageProps> = ({ wagonNumber, o
                 * having no date. A supervisor may set or move it, and the
                 * move is on the audit trail.
                 */}
-              <span className="px-3 py-1 bg-raised border border-line rounded-control text-xs font-bold text-ink-body flex items-center gap-2" data-testid="target-release-date">
+              <span className="px-3 py-1 bg-raised border border-line rounded-control text-xs font-bold text-ink-body flex flex-wrap items-center gap-2" data-testid="target-release-date">
                 {isHi ? 'निर्धारित' : 'Due out'}: {wagon?.targetReleaseDate ? String(wagon.targetReleaseDate).slice(0, 10) : (isHi ? 'तय नहीं' : 'not set')}
                 {isSupervisor && !isReleased && (
                   <input

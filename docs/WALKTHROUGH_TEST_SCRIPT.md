@@ -46,6 +46,8 @@ the evening before, never in the room.
 
 ## 2. Inspector — on the tablet
 
+Every step of this section, performed by the machine on the packaged bundle and photographed on a phone-sized screen, with the exact taps and what to suspect when a screen is not there: `node scripts/inspector-walk.mjs` then `node scripts/inspector-guide.mjs` (the page is published as the *Inspector walk* artifact).
+
 Sign in as **`inspector1` / `password123`**.
 
 | # | Do | Must see |
@@ -63,7 +65,7 @@ Sign in as **`inspector1` / `password123`**.
 | 2.11 | **A wagon → All wagons** | The list of wagons in the shop with their stage. Type `WR/BCNHL/40112` → it opens |
 | 2.12 | Wagon → **Checklist** | Categories as tabs; items with Pass / Fail / Condemn; a condemned item asks for a note. The springs section links to the sorting records |
 | 2.13 | Wagon → **Photos** | Four assembly frames with pocket counts. Bogie 1·A: two counts agree. Bogie 2·B: "counted by Praveen Singh — a blind recount by someone else is needed" and **no figures**. Open the counter: tap pockets, the expected number is **not** shown. Close |
-| 2.14 | Wagon → **Parts** — the wagon's parts ledger: what was taken **off** the wagon, what was fitted **on**, and what was **scrapped**, by position (Bogie 1 / 2, left / right) | The three lists; *Add a part* asks which position and where the part came from (new from Stores, reconditioned, or from another wagon) |
+| 2.14 | Wagon → **Parts** — *Parts in, parts out*: what came **off**, what went back **on**, what was **scrapped**, by position | A balance line (*40 off · 40 back on …*); in the list one outer spring **Replaced with new — crack at the second coil**; the form offers **Came off · Went back on · Replaced with new · Scrapped · Not being refitted**, then Category, Position, Part, How many |
 | 2.15 | Wagon → **Air‑brake test** tab (the Single Wagon Test) | The 14-row proforma; each row judged against the WMM limit as you type |
 | 2.16 | Wagon → **Timeline** | The stage history with dates and who moved it |
 | 2.17 | Wagon → Checklist → **Wheels** (on a BOXN wagon, e.g. `SER/BOXNHL/30914`). Tap a wheel | One large box: the tread diameter chalked on the disc. Type 917 → *below issue limit* against 919 / 906, with the drawing and rule beneath. The flange figures are folded under *optional* — only if the tyre defect gauge was used |

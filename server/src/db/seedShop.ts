@@ -104,7 +104,9 @@ export function seedShopFloor(db: DatabaseSync): void {
   // "when does today's pile finish" tile divides by it.
   for (let daysAgo = 29; daysAgo >= 0; daysAgo--) {
     const dow = dayAt(daysAgo, 12, 0).getUTCDay();
-    if (dow === 0) continue;
+    // Sundays are idle — except the day the seed runs, which always gets a
+    // bench: a rehearsal on a Sunday otherwise showed the DRM "Not yet known".
+    if (dow === 0 && daysAgo !== 0) continue;
     const perDay = daysAgo === 0 ? 120 : 90 + Math.floor(rand() * 40);
     const windowMinutes = daysAgo === 0 ? 80 : 120;
     for (let k = 0; k < perDay; k++) {

@@ -16,6 +16,7 @@ import { getDatabase } from './connection.ts';
 import { runMigrations } from './migrations.ts';
 import { seedShopFloor } from './seedShop.ts';
 import { WagonRepository } from './wagonRepository.ts';
+import { partKeyFor } from './partLedgerRepository.ts';
 import { hashPassword } from '../auth/password.ts';
 import { classifySpring } from '../../../shared/classification/engine.ts';
 import { CASNUB_CHECKLIST_TEMPLATE } from './checklistTemplate.ts';
@@ -2012,6 +2013,58 @@ export function seedDemoData(db?: DatabaseSync): void {
    * canonical certificate with this server's Ed25519 key. The signature
    * verifies anywhere the public key does.
    */
+  /*
+   * The parts ledger for the wagon at Reassembly. Without it the Parts tab
+   * said, in red, "this wagon has no parts record at all" about a wagon four
+   * stages in — true of the seed, and exactly what the room would notice.
+   * A modest, honest ledger: the springs and wedges came off at dismantling,
+   * one outer spring was replaced from Stores for a crack, the rest went
+   * back on. Dates follow the wagon's own stage history.
+   */
+  {
+    const w = DEMO_WAGONS.find((x) => x.wagonNumber === 'WR/BCNHL/40112');
+    const wagonRow = w && (database.prepare('SELECT id FROM wagons WHERE wagon_number = ?').get(w.wagonNumber) as { id: string } | undefined);
+    const already = w && (database.prepare('SELECT COUNT(*) AS n FROM wagon_part_ledger WHERE wagon_number = ?').get(w.wagonNumber) as { n: number }).n > 0;
+    if (w && wagonRow && !already) {
+      // The ledger is append-only (a trigger refuses UPDATE), so the rows are
+      // written with their dates rather than recorded now and backdated.
+      const insert = database.prepare(
+        `INSERT INTO wagon_part_ledger
+           (id, wagon_id, wagon_number, part_key, category, part_name, bogie_position,
+            event, quantity, reason, photo_id, stores_item_id, component_serial,
+            stage, inspector_id, inspector_name, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, ?, 'usr_insp_003', 'Amit Sharma', ?)`
+      );
+      const at = (daysAgo: number, hour: number) => getIsoDate(daysAgo, hour);
+      const put = (event: 'REMOVED' | 'REFITTED' | 'REPLACED' | 'SCRAPPED', category: string, partName: string, bogiePosition: string, quantity: number, stage: string, when: string, reason: string | null = null) => {
+        insert.run(`wpl_${crypto.randomUUID()}`, wagonRow.id, w.wagonNumber, partKeyFor(category, partName, bogiePosition), category, partName, bogiePosition, event, quantity, reason, stage, when);
+      };
+      // Dismantling, day 8: everything off, counted.
+      for (const b of ['BOGIE_1', 'BOGIE_2']) {
+        const n = b === 'BOGIE_1' ? '1' : '2';
+        put('REMOVED', 'SPRINGS', `Outer Spring (Bogie ${n})`, b, 7, 'DISMANTLING', at(8, 10));
+        put('REMOVED', 'SPRINGS', `Inner Spring (Bogie ${n})`, b, 7, 'DISMANTLING', at(8, 10));
+        put('REMOVED', 'SPRINGS', `Snubber Spring (Bogie ${n})`, b, 2, 'DISMANTLING', at(8, 10));
+      }
+      put('REMOVED', 'FRICTION_WEDGES', 'Wedge Main Slope Surface', 'BOGIE_1', 4, 'DISMANTLING', at(8, 11));
+      put('REMOVED', 'FRICTION_WEDGES', 'Elastomeric (EM) Pads (100% Replace — POH)', 'BOGIE_2', 4, 'DISMANTLING', at(8, 11));
+      // Repair, day 4: one outer spring cracked — replaced with a new one from
+      // Stores. One event, not two: the ledger accounts for each removed part
+      // once (refitted, replaced, scrapped or not fitted), so "scrapped" and
+      // "replaced" for the same spring would read as one part too many.
+      put('REPLACED', 'SPRINGS', 'Outer Spring (Bogie 2)', 'BOGIE_2', 1, 'REPAIR_REPLACEMENT', at(4, 15), 'Crack at the second coil — condemned on sight, photographed. New from Stores.');
+      put('REPLACED', 'FRICTION_WEDGES', 'Elastomeric (EM) Pads (100% Replace — POH)', 'BOGIE_2', 4, 'REPAIR_REPLACEMENT', at(4, 15), '100% replacement at POH.');
+      // Reassembly, yesterday: the springs go back — Bogie 2 · Side B is still one short, which the pocket count shows.
+      put('REFITTED', 'SPRINGS', 'Outer Spring (Bogie 1)', 'BOGIE_1', 7, 'REASSEMBLY', at(1, 9));
+      put('REFITTED', 'SPRINGS', 'Inner Spring (Bogie 1)', 'BOGIE_1', 7, 'REASSEMBLY', at(1, 9));
+      put('REFITTED', 'SPRINGS', 'Snubber Spring (Bogie 1)', 'BOGIE_1', 2, 'REASSEMBLY', at(1, 9));
+      put('REFITTED', 'SPRINGS', 'Outer Spring (Bogie 2)', 'BOGIE_2', 6, 'REASSEMBLY', at(1, 11));
+      put('REFITTED', 'SPRINGS', 'Inner Spring (Bogie 2)', 'BOGIE_2', 7, 'REASSEMBLY', at(1, 11));
+      put('REFITTED', 'SPRINGS', 'Snubber Spring (Bogie 2)', 'BOGIE_2', 2, 'REASSEMBLY', at(1, 11));
+      put('REFITTED', 'FRICTION_WEDGES', 'Wedge Main Slope Surface', 'BOGIE_1', 4, 'REASSEMBLY', at(1, 12));
+    }
+  }
+
   {
     const repo = new WagonRepository(database);
     for (const w of DEMO_WAGONS) {

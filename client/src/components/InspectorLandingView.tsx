@@ -329,6 +329,11 @@ export const InspectorLandingView: React.FC<InspectorLandingViewProps> = ({
         )}
       </div>
 
+      {/* The day's record sits under the two cards before anything is chosen —
+          the first walk found it only after tapping Springs, and a person
+          arriving at the screen wants to know where they stand first. */}
+      {workMode === null && <MyRecordToday lang={isHi ? 'hi' : 'en'} compact />}
+
       {/* ---------------------------------------------------------- SPRINGS */}
       {workMode === 'SPRINGS' && (
         <div className="space-y-3">

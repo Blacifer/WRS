@@ -62,6 +62,8 @@ export interface ThroughputReading {
   canQuoteRate: boolean;
   /** Why not, when there is not. Written to be shown to the inspector. */
   reason?: string;
+  /** The same reason in Hindi — the bench runs in Hindi, and this line showed in English there. */
+  reasonHi?: string;
   /** Minutes between the first and last spring of the day. */
   activeMinutes: number;
   /** Springs per hour across that span. */
@@ -80,7 +82,7 @@ export function readThroughput(input: ThroughputInput): ThroughputReading {
   const { total, firstAt, lastAt } = input;
 
   if (!firstAt || !lastAt || total === 0) {
-    return { canQuoteRate: false, activeMinutes: 0, reason: 'No springs recorded yet today.' };
+    return { canQuoteRate: false, activeMinutes: 0, reason: 'No springs recorded yet today.', reasonHi: 'आज अभी तक कोई स्प्रिंग दर्ज नहीं।' };
   }
 
   const start = Date.parse(firstAt);
@@ -89,7 +91,7 @@ export function readThroughput(input: ThroughputInput): ThroughputReading {
   // A clock that disagrees with itself, or timestamps that will not parse.
   // Refuse rather than produce a negative or NaN rate.
   if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) {
-    return { canQuoteRate: false, activeMinutes: 0, reason: 'The recorded times do not make sense, so no rate is shown.' };
+    return { canQuoteRate: false, activeMinutes: 0, reason: 'The recorded times do not make sense, so no rate is shown.', reasonHi: 'दर्ज समय ठीक नहीं बैठते, इसलिए रफ़्तार नहीं दिखाई गई।' };
   }
 
   const activeMinutes = Math.round((end - start) / 60000);
@@ -98,7 +100,8 @@ export function readThroughput(input: ThroughputInput): ThroughputReading {
     return {
       canQuoteRate: false,
       activeMinutes,
-      reason: `Measuring — a rate is shown after ${MIN_SPRINGS_FOR_RATE} springs.`
+      reason: `Measuring — a rate is shown after ${MIN_SPRINGS_FOR_RATE} springs.`,
+      reasonHi: `माप जारी — ${MIN_SPRINGS_FOR_RATE} स्प्रिंग के बाद रफ़्तार दिखेगी।`
     };
   }
 
@@ -106,7 +109,8 @@ export function readThroughput(input: ThroughputInput): ThroughputReading {
     return {
       canQuoteRate: false,
       activeMinutes,
-      reason: 'Measuring — too short a stretch so far to judge a pace from.'
+      reason: 'Measuring — too short a stretch so far to judge a pace from.',
+      reasonHi: 'माप जारी — रफ़्तार आँकने के लिए अभी समय बहुत कम है।'
     };
   }
 

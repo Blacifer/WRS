@@ -185,7 +185,8 @@ export function SingleWagonTestForm({ wagonNumber, wagonType, lang, onRecorded, 
                 <td className="px-2 py-2 text-xs text-ink-muted tabular-nums">{specifiedFor(c)}</td>
                 <td className="px-2 py-2">
                   {c.observational ? (
-                    <div className="flex gap-1.5">
+                    // Wraps on a phone: side by side the second button ("Not") was cut off at the table's edge.
+                    <div className="flex flex-wrap gap-1.5">
                       <button
                         type="button"
                         onClick={() => setObserved((p) => ({ ...p, [c.ref]: true }))}
@@ -208,7 +209,7 @@ export function SingleWagonTestForm({ wagonNumber, wagonType, lang, onRecorded, 
                       inputMode="decimal"
                       value={values[c.ref] ?? ''}
                       onChange={(e) => setValues((p) => ({ ...p, [c.ref]: e.target.value }))}
-                      className={`w-28 bg-raised border rounded px-2 py-1 text-sm text-white tabular-nums ${
+                      className={`w-24 sm:w-28 min-h-[40px] bg-raised border rounded px-2 py-1 text-sm text-white tabular-nums ${
                         looksOutOfRange(c) ? 'border-bad-line' : 'border-line'
                       }`}
                     />

@@ -1176,7 +1176,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
               </div>
             ) : (
               <div className="flex items-baseline gap-3">
-                <span className="text-sm text-ink-muted">{pace.reason}</span>
+                <span className="text-sm text-ink-muted">{isHi ? pace.reasonHi || pace.reason : pace.reason}</span>
                 {pace.activeMinutes > 0 && (
                   <span className="text-xs text-ink-faint">
                     {isHi ? `${pace.activeMinutes} मिनट से` : `${pace.activeMinutes} min so far`}
