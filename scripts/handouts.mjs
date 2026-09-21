@@ -17,6 +17,7 @@ import { resolve } from 'node:path';
 const walk = { format: 'A4', margin: { top: '10mm', bottom: '12mm', left: '10mm', right: '10mm' } };
 const pages = [
   ['docs/handouts/drm-handout.html', 'docs/handouts/drm-handout.pdf', { format: 'A4', margin: { top: '14mm', bottom: '14mm', left: '14mm', right: '14mm' } }],
+  ['docs/handouts/drm-dossier.html', 'docs/handouts/drm-dossier.pdf', { format: 'A4', margin: { top: '16mm', bottom: '16mm', left: '16mm', right: '16mm' }, displayHeaderFooter: true, headerTemplate: '<div></div>', footerTemplate: '<div style="font-family:sans-serif;font-size:8px;color:#7a8590;width:100%;text-align:center">WRS Raipur — Spring &amp; Wagon QC — page <span class="pageNumber"></span> of <span class="totalPages"></span></div>' }],
   ...['inspector', 'supervisor', 'drm', 'admin'].map((r) => [`docs/handouts/${r}-walk.html`, `docs/handouts/${r}-walk.pdf`, walk])
 ];
 const browser = await chromium.launch();

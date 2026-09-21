@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WRS Raipur — Spring &amp; Wagon QC — the dossier</title>
+<style>
+  :root{ --ink:#1b2027; --ink-2:#48525c; --ink-3:#7a8590; --line:#d5d9de; --accent:#1f4e79; --accent-soft:#e3ecf5; --ok:#2e7d4f; --ok-soft:#e2f1e7; --warn:#8a6100; --warn-soft:#fff3d6; --bad:#b3261e; }
+  body{background:#fff;color:var(--ink);font-family:"IBM Plex Sans",-apple-system,"Segoe UI",system-ui,sans-serif;font-size:13.5px;line-height:1.48;margin:0;padding:28px 36px;max-width:900px}
+  .cover{min-height:70vh;display:flex;flex-direction:column;justify-content:center;border-bottom:2px solid var(--ink);margin-bottom:24px;padding-bottom:24px}
+  .eyebrow{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+  h1{font-size:30px;line-height:1.15;margin:8px 0 10px;max-width:24ch}
+  .lede{font-size:16px;color:var(--ink-2);max-width:60ch;margin:0 0 18px}
+  .cover dl{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;font-size:13px;margin:0}
+  .cover dt{color:var(--ink-3)} .cover dd{margin:0}
+  nav.toc{columns:2;column-gap:28px;font-size:13px;margin:0 0 22px}
+  nav.toc a{display:block;color:var(--ink);text-decoration:none;padding:2px 0;border-bottom:1px dotted var(--line)}
+  nav.toc a span{font-family:"IBM Plex Mono",monospace;color:var(--accent);margin-right:8px}
+  h2{font-size:18px;margin:26px 0 8px;padding-top:10px;border-top:2px solid var(--ink);page-break-before:always}
+  h2:first-of-type{page-break-before:auto}
+  h2 span{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--accent);margin-right:10px;font-weight:500}
+  h3{font-size:14px;margin:14px 0 4px}
+  p{margin:0 0 7px;max-width:76ch}
+  ul,ol{margin:0 0 7px;padding-left:20px;max-width:76ch}
+  li{margin-bottom:3px}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;margin:6px 0 10px}
+  th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:500}
+  td.c{text-align:center;font-weight:600}
+  .box{border:1px solid var(--line);border-left:4px solid var(--accent);padding:8px 12px;margin:8px 0;background:#fafbfc;max-width:80ch}
+  .ok{border-left-color:var(--ok);background:var(--ok-soft)}
+  .warn{border-left-color:var(--warn);background:var(--warn-soft)}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .small{font-size:12px;color:var(--ink-2)}
+  code{font-family:"IBM Plex Mono",monospace;font-size:12px;background:var(--accent-soft);padding:0 4px;border-radius:2px}
+  .say{font-style:italic;color:var(--ink-2)}
+  @media print{ body{padding:0} h2{page-break-before:always} table,.box{break-inside:avoid} nav.toc{columns:2} .cover{min-height:auto;page-break-after:always} }
+  @media (max-width:640px){ .two{grid-template-columns:1fr} body{padding:16px} nav.toc{columns:1} }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="eyebrow">Wagon Repair Shop, Raipur · South East Central Railway · for the DRM's office · September 2026</div>
+  <h1>Spring &amp; Wagon QC — what it is, how it is run, and how we propose to start</h1>
+  <p class="lede">A quality record for the spring section and the wagon POH line. It runs on one PC in the shop with no internet. Every figure on every screen is counted from the record; where the evidence is thin, the screen says so. A person decides — always. This document covers the roles, the security, the record and its logs, the photographs and their storage, what the system learns and how, what it needs, and a two‑week shadow run as the way in.</p>
+  <dl>
+    <dt>Prepared by</dt><dd>Pratik Agarwal · pratik96agarwal@yahoo.com</dd>
+    <dt>Version</dt><dd>Build of 21 September 2026 — every screen described here was walked and photographed on that build</dd>
+    <dt>Standard</dt><dd>RDSO G‑95 Rev‑II Tables 28–33 (the shop's own copy), Wagon Maintenance Manual Vols I–II, IRCA Part III, G‑81, G‑112, G‑113, 02‑ABR‑02, CAMTECH air‑brake handbook, BLC underframe guidelines, ROH audit sheet</dd>
+  </dl>
+</div>
+
+<nav class="toc">
+  <a href="#s1"><span>1</span>What it is</a>
+  <a href="#s2"><span>2</span>What changes on the floor — and what does not</a>
+  <a href="#s3"><span>3</span>The roles, and who can do what</a>
+  <a href="#s4"><span>4</span>Security</a>
+  <a href="#s5"><span>5</span>The record and its logs</a>
+  <a href="#s6"><span>6</span>Photographs and storage</a>
+  <a href="#s7"><span>7</span>What it learns, from what, and how far that goes</a>
+  <a href="#s8"><span>8</span>Network, tablets, no internet</a>
+  <a href="#s9"><span>9</span>What it needs, and how it is run day to day</a>
+  <a href="#s10"><span>10</span>The way in — a two‑week shadow run</a>
+  <a href="#s11"><span>11</span>Not yet proven, said plainly</a>
+  <a href="#s12"><span>12</span>Appendix — the screens, role by role</a>
+</nav>
+
+<h2 id="s1"><span>1</span>What it is</h2>
+<h3>Springs — the bench</h3>
+<p>The inspector checks the spring against the strip exactly as today and <b>taps the band</b> on the tablet: one tap per spring, the six bands of G‑95 Rev‑II with their heights printed on the buttons. A chime means serviceable, a buzz means condemned. The gauge in use is on every record, and a gauge with no calibration date marks its readings rather than stopping work. A crack, corrosion or deformation is condemned by its <em>reason</em>, and where photographing is on, the photograph is kept as the evidence. A wrong tap is undone with one tap, and the undo is recorded as a correction. Bogies with no published band table (LWLH25, LCCF20) take a typed height and are judged serviceable or condemned against WMM §309C — never against an invented table. Under the strip, <b>Your record today</b>: the inspector's own count, bands and the day's list.</p>
+<h3>Wagons — the pipeline</h3>
+<p>Each wagon is registered at entry and moves through seven stages to release. It carries its checklist by category (Springs, Wheels &amp; Axles, Bearings, Brake System, Couplers &amp; Draft Gear, Bogie Frame &amp; Bolster, Friction Wedges, Body &amp; Underframe), each item Pass / Fail / Condemned / Repaired / Replaced with the standard it cites; the wheel readings, judged against the drawing's limits as the chalk figure is typed; the bogie assembly photographs with a <b>blind second pocket count</b>; a parts ledger (what came off, went back on, was replaced or scrapped, by position); the air‑brake test proforma (WMM §720‑C, 14 rows, each judged as typed); and its stage history with dates and names.</p>
+<h3>Release</h3>
+<p>A wagon cannot be released with a condemned spring, a short pocket count, a wheel below the last‑shop‑issue diameter or a mandatory check undone — and the screen says which, with the figure and the limit. Advisories do not block, but each must be accepted by a named supervisor with a one‑time code, and the acceptance is on the certificate. The certificate is signed by the shop's own key and carries a QR that verifies on any phone with no server and no login.</p>
+<h3>The DRM</h3>
+<p>When today's pile finishes; how many bogies the sorted stock can build and which position limits it; where wagons wait and which one will miss its date; what keeps coming back; inspector quality; gauge exposure; the shop's springs against the standard. Every figure carries the count it rests on. Nothing on these screens is an estimate, a forecast or a model's number.</p>
+
+<h2 id="s2"><span>2</span>What changes on the floor — and what does not</h2>
+<table>
+  <thead><tr><th>Today</th><th>With the application</th><th>What does not change</th></tr></thead>
+  <tbody>
+    <tr><td>Spring band written in a register at the bench, totalled at the end of the shift</td><td>One tap per spring; the day's count, bands and gauge appear as they happen, for the inspector and the supervisor</td><td>The strip, the gauge, the inspector's eye and judgement</td></tr>
+    <tr><td>A condemned spring is a tick mark</td><td>A condemned spring has a reason and, where photographing is on, its photograph</td><td>Who condemns it</td></tr>
+    <tr><td>Wheel limits from memory or the drawing in the office</td><td>The limit and the drawing number beside the box as the chalk figure is typed</td><td>The reading is still taken by hand</td></tr>
+    <tr><td>Pocket count by one person</td><td>Two people count, the second blind; a short count is caught before the exit gate and named on the release checks</td><td>The count is a person's count, not a camera's</td></tr>
+    <tr><td>Release by signature on paper</td><td>Release blocked on named defects; advisories accepted by a named supervisor with a one‑time code; a certificate that verifies anywhere</td><td>The supervisor decides</td></tr>
+    <tr><td>Monthly figures compiled by hand</td><td>Live figures with their counts, from the same record the floor writes</td><td>Nothing is estimated or predicted</td></tr>
+    <tr><td>The manual in the office</td><td>The manual on the tablet, answered in its own words with the page cited</td><td>The manual is the authority; the app quotes it</td></tr>
+  </tbody>
+</table>
+<div class="box"><b>The principle behind every screen:</b> the machine measures, records and proves; a person decides. Where a model is allowed to help — reading a stencilled number, finding the clause somebody meant, turning a spoken sentence into fields, choosing which question to run — it may only <em>find</em>; the manual states, the table judges, the arithmetic is fixed and the rows are shown.</div>
+
+<h2 id="s3"><span>3</span>The roles, and who can do what</h2>
+<p>Four roles. Each is a fixed set of capabilities, enforced on the server for every request — not by hiding buttons. An address typed by hand into a browser is refused. The table is what the code enforces.</p>
+<table>
+  <thead><tr><th>Capability</th><th>Inspector</th><th>Supervisor</th><th>DRM</th><th>Administrator</th></tr></thead>
+  <tbody>
+    <tr><td>Record springs; withdraw a mistapped spring</td><td class="c">✓</td><td class="c">✓</td><td class="c">—</td><td class="c">—</td></tr>
+    <tr><td>Register a wagon; record checklist verdicts; attach photographs</td><td class="c">✓</td><td class="c">✓</td><td class="c">—</td><td class="c">—</td></tr>
+    <tr><td>View wagons and their history</td><td class="c">own work</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td></tr>
+    <tr><td>Release a wagon (one‑time code)</td><td class="c">—</td><td class="c">✓</td><td class="c">—</td><td class="c">—</td></tr>
+    <tr><td>Override a stage or a band, void a wagon registered in error (one‑time code, reason recorded)</td><td class="c">—</td><td class="c">✓</td><td class="c">—</td><td class="c">—</td></tr>
+    <tr><td>Stores — issue, restock, reserve, add a part</td><td class="c">—</td><td class="c">✓</td><td class="c">—</td><td class="c">✓</td></tr>
+    <tr><td>Audit chain; certificate export; ask the records; the shadow‑run log</td><td class="c">—</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td></tr>
+    <tr><td>Write to the shadow‑run log (the designated reviewer)</td><td class="c">—</td><td class="c">✓</td><td class="c">—</td><td class="c">✓</td></tr>
+    <tr><td>Analytics — the DRM dashboards, the standard report</td><td class="c">—</td><td class="c">—</td><td class="c">✓</td><td class="c">✓</td></tr>
+    <tr><td>View what the system has learned; run the analysis</td><td class="c">—</td><td class="c">✓</td><td class="c">✓</td><td class="c">✓</td></tr>
+    <tr><td>Approve a proposed change to the system's behaviour</td><td class="c">—</td><td class="c">✓</td><td class="c">—</td><td class="c">✓</td></tr>
+    <tr><td>Checklist rules; the gauge register; accounts and roles; system settings</td><td class="c">—</td><td class="c">—</td><td class="c">—</td><td class="c">✓</td></tr>
+  </tbody>
+</table>
+<div class="two">
+  <div>
+    <h3>Inspector — does</h3>
+    <p>The bench and the wagon: records, corrects, photographs, registers. Sees their own work and the wagon in front of them. Cannot release, cannot override, cannot see the dashboards.</p>
+    <h3>Supervisor — decides</h3>
+    <p>Everything the inspector does, plus the exit gate: release with a one‑time code, override with a reason and a code, the pocket‑count figures the inspector is not shown, stores, the shadow‑run log, the audit chain. For the pilot the supervisor's menu is kept to the shop floor.</p>
+  </div>
+  <div>
+    <h3>DRM — oversees</h3>
+    <p>Every dashboard, the standard report, the audit chain, the certificates, ask‑the‑records, the shadow run — read‑only. <b>Cannot register or inspect a wagon</b>, so a figure on the DRM's dashboard is never the DRM's own entry. The record is always written by the floor.</p>
+    <h3>Administrator — maintains</h3>
+    <p>Accounts and roles (switched off, never deleted, so attribution survives), the roster from a spreadsheet, checklist rules with reason and source, the gauge register with calibration papers, stores, the PC's readiness. <b>Cannot release a wagon and cannot alter or delete any record.</b></p>
+  </div>
+</div>
+
+<h2 id="s4"><span>4</span>Security</h2>
+<h3>Signing in and who did what</h3>
+<ul>
+  <li>Every person has their own account and password (stored as a salted PBKDF2‑SHA‑512 hash; the shop's real passwords are set by the people themselves on first sign‑in; the demonstration passwords are refused by a production build unless the demonstration switch is deliberately set). A session lasts a working day and ends on sign‑out; the back button does not reopen a signed‑in screen.</li>
+  <li>Every write carries the signed‑in person's name, role, time and the tablet's address. There is no anonymous entry and no shared account.</li>
+</ul>
+<h3>The consequential actions need a second factor</h3>
+<ul>
+  <li>Releasing a wagon, overriding a band or a stage, voiding a wagon registered in error, exporting the audit trail, creating an account: each asks for a <b>one‑time code</b>, valid five minutes, tied to that action and that person. The code comes from an <b>authenticator app</b> on the person's own phone once enrolled (no network needed), or, until then, is issued by the PC and must be typed back.</li>
+  <li>Every override records the new value, the original, the reason (ten characters at least) and the name. The record shows both.</li>
+</ul>
+<h3>The record cannot be altered</h3>
+<ul>
+  <li>The audit log is <b>append‑only by database trigger</b> and <b>hash‑chained</b>: each entry carries the SHA‑256 of the previous entry, so an altered, inserted or removed entry breaks the chain. The audit screen re‑derives the whole chain on demand, in front of you, and says where it broke if it did. The parts ledger and the spring evidence are append‑only the same way. Corrections are recorded as corrections; nothing is overwritten.</li>
+  <li>The release certificate is signed with the shop's own Ed25519 key. Its QR is a link that verifies the signature in the reader's browser, with no server; the same page verifies a certificate <em>file</em> with no network at all. The wagon passport — the wagon's whole history, exported for the next shop — is a hash‑linked file the next shop can verify without contacting Raipur.</li>
+</ul>
+<h3>The network</h3>
+<ul>
+  <li>Tablets reach the PC over <b>https</b> on the shop Wi‑Fi. The PC carries the workshop's own certificate authority; each tablet installs it once and trusts the PC for good, whatever address the PC gets. The server reissues its own certificate within thirty seconds of an address change.</li>
+  <li><b>Nothing leaves the shop.</b> One PC, one database file, the photographs beside it. No cloud, no internet connection required at any point. One optional connection, switched on by the shop: <b>Zapheit</b>, our own service, which when a key is set receives manual questions and spoken sentences so a model can find the right clause or field. It never produces a figure or a verdict, and with the key removed the application does everything with keyword search and its own parser.</li>
+</ul>
+<h3>Backups</h3>
+<ul>
+  <li>The PC takes a backup every night on its own: an AES‑256 encrypted copy of the database (PBKDF2, 210,000 iterations) with an HMAC to detect tampering, and the photographs encrypted the same way, to a second disk or USB drive kept elsewhere. The key file is kept apart from the backups.</li>
+  <li>A restore onto a second machine has been drilled and its result recorded; the readiness panel on the administrator's dashboard shows when the last backup was taken, where, and whether it sits on the same disk as the database (which it warns against).</li>
+</ul>
+
+<h2 id="s5"><span>5</span>The record and its logs</h2>
+<table>
+  <thead><tr><th>Log</th><th>What it holds</th><th>Who sees it</th><th>Where</th></tr></thead>
+  <tbody>
+    <tr><td><b>Audit chain</b></td><td>Every consequential event — registration, verdicts, overrides, releases, certificate issue, exports — hashed to the one before</td><td>Supervisor, DRM, administrator (<em>Audit Chain</em>; <em>Export Audit Trail</em> with a code)</td><td>Database, append‑only</td></tr>
+    <tr><td><b>Activity</b></td><td>Who did what, when, from which tablet; filterable by person, role, event</td><td>Administrator (<em>History &amp; Logs</em>)</td><td>Database</td></tr>
+    <tr><td><b>Spring record</b></td><td>Every spring: band, height, gauge, inspector, time, condemnation reason, photograph; withdrawn taps kept as corrections</td><td>Inspector (own), supervisor, DRM (aggregated), administrator</td><td>Database</td></tr>
+    <tr><td><b>Wagon record</b></td><td>Checklist, wheels, photographs, pocket counts, parts ledger, brake test, stage moves, sign‑off, certificate</td><td>Supervisor, DRM, administrator; inspector for the wagon in hand</td><td>Database; the passport file on export</td></tr>
+    <tr><td><b>Learning</b></td><td>Every case where the machine proposed and a person accepted or corrected — by subsystem, with counts</td><td>Supervisor, DRM, administrator (<em>System Learning</em>)</td><td>Database</td></tr>
+    <tr><td><b>Shadow run</b></td><td>The register and the app side by side: discrepancies, who was right, the day's summary, the verdict</td><td>Supervisor (writes), DRM (reads), administrator</td><td>Database</td></tr>
+    <tr><td><b>Server log</b></td><td>Every request, its status and duration; starts and restarts</td><td>The administrator, on the PC</td><td><code>logs\wrs‑YYYY‑MM‑DD.log</code>, one file a day; <code>starts.log</code></td></tr>
+    <tr><td><b>Readiness</b></td><td>Backup age and place, cloud copy, manuals indexed, demonstration accounts, restarts in 24 h, audit chain, storage — each row a sentence</td><td>Administrator, first panel of the dashboard</td><td>Computed on demand</td></tr>
+  </tbody>
+</table>
+<p>The one rule across all of them: <b>nothing is deleted.</b> An account is switched off; a wagon registered in error is voided with a reason; a wrong tap is withdrawn; a gauge's calibration is recorded from the date it was recorded, never backdated. The record shows what happened, corrections included.</p>
+
+<h2 id="s6"><span>6</span>Photographs and storage</h2>
+<h3>Where they go</h3>
+<ul>
+  <li>On the shop PC, as files beside the database — <code>photos\year\month\</code> — never on the tablet after sending, never outside the shop. Each row of the record keeps the file's SHA‑256 inside the audit chain, so a photograph altered or replaced on disk is reported as such rather than shown as evidence.</li>
+  <li>Carried with the nightly backup, encrypted the same way; restorable file by file, checked against the stored hash.</li>
+</ul>
+<h3>What they are for</h3>
+<ul>
+  <li><b>Today:</b> the evidence behind a condemned spring or a failed item; the four bogie assembly frames the pocket counts are made from; the wagon number read from the paint.</li>
+  <li><b>Later:</b> the same photographs, labelled by the people who sorted them, are what the camera learns from — this shop's own springs, under this shop's light, with this shop's gauge post in frame (section 7).</li>
+</ul>
+<h3>How much space</h3>
+<table>
+  <thead><tr><th>What</th><th>Size</th><th>At the shop's pace</th></tr></thead>
+  <tbody>
+    <tr><td>One spring photograph (640 px wide, JPEG)</td><td>≈ 50–80 KB</td><td>700 springs a shift with photographing on ≈ 35–55 MB a shift</td></tr>
+    <tr><td>One bogie assembly frame (1280 px)</td><td>≈ 150–250 KB</td><td>4 per wagon ≈ 1 MB a wagon</td></tr>
+    <tr><td>A month of the bench, photographing every spring</td><td colspan="2">≈ 1–1.5 GB</td></tr>
+    <tr><td>A year, bench and wagons</td><td colspan="2">≈ 12–18 GB — a 500 GB disk holds decades; the readiness panel shows the photographs' size and the disk's free space</td></tr>
+    <tr><td>The database itself (springs, wagons, audit, ledger — no images)</td><td colspan="2">≈ 11 MB after a month of the demonstration record; tens of MB a year. The panel warns at 2 GB and fails at 8 GB, which the record does not approach.</td></tr>
+  </tbody>
+</table>
+<p class="small">Photographing every spring is a switch the inspector sets per session; the record does not depend on it. The shop can photograph condemned springs only, or everything — the space is there either way.</p>
+
+<h2 id="s7"><span>7</span>What it learns, from what, and how far that goes</h2>
+<div class="box ok"><b>The honest sentence for the room:</b> it learns from this shop's own photographs and corrections, it gets better as the shop uses it, and nothing changes on its own — every change is proposed with its evidence and accepted by a named supervisor, and the standard is never touched.</div>
+<h3>What is being built up from day one</h3>
+<ul>
+  <li><b>Every spring sorted</b> — band, height, gauge, inspector — some 150,000 a year at the shop's pace. This is what the standard report, the gauge‑drift check and the Stores forecast are computed from; each of those gets sharper as the count grows, and each says the count it rests on.</li>
+  <li><b>Every correction</b> — a tap withdrawn, a reading the amber box questioned and the answer, a stencilled number the reader proposed and the person corrected, a spoken sentence read back and changed. The <em>System Learning</em> screen shows these per subsystem with accuracy and count; on the demonstration record every row reads "no data", because no one has used it yet. That is the truthful starting point.</li>
+  <li><b>Every photograph with its label</b> — the band the inspector tapped while the camera watched, the bogie frame with its human count. These are the training material; they belong to the shop.</li>
+</ul>
+<h3>How the camera earns its place — in this order</h3>
+<ol>
+  <li><b>Evidence only.</b> The camera photographs; the person taps the band. The photograph is filed against the tap. (Today.)</li>
+  <li><b>Blind reads.</b> The camera looks at a spring and says what it would call it, without being told the answer; the inspector's tap is the answer. Agreement is counted week by week — <em>the share of the camera's own answers the inspector kept</em>, allowed to fall. The DRM's dashboard shows this under "what a camera could tell an inspector".</li>
+  <li><b>Proposing.</b> Only after blind reads on this shop's own springs have shown the camera right often enough, over enough weeks, may it propose a band before the tap. <b>The server refuses to accept a camera's band until that has been earned</b> — this is enforced where the record is written, not on the tablet — and the screen says how far it is from earning it.</li>
+  <li><b>Never deciding alone on a condemnation.</b> A condemned spring always has a person's reason on it.</li>
+</ol>
+<h3>What is never learned</h3>
+<p>The G‑95 bands, the condemning limits, the wheel diameters, the brake‑test limits: these are regulation, transcribed and checked, not parameters. The learning screen says so in its footer. The only values the system may propose to tune are its own operational thresholds (how readily the amber box asks, how sure the number reader must be), and each proposal waits for a supervisor.</p>
+<h3>What "gets better with more photographs" means in numbers</h3>
+<p>The pocket count needs real bogie photographs from this shop before it can count reliably — the demonstration set is drawn. The spring camera needs blind reads on the order of several hundred before its agreement means anything, and the readiness of both is shown as a figure with its count, never as a percentage without one. A shop that photographs its springs through the shadow run will have the first honest reading of the camera by the end of it.</p>
+
+<h2 id="s8"><span>8</span>Network, tablets, no internet</h2>
+<div class="two">
+  <div>
+    <h3>Nothing needs the internet</h3>
+    <ul>
+      <li>One PC in the spring section runs the application, the database, the photographs and the indexed manuals (ten documents, 8,200 passages, answered in their own words with the page cited).</li>
+      <li>Tablets on the shop Wi‑Fi — or one access point in the bay. Android tablets with a rear camera; the application installs to the home screen from the browser and opens like an app.</li>
+      <li>Each tablet installs the workshop certificate once. After that: no warning, and the camera, the microphone and offline use are allowed.</li>
+    </ul>
+  </div>
+  <div>
+    <h3>When the Wi‑Fi drops</h3>
+    <ul>
+      <li>The tablet keeps working. Readings are held on the tablet — the screen says how many are waiting — and send themselves when the network returns. Nothing is lost; nothing is recorded twice, even when a reply was lost mid‑way.</li>
+      <li>Mobile data does not reach the PC and is not needed; the tablets keep it off.</li>
+      <li>For the DRM at headquarters, a <b>read‑only mirror</b> of the nightly backup can run there; the live record never leaves the shop.</li>
+    </ul>
+  </div>
+</div>
+
+<h2 id="s9"><span>9</span>What it needs, and how it is run day to day</h2>
+<div class="two">
+  <div>
+    <h3>Hardware</h3>
+    <ul>
+      <li>One Windows PC in the spring section — any ordinary PC of the last five years — on power and the shop Wi‑Fi. No server room.</li>
+      <li>Two Android tablets with rear cameras (₹15–20k each) to begin; more as the pilot widens.</li>
+      <li>A second disk or a USB drive for the encrypted backup, kept elsewhere.</li>
+    </ul>
+    <h3>Installing</h3>
+    <p>From a USB stick: the Node runtime, the application folder, two double‑clicks. About ten minutes. The manuals are indexed once. No internet.</p>
+  </div>
+  <div>
+    <h3>Running it</h3>
+    <ul>
+      <li><b>START</b> keeps the server running and restarts it if it stops; it can be scheduled at boot so nobody touches it.</li>
+      <li>The backup takes itself every night; the readiness panel says whether it did.</li>
+      <li>Accounts, roles, the roster, checklist rules and the gauge register are the administrator's screens — no programmer is needed to add an inspector, a gauge or a shop line.</li>
+      <li>The manual is searched on the tablet; the answer quotes the page.</li>
+    </ul>
+    <h3>Support</h3>
+    <p>Updates arrive as a new folder on a stick; the record and the photographs stay where they are. Nothing phones home.</p>
+  </div>
+</div>
+
+<h2 id="s10"><span>10</span>The way in — a two‑week shadow run</h2>
+<div class="box ok"><b>The proposal:</b> two weeks in the spring section with the application running <em>beside</em> the register — both recording, nothing replaced. One PC, two tablets, two inspectors and one supervisor. At the end, the shadow‑run screen shows where the two disagreed and who was right. That decides go‑live.</div>
+<h3>Why two weeks and not a switch‑over</h3>
+<p>The application has been walked end to end on a built‑in record, but it has not yet met a real spring on this bench, this shop's light, this shop's inspectors at this shop's pace. Two weeks beside the register is enough for different inspectors, different shifts, different wagon types and several hundred springs to have gone through both paths — enough to trust a pattern, not a first clean day. The register stays the record of authority throughout.</p>
+<h3>Day by day</h3>
+<table>
+  <thead><tr><th>When</th><th>What</th><th>Who</th></tr></thead>
+  <tbody>
+    <tr><td>Day 0</td><td>PC installed in the bay; real accounts created, demonstration accounts switched off; certificate on the two tablets; the quick‑start (one page per role) handed to each person; the gauges entered with their calibration papers; one supervisor named as the reviewer</td><td>Us, with the administrator</td></tr>
+    <tr><td>Days 1–10</td><td>Inspectors record every spring and every wagon in the application exactly as they do on paper, in parallel. Photographing on for condemned springs at least. At the end of each shift the reviewer compares the app's day with the register: every band, every verdict, every wagon present in both. Every discrepancy is written into the shadow‑run screen — what, why, who was right — never quietly corrected.</td><td>Inspectors, the reviewer</td></tr>
+    <tr><td>End of week 1</td><td>Reviewer and DRM read the discrepancy log together. Fix anything the shop found; carry on.</td><td>Reviewer, DRM, us</td></tr>
+    <tr><td>End of week 2</td><td>The verdict: the register and the application agree, or they do not, and the cases are listed. Decide: drop the parallel run, extend it, or fix something first.</td><td>DRM</td></tr>
+  </tbody>
+</table>
+<h3>What would stop go‑live</h3>
+<ul>
+  <li>Any case where the application said serviceable and the register (or a re‑measurement) says condemned, or the reverse — a real classification disagreement, not rounding.</li>
+  <li>Any wagon the exit gate let through that the paper checklist would have caught, or blocked that paper would have passed.</li>
+  <li>Any gap — a spring or wagon on paper and not in the record, or against the wrong person.</li>
+</ul>
+<h3>What does not stop it, but is logged</h3>
+<p>A stencilled number the reader misread and the person corrected (expected — the manual entry is there for that); a screen somebody found confusing (feeds the quick‑start and the training, not the go/no‑go).</p>
+<h3>What we bring, and what we ask of the shop</h3>
+<div class="two">
+  <div><ul><li>The PC set up, the tablets trusted, the accounts made, the gauges entered, the manuals indexed — on day 0, by us.</li><li>A person reachable through the two weeks; fixes within a day for anything the floor finds.</li><li>The quick‑start, the role walks with pictures, and this document, printed.</li></ul></div>
+  <div><ul><li>A PC in the bay with power and Wi‑Fi (or the one we bring, on the shop's Wi‑Fi).</li><li>The names of two inspectors and one supervisor.</li><li>The shop's G‑95 Rev‑II and gauge register, to check against.</li><li>Twenty minutes of the reviewer's time at the end of each shift.</li></ul></div>
+</div>
+<h3>After go‑live — what keeps improving on its own record</h3>
+<p>The standard report fills in; the Stores forecast stops saying "not forecast yet" as condemnations accumulate; the gauge‑drift check has enough readings to speak; the camera's blind‑read agreement becomes a real figure; the wagon that will miss its date is computed from the shop's own stage times. Each of these is a screen that already exists and is waiting for the record.</p>
+
+<h2 id="s11"><span>11</span>Not yet proven, said plainly</h2>
+<div class="box warn">
+  <ul style="margin:0">
+    <li><b>The camera on real springs.</b> Every accuracy figure so far is from drawn test images. The shadow run is where the first real figure comes from, and the screen will show it with its count.</li>
+    <li><b>The pocket count on real bogie photographs.</b> Same: the demonstration frames are drawn; the shop's frames are what it must learn from.</li>
+    <li><b>The bearing sound check</b> has never heard a real defective CTRB. It is on the screen with that caveat and is not part of any release decision.</li>
+    <li><b>The shadow‑run verdict itself</b> — which is what the two weeks are for.</li>
+  </ul>
+</div>
+<p>Everything else in this document — the bench, the wagon record, the exit gate, the audit chain, the certificate, the backups, offline work, the roles — has been run end to end on the built record, and each screen described here was walked and photographed on the build of 21 September 2026. The record of that walk, with the pictures, is in the role‑by‑role appendix.</p>
+
+<h2 id="s12"><span>12</span>Appendix — the screens, role by role</h2>
+<p>Four companion documents, one per role, each step with a picture of the screen, the taps in order, what must be on the screen and what to suspect when it is not: <b>Inspector walk</b> (22 steps), <b>Supervisor walk</b> (17), <b>DRM walk</b> (9), <b>Administrator walk</b> (11). They are the same steps the shop will be trained on, and the same steps that were checked on this build.</p>
+<h3>The twenty‑minute demonstration, in order</h3>
+<ol>
+  <li><b>The bench</b> (tablet, inspector): three springs by the band; undo one; the camera photographing; a spring condemned for a crack; the day's record.</li>
+  <li><b>A wagon</b> (tablet): WR/BCNHL/40112 → Photos: four frames, one needing a blind recount, the counter with no expected number.</li>
+  <li><b>The gate</b> (laptop, supervisor): the same wagon's short count as an advisory; SER/BOXNHL/30914 blocked by a condemned spring and the axle‑3 pair at 917.5 mm below 919; the wheels with the drawing beside them.</li>
+  <li><b>Ask the Records</b> (supervisor): which wagon type condemns the most snubbers; is any gauge reading high — and how it was computed.</li>
+  <li><b>The DRM's screens</b>: the shop floor right now; the standard report.</li>
+  <li><b>The proof</b>: the audit chain re‑derived; a certificate's QR verified on a phone with no server.</li>
+  <li><b>The shadow run</b>: a week of the log and the one case that decides.</li>
+</ol>
+<h3>The manuals shipped and cited</h3>
+<p class="small">Wagon Maintenance Manual Vol. I and Vol. II (OEM documentation 2022) · IRCA Conference Rules Part III (2020) · RDSO G‑81 (CTRB class E) · G‑112 (LCCF/LWLH bogies) · G‑113 (CTRB class K) · 02‑ABR‑02 (air‑brake specification) · CAMTECH air‑brake handbook (2012) · RDSO BLC underframe repair guidelines · ROH audit check sheet. The spring bands are the shop's printed G‑95 Rev‑II, Tables 28–33.</p>
+<p class="small" style="margin-top:18px">Pratik Agarwal · pratik96agarwal@yahoo.com</p>
+
+</body>
+</html>
