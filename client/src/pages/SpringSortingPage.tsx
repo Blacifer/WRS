@@ -92,6 +92,8 @@ export function SpringSortingPage({ lang, onClose }: Props) {
    * change and no spring costs an extra action.
    */
   const [capturePhotos, setCapturePhotos] = useState(false);
+  const [lastShot, setLastShot] = useState<{ imageData: string; at: number } | null>(null);
+  const [shotCount, setShotCount] = useState(0);
   const cameraRef = useRef<SpringEvidenceHandle | null>(null);
   /*
    * How much labelled evidence exists so far.
@@ -515,6 +517,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
        * needing the inspector to turn it on.
        */
       const frame = capturePhotos ? cameraRef.current?.grab() ?? null : null;
+      if (frame) { setLastShot({ imageData: frame.imageData, at: Date.now() }); setShotCount((n) => n + 1); }
 
       const res = await api.recordSortedSpring({
         batchId,
@@ -1224,6 +1227,8 @@ export function SpringSortingPage({ lang, onClose }: Props) {
           ref={cameraRef}
           lang={lang}
           active={capturePhotos}
+          lastShot={lastShot}
+          shotCount={shotCount}
           gaugeCode={gaugeCode || undefined}
           onUnavailable={() => { /* sorting is unaffected; the component says so */ }}
         />

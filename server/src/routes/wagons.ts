@@ -3,6 +3,7 @@
  * Indian Railways WRS Raipur (Phase 2)
  */
 
+import os from 'node:os';
 import { getWagonSpringConfig } from '../../../shared/classification/wagonTypes.ts';
 import crypto from 'node:crypto';
 import { Router } from '../framework/index.ts';
@@ -27,6 +28,29 @@ import { otpService } from '../auth/otpService.ts';
 import { TotpService } from '../auth/totpService.ts';
 import { verifySecondFactor } from '../auth/secondFactor.ts';
 import type { LifecycleStage } from '../../../shared/types.ts';
+
+/**
+ * The address another device can reach this server on — for the QR on a
+ * certificate. The request's own host is right when a tablet asked; when the
+ * projector's browser asked from localhost the QR said "localhost" and every
+ * phone that scanned it was told the server could not be found. A loopback
+ * host is replaced by WRS_PUBLIC_ADDRESS if set, else this machine's first
+ * LAN IPv4 with the same port.
+ */
+function advertisedBase(req: Request): string | undefined {
+  const proto = String(req.headers?.['x-forwarded-proto'] || (process.env.TLS_KEY_PATH ? 'https' : 'http'));
+  const host = String(req.headers?.['x-forwarded-host'] || req.headers?.host || '');
+  if (!host) return undefined;
+  const [name, port] = host.startsWith('[') ? [host.replace(/^\[|\].*$/g, ''), host.split(']:')[1]] : host.split(':');
+  if (!/^(localhost|127\.0\.0\.1|::1|0\.0\.0\.0)$/i.test(name)) return `${proto}://${host}`;
+  if (process.env.WRS_PUBLIC_ADDRESS) return process.env.WRS_PUBLIC_ADDRESS.replace(/\/$/, '');
+  for (const list of Object.values(os.networkInterfaces())) {
+    for (const i of list || []) {
+      if ((i.family === 'IPv4' || (i.family as unknown) === 4) && !i.internal) return `${proto}://${i.address}${port ? `:${port}` : ''}`;
+    }
+  }
+  return `${proto}://${host}`;
+}
 
 export const wagonsRouter = Router();
 
@@ -731,10 +755,8 @@ wagonsRouter.get('/:wagonNumber/certificate', authMiddleware, async (req: Authen
 
   try {
     // The QR on the printed certificate links back to this server's verify page.
-    const host = String(req.headers?.['x-forwarded-host'] || req.headers?.host || '');
-    const proto = String(req.headers?.['x-forwarded-proto'] || (process.env.TLS_KEY_PATH ? 'https' : 'http'));
     const cert = CertificateGenerator.generate(
-      wagonNumber, wagonRepo, inspectionRepo, undefined, format, { provisional, verifyBaseUrl: host ? `${proto}://${host}` : undefined }
+      wagonNumber, wagonRepo, inspectionRepo, undefined, format, { provisional, verifyBaseUrl: advertisedBase(req) }
     );
 
     // Uses the existing CERTIFICATE_GENERATED event type rather than adding new

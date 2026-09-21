@@ -42,6 +42,10 @@ export interface SpringEvidenceHandle {
 }
 
 interface Props {
+  /** The frame just saved against a tap, for the shutter flash and the corner thumbnail. */
+  lastShot?: { imageData: string; at: number } | null;
+  /** How many frames this session has saved. */
+  shotCount?: number;
   lang: 'en' | 'hi';
   active: boolean;
   /**
@@ -62,7 +66,7 @@ interface Props {
 }
 
 export const SpringEvidenceCamera = forwardRef<SpringEvidenceHandle, Props>(
-  function SpringEvidenceCamera({ lang, active, gaugeCode, onUnavailable }, ref) {
+  function SpringEvidenceCamera({ lastShot = null, shotCount = 0, lang, active, gaugeCode, onUnavailable }, ref) {
     const isHi = lang === 'hi';
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
@@ -165,6 +169,18 @@ export const SpringEvidenceCamera = forwardRef<SpringEvidenceHandle, Props>(
     return (
       <div className="rounded-card border border-line bg-card overflow-hidden">
         <div className="relative bg-black">
+          {/* The shutter: a white flash on each saved frame, and the frame itself
+              in the corner with the count — the first walk saw the camera and
+              could not tell whether anything had been captured. */}
+          {lastShot && <div key={lastShot.at} className="pointer-events-none absolute inset-0 bg-white/90 animate-[shutter_.35s_ease-out_forwards]" aria-hidden="true" />}
+          {lastShot && (
+            <div className="absolute bottom-2 right-2 flex items-end gap-2" data-testid="last-shot">
+              <img src={lastShot.imageData} alt="" className="w-16 h-16 object-cover rounded border-2 border-white/80 shadow" />
+              <span className="px-2 py-1 rounded-full bg-black/70 text-[11px] font-bold text-white">
+                {isHi ? `फ़ोटो सुरक्षित ✓ · इस सत्र में ${shotCount}` : `Photo saved ✓ · ${shotCount} this session`}
+              </span>
+            </div>
+          )}
           <video
             ref={videoRef}
             data-testid="spring-evidence-video"

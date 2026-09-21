@@ -52,6 +52,13 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
   // wagon's checklist cannot know which of its two bogies was verified.
   const [bogiePosition, setBogiePosition] = useState<'BOGIE_1' | 'BOGIE_2'>('BOGIE_1');
   const [measuredHeight, setMeasuredHeight] = useState<number | null>(260.00);
+  /** The wagons in the shop right now, newest first, for the picker under the number. */
+  const [wagonsInShop, setWagonsInShop] = useState<Array<{ wagonNumber: string; wagonType: string; currentStage?: string }>>([]);
+  useEffect(() => {
+    api.queryWagons({ limit: 20 })
+      .then((r: any) => setWagonsInShop((r?.data?.wagons || r?.data || []).filter((w: any) => w.currentStage !== 'CERTIFIED_RELEASE' && w.status !== 'RELEASED')))
+      .catch(() => setWagonsInShop([]));
+  }, []);
   const [measurementSource, setMeasurementSource] = useState<'OCR' | 'MANUAL'>('OCR');
   const [ocrConfidence, setOcrConfidence] = useState<number | undefined>(0.99);
   const [damageType, setDamageType] = useState<DamageType>('NONE');
@@ -345,13 +352,29 @@ export const InspectionPage: React.FC<InspectionPageProps> = ({ lang, user }) =>
           <label className="block text-xs font-bold text-ink-body">
             {dict.form.wagonNumber}
           </label>
+          {/* The wagons in the shop are offered as you type — the first walk
+              wanted a list to pick from rather than a number to remember. */}
           <input
             type="text"
+            list="wagons-in-shop"
             value={wagonNumber}
             onChange={(e) => setWagonNumber(e.target.value.toUpperCase())}
             placeholder={dict.form.wagonPlaceholder}
             className="w-full bg-transparent border-b border-white/20 focus:border-white py-3 text-white font-mono text-xl outline-none transition-colors uppercase placeholder:text-neutral-600"
           />
+          <datalist id="wagons-in-shop">
+            {wagonsInShop.map((w) => <option key={w.wagonNumber} value={w.wagonNumber}>{`${w.wagonType} · ${String(w.currentStage || '').replace(/_/g, ' ').toLowerCase()}`}</option>)}
+          </datalist>
+          {wagonsInShop.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {wagonsInShop.slice(0, 6).map((w) => (
+                <button key={w.wagonNumber} type="button" onClick={() => setWagonNumber(w.wagonNumber)}
+                  className={`px-2.5 py-1 rounded-control border text-[11px] font-mono ${wagonNumber === w.wagonNumber ? 'bg-selected border-accent-line text-ink' : 'border-line text-ink-muted hover:text-ink'}`}>
+                  {w.wagonNumber}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Bogie Type Selector (Touch targets >= 48px) */}

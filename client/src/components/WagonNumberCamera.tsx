@@ -98,8 +98,8 @@ export function WagonNumberCamera({ lang, onRead, onClose }: Props) {
             </h3>
             <p className="text-[11px] text-ink-muted mt-0.5">
               {isHi
-                ? 'वैगन पर लिखे नंबर पर कैमरा रखें — पढ़ा गया नंबर आप जाँच सकेंगे'
-                : 'Point at the number painted on the wagon. You will see the reading before it is used.'}
+                ? 'वैगन पर स्टेंसिल किए ग्यारह अंकों पर कैमरा रखें (जैसे 22057123457) — SER/BOXNHL/… वाला रूप टाइप किया जाता है। पढ़ा गया नंबर आप जाँच सकेंगे'
+                : 'Point at the eleven digits stencilled on the wagon (e.g. 22057123457) — not the SER/BOXNHL/… form, which is typed. You will see the reading before it is used.'}
             </p>
           </div>
           <button onClick={onClose} className="text-ink-muted hover:text-white text-lg leading-none">✕</button>

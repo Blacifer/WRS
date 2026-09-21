@@ -176,10 +176,21 @@ export class ApiClient {
       headers.set('Authorization', `Bearer ${this.token}`);
     }
 
-    const res = await fetch(`${BASE_URL}${path}`, {
-      ...options,
-      headers
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
+    } catch (e) {
+      // The browser's "Failed to fetch" told a supervisor nothing. This is
+      // the one sentence that fits every cause — server restarting, Wi-Fi
+      // gone, wrong address — and says what happens to the work.
+      const hi = (() => { try { return localStorage.getItem('wrs_lang') === 'hi'; } catch { return false; } })();
+      const err = new Error(hi
+        ? 'सर्वर तक नहीं पहुँच सके — शायद वह फिर से चालू हो रहा है या Wi‑Fi चला गया है। इस डिवाइस पर दर्ज काम सुरक्षित है और जुड़ते ही भेज दिया जाएगा।'
+        : 'Cannot reach the server — it may be restarting, or the Wi‑Fi has gone. Work recorded on this device is kept and sends when it is back.');
+      (err as any).cause = e;
+      (err as any).network = true;
+      throw err;
+    }
 
     const contentType = res.headers.get('content-type') || '';
     // Text bodies come back as text. The passport is NDJSON — one JSON object per

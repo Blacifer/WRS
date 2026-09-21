@@ -69,7 +69,7 @@ Sign in as **`inspector1` / `password123`**.
 | 2.15 | Wagon → **Air‑brake test** tab (the Single Wagon Test) | The 14-row proforma; each row judged against the WMM limit as you type |
 | 2.16 | Wagon → **Timeline** | The stage history with dates and who moved it |
 | 2.17 | Wagon → Checklist → **Wheels** (on a BOXN wagon, e.g. `SER/BOXNHL/30914`). Tap a wheel | One large box: the tread diameter chalked on the disc. Type 917 → *below issue limit* against 919 / 906, with the drawing and rule beneath. The flange figures are folded under *optional* — only if the tyre defect gauge was used |
-| 2.18 | Read a wagon number with the camera (A wagon → camera icon) | Point at any printed number; it proposes the text; you confirm or correct — it never records unconfirmed |
+| 2.18 | Read a wagon number with the camera — point at the **eleven stencilled digits** (print **22057123457** large; a valid BOXNHL number). Not the SER/BOXNHL/… form, which is typed | It proposes the digits and the type they imply; you confirm or correct — never records unconfirmed. Letters are never read; a number whose check digit fails is not offered |
 | 2.19 | **Manual** | Ask "brake block condemning limit" → **Answer — in the document's own words**, large, with *Source:* the manual and page beneath; further passages under *Also in*. Ask "wheel diameter variation same axle bogie" → IRCA Part III appears, cited by name. It quotes; it never paraphrases — that is deliberate |
 | 2.20 | Wi‑Fi **off** on the tablet. Sort three springs. Wi‑Fi **on**. | The three sort while offline (a queued count shows); within a minute the queue empties and they appear on the laptop's records — exactly three, no duplicates |
 | 2.21 | Try to open the DRM dashboard or Audit chain URL by hand | Refused — an inspector does not have those screens |
@@ -154,7 +154,7 @@ Open a terminal in the project folder (`cd ~/Desktop/WRS_Raipur`).
 | # | Do | Must see |
 |---|---|---|
 | 6.1 | On the phone, sign in as `inspector1`, open **Sorting**. On the Mac: `bash scripts/rehearsal.sh stop`. On the phone, tap two bands. | The phone shows *offline* / *waiting to send*; the taps are accepted and counted. Then `bash scripts/rehearsal.sh start` (a minute or two). The phone reconnects on its own; the queue empties; *Your record today* shows the two taps once each |
-| 6.2 | On the Mac, turn Wi‑Fi off. Use the laptop's own screen; look at the phone. | The Mac's own `https://localhost:3200` keeps working; the phone goes offline and queues. Wi‑Fi back on → the phone reconnects |
+| 6.2 | Mac: turn **Wi‑Fi off** (not *stop* — the server keeps running, the network goes). Watch the phone | The phone shows **Offline** and keeps sorting; the Mac's own screen keeps working. Wi‑Fi on → reconnects within seconds. (If you *stop* the server instead, every screen says *Cannot reach the server — it may be restarting…*) |
 | 6.3 | `bash scripts/rehearsal.sh log` | Lines for every start; every request with its status; the stop from 6.1 written with its reason |
 | 6.4 | `bash scripts/rehearsal.sh backup` | A `…db.enc` and its `.hmac` listed in `backups-elsewhere/`, with the time. As admin, the *Deployment readiness* row for the backup shows *newest 0 hours ago* |
 | 6.5 | `bash scripts/rehearsal.sh restore` | The newest backup restored into a second folder, and a table: wagons, inspections, sorting records, audit entries — **live and restored counts equal** |

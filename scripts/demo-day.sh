@@ -17,6 +17,7 @@ cd "$(dirname "$0")/.."
 
 PORT="${DEMO_PORT:-3200}"
 OUT="${1:-demo-rehearsal}"
+ROOT_DIR="$PWD"
 BUNDLE="$PWD/dist-shop/wrs-raipur"
 LOG=/tmp/wrs_demo_day_server.log
 
@@ -56,6 +57,13 @@ sed -i.bak \
   -e "s#^CORS_ORIGIN=.*#CORS_ORIGIN=https://localhost:$PORT#" \
   -e "s#^WRS_BACKUP_DIR=.*#WRS_BACKUP_DIR=$BUNDLE/backups-elsewhere#" .env
 rm -f .env.bak
+# The model's key stays out of the rehearsal unless asked for: with it set,
+# manual queries and voice transcripts leave the machine, and the "nothing
+# leaves the shop" sentence in the room stops being true. WITH_ZAPHEIT=1
+# carries the ZAPHEIT_* lines from the project's own .env into this one.
+if [ "${WITH_ZAPHEIT:-}" = "1" ] && [ -f "$ROOT_DIR/.env" ]; then
+  grep -E '^ZAPHEIT_' "$ROOT_DIR/.env" >> .env && echo "WITH_ZAPHEIT=1: the model's key is set for this rehearsal — manual queries and voice transcripts leave this machine"
+fi
 # Every start: the CA is made once and kept; the server certificate is reissued
 # only when this machine's addresses have changed (a new Wi-Fi, a phone hotspot).
 node server/scripts/make-lan-cert.mjs server/certs | grep -E "made the workshop CA|issued the server" || true
