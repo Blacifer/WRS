@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WRS Raipur — The Spring Line — proposal</title>
+<style>
+  :root{ --ink:#1b2027; --ink-2:#48525c; --ink-3:#7a8590; --line:#d5d9de; --accent:#1f4e79; --accent-soft:#e3ecf5; --ok:#2e7d4f; --ok-soft:#e2f1e7; --warn:#8a6100; --warn-soft:#fff3d6; }
+  body{background:#fff;color:var(--ink);font-family:"IBM Plex Sans",-apple-system,"Segoe UI",system-ui,sans-serif;font-size:13.5px;line-height:1.48;margin:0;padding:28px 36px;max-width:900px}
+  .eyebrow{font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+  header{border-bottom:2px solid var(--ink);padding-bottom:12px;margin-bottom:18px}
+  h1{font-size:26px;line-height:1.15;margin:6px 0 8px;max-width:26ch}
+  .lede{font-size:15px;color:var(--ink-2);max-width:66ch;margin:0}
+  h2{font-size:17px;margin:24px 0 8px;padding-top:10px;border-top:2px solid var(--ink)}
+  h2 span{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--accent);margin-right:10px;font-weight:500}
+  h3{font-size:14px;margin:12px 0 4px}
+  p{margin:0 0 7px;max-width:76ch}
+  ul,ol{margin:0 0 7px;padding-left:20px;max-width:76ch}
+  li{margin-bottom:3px}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;margin:6px 0 10px}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);font-weight:500}
+  .box{border:1px solid var(--line);border-left:4px solid var(--accent);padding:9px 13px;margin:9px 0;background:#fafbfc;max-width:80ch}
+  .ok{border-left-color:var(--ok);background:var(--ok-soft)}
+  .warn{border-left-color:var(--warn);background:var(--warn-soft)}
+  blockquote{margin:8px 0;padding:6px 14px;border-left:3px solid var(--line);color:var(--ink-2);font-style:italic;max-width:74ch}
+  .figs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:10px 0}
+  .fig{border:1px solid var(--line);padding:10px 12px}
+  .fig b{display:block;font-size:24px;line-height:1.1;font-variant-numeric:tabular-nums}
+  .fig span{font-size:11.5px;color:var(--ink-2)}
+  .flow{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:12px;align-items:stretch;margin:12px 0 6px}
+  .st{border:1.5px solid var(--ink);padding:6px 6px 7px;position:relative;background:#fff;min-width:0}
+  .st:not(:last-child)::after{content:"▶";position:absolute;right:-11px;top:50%;transform:translateY(-50%);font-size:9px;color:var(--ink)}
+  .st .n{font-family:"IBM Plex Mono",monospace;font-size:9.5px;color:var(--accent)}
+  .st .t{font-weight:700;font-size:12px}
+  .st .d{font-size:10px;color:var(--ink-2);line-height:1.28;margin-top:2px}
+  .st.buy{background:var(--warn-soft)} .st.ours{background:var(--ok-soft)}
+  .key{font-size:11.5px;color:var(--ink-2);margin:0 0 10px}
+  .key i{display:inline-block;width:11px;height:11px;vertical-align:-1px;border:1px solid var(--ink);margin:0 4px 0 12px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .small{font-size:12px;color:var(--ink-2)}
+  @media print{ body{padding:0} h2{break-after:avoid} table,.box,.flow,.figs{break-inside:avoid} .pb{page-break-before:always} }
+  @media (max-width:680px){ .two,.figs{grid-template-columns:1fr 1fr} body{padding:16px} .flow{grid-template-columns:repeat(2,minmax(0,1fr))} .st::after{display:none} }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Wagon Repair Shop, Raipur · South East Central Railway · for the Chief Workshop Manager · September 2026</div>
+  <h1>The spring line — 1000 springs in four hours, clean, judged, marked and grouped</h1>
+  <p class="lede">A proposal in answer to the CWM's request after the demonstration of 23 September 2026. It sets out what the line does, station by station; what the Wagon Maintenance Manual already requires of it; the arithmetic of the target; what has to be bought and what we supply; and a first step that can start this week at almost no cost.</p>
+</header>
+
+<h2><span>1</span>What was asked</h2>
+<p>A line where a spring taken off a wagon is <b>washed and cleaned</b>, then <b>measured and judged</b>; a spring that is condemned is moved aside with its condition stated; a good spring moves on, is <b>painted</b> with its band where needed, and comes out <b>finished and grouped</b> — <b>900 to 1000 springs in less than four hours</b>.</p>
+
+<h2><span>2</span>The manual already asks for this line — by hand</h2>
+<p>The Wagon Maintenance Manual (Revised, 2.0), Chapter 6, <i>Maintenance Issues of Springs</i>, lists what a spring section should have:</p>
+<blockquote>4‑tier stacking for easy placement and removal · spring height gauges kept in the spring section · wheeled trolleys for moving sets of springs · <b>"Marking of coloured band on springs is most commonly adopted system in ROH depots. It is recommended that marking of bands may be done for easy grouping of springs."</b> · <b>"Wire brush is being used for cleaning of springs. The practice is useful & be continued."</b></blockquote>
+<p>And the grouping rule, stated twice in the same chapter:</p>
+<blockquote>"Springs should be so grouped that the free height variation in the group is not more than 3 mm. Mixing of new and old springs should be avoided."</blockquote>
+<div class="box ok"><b>Two consequences.</b> First, the line proposed here is the manual's own sequence — clean, gauge, mark the band, group — mechanised, in the manual's own order. Second, <b>the group is the band</b>: the G‑95 Rev‑II bands (Tables 28–33) are exactly 3 mm wide, so a spring sorted into its band is already in a group the manual accepts. The application demonstrated on 23 September already enforces the 3 mm rule at the exit gate.</div>
+
+<h2><span>3</span>The arithmetic — and why this is not a robotics problem</h2>
+<div class="figs">
+  <div class="fig"><b>14.4 s</b><span>per spring — 1000 in four hours, 250 an hour</span></div>
+  <div class="fig"><b>≈ 33</b><span>wagons' worth of springs (14 outer, 12 inner, 4 snubber each)</span></div>
+  <div class="fig"><b>≈ 10 t</b><span>of steel through the line in four hours</span></div>
+  <div class="fig"><b>≈ 160 / h</b><span>what the bench already does <i>while it is running</i></span></div>
+</div>
+<p>The spring section handles about 700 springs a shift today. But when springs are actually being sorted, the bench already runs at about 160 an hour. The shift yields 700 because the bench is <em>not</em> sorting most of the time: springs are fetched, brushed by hand, carried to the gauge, written down, stacked, and the next trolley is waited for.</p>
+<p>So the gap from today to 250 an hour is <b>about one and a half times, and all of it is flow</b> — not measurement, and not decision, which the application already makes instantly and records. What limits the line is <b>ten tonnes of steel</b> moving through it in four hours; handled by hand four times each, that is close to forty tonnes lifted. A conveyor and a cleaning machine are therefore essential. A robot is not: automation later reduces the number of people on the line; it is not what reaches the target.</p>
+
+<h2 class="pb"><span>4</span>The line, station by station</h2>
+<div class="flow">
+  <div class="st"><div class="n">0</div><div class="t">Infeed</div><div class="d">A trolley of one wagon's springs; the run is opened against that wagon</div></div>
+  <div class="st buy"><div class="n">1</div><div class="t">Clean</div><div class="d">Through‑feed shot blast or powered wire brush — to bare metal</div></div>
+  <div class="st"><div class="n">2</div><div class="t">Measure</div><div class="d">Free height on a flat plate with a digital height gauge</div></div>
+  <div class="st ours"><div class="n">3</div><div class="t">Judge</div><div class="d">Band or condemn, against G‑95 Rev‑II, recorded</div></div>
+  <div class="st"><div class="n">4</div><div class="t">Look</div><div class="d">A person, five seconds on a clean spring</div></div>
+  <div class="st"><div class="n">5</div><div class="t">Route &amp; paint</div><div class="d">Into its band lane; the lane paints its own colour</div></div>
+  <div class="st ours"><div class="n">6</div><div class="t">Group &amp; issue</div><div class="d">A matched set drawn from one band, issued to a wagon</div></div>
+</div>
+<p class="key">Shaded <i style="background:#fff3d6"></i> to be bought <i style="background:#e2f1e7"></i> supplied as software, largely built already</p>
+<table>
+  <thead><tr><th>#</th><th>Station</th><th>What happens, and why it is done this way</th></tr></thead>
+  <tbody>
+    <tr><td>0</td><td>Infeed</td><td>Springs arrive <b>one wagon's set to a trolley</b>. This matters: nominal free heights are almost the same across the CASNUB types (outer springs 260, 260, 253, 253 mm…), so no machine can tell a spring's bogie type from the spring itself. The line is told, from the wagon the set came off — which the application already records in each wagon's parts ledger, with the expected counts.</td></tr>
+    <tr><td>1</td><td>Clean</td><td>The manual's wire brush, mechanised. A through‑feed shot‑blast machine cleans to bare metal, so pitting, corrosion and cracks can actually be seen at station 4; it is a dry process, so no drying station is needed. This is the one significant purchase.</td></tr>
+    <tr><td>2</td><td>Measure</td><td>The spring stands on a flat plate; a light platen rests on the top coil; a digital height gauge reads the free height. ±0.25 mm is ample against 3 mm bands. The method copies the shop's dial gauge so figures stay comparable with today's. <b>The gauge sends its reading straight into the application</b> — no writing, no typing.</td></tr>
+    <tr><td>3</td><td>Judge</td><td>The application decides the band, or condemns, against the shop's G‑95 Rev‑II tables — the same rule, the same record and the same hash‑chained audit demonstrated on 23 September. Nothing new is invented for the line.</td></tr>
+    <tr><td>4</td><td>Look</td><td>A person inspects the clean spring: cracks, permanent set, broken or corroded end coils. Five seconds is enough on a clean spring under good light.</td></tr>
+    <tr><td>5</td><td>Route &amp; paint</td><td>Each spring goes into its band lane — six lanes and a condemned lane. <b>Each lane paints only its own colour</b>, so there is never a colour change and no chance of a spring painted before it is judged.</td></tr>
+    <tr><td>6</td><td>Group &amp; issue</td><td>A wagon's set is drawn from one band bin. The application already computes how many complete bogies the sorted stock can build and which position limits it; the line adds <b>issuing</b> — the set is recorded against the wagon, and stock drops.</td></tr>
+  </tbody>
+</table>
+<div class="box"><b>One rule carried over from the application unchanged:</b> a machine may pass a spring; only a person condemns one. A spring the gauge says is condemned goes to a hold bin and is counted as <i>condemned, awaiting confirmation</i> until a person confirms or re‑measures it.</div>
+
+<h2><span>5</span>What we supply, and what has to be bought</h2>
+<div class="two">
+  <div>
+    <h3>We supply — the software</h3>
+    <ul>
+      <li>The measuring station's screen and the gauge link — <b>available now</b> (section 6).</li>
+      <li>The line's record: each run against its wagon, each spring from infeed to bin, stoppages and their reasons.</li>
+      <li>The line board for the supervisor and the CWM: springs an hour against the 14.4 s target, the slowest station named, bins filling, the day's output.</li>
+      <li>Issuing matched sets to wagons, with stock that drops as sets are issued.</li>
+      <li>The specification and acceptance tests for each machine below, and connecting each to the record.</li>
+    </ul>
+  </div>
+  <div>
+    <h3>To be bought or fabricated — each on quotation</h3>
+    <ol>
+      <li><b>Through‑feed shot‑blast or powered wire‑brush cleaning machine</b> — the one significant purchase and the longest lead time.</li>
+      <li><b>Powered roller conveyor</b> through the stations, with lifting aid at infeed and outfeed — what the ten tonnes actually needs.</li>
+      <li><b>Measuring fixture</b> — flat plate, platen, digital height gauge with USB or serial output.</li>
+      <li><b>Six band lanes and a condemned lane</b>, with a paint head per lane.</li>
+      <li>A station computer and a UPS for the shop server.</li>
+    </ol>
+    <p class="small">Prices are deliberately not given here: they should come from quotations, not from us. Utilities — compressed air and power — depend on the cleaning machine chosen; a wet wash would add effluent handling, which shot blast avoids.</p>
+  </div>
+</div>
+
+<h2><span>6</span>Delivery in three steps — the first can start this week</h2>
+<table>
+  <thead><tr><th>Step</th><th>What</th><th>Cost to the shop</th><th>What it proves</th></tr></thead>
+  <tbody>
+    <tr><td><b>1 — Timed trial</b><br><span class="small">now</span></td><td>One digital height gauge with USB output on the existing bench. <b>The application already has the timed trial built in</b>: start it, sort as usual, stop it, and it shows the real seconds per spring against 14.4 s, how long 1000 springs would take at that pace, and every stoppage counted separately.</td><td>One gauge</td><td>The real takt time of one station on real springs — the figure every later decision rests on. Nothing is bought against an assumed number.</td></tr>
+    <tr><td><b>2 — The manned line</b><br><span class="small">after the trial and quotations</span></td><td>Cleaning machine, conveyor, measuring station, lanes and paint — with people at the stations. The line's record, board and issuing in the application.</td><td>The purchases in section 5</td><td>250 an hour, sustained, on the shop floor, with every spring recorded.</td></tr>
+    <tr><td><b>3 — Automation where it pays</b><br><span class="small">only if step 2 shows it is worth it</span></td><td>Automatic measuring and routing where people are the constraint. The application does not change: it was never built to care whether a station is a person or a machine.</td><td>By station, on evidence</td><td>Fewer people for the same output.</td></tr>
+  </tbody>
+</table>
+
+<h2><span>7</span>Five things we need the CWM to decide</h2>
+<ol>
+  <li><b>What "needs repair" means for a spring.</b> The Wagon Maintenance Manual prescribes <i>replace</i>, not repair, for load‑bearing and snubber coil springs — none of the ten manuals shipped with the application describes a repair or reconditioning process for them. If re‑setting or re‑tempering is meant, that is heat‑treatment plant and a separate project; if a "repair lane" means a hold for re‑measurement, it is already in the design.</li>
+  <li><b>What the 1000‑in‑four‑hours is based on</b> — a normal day's springs done in half a shift, or clearing a backlog. It decides whether the line is built for 250 an hour all day or for a peak.</li>
+  <li><b>Cracks.</b> A person at station 4 finds what can be seen on a clean spring. Hidden cracks need magnetic‑particle or eddy‑current testing — a separate machine and a separate decision. <b>The application already records the reason for every condemnation</b>, so a few weeks of use will show how many springs are condemned for cracks rather than height, and whether that machine is worth buying.</li>
+  <li><b>BOXNS (LWLH25) and BLCA (LCCF20) springs.</b> WMM §309C gives them only a nominal and a condemning height — no bands, so no colour to paint and no band to group by. They can be judged serviceable or condemned on the line; how they should be grouped needs the shop's direction.</li>
+  <li><b>Where the line goes</b> — space in the spring section, power, and compressed air.</li>
+</ol>
+
+<h2><span>8</span>What we ask of the shop to begin</h2>
+<ul>
+  <li>Approval to run the <b>timed trial</b> at the existing bench, with one digital height gauge.</li>
+  <li>An inspector and a supervisor for two or three shifts of trial, and a place to put the gauge.</li>
+  <li>The answers to section 7 — the first two above all.</li>
+  <li>After the trial: a site walk of the spring section to fix the line's layout, and the shop's route for quotations.</li>
+</ul>
+<p class="small" style="margin-top:20px">Pratik Agarwal · pratik96agarwal@yahoo.com</p>
+
+</body>
+</html>
