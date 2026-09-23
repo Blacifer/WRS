@@ -16,7 +16,7 @@ import {
   type DiscrepancyRow, type AmberBoxFigures, type DailySummaryRow, type ShadowVerdict,
   type WhoWasRight, type DiscrepancyCause, type VerdictWord
 } from '../../../shared/analysis/shadowRun.ts';
-import { workedMinutes, ratePerHour, PLAUSIBLE_SPRINGS_PER_HOUR, PLAUSIBLE_ITEMS_PER_HOUR, IDLE_GAP_MINUTES, type Rate } from '../../../shared/analysis/workedTime.ts';
+import { workedMinutes, ratePerHour, plausibleSpringCeiling, isLineBatch, PLAUSIBLE_ITEMS_PER_HOUR, IDLE_GAP_MINUTES, type Rate } from '../../../shared/analysis/workedTime.ts';
 
 export interface DiscrepancyInput {
   occurredOn: string;
@@ -203,7 +203,7 @@ export class ShadowRepository {
     const until = new Date(Date.parse(since) + 86400_000).toISOString();
 
     const springs = this.db.prepare(`
-      SELECT created_at, inspector_id, status FROM spring_sorting_records
+      SELECT created_at, inspector_id, status, batch_id FROM spring_sorting_records
       WHERE created_at >= ? AND created_at < ? AND voided = 0
         AND NOT EXISTS (SELECT 1 FROM spring_sorting_records later WHERE later.supersedes = spring_sorting_records.id)
       ORDER BY created_at
@@ -242,7 +242,8 @@ export class ShadowRepository {
       amber: this.amberFigures(since, until),
       bench: {
         workedMinutes: Math.round(benchMinutes * 10) / 10,
-        springsPerHour: ratePerHour(allSprings.length, benchMinutes, PLAUSIBLE_SPRINGS_PER_HOUR),
+        // A day that includes a timed trial or a line run is judged against the line's ceiling.
+        springsPerHour: ratePerHour(allSprings.length, benchMinutes, plausibleSpringCeiling(springs.some((r) => isLineBatch(r.batch_id)) ? 'LINE' : 'BENCH')),
         inspectors: new Set(allSprings.map((r) => r.inspector_id)).size
       },
       checklists: {

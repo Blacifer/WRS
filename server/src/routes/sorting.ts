@@ -41,7 +41,7 @@ function bad(res: Response, message: string, code = 'VALIDATION_ERROR', status =
 // ---------------------------------------------------------------------------
 // POST /api/sorting/record — one sorted spring
 // ---------------------------------------------------------------------------
-sortingRouter.post('/record', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+sortingRouter.post('/record', authMiddleware, requireCapability('spring.record'), (req: AuthenticatedRequest, res: Response) => {
   try {
     const b = req.body || {};
     const bogieType = b.bogieType as SortingBogie;
@@ -264,7 +264,7 @@ sortingRouter.post('/record', authMiddleware, (req: AuthenticatedRequest, res: R
 // this appends a superseding record instead. Both survive, so the correction
 // is itself part of the trail.
 // ---------------------------------------------------------------------------
-sortingRouter.post('/batches/:batchId/undo', authMiddleware, (req: AuthenticatedRequest, res: Response) => {
+sortingRouter.post('/batches/:batchId/undo', authMiddleware, requireCapability('spring.correct'), (req: AuthenticatedRequest, res: Response) => {
   const batchId = req.params?.batchId;
   const actorId = req.user?.id;
 

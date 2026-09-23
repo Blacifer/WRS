@@ -29,6 +29,22 @@ export const IDLE_GAP_MINUTES = 15;
 export const PLAUSIBLE_SPRINGS_PER_HOUR = 200;
 export const PLAUSIBLE_ITEMS_PER_HOUR = 400;
 
+/*
+ * A timed trial or a staffed line is not one pair of hands at a bench. The
+ * CWM's target is 250 springs an hour (1000 in four hours, 14.4 s each), which
+ * the bench ceiling above would call fake on the day the evidence is taken.
+ * The line has its own ceiling instead of the bench's being raised: 400 an
+ * hour still catches seeded data, which is written at hundreds a SECOND, and
+ * the bench check keeps meaning what it meant.
+ */
+export const PLAUSIBLE_LINE_SPRINGS_PER_HOUR = 400;
+export type WorkMode = 'BENCH' | 'LINE';
+export const plausibleSpringCeiling = (mode: WorkMode): number =>
+  mode === 'LINE' ? PLAUSIBLE_LINE_SPRINGS_PER_HOUR : PLAUSIBLE_SPRINGS_PER_HOUR;
+
+/** A sorting batch opened as a timed trial or a line run, by the id the bench mints for it. */
+export const isLineBatch = (batchId: string | null | undefined): boolean => /^(trial|line)_/.test(String(batchId || ''));
+
 /** Total worked minutes across instants, splitting on idle gaps. One instant has no duration. */
 export function workedMinutes(instants: Array<string | number>): number {
   const t = instants.map((s) => (typeof s === 'number' ? s : Date.parse(s))).filter(Number.isFinite).sort((a, b) => a - b);

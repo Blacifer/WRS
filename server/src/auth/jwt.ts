@@ -14,6 +14,15 @@ export interface JwtPayload {
   name: string;
   iat?: number;
   exp?: number;
+  /**
+   * What kind of credential this is. Every token this function signs is a
+   * person's. A station PC or gauge on the spring line will one day carry
+   * its own token signed with the same secret; without this claim such a
+   * token would verify here and pass every route guarded by authMiddleware
+   * as if it were an inspector. Absent on tokens issued before this field
+   * existed, which are read as 'user' until they expire (24 h).
+   */
+  typ?: 'user';
 }
 
 function base64UrlEncode(str: string): string {
@@ -47,6 +56,7 @@ export function signToken(user: User, expiresInSeconds: number = 86400): string 
     username: user.username,
     role: user.role,
     name: user.name,
+    typ: 'user',
     iat: now,
     exp: now + expiresInSeconds
   };
@@ -98,7 +108,12 @@ export function verifyToken(token: string): JwtPayload | null {
 
   try {
     const payloadJson = base64UrlDecode(encodedPayload);
-    const payload = JSON.parse(payloadJson) as JwtPayload;
+    const payload = JSON.parse(payloadJson) as JwtPayload & { typ?: string };
+
+    // Only a person's token is a person's token. See JwtPayload.typ.
+    if (payload.typ !== undefined && payload.typ !== 'user') {
+      return null;
+    }
 
     const now = Math.floor(Date.now() / 1000);
     if (payload.exp && payload.exp < now) {

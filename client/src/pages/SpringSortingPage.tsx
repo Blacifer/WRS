@@ -40,6 +40,7 @@ import BlindSpringRead from '../components/BlindSpringRead.tsx';
 import TeachTheCamera from '../components/TeachTheCamera.tsx';
 import AutoSortBench from '../components/AutoSortBench.tsx';
 import { MyRecordToday } from '../components/MyRecordToday.tsx';
+import { TaktClock } from '../components/TaktClock.tsx';
 import type { SpringEvidenceHandle } from '../components/SpringEvidenceCamera.tsx';
 import type { PendingSortedSpring } from '../services/offlineDb.ts';
 
@@ -258,7 +259,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
    * longer knew about. It survives a reload and not a shift, which is the
    * same rule the active screen and the chosen gauge follow.
    */
-  const [batchId] = useState<string>(() => {
+  const [batchId, setBatchId] = useState<string>(() => {
     try {
       const saved = sessionStorage.getItem('wrs-sorting-batch');
       if (saved) return saved;
@@ -267,6 +268,23 @@ export function SpringSortingPage({ lang, onClose }: Props) {
     try { sessionStorage.setItem('wrs-sorting-batch', fresh); } catch { }
     return fresh;
   });
+  /*
+   * The timed trial. Instants (ms) of the springs recorded since Start; null
+   * when no trial runs. A trial is its own batch ("trial_…") so the shadow
+   * report judges that day against the line's rate ceiling, not the bench's.
+   * A reload keeps the batch but not the instants — the clock restarts.
+   */
+  const [trialInstants, setTrialInstants] = useState<number[] | null>(() => (batchId.startsWith('trial_') ? [] : null));
+  const [trialFinished, setTrialFinished] = useState<number[] | null>(null);
+  const [heightMeasured, setHeightMeasured] = useState('');
+  const newBatch = (prefix: 'batch' | 'trial') => {
+    const fresh = `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    try { sessionStorage.setItem('wrs-sorting-batch', fresh); } catch { }
+    setBatchId(fresh);
+  };
+  const startTrial = () => { newBatch('trial'); setTrialFinished(null); setTrialInstants([]); };
+  const stopTrial = () => { setTrialFinished(trialInstants); setTrialInstants(null); newBatch('batch'); };
+  const noteTrialSpring = () => setTrialInstants((xs) => (xs === null ? null : [...xs, Date.now()]));
   const [tallies, setTallies] = useState<Tally[]>([]);
   const [capacity, setCapacity] = useState<Capacity[]>([]);
   /*
@@ -438,7 +456,9 @@ export function SpringSortingPage({ lang, onClose }: Props) {
     height: number,
     band: string | null,
     condemned: boolean,
-    damageType: string | null = null
+    damageType: string | null = null,
+    /** True when the height came off an instrument (a gauge, typed or USB) rather than the strip's band midpoint. */
+    measured = false
   ) => {
     setBusy(true);
     setError(null);
@@ -454,7 +474,8 @@ export function SpringSortingPage({ lang, onClose }: Props) {
      * spring would be a chime with no verdict behind it.
      */
     const localVerdict = (() => {
-      if (banded || condemned) return null;
+      // A tapped band IS the answer; a measured height — any bogie — has to be judged.
+      if ((banded && !measured) || condemned) return null;
       try {
         return judgeSortedSpring({
           bogieType, condition, position, measuredHeight: height
@@ -466,8 +487,10 @@ export function SpringSortingPage({ lang, onClose }: Props) {
     const localStatus = condemned ? 'CONDEMNED' : localVerdict?.status ?? 'PASS';
     const localLabel = condemned
       ? (isHi ? 'कंडम' : 'Condemned')
-      : banded
+      : banded && !measured
         ? `${band}`
+        : banded && localVerdict?.status === 'PASS' && localVerdict.band
+          ? `${localVerdict.band} — ${height}mm`
         : localStatus === 'CONDEMNED'
           ? (isHi ? `कंडम — ${height}mm` : `Condemned — ${height}mm`)
           : (isHi ? `ठीक — ${height}mm` : `Serviceable — ${height}mm`);
@@ -479,7 +502,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         condition,
         springPosition: position,
         measuredFreeHeight: height,
-        heightIsApproximate: true,
+        heightIsApproximate: !measured,
         tappedBand: band,
         condemned: condemned || localStatus === 'CONDEMNED',
         damageType: damageType ?? undefined,
@@ -489,6 +512,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
       if (condemned || localStatus === 'CONDEMNED') playCondemnedBuzz();
       else playPassChime();
       setLastRecorded(localLabel);
+      noteTrialSpring();
       if (why) setError(null);
     };
 
@@ -525,12 +549,13 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         condition,
         springPosition: position,
         measuredFreeHeight: height,
-        heightIsApproximate: true,
+        heightIsApproximate: !measured,
         damageType: damageType ?? undefined,
         gaugeCode: gaugeCode || null
       });
       if (res.data.status === 'CONDEMNED') playCondemnedBuzz();
       else playPassChime();
+      noteTrialSpring();
 
       const flagged = (res.data as any).anomaly;
       setQueried(
@@ -620,6 +645,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         const taken = queued[queued.length - 1];
         await offlineDb.removePendingSorting(taken.clientTempId);
         await readPending();
+        setTrialInstants((xs) => (xs && xs.length ? xs.slice(0, -1) : xs));
         setUndoNotice(
           isHi
             ? `वापस लिया: ${taken.tappedBand || taken.measuredFreeHeight + 'mm'}`
@@ -662,6 +688,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
               .filter(Boolean).join(' · ')
           : null;
 
+        setTrialInstants((xs) => (xs && xs.length ? xs.slice(0, -1) : xs));
         setUndoNotice(
           left === 0
             ? (isHi
@@ -869,6 +896,15 @@ export function SpringSortingPage({ lang, onClose }: Props) {
         )}
       </div>
 
+      <TaktClock
+        lang={isHi ? 'hi' : 'en'}
+        instants={trialInstants}
+        finished={trialFinished}
+        onStart={startTrial}
+        onStop={stopTrial}
+        busy={pendingCount > 0}
+      />
+
       {/* The work itself: one tap per spring */}
       <div className="rounded-card border border-line bg-card p-5 space-y-3">
         <p className="text-sm font-bold text-white">
@@ -907,6 +943,11 @@ export function SpringSortingPage({ lang, onClose }: Props) {
                 step="0.5"
                 value={heightInput}
                 onChange={(e) => setHeightInput(e.target.value)}
+                onKeyDown={async (e) => {
+                  if (e.key !== 'Enter' || busy || heightInput.trim() === '' || !Number.isFinite(Number(heightInput))) return;
+                  const h = Number(heightInput); setHeightInput('');
+                  await record(h, null, false, null, true);
+                }}
                 placeholder={isHi ? 'मिमी' : 'mm'}
                 className="flex-1 min-h-[68px] bg-raised border-2 border-line rounded-control px-4 text-2xl font-extrabold text-white tabular-nums"
               />
@@ -915,7 +956,7 @@ export function SpringSortingPage({ lang, onClose }: Props) {
                 disabled={busy || !Number.isFinite(Number(heightInput)) || heightInput.trim() === ''}
                 onClick={async () => {
                   const h = Number(heightInput);
-                  await record(h, null, false);
+                  await record(h, null, false, null, true);
                   setHeightInput('');
                 }}
                 className="min-h-[68px] px-6 rounded-control bg-white text-black font-extrabold text-sm disabled:opacity-40 active:scale-95 transition-transform"
@@ -923,6 +964,41 @@ export function SpringSortingPage({ lang, onClose }: Props) {
                 {isHi ? 'दर्ज करें' : 'Record'}
               </button>
             </div>
+          </div>
+        )}
+
+        {/*
+          A measured height, for a banded bogie too. A USB height gauge types
+          its reading and Enter into whatever has focus, so the spring is
+          recorded with no tap and the server judges the band from the real
+          figure — the path the spring line's measuring station will use.
+          Not "approximate": this is an instrument reading, not a midpoint.
+        */}
+        {banded && (
+          <div className="flex gap-2.5 items-stretch" data-testid="measured-height-row">
+            <input
+              data-testid="measured-height-input"
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              value={heightMeasured}
+              onChange={(e) => setHeightMeasured(e.target.value)}
+              onKeyDown={async (e) => {
+                if (e.key !== 'Enter' || busy || heightMeasured.trim() === '' || !Number.isFinite(Number(heightMeasured))) return;
+                const h = Number(heightMeasured); setHeightMeasured('');
+                await record(h, null, false, null, true);
+              }}
+              placeholder={isHi ? 'या नापी ऊँचाई (मिमी) — गेज यहाँ टाइप करता है' : 'Or a measured height (mm) — a USB gauge types here'}
+              className="flex-1 min-h-[52px] bg-raised border border-line rounded-control px-4 text-lg font-bold text-white tabular-nums placeholder:text-ink-faint placeholder:text-sm placeholder:font-normal"
+            />
+            <button
+              data-testid="record-measured-height"
+              disabled={busy || heightMeasured.trim() === '' || !Number.isFinite(Number(heightMeasured))}
+              onClick={async () => { const h = Number(heightMeasured); setHeightMeasured(''); await record(h, null, false, null, true); }}
+              className="min-h-[52px] px-5 rounded-control border border-line-strong text-white font-bold text-sm disabled:opacity-40"
+            >
+              {isHi ? 'दर्ज करें' : 'Record'}
+            </button>
           </div>
         )}
 
